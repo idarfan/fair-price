@@ -1,0 +1,6 @@
+<% content_for(:title) { "新增通知 — FairPrice" } %>
+<%= render StockAlert::AlertFormComponent.new(
+      alert:  @alert,
+      action: watchlist_path,
+      method: "post"
+    ) %>

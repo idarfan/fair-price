@@ -1,0 +1,22 @@
+<% content_for :title, "FairPrice — 美股公允價值分析" %>
+
+<div class="max-w-xl mx-auto space-y-6 mt-10">
+  <% if flash[:error] || flash.now[:error] %>
+    <%= render FairValue::AlertComponent.new(
+          message: flash[:error] || flash.now[:error],
+          type:    (flash.now[:alert_type] || :error).to_sym
+        ) %>
+  <% end %>
+
+  <%= render FairValue::SearchBarComponent.new(
+        ticker:             @ticker.to_s,
+        discount_rate:      @discount_rate.to_f,
+        show_discount_rate: true,
+        autofocus:          true
+      ) %>
+
+  <div class="text-center text-sm text-gray-400 space-y-1">
+    <p>輸入美股代號，即可取得深度估值分析報告</p>
+    <p class="text-xs">數據來源：Finnhub｜支援 NYSE / NASDAQ 上市股票</p>
+  </div>
+</div>

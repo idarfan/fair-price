@@ -1,0 +1,97 @@
+<% content_for :title, "#{@ticker} | FairPrice" %>
+<% stock    = @stock %>
+<% analysis = @analysis %>
+
+<div class="space-y-5">
+
+  <%# Stock Header %>
+  <%= render FairValue::StockHeaderComponent.new(
+        symbol:              stock[:symbol],
+        name:                stock[:name],
+        sector:              stock[:sector],
+        industry:            stock[:industry],
+        exchange:            stock[:exchange],
+        currency:            stock[:currency],
+        current_price:       stock[:current_price],
+        fifty_two_week_low:  stock[:fifty_two_week_low],
+        fifty_two_week_high: stock[:fifty_two_week_high],
+        show_52_week_range:  true
+      ) %>
+
+  <%# Fair Value Summary %>
+  <%= render FairValue::FairValueSummaryComponent.new(
+        fair_value_low:   analysis[:fair_value_low],
+        fair_value_high:  analysis[:fair_value_high],
+        current_price:    stock[:current_price],
+        currency:         stock[:currency],
+        stock_type:       analysis[:stock_type],
+        growth_rate:      analysis[:growth_rate],
+        growth_rate_note: analysis[:growth_rate_note],
+        judgment:         analysis[:judgment],
+        show_details:     true
+      ) %>
+
+  <%# Valuation Methods Table %>
+  <%= render FairValue::ValuationTableComponent.new(
+        valuations:      analysis[:valuation_methods],
+        current_price:   stock[:current_price],
+        currency:        stock[:currency],
+        show_formulas:   false,
+        caption:         "估值方法彙整",
+        highlight_first: true
+      ) %>
+
+  <%# Methodology Note — 為何採用此估值方法 %>
+  <%= render FairValue::MethodologyNoteComponent.new(
+        stock_type:           analysis[:stock_type],
+        stock_type_rationale: analysis[:stock_type_rationale],
+        valuation_methods:    analysis[:valuation_methods],
+        growth_rate:          analysis[:growth_rate],
+        growth_rate_note:     analysis[:growth_rate_note],
+        expanded:             false
+      ) %>
+
+  <%# Analyst Consensus — 分析師評級 %>
+  <%= render FairValue::AnalystConsensusComponent.new(
+        consensus: stock[:analyst_consensus],
+        symbol:    stock[:symbol]
+      ) %>
+
+  <%# Key Fundamentals Grid %>
+  <% fundamentals = [
+       { label: "EPS (TTM)",     value: stock[:eps_ttm],          format: :currency, currency: stock[:currency], icon: "💰" },
+       { label: "每股淨值",      value: stock[:book_value],        format: :currency, currency: stock[:currency], icon: "📚" },
+       { label: "ROE",           value: stock[:roe],               format: :percent,  decimals: 1, icon: "📈",
+         highlight: stock[:roe] ? (stock[:roe] > 0 ? :positive : :negative) : nil },
+       { label: "股息/股 (TTM)", value: stock[:dividend_rate],     format: :currency, currency: stock[:currency], icon: "💵" },
+       { label: "盈餘成長 YoY", value: stock[:earnings_growth],   format: :percent,  decimals: 1, icon: "📊" },
+       { label: "營收成長 YoY", value: stock[:revenue_growth],    format: :percent,  decimals: 1, icon: "📊" },
+     ] %>
+  <%= render FairValue::MetricsGridComponent.new(
+        metrics: fundamentals,
+        title:   "基本財務指標",
+        columns: 3
+      ) %>
+
+  <%# Scale metrics %>
+  <% scale_metrics = [
+       { label: "流通股數",   value: stock[:shares_outstanding], format: :large, currency: stock[:currency], icon: "🔢" },
+       { label: "總營收",     value: stock[:total_revenue],      format: :large, currency: stock[:currency], icon: "💹" },
+       { label: "自由現金流", value: stock[:free_cashflow],      format: :large, currency: stock[:currency], icon: "🏦" },
+       { label: "EBITDA",     value: stock[:ebitda],             format: :large, currency: stock[:currency], icon: "📉" },
+     ] %>
+  <%= render FairValue::MetricsGridComponent.new(
+        metrics:    scale_metrics,
+        title:      "規模指標",
+        columns:    4,
+        show_empty: false
+      ) %>
+
+  <%# Disclaimer %>
+  <div class="text-xs text-gray-400 bg-gray-100 rounded-xl p-4">
+    <p class="font-medium text-gray-500 mb-1">⚠️ 免責聲明</p>
+    <p>本分析僅供參考，不構成任何投資建議。所有估值模型均基於歷史財務數據與假設，實際結果可能有重大差異。投資有風險，請自行判斷。</p>
+    <p class="mt-1">折現率：<strong><%= @discount_rate %>%</strong>｜類型：<strong><%= analysis[:stock_type] %></strong>｜數據日期：即時報價（<%= Time.current.strftime("%Y-%m-%d") %>）</p>
+  </div>
+
+</div>

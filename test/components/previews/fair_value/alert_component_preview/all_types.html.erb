@@ -1,0 +1,6 @@
+<div class="space-y-3">
+  <%= render FairValue::AlertComponent.new(message: "找不到股票：INVALID（請確認代號正確）", type: :error, title: "查詢失敗") %>
+  <%= render FairValue::AlertComponent.new(message: "API 金鑰即將到期，請至 Finnhub 更新設定", type: :warning, title: "注意") %>
+  <%= render FairValue::AlertComponent.new(message: "數據來源 Finnhub，每分鐘最多 60 次查詢", type: :info) %>
+  <%= render FairValue::AlertComponent.new(message: "分析完成：AAPL Apple Inc.", type: :success) %>
+</div>

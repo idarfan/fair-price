@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <title><%= content_for(:title).presence || "FairPrice" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.css">
+    <script src="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.min.js"></script>
+    <script>
+      NProgress.configure({ showSpinner: false, speed: 300, minimum: 0.15 });
+      document.addEventListener('DOMContentLoaded', function () {
+        NProgress.done();
+        document.addEventListener('click', function (e) {
+          var link = e.target.closest('a[href]');
+          if (!link) return;
+          var href = link.getAttribute('href');
+          if (!href || href.startsWith('#') || href.startsWith('javascript') || link.target === '_blank') return;
+          NProgress.start(); NProgress.set(0.4);
+        });
+        document.addEventListener('submit', function () {
+          NProgress.start(); NProgress.set(0.4);
+        });
+      });
+    </script>
+  </head>
+  <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
+
+    <%= render FairValue::NavbarComponent.new(
+          ticker:        @ticker,
+          discount_rate: @discount_rate.to_f,
+          show_search:   @ticker.present?
+        ) %>
+
+    <main class="flex-1 overflow-y-auto px-6 py-6">
+      <% if flash[:notice] %>
+        <div class="mb-4 px-4 py-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg flex items-center gap-2">
+          <span>✅</span><span><%= flash[:notice] %></span>
+        </div>
+      <% end %>
+      <% if flash[:alert] %>
+        <div class="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg flex items-center gap-2">
+          <span>⚠️</span><span><%= flash[:alert] %></span>
+        </div>
+      <% end %>
+      <div class="max-w-7xl mx-auto">
+        <%= yield %>
+      </div>
+    </main>
+
+    <footer class="border-t border-gray-200 bg-white py-4">
+      <p class="text-center text-xs text-gray-400">
+        FairPrice — 數據來源 Finnhub ｜ 僅供參考，不構成投資建議
+      </p>
+    </footer>
+
+  </body>
+</html>

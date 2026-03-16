@@ -1,0 +1,6 @@
+<% content_for :title, "Portfolio | FairPrice" %>
+
+<%= render Portfolio::HoldingListComponent.new(
+      holdings: @holdings,
+      quotes:   @quotes
+    ) %>

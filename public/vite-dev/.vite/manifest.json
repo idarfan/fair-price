@@ -1,0 +1,14 @@
+{
+  "entrypoints/application.js": {
+    "file": "assets/application-DBfCPIOZ.js",
+    "name": "entrypoints/application.js",
+    "src": "entrypoints/application.js",
+    "isEntry": true
+  },
+  "entrypoints/application.jsx": {
+    "file": "assets/application-C6BVm-uy.js",
+    "name": "entrypoints/application.jsx",
+    "src": "entrypoints/application.jsx",
+    "isEntry": true
+  }
+}

@@ -1,0 +1,10 @@
+<% content_for(:title) { "到價通知 — FairPrice" } %>
+<%= render StockAlert::AlertListComponent.new(alerts: @alerts, market_data: @market_data) %>
+<script>
+  // Confirm before delete
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    var msg  = form.dataset.confirmDelete;
+    if (msg && !confirm(msg)) e.preventDefault();
+  });
+</script>
