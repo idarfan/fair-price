@@ -5,10 +5,10 @@
     "src": "entrypoints/application.js",
     "isEntry": true
   },
-  "entrypoints/application.jsx": {
-    "file": "assets/application-C6BVm-uy.js",
-    "name": "entrypoints/application.jsx",
-    "src": "entrypoints/application.jsx",
+  "entrypoints/ownership.tsx": {
+    "file": "assets/ownership-C_PNJjdz.js",
+    "name": "entrypoints/ownership.tsx",
+    "src": "entrypoints/ownership.tsx",
     "isEntry": true
   }
 }

@@ -48,6 +48,11 @@ Rails.application.routes.draw do
   patch "momentum/watchlist/:id",         to: "watchlist_items#update",     as: :momentum_watchlist_item
   delete "momentum/watchlist/:id",        to: "watchlist_items#destroy"
 
+  # Ownership Structure
+  get  "ownership",         to: "ownership#index",   as: :ownership
+  get  "ownership/history", to: "ownership#history", as: :ownership_history
+  post "ownership/fetch",   to: "ownership#fetch",   as: :ownership_fetch
+
   # Flight Expert
   get  "flight",       to: "flight#index", as: :flight
   post "flight/chat",  to: "flight#chat",  as: :flight_chat

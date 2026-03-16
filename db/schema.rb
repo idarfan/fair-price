@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_13_000002) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_16_062750) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -29,6 +29,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_13_000002) do
     t.datetime "updated_at", null: false
     t.index ["flight_conversation_id", "created_at"], name: "index_flight_messages_on_flight_conversation_id_and_created_at"
     t.index ["flight_conversation_id"], name: "index_flight_messages_on_flight_conversation_id"
+  end
+
+  create_table "ownership_snapshots", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "fetched_at", null: false
+    t.decimal "insiders_pct", precision: 5, scale: 2
+    t.integer "institutions_count"
+    t.decimal "institutions_float_pct", precision: 5, scale: 2
+    t.decimal "institutions_pct", precision: 5, scale: 2
+    t.string "source"
+    t.string "symbol", null: false
+    t.jsonb "top_holders", default: []
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "fetched_at"], name: "index_ownership_snapshots_on_symbol_and_fetched_at"
+    t.index ["symbol"], name: "index_ownership_snapshots_on_symbol"
   end
 
   create_table "portfolios", force: :cascade do |t|

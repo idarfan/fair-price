@@ -26,6 +26,21 @@
         });
       });
     </script>
+    <%= vite_client_tag %>
+    <%= vite_javascript_tag 'application' %>
+    <% if controller_name == 'ownership' %>
+      <%= vite_javascript_tag 'ownership.tsx' %>
+    <% end %>
+    <!--
+      If using a TypeScript entrypoint file:
+        vite_typescript_tag 'application'
+
+      If using a .jsx or .tsx entrypoint, add the extension:
+        vite_javascript_tag 'application.jsx'
+
+      Visit the guide for more information: https://vite-ruby.netlify.app/guide/rails
+    -->
+
   </head>
   <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
 
@@ -46,9 +61,13 @@
           <span>⚠️</span><span><%= flash[:alert] %></span>
         </div>
       <% end %>
-      <div class="max-w-7xl mx-auto">
+      <% if controller_name == 'ownership' %>
         <%= yield %>
-      </div>
+      <% else %>
+        <div class="max-w-7xl mx-auto">
+          <%= yield %>
+        </div>
+      <% end %>
     </main>
 
     <footer class="border-t border-gray-200 bg-white py-4">

@@ -52,6 +52,23 @@ bundle exec rubocop -a   # 自動修正
 
 ## 變更記錄
 
+### 2026-03-16 — 新增「持股結構」工具（Vite + React + PostgreSQL 歷史快照）
+
+**動機：** 提供 Watchlist 股票的持股結構歷史追蹤，可查看機構持股% 與內部人持股% 隨時間的變化趨勢。
+
+**異動內容：**
+- `db/migrate/*_create_ownership_snapshots.rb`：新增 `ownership_snapshots` 資料表（symbol、機構持股%、內部人持股%、top_holders JSONB、fetched_at）
+- `app/models/ownership_snapshot.rb`：新增 Model，含 `history_for`、`latest_for` 類別方法
+- `app/controllers/ownership_controller.rb`：新增 Controller，提供 index/history/fetch 三個 action
+- `config/routes.rb`：新增 `/ownership`、`/ownership/history`、`/ownership/fetch` 路由
+- `app/frontend/ownership/`：Vite + React 前端（OwnershipApp、SymbolList、OwnershipPanel、OwnershipChart），使用 Recharts 繪製折線圖
+- `app/frontend/entrypoints/ownership.tsx`：React 掛載點
+- `app/components/ownership/page_component.rb`：Phlex shell（渲染 `#ownership-root` 掛載 div）
+- `app/views/layouts/application.html.erb`：條件性載入 ownership.tsx bundle
+- `app/components/fair_value/app_switcher_component.rb`：Sidebar 新增「🏦 持股結構」入口
+- `config/initializers/content_security_policy.rb`：開發環境啟用 Vite HMR（unsafe_eval + WebSocket）
+- `Gemfile`：新增 `vite_rails ~> 3.0`
+
 ### 2026-03-16 — 安全性強化：CSP 啟用、ValuationService 測試、open_timeout 修正
 
 **動機：** Rails 審計發現三項安全/品質問題：CSP header 未啟用、核心估值邏輯 0% 測試覆蓋率、Anthropic API 連線無 open_timeout 可能永久阻塞 worker。
