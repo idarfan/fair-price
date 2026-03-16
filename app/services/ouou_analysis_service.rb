@@ -43,7 +43,7 @@ class OuouAnalysisService
     uri     = URI(ANTHROPIC_API)
     request = build_http_request(uri, prompt)
 
-    Net::HTTP.start(uri.host, uri.port, use_ssl: true, read_timeout: 120) do |http|
+    Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 10, read_timeout: 120) do |http|
       http.request(request) do |response|
         response.read_body do |chunk|
           parse_sse_chunk(chunk, &block)

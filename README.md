@@ -52,6 +52,15 @@ bundle exec rubocop -a   # 自動修正
 
 ## 變更記錄
 
+### 2026-03-16 — 安全性強化：CSP 啟用、ValuationService 測試、open_timeout 修正
+
+**動機：** Rails 審計發現三項安全/品質問題：CSP header 未啟用、核心估值邏輯 0% 測試覆蓋率、Anthropic API 連線無 open_timeout 可能永久阻塞 worker。
+
+**異動內容：**
+- `config/initializers/content_security_policy.rb`：啟用 Content Security Policy，設定 `default_src :self`、`script_src/style_src` 允許 `cdn.jsdelivr.net` 及 `unsafe_inline`（NProgress inline script）、`connect_src :self`（SSE streaming）、`object_src/frame_ancestors :none`
+- `app/services/ouou_analysis_service.rb`：`Net::HTTP.start` 加入 `open_timeout: 10`，防止 Anthropic API 不可達時 worker 永久阻塞
+- `spec/services/valuation_service_spec.rb`：新增 ValuationService 測試，33 個 examples 涵蓋股票分類、成長率估算、估值方法選擇、nil 邊界條件、整合測試及 judgment 判斷邏輯
+
 ### 2026-03-12 — Portfolio 持股點擊浮動面板（機構/大戶持股佔比）
 
 **動機：** 讓使用者在持股頁面快速查閱任意股票的機構持股比例與主要大戶名單，無需離開頁面。
