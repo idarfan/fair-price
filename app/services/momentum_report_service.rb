@@ -44,28 +44,33 @@ class MomentumReportService
   end
 
   # ── Watchlist stocks ────────────────────────────────────────────────────
+  # 每批最多 5 支平行抓取，避免同時發出過多 Finnhub 請求觸發 rate limit。
   def fetch_stocks
-    @symbols.map { |symbol| Thread.new { fetch_stock(symbol) } }
-            .filter_map(&:value)
+    @symbols.each_slice(5).flat_map do |batch|
+      batch.map { |symbol| Thread.new { fetch_stock(symbol) } }
+           .filter_map(&:value)
+    end
   end
 
   def fetch_stock(symbol)
-    quote = @finnhub.quote(symbol)
-    return nil if quote.nil? || quote["c"].to_f.zero?
+    Rails.cache.fetch("momentum_quote:#{symbol}", expires_in: 60.seconds) do
+      quote = @finnhub.quote(symbol)
+      next nil if quote.nil? || quote["c"].to_f.zero?
 
-    candle_data = fetch_candles(symbol)
-    {
-      symbol:     symbol,
-      name:       nil,
-      price:      quote["c"].to_f,
-      change:     quote["d"].to_f,
-      change_pct: quote["dp"].to_f / 100.0,
-      volume:     candle_data[:volume],
-      day_high:   quote["h"].to_f.nonzero?,
-      day_low:    quote["l"].to_f.nonzero?,
-      high_52w:   candle_data[:high_52w],
-      low_52w:    candle_data[:low_52w]
-    }
+      candle_data = fetch_candles(symbol)
+      {
+        symbol:     symbol,
+        name:       nil,
+        price:      quote["c"].to_f,
+        change:     quote["d"].to_f,
+        change_pct: quote["dp"].to_f / 100.0,
+        volume:     candle_data[:volume],
+        day_high:   quote["h"].to_f.nonzero?,
+        day_low:    quote["l"].to_f.nonzero?,
+        high_52w:   candle_data[:high_52w],
+        low_52w:    candle_data[:low_52w]
+      }
+    end
   end
 
   def fetch_futures_change(symbol)
@@ -80,28 +85,6 @@ class MomentumReportService
     { high_52w: result[:high_52w], low_52w: result[:low_52w], volume: result[:volume] }
   end
 
-  # ── Market news ─────────────────────────────────────────────────────────
-  def fetch_news
-    items      = @finnhub.market_news(count: 6)
-    translator = TranslationService.new
-
-    # Translate all headlines in parallel to minimise latency
-    threads = items.map do |item|
-      Thread.new do
-        {
-          headline: translator.translate(item["headline"]),
-          source:   item["source"],
-          url:      item["url"],
-          datetime: format_epoch(item["datetime"])
-        }
-      end
-    end
-    threads.map(&:value)
-  rescue StandardError => e
-    Rails.logger.warn("[MomentumReport] News fetch failed: #{e.message}")
-    []
-  end
-
   # ── Earnings calendar (next 7 days) ─────────────────────────────────────
   def fetch_upcoming_earnings
     from_date = Date.current.to_s
@@ -113,12 +96,6 @@ class MomentumReportService
   rescue StandardError => e
     Rails.logger.warn("[MomentumReport] Earnings fetch failed: #{e.message}")
     []
-  end
-
-  def format_epoch(epoch)
-    return nil unless epoch
-
-    Time.at(epoch.to_i).in_time_zone("Taipei").strftime("%m/%d %H:%M")
   end
 
   def yaml_symbols

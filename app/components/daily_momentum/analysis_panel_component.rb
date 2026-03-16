@@ -133,8 +133,17 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
             source.onerror = function () {
               source.close();
               if (typeof NProgress !== 'undefined') NProgress.done();
+              loaded[symbol] = false;
               if (!buffer) {
-                panel.innerHTML = '<p class="py-4 text-center text-red-400 text-sm">分析失敗，請稍後再試</p>';
+                panel.innerHTML =
+                  '<div class="py-6 text-center">' +
+                    '<p class="text-red-400 text-sm mb-3">串流中斷，請重試</p>' +
+                    '<button type="button" data-retry-analysis="' + symbol + '" ' +
+                      'class="px-4 py-1.5 text-xs font-medium bg-indigo-50 text-indigo-600 ' +
+                      'rounded-full border border-indigo-200 hover:bg-indigo-100 transition-colors">' +
+                      '🔄 重新分析' +
+                    '</button>' +
+                  '</div>';
               }
             };
           }
@@ -174,8 +183,10 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
               });
           }
 
-          // ── Export handlers ────────────────────────────────────────────
+          // ── Retry / Export handlers ────────────────────────────────────
           document.addEventListener('click', function (e) {
+            var retryBtn = e.target.closest('[data-retry-analysis]');
+            if (retryBtn) { startAnalysis(retryBtn.dataset.retryAnalysis); return; }
             var pngBtn = e.target.closest('[data-export-png]');
             if (pngBtn) { exportPng(pngBtn.dataset.exportPng); return; }
             var pdfBtn = e.target.closest('[data-export-pdf]');

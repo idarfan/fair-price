@@ -62,8 +62,8 @@ class DailyMomentum::WatchlistManagerComponent < ApplicationComponent
         th(class: "px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide") { plain("股票") }
         th(class: "px-4 py-2.5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide") { plain("現價") }
         th(class: "px-4 py-2.5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide") { plain("漲跌") }
-        th(class: "px-4 py-2.5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide") { plain("成交量") }
-        th(class: "px-4 py-2.5 text-xs font-semibold text-gray-400 uppercase tracking-wide") { plain("價格區間") }
+        th(class: "px-4 py-2.5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell") { plain("成交量") }
+        th(class: "px-4 py-2.5 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell") { plain("價格區間") }
         th(class: "px-2 py-2.5 w-16")
       end
     end
@@ -144,11 +144,11 @@ class DailyMomentum::WatchlistManagerComponent < ApplicationComponent
 
       td(class: "px-4 py-3 text-right") { render_change(stock) }
 
-      td(class: "px-4 py-3 text-right text-gray-500") do
+      td(class: "px-4 py-3 text-right text-gray-500 hidden md:table-cell") do
         plain(stock&.dig(:volume) ? fmt_large(stock[:volume].to_f) : "—")
       end
 
-      td(class: "px-4 py-3 text-sm text-gray-500") do
+      td(class: "px-4 py-3 text-sm text-gray-500 hidden md:table-cell") do
         render_range(stock)
       end
 

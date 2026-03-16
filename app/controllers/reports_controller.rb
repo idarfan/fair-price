@@ -117,9 +117,9 @@ class ReportsController < ApplicationController
   def derive_stance(vix)
     return :cash if vix.nil?
 
-    if    vix < 16  then :aggressive
-    elsif vix <= 22 then :conservative
-    else                 :cash
+    if    vix < MomentumThresholds::VIX_AGGRESSIVE_MAX   then :aggressive
+    elsif vix <= MomentumThresholds::VIX_CONSERVATIVE_MAX then :conservative
+    else                                                        :cash
     end
   end
 end

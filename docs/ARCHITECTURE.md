@@ -143,7 +143,7 @@ ReportsController#index
 ReportsController#analysis（SSE endpoint）
   └── OuouAnalysisService#call
         ├── [Cache hit]  Rails.cache 讀取 → 直接 yield 全文（TTL 3 小時）
-        └── [Cache miss] Anthropic Claude API（claude-sonnet-4-6）
+        └── [Cache miss] Anthropic Claude API（claude-opus-4-6）
               → 組合 prompt（含 Ruby 預建 Markdown 表格）
               → SSE 串流逐 chunk yield
               → 串流完成後寫入 Rails.cache

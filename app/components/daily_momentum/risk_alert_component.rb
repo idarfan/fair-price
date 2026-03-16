@@ -70,9 +70,9 @@ class DailyMomentum::RiskAlertComponent < ApplicationComponent
   def vix_note
     return "無資料" if @vix.nil?
 
-    if    @vix < 16  then "市場平靜，可積極操作"
-    elsif @vix <= 22 then "中度波動，謹慎為宜"
-    else                  "高度恐慌，建議觀望"
+    if    @vix < MomentumThresholds::VIX_AGGRESSIVE_MAX   then "市場平靜，可積極操作"
+    elsif @vix <= MomentumThresholds::VIX_CONSERVATIVE_MAX then "中度波動，謹慎為宜"
+    else                                                         "高度恐慌，建議觀望"
     end
   end
 end
