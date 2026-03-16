@@ -31,16 +31,6 @@
     <% if controller_name == 'ownership' %>
       <%= vite_javascript_tag 'ownership.tsx' %>
     <% end %>
-    <!--
-      If using a TypeScript entrypoint file:
-        vite_typescript_tag 'application'
-
-      If using a .jsx or .tsx entrypoint, add the extension:
-        vite_javascript_tag 'application.jsx'
-
-      Visit the guide for more information: https://vite-ruby.netlify.app/guide/rails
-    -->
-
   </head>
   <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
 
@@ -50,31 +40,33 @@
           show_search:   @ticker.present?
         ) %>
 
-    <main class="flex-1 overflow-y-auto px-6 py-6">
-      <% if flash[:notice] %>
-        <div class="mb-4 px-4 py-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg flex items-center gap-2">
-          <span>✅</span><span><%= flash[:notice] %></span>
-        </div>
-      <% end %>
-      <% if flash[:alert] %>
-        <div class="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg flex items-center gap-2">
-          <span>⚠️</span><span><%= flash[:alert] %></span>
-        </div>
-      <% end %>
-      <% if controller_name == 'ownership' %>
+    <% if controller_name == 'ownership' %>
+      <main class="flex-1 overflow-hidden flex flex-col">
         <%= yield %>
-      <% else %>
+      </main>
+    <% else %>
+      <main class="flex-1 overflow-y-auto px-6 py-6">
+        <% if flash[:notice] %>
+          <div class="mb-4 px-4 py-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg flex items-center gap-2">
+            <span>✅</span><span><%= flash[:notice] %></span>
+          </div>
+        <% end %>
+        <% if flash[:alert] %>
+          <div class="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg flex items-center gap-2">
+            <span>⚠️</span><span><%= flash[:alert] %></span>
+          </div>
+        <% end %>
         <div class="max-w-7xl mx-auto">
           <%= yield %>
         </div>
-      <% end %>
-    </main>
+      </main>
 
-    <footer class="border-t border-gray-200 bg-white py-4">
-      <p class="text-center text-xs text-gray-400">
-        FairPrice — 數據來源 Finnhub ｜ 僅供參考，不構成投資建議
-      </p>
-    </footer>
+      <footer class="border-t border-gray-200 bg-white py-4">
+        <p class="text-center text-xs text-gray-400">
+          FairPrice — 數據來源 Finnhub ｜ 僅供參考，不構成投資建議
+        </p>
+      </footer>
+    <% end %>
 
   </body>
 </html>

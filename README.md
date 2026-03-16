@@ -52,6 +52,29 @@ bundle exec rubocop -a   # 自動修正
 
 ## 變更記錄
 
+### 2026-03-16 — 持股結構資料修正與 UX 調整
+
+**動機：** 修正 Yahoo Finance 回傳的持股百分比顯示錯誤、機構數量欄位名稱錯誤，並調整 UX 為手動更新模式。
+
+**異動內容：**
+- `app/services/yahoo_finance_service.rb`：修正 `pct_to_f` 將 0~1 小數 ×100 轉為百分比；修正 `institutionsCount` 欄位名稱；`pctChange` 同步換算
+- `app/controllers/api/v1/ownership_snapshots_controller.rb`：時間範圍改為 1w/1m/90d；`pct_change` 加入 holder 序列化
+- `app/frontend/ownership/OwnershipApp.tsx`：左側點擊只切換股票，不自動抓取；加「更新快照」手動按鈕
+- `app/frontend/ownership/components/TimeRangeSelector.tsx`：範圍改為週/月/90天
+- DB schema：唯一鍵恢復為 `ticker + quarter`（每季一筆，重複更新同一筆）
+
+### 2026-03-16 — 持股結構改版：趨勢追蹤、季度比較、機構持有人詳表
+
+**動機：** 將持股結構從「單一快照」升級為「趨勢追蹤」，支援季度對比、時間範圍篩選、機構持有人季度變化分析。
+
+**異動內容：**
+- `db/migrate/*_redesign_ownership_schema.rb`：重建 `ownership_snapshots`（ticker + quarter unique）+ 新增 `ownership_holders` 資料表
+- `app/models/ownership_snapshot.rb` / `ownership_holder.rb`：改寫 Model，建立 has_many 關聯
+- `app/services/ownership_snapshot_service.rb`：新建 Service，封裝 upsert / load_history / previous_snapshot 邏輯
+- `app/controllers/api/v1/ownership_snapshots_controller.rb`：新增 JSON API，支援 `?range=90d|1q|6m|1y`
+- `config/routes.rb`：新增 API 路由 `GET/POST /api/v1/ownership_snapshots/:ticker`
+- `app/frontend/ownership/`：全面改版，新增 MetricCards、TimeRangeSelector、OwnershipTrendChart（ComposedChart + Area）、HoldersTable（季度變化 + NEW badge）、utils/format.ts
+
 ### 2026-03-16 — 新增「持股結構」工具（Vite + React + PostgreSQL 歷史快照）
 
 **動機：** 提供 Watchlist 股票的持股結構歷史追蹤，可查看機構持股% 與內部人持股% 隨時間的變化趨勢。

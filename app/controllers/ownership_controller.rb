@@ -8,41 +8,32 @@ class OwnershipController < ApplicationController
   end
 
   def history
-    symbol    = sanitize_symbol(params[:symbol])
-    snapshots = OwnershipSnapshot.history_for(symbol, limit: 30)
+    ticker    = sanitize_symbol(params[:symbol])
+    snapshots = service.load_history(ticker)
 
     render json: {
-      symbol:    symbol,
+      symbol:    ticker,
       snapshots: snapshots.map { |s| serialize_snapshot(s) }
     }
   end
 
   def fetch
-    symbol = sanitize_symbol(params[:symbol])
-    data   = YahooFinanceService.new.holders(symbol) ||
-             SecEdgarService.new.holders(symbol)
+    ticker = sanitize_symbol(params[:symbol])
+    data   = YahooFinanceService.new.holders(ticker) ||
+             SecEdgarService.new.holders(ticker)
 
     unless data
-      render json: { error: "無法取得 #{symbol} 的持股資料" }, status: :unprocessable_content
+      render json: { error: "無法取得 #{ticker} 的持股資料" }, status: :unprocessable_content
       return
     end
 
-    summary  = data[:summary] || {}
-    snapshot = OwnershipSnapshot.create!(
-      symbol:                 symbol,
-      fetched_at:             Time.current,
-      institutions_pct:       summary[:institutions_pct],
-      insiders_pct:           summary[:insiders_pct],
-      institutions_float_pct: summary[:institutions_float_pct],
-      institutions_count:     summary[:institutions_count],
-      top_holders:            data[:top_holders] || [],
-      source:                 data[:source]
-    )
-
+    snapshot = service.save_snapshot(ticker, data)
     render json: serialize_snapshot(snapshot), status: :created
   end
 
   private
+
+  def service = OwnershipSnapshotService.new
 
   def sanitize_symbol(sym)
     sym.to_s.upcase.gsub(/[^A-Z0-9.\-]/, "").first(10).presence
@@ -50,14 +41,19 @@ class OwnershipController < ApplicationController
 
   def serialize_snapshot(s)
     {
-      id:                     s.id,
-      fetched_at:             s.fetched_at.iso8601,
-      institutions_pct:       s.institutions_pct&.to_f,
-      insiders_pct:           s.insiders_pct&.to_f,
-      institutions_float_pct: s.institutions_float_pct&.to_f,
-      institutions_count:     s.institutions_count,
-      top_holders:            s.top_holders,
-      source:                 s.source
+      quarter:           s.quarter,
+      date:              s.snapshot_date,
+      institutional_pct: s.institutional_pct&.to_f,
+      insider_pct:       s.insider_pct&.to_f,
+      institution_count: s.institution_count,
+      holders:           s.ownership_holders.map { |h|
+        {
+          name:         h.name,
+          pct:          h.pct&.to_f,
+          value:        h.market_value,
+          filing_date:  h.filing_date
+        }
+      }
     }
   end
 end

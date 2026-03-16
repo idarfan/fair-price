@@ -72,18 +72,19 @@ class YahooFinanceService
     ownership_raw = result.dig("institutionOwnership", "ownershipList") || []
 
     summary = {
-      institutions_pct:       breakdown.dig("institutionsPercentHeld", "raw"),
-      insiders_pct:           breakdown.dig("insidersPercentHeld", "raw"),
-      institutions_float_pct: breakdown.dig("institutionsFloatPercentHeld", "raw"),
-      institutions_count:     breakdown.dig("numberOfInstitutions", "raw")
+      institutions_pct:       pct_to_f(breakdown.dig("institutionsPercentHeld",      "raw")),
+      insiders_pct:           pct_to_f(breakdown.dig("insidersPercentHeld",          "raw")),
+      institutions_float_pct: pct_to_f(breakdown.dig("institutionsFloatPercentHeld", "raw")),
+      institutions_count:     breakdown.dig("institutionsCount", "raw")
     }
 
     top_holders = ownership_raw.first(10).map do |h|
       {
         name:        h.dig("organization") || "—",
-        pct_held:    h.dig("pctHeld", "raw"),
+        pct_held:    pct_to_f(h.dig("pctHeld",   "raw")),
         value:       h.dig("value", "raw"),
-        report_date: h.dig("reportDate", "fmt")
+        report_date: h.dig("reportDate", "fmt"),
+        pct_change:  pct_to_f(h.dig("pctChange", "raw"))
       }
     end
 
@@ -134,5 +135,10 @@ class YahooFinanceService
 
   def empty_holders
     { summary: nil, top_holders: [] }
+  end
+
+  # Yahoo Finance 回傳 0~1 的小數（0.0929 = 9.29%），乘以 100 轉成百分比
+  def pct_to_f(val)
+    val.nil? ? nil : (val.to_f * 100).round(4)
   end
 end

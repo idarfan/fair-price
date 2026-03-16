@@ -6,6 +6,9 @@ Rails.application.routes.draw do
     namespace :v1 do
       get "valuations/:ticker", to: "valuations#show",
           constraints: { ticker: /[A-Za-z0-9.\-]{1,10}/ }
+
+      get  "ownership_snapshots/:ticker", to: "ownership_snapshots#index",  as: :ownership_snapshots
+      post "ownership_snapshots/:ticker", to: "ownership_snapshots#create"
     end
   end
 

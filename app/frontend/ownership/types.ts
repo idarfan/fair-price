@@ -1,22 +1,24 @@
-export interface TopHolder {
+export interface Holder {
   name:        string
-  pct_held:    number | null
+  pct:         number | null
   value:       number | null
-  report_date: string | null
+  filing_date: string | null
+  pct_change:  number | null  // Yahoo Finance 提供的 vs 上季股份變化（0.019 = +1.9%）
 }
 
-export interface Snapshot {
-  id:                     number
-  fetched_at:             string
-  institutions_pct:       number | null
-  insiders_pct:           number | null
-  institutions_float_pct: number | null
-  institutions_count:     number | null
-  top_holders:            TopHolder[]
-  source:                 string | null
+export interface ApiSnapshot {
+  quarter:           string
+  date:              string
+  institutional_pct: number | null
+  insider_pct:       number | null
+  institution_count: number | null
+  holders:           Holder[]
 }
 
-export interface HistoryResponse {
-  symbol:    string
-  snapshots: Snapshot[]
+export interface ApiResponse {
+  snapshots: ApiSnapshot[]
+  previous:  ApiSnapshot | null
 }
+
+// 保留舊型別供 SymbolList 使用
+export type { ApiSnapshot as Snapshot }

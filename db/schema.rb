@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_16_062750) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_16_105726) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -31,19 +31,30 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_16_062750) do
     t.index ["flight_conversation_id"], name: "index_flight_messages_on_flight_conversation_id"
   end
 
+  create_table "ownership_holders", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.date "filing_date"
+    t.bigint "market_value"
+    t.string "name", null: false
+    t.bigint "ownership_snapshot_id", null: false
+    t.decimal "pct", precision: 8, scale: 4
+    t.decimal "pct_change", precision: 8, scale: 4
+    t.datetime "updated_at", null: false
+    t.index ["ownership_snapshot_id", "name"], name: "index_ownership_holders_on_ownership_snapshot_id_and_name", unique: true
+    t.index ["ownership_snapshot_id"], name: "index_ownership_holders_on_ownership_snapshot_id"
+  end
+
   create_table "ownership_snapshots", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.datetime "fetched_at", null: false
-    t.decimal "insiders_pct", precision: 5, scale: 2
-    t.integer "institutions_count"
-    t.decimal "institutions_float_pct", precision: 5, scale: 2
-    t.decimal "institutions_pct", precision: 5, scale: 2
-    t.string "source"
-    t.string "symbol", null: false
-    t.jsonb "top_holders", default: []
+    t.decimal "insider_pct", precision: 6, scale: 2
+    t.integer "institution_count"
+    t.decimal "institutional_pct", precision: 6, scale: 2
+    t.string "quarter", null: false
+    t.date "snapshot_date", null: false
+    t.string "ticker", null: false
     t.datetime "updated_at", null: false
-    t.index ["symbol", "fetched_at"], name: "index_ownership_snapshots_on_symbol_and_fetched_at"
-    t.index ["symbol"], name: "index_ownership_snapshots_on_symbol"
+    t.index ["ticker", "quarter"], name: "index_ownership_snapshots_on_ticker_and_quarter", unique: true
+    t.index ["ticker", "snapshot_date"], name: "index_ownership_snapshots_on_ticker_and_snapshot_date"
   end
 
   create_table "portfolios", force: :cascade do |t|
@@ -83,4 +94,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_16_062750) do
   end
 
   add_foreign_key "flight_messages", "flight_conversations"
+  add_foreign_key "ownership_holders", "ownership_snapshots"
 end

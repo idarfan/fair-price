@@ -1,20 +1,10 @@
 # frozen_string_literal: true
 
 class OwnershipSnapshot < ApplicationRecord
-  SYMBOL_FORMAT = /\A[A-Z0-9.\-]{1,10}\z/
+  has_many :ownership_holders, dependent: :destroy
 
-  before_validation { self.symbol = symbol&.upcase&.strip }
+  validates :ticker, :quarter, :snapshot_date, presence: true
+  validates :quarter, uniqueness: { scope: :ticker }
 
-  validates :symbol,     presence: true, format: { with: SYMBOL_FORMAT }
-  validates :fetched_at, presence: true
-
-  scope :ordered, -> { order(fetched_at: :asc) }
-
-  def self.history_for(sym, limit: 30)
-    where(symbol: sym.upcase).order(fetched_at: :asc).last(limit)
-  end
-
-  def self.latest_for(sym)
-    where(symbol: sym.upcase).order(fetched_at: :desc).first
-  end
+  scope :for_ticker, ->(ticker) { where(ticker: ticker.upcase).order(:snapshot_date) }
 end
