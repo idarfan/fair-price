@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 class OuouAnalysisService
-  ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
-  MODEL         = "claude-opus-4-6"
+  GROQ_API   = "https://api.groq.com/openai/v1/chat/completions"
+  MODEL      = "llama-3.3-70b-versatile"
   MAX_TOKENS    = 4096
   CACHE_TTL     = 3.hours
   CACHE_PREFIX  = "ouou_analysis"
@@ -10,7 +10,7 @@ class OuouAnalysisService
   def initialize(symbol:)
     @symbol  = symbol.upcase
     @finnhub = FinnhubService.new
-    @api_key = ENV.fetch("ANTHROPIC_API_KEY") { raise "ANTHROPIC_API_KEY not set" }
+    @api_key = ENV.fetch("GROQ_API_KEY") { raise "GROQ_API_KEY not set" }
   end
 
   # Yields text chunks as they stream from Claude.
@@ -21,13 +21,15 @@ class OuouAnalysisService
       return
     end
 
-    market_data = collect_market_data
-    prompt      = build_prompt(market_data)
-    accumulated = +""
+    market_data   = collect_market_data
+    prompt        = build_prompt(market_data)
+    momentum_md   = build_momentum_table(market_data[:yahoo][:closes], market_data[:yahoo][:volumes])
+    accumulated   = +""
 
     stream_request(prompt) do |chunk|
-      accumulated << chunk
-      block.call(chunk)
+      replaced = chunk.gsub("[MOMENTUM_TABLE]", "\n\n" + momentum_md + "\n\n")
+      accumulated << replaced
+      block.call(replaced)
     end
 
     if accumulated.present?
@@ -40,7 +42,7 @@ class OuouAnalysisService
   private
 
   def stream_request(prompt, &block)
-    uri     = URI(ANTHROPIC_API)
+    uri     = URI(GROQ_API)
     request = build_http_request(uri, prompt)
 
     Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 10, read_timeout: 120) do |http|
@@ -54,15 +56,16 @@ class OuouAnalysisService
 
   def build_http_request(uri, prompt)
     req = Net::HTTP::Post.new(uri)
-    req["x-api-key"]         = @api_key
-    req["anthropic-version"] = "2023-06-01"
-    req["content-type"]      = "application/json"
+    req["Authorization"] = "Bearer #{@api_key}"
+    req["content-type"]  = "application/json"
     req.body = {
       model:      MODEL,
       max_tokens: MAX_TOKENS,
-      system:     system_prompt,
-      messages:   [ { role: "user", content: prompt } ],
-      stream:     true
+      messages:   [
+        { role: "system", content: system_prompt },
+        { role: "user",   content: prompt }
+      ],
+      stream: true
     }.to_json
     req
   end
@@ -75,10 +78,7 @@ class OuouAnalysisService
       next if data == "[DONE]" || data.empty?
 
       parsed = JSON.parse(data)
-      next unless parsed["type"] == "content_block_delta"
-      next unless parsed.dig("delta", "type") == "text_delta"
-
-      text = parsed.dig("delta", "text")
+      text = parsed.dig("choices", 0, "delta", "content")
       block.call(text) if text&.present?
     rescue JSON::ParserError
       next
@@ -135,9 +135,10 @@ class OuouAnalysisService
 
   def build_momentum_table(closes, volumes)
     rows = [
-      [ "5日動量",  compute_momentum(closes, 5)  ],
-      [ "20日動量", compute_momentum(closes, 20) ],
-      [ "成交量",   volume_vs_avg(volumes)        ]
+      [ "5日動量",        compute_momentum(closes, 5)     ],
+      [ "20日動量",       compute_momentum(closes, 20)    ],
+      [ "今日成交量",     volume_vs_avg(volumes)           ],
+      [ "近5日成交量趨勢", recent_volume_trend(volumes)    ]
     ]
     lines = [ "| 指標 | 數值 |", "|---|---|" ]
     rows.each { |name, val| lines << "| #{name} | #{val} |" }
@@ -169,6 +170,19 @@ class OuouAnalysisService
     "#{fmt_vol(today)} vs 20日均量 #{fmt_vol(avg)}#{ratio ? "（#{ratio}%）" : ''}"
   end
 
+  def recent_volume_trend(volumes)
+    return "N/A" if volumes.size < 6
+
+    avg20  = (volumes.last(20).sum / 20.0)
+    days   = volumes.last(5)
+    labels = %w[D-4 D-3 D-2 D-1 今日]
+    parts  = labels.zip(days).map do |label, vol|
+      ratio = avg20.positive? ? (vol.to_f / avg20 * 100).round(0) : nil
+      "#{label}:#{fmt_vol(vol.to_i)}#{ratio ? "(#{ratio}%)" : ''}"
+    end
+    parts.join(" → ")
+  end
+
   def analysis_date_footer
     ts = Time.current.in_time_zone("Eastern Time (US & Canada)").strftime("%Y-%m-%d %H:%M ET")
     "\n\n---\n\n📌 本分析為歐歐AI基於Finnhub公開數據的觀點，不構成投資建議，請自行評估風險。🐾\n\n*分析時間：#{ts}*"
@@ -191,38 +205,97 @@ class OuouAnalysisService
   end
 
   def system_prompt # rubocop:disable Metrics/MethodLength
-    <<~SYSTEM
+    <<~'SYSTEM'
       你是歐歐 🐱，一隻招財貓投資分析師。說話帶點貓性俏皮，但分析數據絕對紮實。全程使用繁體中文。
 
-      ## 分析框架
+      你的輸出必須嚴格遵照以下 Markdown 結構範本，用實際分析內容替換 [方括號] 中的佔位符。
+      不得更改標題層級、不得省略任何章節、不得省略表格、不得在結尾加免責聲明。
 
-      ### 1. 🐱 市場立場（必須基於 VIX）
-      - VIX < 16：🟢 激進買入
-      - VIX 16–22：🟡 保守買入
-      - VIX > 22：🔴 持幣觀望
+      ---
 
-      輸出：`歐歐立場：[立場] ｜ VIX:[值] ｜ 邏輯：[2句]`
+      # 🐱 歐歐的[TICKER]（[公司全名]）投資分析報告
 
-      ### 2. 📊 技術面分析
-      - 5日動量評估
-      - 52週位置（接近高點 / 低點 / 中間）
-      - 支撐與阻力位估算
+      ## 1. 🐱 市場立場
 
-      ### 3. 📰 催化因素
-      - 基於近期新聞的主要催化劑
+      歐歐立場：[🟢激進買入 / 🟡保守買入 / 🔴持幣觀望] ｜ VIX：[值] ｜
+      遵循：[第一句邏輯說明]。
+      [第二句補充說明，可帶貓性比喻]
 
-      ### 4. 🎯 操作建議
-      - 入場觸發條件
-      - 止損位
-      - 目標價（短線 / 中線）
-      - 成功概率估計（%）
-      - 風報比
+      ## 2. 📊 技術面分析
 
-      ### 5. ⚠️ 風險提示
-      - 主要下行風險（3點）
-      - 單筆最大倉位建議
+      ### 動量觀察
 
-      輸出請使用 Markdown 格式，標題清晰，條列整齊。結尾不需附加任何免責聲明。
+      [MOMENTUM_TABLE]
+
+      ### 歐歐解讀 🐾
+
+      **[動量主題，例：5日動量 vs 20日動量的矛盾]：**
+
+      - [解讀要點一]
+      - [解讀要點二]
+
+      ### 52週位置分析：
+
+      - [52週位置解讀]
+      - [接近高點/低點/中間的含義]
+
+      ### 支撐與阻力位估算：
+
+      | 層級 | 價位 | 說明 |
+      |---|---|---|
+      | [強阻力] | $[價格區間] | [說明] |
+      | [短線阻力] | $[價格區間] | [說明] |
+      | [短線支撐] | $[價格區間] | [說明] |
+      | [中線支撐] | $[價格區間] | [說明] |
+      | [強支撐] | $[價格區間] | [說明] |
+
+      ## 3. 📰 催化因素
+
+      ### 🔥 正面催化劑
+
+      - **[催化劑標題]**：[說明]
+      - **[催化劑標題]**：[說明]
+
+      ### ⚡ 需要留意的訊號
+
+      - [風險訊號說明]
+
+      ## 4. 🎯 操作建議
+
+      > ⚠️ 以下基於歐歐 [立場] 的大前提，僅適合 [適合的投資人類型]。
+
+      ### 策略一：[策略名稱]（[標籤，例：首選 ✅]）
+
+      | 項目 | 內容 |
+      |---|---|
+      | 入場觸發 | [觸發條件] |
+      | 止損位 | $[價格]（[止損邏輯]） |
+      | 短線目標 | $[價格]（[理由]） |
+      | 中線目標 | $[價格區間]（[理由]） |
+      | 成功概率 | [X]%（[前提條件]） |
+      | 風報比 | [計算說明] → 約 1:[比值] |
+
+      ### 歐歐推薦 🐾
+
+      [總推薦說明，1–2句]
+
+      ## 5. ⚠️ 風險提示
+
+      ### 主要下行風險
+
+      - [emoji] **[風險標題]**：[說明]
+      - [emoji] **[風險標題]**：[說明]
+      - [emoji] **[風險標題]**：[說明]
+
+      ### 倉位建議
+
+      > 🐱 歐歐建議：單筆最大倉位不超過總資金的 [X–Y]%
+
+      [倉位說明，1–2句，可帶貓性比喻]
+
+      ### 🐱 歐歐總結
+
+      > [整體總結，2–3句，點出最核心的操作邏輯]
     SYSTEM
   end
 end

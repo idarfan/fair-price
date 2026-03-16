@@ -69,7 +69,44 @@ class ReportsController < ApplicationController
 
   # ── Markdown helpers ────────────────────────────────────────────────────────
   def render_gfm(text)
-    Kramdown::Document.new(normalize_md_tables(text), input: "GFM").to_html
+    Kramdown::Document.new(normalize_md_tables(normalize_llama_output(text)), input: "GFM").to_html
+  end
+
+  # Fix Llama-specific markdown issues before passing to normalize_md_tables.
+  #
+  # Handles four Llama output problems:
+  #   A) mid-line heading WITHOUT space  ("text##2. Title")  → split + add space
+  #   B) mid-line heading WITH space     ("text## Title")    → split
+  #   C) heading-start without space     ("##Title")         → add space
+  #   D) table or blockquote glued to heading on same line   → split
+  #   E) line-by-line: ensure blank line after every heading
+  def normalize_llama_output(text) # rubocop:disable Metrics/MethodLength
+    # Pass A: mid-line heading WITHOUT space after # ("text##2. Title")
+    text = text.gsub(/([^\n])\n?(#+)([^#\s\n])/) { $1 + "\n\n" + $2 + " " + $3 }
+
+    # Pass B: mid-line heading WITH space after # ("text## Title")
+    text = text.gsub(/([^\n])(#+\s)/) { $1 + "\n\n" + $2 }
+
+    # Pass C: heading-start without space ("##Title" → "## Title")
+    text = text.gsub(/^(#+)([^#\s\n])/) { $1 + " " + $2 }
+
+    # Pass D1: table row glued to end of heading line ("### Heading| col1 |")
+    text = text.gsub(/^(#+\s[^|\n]+)\|/) { $1 + "\n\n|" }
+
+    # Pass D2: blockquote glued to non-blank content ("text> quote")
+    text = text.gsub(/([^\n])\n?(>\s)/) { $1 + "\n\n" + $2 }
+
+    # Pass E: ensure blank line after every heading line.
+    lines  = text.split("\n", -1)
+    result = []
+    lines.each_with_index do |line, i|
+      result << line
+      next_line = lines[i + 1]
+      if line.match?(/^#+\s/) && next_line && !next_line.strip.empty?
+        result << ""
+      end
+    end
+    result.join("\n")
   end
 
   # Robust GFM table normalizer.
@@ -77,8 +114,7 @@ class ReportsController < ApplicationController
   # Two-pass approach:
   # 1. Replace every separator row in-place (derive col count from pipe count — no
   #    look-ahead required, handles all non-ASCII dash variants).
-  # 2. Drop blank lines that appear immediately before a separator row (Claude
-  #    sometimes inserts a blank line between the header row and the separator).
+  # 2. Drop blank lines that appear immediately before a separator row.
   def normalize_md_tables(text) # rubocop:disable Metrics/MethodLength
     # Pass 1: rebuild every separator row with ASCII hyphens.
     lines = text.each_line.map do |line|

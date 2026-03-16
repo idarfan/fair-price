@@ -19,7 +19,7 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
         span(class: "mr-2") { plain("🐱") }
         plain("歐歐投資分析")
       end
-      span(class: "text-xs text-indigo-400 font-medium") { plain("Powered by Claude Opus") }
+      span(class: "text-xs text-indigo-400 font-medium") { plain("Powered by Groq / Llama 3.3") }
     end
   end
 
@@ -223,17 +223,19 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
               '<title>' + symbol + ' 歐歐投資分析</title>' +
               '<style>' +
                 'body{font-family:sans-serif;font-size:13px;color:#111827;padding:2rem;max-width:780px;margin:0 auto}' +
-                'h1,h2,h3,h4{font-weight:700;margin-top:1.25rem;margin-bottom:.375rem}' +
-                'h1{font-size:1.125rem}h2{font-size:1rem}h3{font-size:.9375rem}h4{font-size:.875rem}' +
-                'p{margin-top:.5rem;line-height:1.65}' +
-                'ul,ol{margin:.5rem 0 .5rem 1.5rem}li{margin-bottom:.2rem;list-style:disc}' +
+                'h1{font-size:1.375rem;font-weight:700;color:#111827;margin-top:1.5rem;margin-bottom:.5rem}' +
+                'h2{font-size:1.125rem;font-weight:700;color:#111827;margin-top:1.5rem;margin-bottom:.5rem;padding-bottom:.25rem;border-bottom:1px solid #e5e7eb}' +
+                'h3{font-size:1rem;font-weight:700;color:#1f2937;margin-top:1.25rem;margin-bottom:.375rem}' +
+                'h4{font-size:.9375rem;font-weight:600;color:#374151;margin-top:1rem;margin-bottom:.25rem}' +
+                'p{margin-top:.5rem;line-height:1.7}' +
+                'ul,ol{margin:.5rem 0 .5rem 1.5rem}li{margin-bottom:.3rem;list-style:disc;line-height:1.65}' +
                 'strong{font-weight:600}em{font-style:italic}' +
-                'hr{border:none;border-top:1px solid #e5e7eb;margin:1rem 0}' +
-                'blockquote{border-left:3px solid #e5e7eb;padding-left:.75rem;color:#6b7280;margin:.5rem 0}' +
+                'hr{border:none;border-top:1px solid #e5e7eb;margin:1.25rem 0}' +
+                'blockquote{border-left:3px solid #c7d2fe;background:#eef2ff;padding:.6rem .75rem;color:#374151;margin:.75rem 0;border-radius:0 .375rem .375rem 0}' +
                 'code{background:#f3f4f6;border-radius:.25rem;padding:.1rem .3rem;font-size:.8125rem;font-family:monospace}' +
                 'table{width:100%;border-collapse:collapse;margin:.75rem 0;font-size:.8125rem}' +
-                'th{background:#f9fafb;text-align:left;padding:.5rem .75rem;font-weight:600;border:1px solid #e5e7eb}' +
-                'td{padding:.45rem .75rem;border:1px solid #e5e7eb;vertical-align:top}' +
+                'th{background:#f3f4f6;text-align:left;padding:.5rem .75rem;font-weight:600;border:1px solid #d1d5db}' +
+                'td{padding:.45rem .75rem;border:1px solid #d1d5db;vertical-align:top}' +
                 'tr:nth-child(even) td{background:#f9fafb}' +
                 '@media print{body{padding:0}}' +
               '</style>' +
