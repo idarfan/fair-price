@@ -42,19 +42,37 @@ systemctl --user restart fairprice
 systemctl --user status  fairprice
 journalctl --user -u fairprice -n 30
 
+# Vite dev server（port 3036）
+systemctl --user restart fairprice-vite
+systemctl --user status  fairprice-vite
+
 # Boot check
 bundle exec rails runner "puts 'Boot OK'"
 
 # Routes
 bundle exec rails routes
 
-# Lookbook previews
+# Lookbook / Storybook previews
 open http://localhost:3003/lookbook
 ```
 
 ## Architecture
 
-**No database. No React. No Vite.** Pure Phlex + Tailwind CDN app backed by Finnhub HTTP calls.
+PostgreSQL 持久化資料（ownership snapshots 等）。Rails 後端 + 混合前端架構：
+
+- **Phlex + Tailwind**：適用於 Rails 傳統頁面（FairPrice、Daily Momentum、Watchlist 等）
+- **Vite + React + Recharts**：適用於需要互動圖表的獨立頁面（持股結構等）
+- **Storybook**：React 元件開發與預覽
+
+### 前端技術選擇原則
+
+| 頁面類型 | 建議技術 |
+|---------|---------|
+| 靜態資料展示、表單 | Phlex + Tailwind |
+| 互動圖表、複雜 UI 狀態 | Vite + React + Recharts |
+| 元件開發預覽 | Storybook（React 元件）/ Lookbook（Phlex 元件）|
+
+**不強制使用 Phlex**：新功能依複雜度與互動需求自由選擇技術棧。
 
 Two tools under one process on port 3003:
 
@@ -62,7 +80,8 @@ Two tools under one process on port 3003:
 |------|-------|------------|-----------|
 | FairPrice | `/`, `/valuations/:ticker` | `ValuationsController` | `FairValue::` |
 | Daily Momentum | `/momentum` | `ReportsController` | `DailyMomentum::` |
-| JSON API | `/api/v1/valuations/:ticker` | `Api::V1::ValuationsController` | — |
+| 持股結構 | `/ownership` | `OwnershipController` | — |
+| JSON API | `/api/v1/...` | `Api::V1::*` | — |
 
 Shared infrastructure:
 - `ApplicationComponent`：格式化 helpers（`fmt_currency`, `fmt_percent`, `fmt_large`, `change_color`, `upside_color`）
@@ -96,8 +115,19 @@ Edit `config/watchlist.yml` to change tracked symbols — no code change needed.
 
 Market time segment derived from ET clock in `MomentumReportService#time_segment`.
 
+## 持股結構 data flow
+
+```
+OwnershipApp.tsx（React）
+  └── GET  /api/v1/ownership_snapshots/:ticker?range=1w|1m|90d
+  └── POST /api/v1/ownership_snapshots/:ticker（手動更新快照）
+        └── Api::V1::OwnershipSnapshotsController
+              └── YahooFinanceService#holders → OwnershipSnapshotService#save_snapshot
+                    → OwnershipSnapshot（ticker+quarter 唯一）+ OwnershipHolder
+```
+
 ## Adding a new tool to the sidebar
 
 1. Add route in `config/routes.rb`
-2. Create controller + view under new namespace
+2. Create controller + view（Phlex 或 React 均可）
 3. Add entry to `APP_LINKS` in `app/components/fair_value/app_switcher_component.rb`
