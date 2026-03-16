@@ -52,6 +52,23 @@ bundle exec rubocop -a   # 自動修正
 
 ## 變更記錄
 
+### 2026-03-17 — 修復歐歐分析重複點擊導致串流衝突
+
+**動機：** 串流進行中再次點擊 🐱 按鈕會開第二條 EventSource 連線，兩條互相寫同一面板，導致分析停頓或需點第二次才出現結果。
+
+**異動內容：**
+- `app/components/daily_momentum/analysis_panel_component.rb`：新增 `streaming` 狀態物件，串流進行中防止重複觸發；`onerror` 無論 buffer 是否有內容都顯示重試按鈕
+
+### 2026-03-17 — 切換至 Groq (Llama 3.3)，修正 Llama markdown 格式
+
+**動機：** 使用 Groq 免費 API（llama-3.3-70b-versatile）取代 Anthropic Claude，速度更快；Llama 輸出的 markdown 標題無換行導致 Kramdown 渲染破版，需加入正規化處理。
+
+**異動內容：**
+- `app/services/ouou_analysis_service.rb`：改用 Groq API，OpenAI 相容格式（SSE streaming、messages 結構）；新增 `[MOMENTUM_TABLE]` 佔位符替換機制；更新 system prompt 為完整 markdown 範本
+- `app/controllers/reports_controller.rb`：新增 `normalize_llama_output`，處理五種 Llama 格式問題（mid-line heading、##N. 無空格、表格黏標題、blockquote 黏標題）
+- `app/components/daily_momentum/analysis_panel_component.rb`：標示更新為 Powered by Groq / Llama 3.3；PDF 匯出 CSS 同步調整
+- `app/assets/tailwind/application.css`：md-body heading 層次更明確，blockquote 樣式強化
+
 ### 2026-03-16 — 持股結構資料修正與 UX 調整
 
 **動機：** 修正 Yahoo Finance 回傳的持股百分比顯示錯誤、機構數量欄位名稱錯誤，並調整 UX 為手動更新模式。
