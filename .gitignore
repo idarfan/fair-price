@@ -28,3 +28,6 @@ config/credentials/*.key
 
 # Node
 /node_modules
+
+# Claude Code 本地設定
+.claude/settings.local.json
