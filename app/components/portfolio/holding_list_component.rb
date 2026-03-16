@@ -176,7 +176,8 @@ class Portfolio::HoldingListComponent < ApplicationComponent
     # 可拖動浮動面板，初始位置：右側垂直置中
     div(id:    "ownership-panel",
         style: "display:none; position:fixed; left:50%; top:50%; " \
-               "transform:translate(-50%,-50%); z-index:50; width:28rem; " \
+               "transform:translate(-50%,-50%); z-index:50; " \
+               "min-width:28rem; width:max-content; max-width:min(56rem,92vw); " \
                "max-height:82vh; overflow-y:auto;",
         class: "bg-white rounded-2xl shadow-2xl border-2 border-orange-200") do
       # 標題列（拖動把手）

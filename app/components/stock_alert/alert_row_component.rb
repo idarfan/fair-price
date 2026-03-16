@@ -34,7 +34,9 @@ class StockAlert::AlertRowComponent < ApplicationComponent
   end
 
   def render_symbol
-    td(class: "px-3 py-3") do
+    td(class: "px-3 py-3 cursor-pointer select-none",
+       data:  { ownership_symbol: @alert.symbol },
+       title: "查看 #{@alert.symbol} 持股結構") do
       div(class: "flex items-center gap-2") do
         div(class: "flex-shrink-0 w-7 h-7 relative") do
           img(
