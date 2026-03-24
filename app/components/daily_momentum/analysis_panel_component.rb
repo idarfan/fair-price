@@ -45,7 +45,8 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
     script do
       raw <<~'JS'.html_safe
         (function () {
-          var loaded = {};
+          var loaded    = {};
+          var streaming = {};
 
           // ── 🐱 button click ───────────────────────────────────────────
           document.addEventListener('click', function (e) {
@@ -57,7 +58,7 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
           function startAnalysis(symbol) {
             if (!document.getElementById('atab-' + symbol)) createTab(symbol);
             activateTab(symbol);
-            if (!loaded[symbol]) streamAnalysis(symbol);
+            if (!loaded[symbol] && !streaming[symbol]) streamAnalysis(symbol);
           }
 
           // ── Tab management ────────────────────────────────────────────
@@ -100,6 +101,7 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
 
           // ── SSE streaming ─────────────────────────────────────────────
           function streamAnalysis(symbol) {
+            streaming[symbol] = true;
             var panel = document.getElementById('apanel-' + symbol);
             var buffer = '';
 
@@ -118,7 +120,8 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
             source.onmessage = function (e) {
               if (e.data === '[DONE]') {
                 source.close();
-                loaded[symbol] = true;
+                loaded[symbol]    = true;
+                streaming[symbol] = false;
                 if (typeof NProgress !== 'undefined') NProgress.done();
                 renderMarkdown(symbol, buffer);
                 return;
@@ -132,19 +135,18 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
 
             source.onerror = function () {
               source.close();
+              streaming[symbol] = false;
+              loaded[symbol]    = false;
               if (typeof NProgress !== 'undefined') NProgress.done();
-              loaded[symbol] = false;
-              if (!buffer) {
-                panel.innerHTML =
-                  '<div class="py-6 text-center">' +
-                    '<p class="text-red-400 text-sm mb-3">串流中斷，請重試</p>' +
-                    '<button type="button" data-retry-analysis="' + symbol + '" ' +
-                      'class="px-4 py-1.5 text-xs font-medium bg-indigo-50 text-indigo-600 ' +
-                      'rounded-full border border-indigo-200 hover:bg-indigo-100 transition-colors">' +
-                      '🔄 重新分析' +
-                    '</button>' +
-                  '</div>';
-              }
+              panel.innerHTML =
+                '<div class="py-6 text-center">' +
+                  '<p class="text-red-400 text-sm mb-3">串流中斷，請重試</p>' +
+                  '<button type="button" data-retry-analysis="' + symbol + '" ' +
+                    'class="px-4 py-1.5 text-xs font-medium bg-indigo-50 text-indigo-600 ' +
+                    'rounded-full border border-indigo-200 hover:bg-indigo-100 transition-colors">' +
+                    '🔄 重新分析' +
+                  '</button>' +
+                '</div>';
             };
           }
 

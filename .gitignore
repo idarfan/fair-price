@@ -32,6 +32,14 @@ config/credentials/*.key
 # Claude Code 本地設定
 .claude/settings.local.json
 
+# 測試覆蓋率報告
+/coverage/
+
+# docs 截圖與 PDF（不追蹤二進制媒體）
+docs/*.png
+docs/*.jpg
+docs/*.pdf
+
 # Vite Ruby
 /public/vite*
 node_modules
