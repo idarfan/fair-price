@@ -28,6 +28,13 @@ export interface PayoffSummary {
   breakevens: number[]
 }
 
+export interface StrategyDetail {
+  what:     string   // 這是什麼
+  when:     string   // 什麼時候用
+  risks:    string   // 主要風險
+  scenario: string   // 實戰應用場景（以當前標的為例）
+}
+
 export interface StrategyTemplate {
   key:       string
   name:      string
@@ -38,6 +45,7 @@ export interface StrategyTemplate {
   maxProfit: string
   risk:      string
   defaultLegs: PayoffLeg[]
+  detail?:   StrategyDetail
 }
 
 export interface OIPoint {

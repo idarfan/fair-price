@@ -4,10 +4,11 @@ import type {
 } from './types'
 import { getStrategies, buildLegsForPrice } from './strategies'
 import { buildChartData, calcSummary }       from './payoff'
-import OutlookSelector      from './components/OutlookSelector'
-import StrategyRecommendList from './components/StrategyRecommendList'
-import PayoffChart           from './components/PayoffChart'
-import SentimentPanel        from './components/SentimentPanel'
+import OutlookSelector        from './components/OutlookSelector'
+import StrategyRecommendList  from './components/StrategyRecommendList'
+import StrategyDetailPanel    from './components/StrategyDetailPanel'
+import PayoffChart             from './components/PayoffChart'
+import SentimentPanel          from './components/SentimentPanel'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -240,10 +241,11 @@ export default function OptionsAnalyzerApp({ initialSymbol }: { initialSymbol: s
           <SentimentPanel sentiment={sentiment} ivRank={ivRank} />
         </div>
 
-        {/* Right: Strategy + Payoff */}
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-          {/* Strategy tabs */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        {/* Right: 3 columns — strategy list | detail panel | payoff chart */}
+        <div className="flex-1 overflow-hidden flex">
+
+          {/* Col A: Strategy list + custom legs */}
+          <div className="w-56 flex-shrink-0 border-r border-gray-100 overflow-y-auto bg-white">
             <div className="flex border-b border-gray-100">
               <button
                 onClick={() => setActiveTab('recommend')}
@@ -266,7 +268,7 @@ export default function OptionsAnalyzerApp({ initialSymbol }: { initialSymbol: s
                 自訂腳位
               </button>
             </div>
-            <div className="p-3">
+            <div className="p-2">
               {activeTab === 'recommend' ? (
                 <StrategyRecommendList
                   strategies={strategies}
@@ -284,11 +286,22 @@ export default function OptionsAnalyzerApp({ initialSymbol }: { initialSymbol: s
             </div>
           </div>
 
-          {/* Payoff Chart */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">損益圖</p>
+          {/* Col B: Strategy detail panel (7 blocks) */}
+          <div className="w-80 flex-shrink-0 border-r border-gray-100 overflow-y-auto p-4 bg-white">
+            <StrategyDetailPanel
+              template={strategies[selectedIdx] ?? null}
+              legs={legs as import('./types').PayoffLeg[]}
+              price={price}
+              summary={summary}
+            />
+          </div>
+
+          {/* Col C: Payoff chart */}
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">損益圖</p>
             <PayoffChart data={chartData} summary={summary} price={price} />
           </div>
+
         </div>
       </div>
     </div>
