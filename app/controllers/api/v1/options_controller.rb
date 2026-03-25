@@ -23,6 +23,22 @@ module Api
         render json: mock_iv_rank(symbol)
       end
 
+      # POST /api/v1/options/analyze_image
+      # Body: multipart/form-data { image: <file> }
+      def analyze_image
+        image = params[:image]
+        return render json: { error: "請上傳圖片" }, status: :unprocessable_entity if image.blank?
+
+        unless image.content_type.to_s.start_with?("image/")
+          return render json: { error: "只接受圖片格式（JPG / PNG / WebP）" }, status: :unprocessable_entity
+        end
+
+        result = OptionsOcrService.new(image).call
+        render json: result
+      rescue => e
+        render json: { error: e.message }, status: :unprocessable_entity
+      end
+
       # POST /api/v1/options/strategy_recommend
       # Body: { symbol, outlook, iv_rank }
       def strategy_recommend

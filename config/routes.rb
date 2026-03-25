@@ -9,6 +9,16 @@ Rails.application.routes.draw do
 
       get  "ownership_snapshots/:ticker", to: "ownership_snapshots#index",  as: :ownership_snapshots
       post "ownership_snapshots/:ticker", to: "ownership_snapshots#create"
+
+      # Options Analyzer API
+      get  "options/:symbol/chain",      to: "options#chain",
+           constraints: { symbol: /[A-Za-z0-9.\-]{1,10}/ }
+      get  "options/:symbol/sentiment",  to: "options#sentiment",
+           constraints: { symbol: /[A-Za-z0-9.\-]{1,10}/ }
+      get  "options/:symbol/iv_rank",    to: "options#iv_rank",
+           constraints: { symbol: /[A-Za-z0-9.\-]{1,10}/ }
+      post "options/strategy_recommend", to: "options#strategy_recommend"
+      post "options/analyze_image",      to: "options#analyze_image"
     end
   end
 
@@ -50,6 +60,11 @@ Rails.application.routes.draw do
   patch "momentum/watchlist/reorder",     to: "watchlist_items#reorder",    as: :reorder_momentum_watchlist
   patch "momentum/watchlist/:id",         to: "watchlist_items#update",     as: :momentum_watchlist_item
   delete "momentum/watchlist/:id",        to: "watchlist_items#destroy"
+
+  # Options Analyzer
+  get "options",         to: "options#index", as: :options
+  get "options/:symbol", to: "options#show",  as: :option_detail,
+      constraints: { symbol: /[A-Za-z0-9.\-]{1,10}/ }
 
   # Ownership Structure
   get  "ownership",         to: "ownership#index",   as: :ownership

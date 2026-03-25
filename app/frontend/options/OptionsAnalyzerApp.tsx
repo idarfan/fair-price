@@ -9,6 +9,7 @@ import StrategyRecommendList  from './components/StrategyRecommendList'
 import StrategyDetailPanel    from './components/StrategyDetailPanel'
 import PayoffChart             from './components/PayoffChart'
 import SentimentPanel          from './components/SentimentPanel'
+import ImageUploadZone, { OcrResult } from './components/ImageUploadZone'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -219,17 +220,40 @@ export default function OptionsAnalyzerApp({ initialSymbol }: { initialSymbol: s
     setSymbol(sym)
   }
 
+  const handleOcrResult = useCallback((result: OcrResult) => {
+    // 自動填入 symbol
+    if (result.symbol) setSymbol(result.symbol)
+    // 自動設定 outlook
+    if (result.outlook) setOutlook(result.outlook as MarketOutlook)
+    // 若識別到腳位，直接覆蓋 legs
+    if (result.legs.length > 0) {
+      setLegs(result.legs.map(l => ({
+        ...l,
+        id:       nextLegId++,
+        iv:       l.iv ?? undefined,
+        dte:      l.dte ?? undefined,
+        quantity: l.quantity,
+      } as LegRow)))
+      setActiveTab('custom')
+    }
+  }, [])
+
   return (
     <div className="flex flex-col h-full min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 flex flex-col gap-2">
         <h1 className="text-base font-bold text-gray-800">美股期權分析</h1>
-        <SymbolBar
-          symbol={symbol}
-          price={price}
-          loading={loading}
-          onSearch={handleSearch}
-        />
+        <div className="flex items-start gap-2 flex-wrap">
+          <div className="flex-1 min-w-0">
+            <SymbolBar
+              symbol={symbol}
+              price={price}
+              loading={loading}
+              onSearch={handleSearch}
+            />
+          </div>
+          <ImageUploadZone onResult={handleOcrResult} />
+        </div>
         {error && <p className="text-xs text-red-500">{error}</p>}
       </div>
 
