@@ -31,6 +31,9 @@
     <% if controller_name == 'ownership' %>
       <%= vite_javascript_tag 'ownership.tsx' %>
     <% end %>
+    <% if controller_name == 'options' %>
+      <%= vite_javascript_tag 'options.tsx' %>
+    <% end %>
   </head>
   <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
 
@@ -40,7 +43,7 @@
           show_search:   @ticker.present?
         ) %>
 
-    <% if controller_name == 'ownership' %>
+    <% if controller_name == 'ownership' || controller_name == 'options' %>
       <main class="flex-1 overflow-hidden flex flex-col">
         <%= yield %>
       </main>
