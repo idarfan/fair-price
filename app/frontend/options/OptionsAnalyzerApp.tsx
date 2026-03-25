@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import type {
-  MarketOutlook, StrategyTemplate, SentimentData, IvRankData, PayoffLeg
+  MarketOutlook, SentimentData, IvRankData, PayoffLeg
 } from './types'
 import { getStrategies, buildLegsForPrice } from './strategies'
 import { buildChartData, calcSummary }       from './payoff'
@@ -140,7 +140,6 @@ export default function OptionsAnalyzerApp({ initialSymbol }: { initialSymbol: s
   const [outlook,     setOutlook]     = useState<MarketOutlook>('bullish')
   const [ivRank,      setIvRank]      = useState<IvRankData | null>(null)
   const [sentiment,   setSentiment]   = useState<SentimentData | null>(null)
-  const [strategies,  setStrategies]  = useState<StrategyTemplate[]>([])
   const [selectedIdx, setSelectedIdx] = useState(0)
   const [legs,        setLegs]        = useState<LegRow[]>([])
   const [activeTab,   setActiveTab]   = useState<'recommend' | 'custom'>('recommend')
@@ -168,17 +167,19 @@ export default function OptionsAnalyzerApp({ initialSymbol }: { initialSymbol: s
 
   useEffect(() => { fetchData(symbol) }, [symbol, fetchData])
 
-  // Recompute strategies when outlook or ivRank changes
+  const strategies = React.useMemo(
+    () => getStrategies(outlook, ivRank?.iv_rank ?? 50),
+    [outlook, ivRank]
+  )
+
+  // Reset legs when strategy list changes (new outlook/symbol)
   useEffect(() => {
-    const rank = ivRank?.iv_rank ?? 50
-    const list = getStrategies(outlook, rank)
-    setStrategies(list)
     setSelectedIdx(0)
-    if (list.length > 0 && price > 0) {
-      const builtLegs = buildLegsForPrice(list[0], price)
+    if (strategies.length > 0 && price > 0) {
+      const builtLegs = buildLegsForPrice(strategies[0], price)
       setLegs(builtLegs.map(l => ({ ...l, id: nextLegId++ })))
     }
-  }, [outlook, ivRank, price])
+  }, [strategies, price])
 
   // Rebuild legs when selected strategy changes
   const handleSelectStrategy = (i: number) => {
@@ -204,10 +205,14 @@ export default function OptionsAnalyzerApp({ initialSymbol }: { initialSymbol: s
   const handleChangeLeg = (id: number, field: keyof PayoffLeg, value: number | string) =>
     setLegs(prev => prev.map(l => l.id === id ? { ...l, [field]: value } : l))
 
-  const chartData = legs.length > 0 && price > 0
-    ? buildChartData(legs as PayoffLeg[], price)
-    : []
-  const summary = chartData.length > 0 ? calcSummary(chartData) : null
+  const chartData = React.useMemo(
+    () => (legs.length > 0 && price > 0 ? buildChartData(legs as PayoffLeg[], price) : []),
+    [legs, price]
+  )
+  const summary = React.useMemo(
+    () => (chartData.length > 0 ? calcSummary(chartData) : null),
+    [chartData]
+  )
 
   const handleSearch = async (sym: string) => {
     setSymbol(sym)
