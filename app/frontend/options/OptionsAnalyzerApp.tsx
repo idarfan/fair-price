@@ -145,6 +145,7 @@ export default function OptionsAnalyzerApp({ initialSymbol }: { initialSymbol: s
   const [selectedIdx, setSelectedIdx] = useState(0)
   const [legs,        setLegs]        = useState<LegRow[]>([])
   const [activeTab,   setActiveTab]   = useState<'recommend' | 'custom'>('recommend')
+  const [rightTab,    setRightTab]    = useState<'chart' | 'upload'>('chart')
 
   const fetchData = useCallback(async (sym: string) => {
     setLoading(true)
@@ -221,11 +222,8 @@ export default function OptionsAnalyzerApp({ initialSymbol }: { initialSymbol: s
   }
 
   const handleOcrResult = useCallback((result: OcrResult) => {
-    // 自動填入 symbol
     if (result.symbol) setSymbol(result.symbol)
-    // 自動設定 outlook
     if (result.outlook) setOutlook(result.outlook as MarketOutlook)
-    // 若識別到腳位，直接覆蓋 legs
     if (result.legs.length > 0) {
       setLegs(result.legs.map(l => ({
         ...l,
@@ -236,6 +234,8 @@ export default function OptionsAnalyzerApp({ initialSymbol }: { initialSymbol: s
       } as LegRow)))
       setActiveTab('custom')
     }
+    // 分析完成後切到損益圖看結果
+    setRightTab('chart')
   }, [])
 
   return (
@@ -308,20 +308,42 @@ export default function OptionsAnalyzerApp({ initialSymbol }: { initialSymbol: s
           />
         </div>
 
-        {/* Col 4：損益圖 */}
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 min-w-0">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">損益圖</p>
-          <PayoffChart data={chartData} summary={summary} price={price} />
-        </div>
+        {/* Col 4：損益圖 ｜ 截圖分析（tab 切換）*/}
+        <div className="flex-1 overflow-hidden flex flex-col min-w-0">
+          {/* Tab bar */}
+          <div className="flex border-b border-gray-100 bg-white flex-shrink-0">
+            <button
+              onClick={() => setRightTab('chart')}
+              className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                rightTab === 'chart'
+                  ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              📊 損益圖
+            </button>
+            <button
+              onClick={() => setRightTab('upload')}
+              className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                rightTab === 'upload'
+                  ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              📸 截圖分析
+            </button>
+          </div>
 
-        {/* Col 5：截圖上傳（右側常駐，大型拖曳區）*/}
-        <div className="w-56 flex-shrink-0 border-l border-gray-200 bg-gray-50 flex flex-col">
-          <div className="px-3 pt-3 pb-1">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">截圖分析</p>
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <ImageUploadZone onResult={handleOcrResult} />
-          </div>
+          {/* Tab content */}
+          {rightTab === 'chart' ? (
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+              <PayoffChart data={chartData} summary={summary} price={price} />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-hidden bg-gray-50">
+              <ImageUploadZone onResult={handleOcrResult} />
+            </div>
+          )}
         </div>
 
       </div>
