@@ -243,90 +243,87 @@ export default function OptionsAnalyzerApp({ initialSymbol }: { initialSymbol: s
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 flex flex-col gap-2">
         <h1 className="text-base font-bold text-gray-800">美股期權分析</h1>
-        <div className="flex items-start gap-2 flex-wrap">
-          <div className="flex-1 min-w-0">
-            <SymbolBar
-              symbol={symbol}
-              price={price}
-              loading={loading}
-              onSearch={handleSearch}
-            />
-          </div>
-          <ImageUploadZone onResult={handleOcrResult} />
-        </div>
+        <SymbolBar symbol={symbol} price={price} loading={loading} onSearch={handleSearch} />
         {error && <p className="text-xs text-red-500">{error}</p>}
       </div>
 
-      {/* Body */}
-      <div className="flex flex-1 gap-0 overflow-hidden">
-        {/* Left: Outlook + Sentiment */}
-        <div className="w-72 flex-shrink-0 border-r border-gray-200 overflow-y-auto p-3 flex flex-col gap-3 bg-white">
+      {/* Body：5 欄 */}
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* Col 1：Outlook + Sentiment */}
+        <div className="w-64 flex-shrink-0 border-r border-gray-200 overflow-y-auto p-3 flex flex-col gap-3 bg-white">
           <OutlookSelector value={outlook} onChange={setOutlook} />
           <SentimentPanel sentiment={sentiment} ivRank={ivRank} />
         </div>
 
-        {/* Right: 3 columns — strategy list | detail panel | payoff chart */}
-        <div className="flex-1 overflow-hidden flex">
-
-          {/* Col A: Strategy list + custom legs */}
-          <div className="w-56 flex-shrink-0 border-r border-gray-100 overflow-y-auto bg-white">
-            <div className="flex border-b border-gray-100">
-              <button
-                onClick={() => setActiveTab('recommend')}
-                className={`flex-1 py-2 text-xs font-medium transition-colors ${
-                  activeTab === 'recommend'
-                    ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                推薦策略
-              </button>
-              <button
-                onClick={() => setActiveTab('custom')}
-                className={`flex-1 py-2 text-xs font-medium transition-colors ${
-                  activeTab === 'custom'
-                    ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                自訂腳位
-              </button>
-            </div>
-            <div className="p-2">
-              {activeTab === 'recommend' ? (
-                <StrategyRecommendList
-                  strategies={strategies}
-                  selectedIdx={selectedIdx}
-                  onSelect={handleSelectStrategy}
-                />
-              ) : (
-                <LegEditor
-                  legs={legs}
-                  onAdd={handleAddLeg}
-                  onRemove={handleRemoveLeg}
-                  onChange={handleChangeLeg}
-                />
-              )}
-            </div>
+        {/* Col 2：策略列表 */}
+        <div className="w-52 flex-shrink-0 border-r border-gray-100 overflow-y-auto bg-white flex flex-col">
+          <div className="flex border-b border-gray-100">
+            <button
+              onClick={() => setActiveTab('recommend')}
+              className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                activeTab === 'recommend'
+                  ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              推薦策略
+            </button>
+            <button
+              onClick={() => setActiveTab('custom')}
+              className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                activeTab === 'custom'
+                  ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              自訂腳位
+            </button>
           </div>
-
-          {/* Col B: Strategy detail panel (7 blocks) */}
-          <div className="w-80 flex-shrink-0 border-r border-gray-100 overflow-y-auto p-4 bg-white">
-            <StrategyDetailPanel
-              template={strategies[selectedIdx] ?? null}
-              legs={legs as import('./types').PayoffLeg[]}
-              price={price}
-              summary={summary}
-            />
+          <div className="p-2 flex-1 overflow-y-auto">
+            {activeTab === 'recommend' ? (
+              <StrategyRecommendList
+                strategies={strategies}
+                selectedIdx={selectedIdx}
+                onSelect={handleSelectStrategy}
+              />
+            ) : (
+              <LegEditor
+                legs={legs}
+                onAdd={handleAddLeg}
+                onRemove={handleRemoveLeg}
+                onChange={handleChangeLeg}
+              />
+            )}
           </div>
-
-          {/* Col C: Payoff chart */}
-          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">損益圖</p>
-            <PayoffChart data={chartData} summary={summary} price={price} />
-          </div>
-
         </div>
+
+        {/* Col 3：策略解說（7 個區塊）*/}
+        <div className="w-72 flex-shrink-0 border-r border-gray-100 overflow-y-auto p-4 bg-white">
+          <StrategyDetailPanel
+            template={strategies[selectedIdx] ?? null}
+            legs={legs as import('./types').PayoffLeg[]}
+            price={price}
+            summary={summary}
+          />
+        </div>
+
+        {/* Col 4：損益圖 */}
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 min-w-0">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">損益圖</p>
+          <PayoffChart data={chartData} summary={summary} price={price} />
+        </div>
+
+        {/* Col 5：截圖上傳（右側常駐，大型拖曳區）*/}
+        <div className="w-56 flex-shrink-0 border-l border-gray-200 bg-gray-50 flex flex-col">
+          <div className="px-3 pt-3 pb-1">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">截圖分析</p>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <ImageUploadZone onResult={handleOcrResult} />
+          </div>
+        </div>
+
       </div>
     </div>
   )
