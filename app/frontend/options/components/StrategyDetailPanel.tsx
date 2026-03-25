@@ -36,9 +36,9 @@ function Block({
       >
         {icon}
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 overflow-hidden">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{title}</p>
-        <div className="text-sm text-gray-700 leading-relaxed">{children}</div>
+        <div className="text-sm text-gray-700 leading-relaxed break-words">{children}</div>
       </div>
     </div>
   )
@@ -102,11 +102,11 @@ export default function StrategyDetailPanel({ template, legs, price, summary }: 
   const bes          = summary?.breakevens ?? []
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4 min-w-0">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <h2 className="text-base font-bold text-gray-800">{template.name}</h2>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <h2 className="text-sm font-bold text-gray-800 break-words">{template.name}</h2>
           <span
             className="text-xs px-2 py-0.5 rounded-full font-medium"
             style={{

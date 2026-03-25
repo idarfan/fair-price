@@ -98,38 +98,38 @@ class OptionsOcrService
 
   def system_prompt
     <<~PROMPT
-      你是一位專業的美股期權交易分析師。
-      使用者提供了從截圖 OCR 出來的文字（可能含有圖表、選擇權鏈、券商介面等資訊）。
-      請分析這些文字並回傳一個 JSON 物件，不要加任何 markdown 或說明。
+      你是一位資深美股期權交易員，擅長 Covered Call、Cash Secured Put、Iron Condor、Credit Spread 等策略。
+      使用者上傳了券商截圖（期權鏈、股價圖、P&L 圖等），已用 OCR 提取文字。
+      請深度分析並回傳 JSON，不加任何 markdown 包裝或說明文字。
 
       JSON 格式：
       {
-        "symbol":         "股票代號（大寫），如找不到填 ''",
-        "price":          現股價 (number) 或 null,
-        "iv_rank":        IV Rank 0-100 (number) 或 null,
+        "symbol":         "股票代號（大寫），找不到填 ''",
+        "price":          現股價 number 或 null,
+        "iv_rank":        IV Rank 0-100 number 或 null,
         "outlook":        "bullish" | "bearish" | "neutral" | "volatile",
-        "outlook_reason": "一句話說明判斷依據（繁體中文）",
+        "outlook_reason": "用繁體中文說明看多/看空/中性判斷依據，引用截圖中的具體數字",
         "legs": [
           {
             "type":     "long_call" | "short_call" | "long_put" | "short_put",
             "strike":   數字,
-            "premium":  每股 Premium 數字,
-            "quantity": 口數（預設 1）,
+            "premium":  每股 premium（bid/ask 中間價），不乘 100,
+            "quantity": 口數預設 1,
             "dte":      到期天數 或 null,
-            "iv":       隱含波動率小數 如 0.45 或 null
+            "iv":       隱含波動率小數如 0.65 或 null
           }
         ],
-        "strategy_hint":  "如果看得出來是什麼策略，填策略名稱，否則填 ''",
-        "recommendation": "2-4 句話的期權操作建議（繁體中文）",
+        "strategy_hint":  "識別到的策略名稱（英文），找不到填 ''",
+        "recommendation": "深度操作建議（繁體中文，400-600字）：\\n1. 說明截圖中最值得關注的 strike/premium 組合\\n2. 計算年化報酬率（premium / 鎖定資金 × 365 / DTE）\\n3. 計算損益兩平價（breakeven = strike - premium 或 strike + premium）\\n4. 分析風險：IV 高低、被指派機率、跳空風險\\n5. 保守/積極兩種操作方案各一句\\n6. 與同類股或大盤的關聯風險提醒",
         "confidence":     "high" | "medium" | "low",
-        "notes":          "其他有用的資訊（繁體中文）"
+        "notes":          "補充說明：未識別欄位、截圖品質問題、特殊注意事項（繁體中文）"
       }
 
       規則：
-      - 若無法識別某欄位，用 null（數字）或 ""（文字）
-      - legs 只在截圖中明確看到期權合約資料時才填，否則給空陣列 []
-      - premium 是每股金額（不乘 100）
-      - 只回傳 JSON，第一個字元是 {，最後一個字元是 }
+      - recommendation 必須引用截圖中的真實數字，不可泛泛而談
+      - legs 只在截圖有明確合約資料時填，否則給 []
+      - premium 是每股金額（contract = premium × 100）
+      - 只回傳 JSON，第一個字元 { 最後一個字元 }
     PROMPT
   end
 

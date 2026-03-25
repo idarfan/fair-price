@@ -131,3 +131,16 @@ OwnershipApp.tsx（React）
 1. Add route in `config/routes.rb`
 2. Create controller + view（Phlex 或 React 均可）
 3. Add entry to `APP_LINKS` in `app/components/fair_value/app_switcher_component.rb`
+
+## Storybook + Chromatic 視覺回歸測試
+
+**執行指令：**
+```bash
+npx chromatic
+```
+Token 存放位置：**`frontend/.env`**（key: `CHROMATIC_PROJECT_TOKEN`）
+
+> ⚠️ fairprice 尚未建立 Chromatic 專案。需到 chromatic.com 新建，取得專案專屬 token 後寫入 `frontend/.env`。
+>
+> 參考 token 格式：`CHROMATIC_PROJECT_TOKEN=chpt_xxxxxxxxxxxxxxx`
+> （x-order-manager-systems 的 token 在 `/home/idarfan/x-order-manager-systems/frontend/.env`，**不可共用**，每個專案有各自獨立的 snapshot 計數與歷史記錄）

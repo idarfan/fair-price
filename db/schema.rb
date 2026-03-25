@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_16_105726) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_25_113759) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -29,6 +29,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_16_105726) do
     t.datetime "updated_at", null: false
     t.index ["flight_conversation_id", "created_at"], name: "index_flight_messages_on_flight_conversation_id_and_created_at"
     t.index ["flight_conversation_id"], name: "index_flight_messages_on_flight_conversation_id"
+  end
+
+  create_table "options_snapshots", force: :cascade do |t|
+    t.datetime "cached_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
+    t.datetime "created_at", null: false
+    t.decimal "current_price", precision: 10, scale: 4
+    t.string "expiration_date"
+    t.decimal "iv_rank", precision: 5, scale: 2
+    t.decimal "iv_skew", precision: 6, scale: 4
+    t.decimal "pc_ratio", precision: 6, scale: 4
+    t.jsonb "raw_data", default: {}, null: false
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.index ["cached_at"], name: "index_options_snapshots_on_cached_at"
+    t.index ["symbol", "expiration_date"], name: "index_options_snapshots_on_symbol_expiration"
+    t.index ["symbol"], name: "index_options_snapshots_on_symbol"
   end
 
   create_table "ownership_holders", force: :cascade do |t|

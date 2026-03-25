@@ -6,8 +6,8 @@ class FairValue::AppSwitcherComponent < ApplicationComponent
     { icon: "📈", label: "Daily Momentum", href: "/momentum", desc: "每日動量報告" },
     { icon: "📁", label: "Portfolio",      href: "/portfolio", desc: "個人持股追蹤" },
     { icon: "🔔", label: "Watchlist",      href: "/watchlist",  desc: "自選股到價通知" },
+    { icon: "📉", label: "Options",        href: "/options",    desc: "美股期權分析｜策略推薦｜IV Rank" },
     { icon: "🏦", label: "持股結構",       href: "/ownership",  desc: "Watchlist 持股結構變化圖表" },
-    { icon: "📉", label: "Screener",       href: "#",           desc: "選股條件篩選器" },
     { icon: "✈️",  label: "航班查詢",       href: "/flight",   desc: "台日航班專家" }
   ].freeze
 
