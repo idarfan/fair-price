@@ -1,75 +1,32 @@
 # frozen_string_literal: true
 
-require "open3"
-require "tempfile"
+require "base64"
 
-# 流程：EasyOCR（本地 Python）抽文字 → Groq（免費）解讀 → 結構化建議
+# 流程：圖片 base64 → Groq Vision（llama-4-scout）直接解讀 → 結構化建議
+# 移除 EasyOCR 依賴（太慢、需下載大模型、CPU 無法在合理時間內完成）
 class OptionsOcrService
-  GROQ_API  = "https://api.groq.com/openai/v1/chat/completions"
-  MODEL     = "llama-3.3-70b-versatile"
-  PYTHON    = "python3"
-  OCR_SCRIPT = Rails.root.join("scripts", "options_ocr.py").to_s
+  GROQ_API     = "https://api.groq.com/openai/v1/chat/completions"
+  VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
   def initialize(image_file)
     @image_file = image_file
   end
 
   def call
-    # Step 1：把上傳的圖片存到暫存檔
-    tmp = write_temp_image
-    # Step 2：EasyOCR 抽文字
-    raw_text = run_ocr(tmp.path)
-    # Step 3：Groq 解讀 + 生成建議
-    interpret(raw_text)
-  ensure
-    tmp&.close
-    tmp&.unlink
+    b64      = encode_image
+    mime     = @image_file.content_type.to_s.presence || "image/png"
+    analyze_with_vision(b64, mime)
   end
 
   private
 
-  # ── Step 1 ─────────────────────────────────────────────────────────────────
-
-  def write_temp_image
-    ext = case @image_file.content_type.to_s
-          when /jpeg|jpg/ then ".jpg"
-          when /png/      then ".png"
-          when /webp/     then ".webp"
-          else ".png"
-          end
-    tmp = Tempfile.new(["options_ocr", ext], binmode: true)
-    tmp.write(@image_file.read)
-    tmp.flush
-    tmp
+  def encode_image
+    data = @image_file.read
+    raise "圖片太大（上限 3MB）" if data.bytesize > 3 * 1024 * 1024
+    Base64.strict_encode64(data)
   end
 
-  # ── Step 2：EasyOCR subprocess ─────────────────────────────────────────────
-
-  def run_ocr(image_path)
-    stdout, stderr, status = Open3.capture3(PYTHON, OCR_SCRIPT, image_path)
-
-    unless status.success?
-      Rails.logger.error("[OptionsOcr] OCR script error: #{stderr}")
-      raise "OCR 執行失敗，請確認 Python 環境"
-    end
-
-    parsed = JSON.parse(stdout)
-    if parsed["error"]
-      raise "OCR 錯誤：#{parsed['error']}"
-    end
-
-    text = parsed["text"].to_s.strip
-    raise "圖片中未識別到任何文字，請上傳更清晰的截圖" if text.blank?
-
-    Rails.logger.info("[OptionsOcr] Extracted #{parsed['count']} lines")
-    text
-  rescue JSON::ParserError
-    raise "OCR 腳本輸出無法解析"
-  end
-
-  # ── Step 3：Groq 解讀 ──────────────────────────────────────────────────────
-
-  def interpret(raw_text)
+  def analyze_with_vision(b64, mime)
     api_key = ENV.fetch("GROQ_API_KEY") { raise "GROQ_API_KEY not set" }
 
     response = HTTParty.post(
@@ -79,28 +36,36 @@ class OptionsOcrService
         "Content-Type"  => "application/json"
       },
       body: {
-        model:      MODEL,
-        max_tokens: 1024,
+        model:      VISION_MODEL,
+        max_tokens: 1500,
         stream:     false,
         messages: [
-          { role: "system", content: system_prompt },
-          { role: "user",   content: "以下是從截圖 OCR 提取的文字，請分析：\n\n#{raw_text}" }
+          {
+            role:    "user",
+            content: [
+              { type: "text", text: vision_prompt },
+              {
+                type:      "image_url",
+                image_url: { url: "data:#{mime};base64,#{b64}" }
+              }
+            ]
+          }
         ]
       }.to_json,
-      timeout: 30
+      timeout: 60
     )
 
-    raise "Groq API 錯誤 #{response.code}" unless response.success?
+    raise "Groq Vision API 錯誤 #{response.code}" unless response.success?
 
     content = response.parsed_response.dig("choices", 0, "message", "content").to_s.strip
     parse_groq_response(content)
   end
 
-  def system_prompt
+  def vision_prompt
     <<~PROMPT
       你是一位資深美股期權交易員，擅長 Covered Call、Cash Secured Put、Iron Condor、Credit Spread 等策略。
-      使用者上傳了券商截圖（期權鏈、股價圖、P&L 圖等），已用 OCR 提取文字。
-      請深度分析並回傳 JSON，不加任何 markdown 包裝或說明文字。
+      使用者上傳了券商截圖（期權鏈、股價圖、P&L 圖等）。
+      請深度分析截圖內容並回傳 JSON，不加任何 markdown 包裝或說明文字。
 
       JSON 格式：
       {
@@ -120,7 +85,7 @@ class OptionsOcrService
           }
         ],
         "strategy_hint":  "識別到的策略名稱（英文），找不到填 ''",
-        "recommendation": "深度操作建議（繁體中文，400-600字）：\\n1. 說明截圖中最值得關注的 strike/premium 組合\\n2. 計算年化報酬率（premium / 鎖定資金 × 365 / DTE）\\n3. 計算損益兩平價（breakeven = strike - premium 或 strike + premium）\\n4. 分析風險：IV 高低、被指派機率、跳空風險\\n5. 保守/積極兩種操作方案各一句\\n6. 與同類股或大盤的關聯風險提醒",
+        "recommendation": "深度操作建議（繁體中文，400-600字）：\n1. 說明截圖中最值得關注的 strike/premium 組合\n2. 計算年化報酬率（premium / 鎖定資金 × 365 / DTE）\n3. 計算損益兩平價（breakeven = strike - premium 或 strike + premium）\n4. 分析風險：IV 高低、被指派機率、跳空風險\n5. 保守/積極兩種操作方案各一句\n6. 與同類股或大盤的關聯風險提醒",
         "confidence":     "high" | "medium" | "low",
         "notes":          "補充說明：未識別欄位、截圖品質問題、特殊注意事項（繁體中文）"
       }
@@ -135,7 +100,7 @@ class OptionsOcrService
 
   def parse_groq_response(content)
     json_str = content.match(/\{.*\}/m)&.to_s
-    raise "Groq 回應中找不到 JSON" if json_str.blank?
+    raise "Groq Vision 回應中找不到 JSON" if json_str.blank?
 
     raw = JSON.parse(json_str)
 

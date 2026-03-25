@@ -134,7 +134,7 @@ function SymbolBar({
 
 // ─── Header Upload Zone ───────────────────────────────────────────────────────
 
-function HeaderUploadZone({ onResult }: { onResult: (r: OcrResult) => void }) {
+function HeaderUploadZone({ onResult }: { onResult: (r: OcrResult, previewUrl: string) => void }) {
   const [dragging, setDragging] = useState(false)
   const [loading,  setLoading]  = useState(false)
   const [status,   setStatus]   = useState('')
@@ -144,16 +144,18 @@ function HeaderUploadZone({ onResult }: { onResult: (r: OcrResult) => void }) {
     if (!file.type.startsWith('image/')) { setStatus('請上傳圖片檔案'); return }
     setLoading(true)
     setStatus('分析中…')
+    const previewUrl = URL.createObjectURL(file)
     try {
       const fd = new FormData()
       fd.append('image', file)
       const res = await fetch('/api/v1/options/analyze_image', { method: 'POST', body: fd })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '分析失敗')
-      onResult(data as OcrResult)
+      onResult(data as OcrResult, previewUrl)
       setStatus('✅ 分析完成')
       setTimeout(() => setStatus(''), 3000)
     } catch (e) {
+      URL.revokeObjectURL(previewUrl)
       setStatus(e instanceof Error ? `❌ ${e.message}` : '❌ 錯誤')
     } finally {
       setLoading(false)
@@ -220,7 +222,8 @@ export default function OptionsAnalyzerApp({ initialSymbol }: { initialSymbol: s
   const [selectedIdx, setSelectedIdx] = useState(0)
   const [legs,        setLegs]        = useState<LegRow[]>([])
   const [activeTab,   setActiveTab]   = useState<'recommend' | 'custom'>('recommend')
-  const [ocrResult,   setOcrResult]   = useState<OcrResult | null>(null)
+  const [ocrResult,    setOcrResult]    = useState<OcrResult | null>(null)
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null)
 
   const fetchData = useCallback(async (sym: string) => {
     setLoading(true)
@@ -296,8 +299,9 @@ export default function OptionsAnalyzerApp({ initialSymbol }: { initialSymbol: s
     setSymbol(sym)
   }
 
-  const handleOcrResult = useCallback((result: OcrResult) => {
+  const handleOcrResult = useCallback((result: OcrResult, previewUrl: string) => {
     setOcrResult(result)
+    setUploadedImage(previewUrl)
     if (result.symbol) setSymbol(result.symbol)
     if (result.outlook) setOutlook(result.outlook as MarketOutlook)
     if (result.legs.length > 0) {
@@ -396,6 +400,21 @@ export default function OptionsAnalyzerApp({ initialSymbol }: { initialSymbol: s
           <div className="p-4">
             <PayoffChart data={chartData} summary={summary} price={price} />
           </div>
+
+          {/* 上傳的券商截圖縮圖 */}
+          {uploadedImage && (
+            <div className="mx-4 mb-2 flex items-start gap-2">
+              <img
+                src={uploadedImage}
+                alt="券商截圖"
+                className="max-h-48 rounded-xl border border-gray-200 shadow-sm object-contain bg-white"
+              />
+              <button
+                onClick={() => { URL.revokeObjectURL(uploadedImage); setUploadedImage(null) }}
+                className="text-gray-300 hover:text-gray-500 text-xs mt-1"
+              >✕</button>
+            </div>
+          )}
 
           {/* AI 截圖分析結果 */}
           {ocrResult && (ocrResult.recommendation || ocrResult.outlook_reason || ocrResult.notes) && (

@@ -27,7 +27,7 @@ def main():
         img = Image.open(image_path).convert("RGB")
 
         # 初始化 reader（英文 + 繁中，gpu=False 確保 CPU 可用）
-        reader = easyocr.Reader(["en", "ch_tra"], gpu=False, verbose=False)
+        reader = easyocr.Reader(["en"], gpu=False, verbose=False)
         results = reader.readtext(np.array(img))
 
         # 依 Y 座標排序（上→下），同行內依 X 座標排序（左→右）
