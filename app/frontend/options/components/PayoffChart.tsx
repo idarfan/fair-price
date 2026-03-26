@@ -63,7 +63,8 @@ export default function PayoffChart({ data, summary, price }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {summary && <SummaryRow summary={summary} />}
-      <ResponsiveContainer width="100%" height={220}>
+      <div style={{ width: '100%', height: 220 }}>
+      <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
           <defs>
             <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
@@ -136,6 +137,7 @@ export default function PayoffChart({ data, summary, price }: Props) {
           />
         </AreaChart>
       </ResponsiveContainer>
+      </div>
     </div>
   )
 }

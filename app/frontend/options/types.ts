@@ -71,6 +71,9 @@ export interface SentimentData {
 export interface IvRankData {
   symbol:     string
   iv_rank:    number
+  current_hv: number | null
+  hv_high:    number | null
+  hv_low:     number | null
   iv_comment: string
   peers: Array<{ symbol: string; iv: number; iv_rank: number }>
 }

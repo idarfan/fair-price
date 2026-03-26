@@ -5,5 +5,5 @@ import OptionsAnalyzerApp from '../options/OptionsAnalyzerApp'
 const el = document.getElementById('options-root')
 if (el) {
   const symbol: string = JSON.parse(el.dataset.symbol || '""')
-  createRoot(el).render(<OptionsAnalyzerApp initialSymbol={symbol || 'AAPL'} />)
+  createRoot(el).render(<OptionsAnalyzerApp initialSymbol={symbol} />)
 }

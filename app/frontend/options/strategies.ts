@@ -82,6 +82,22 @@ export const STRATEGIES: StrategyMap = {
           scenario: 'WULF $5.00，買 $5.00 Call / 賣 $6.00 Call，淨 Debit ~$0.25 = $25。最大獲利 $75（$100 − $25），風險回報比 1:3。WULF 漲至 $6.00 以上 → 全賺 $75。',
         },
       },
+      {
+        key: 'pmcc', name: 'Poor Man\'s Covered Call（PMCC / 對角價差）',
+        desc: '買長天期深價內 Call 替代持股 + 賣短天期 OTM Call 收租。低資金版 Covered Call。',
+        dte: '長腳 120–180 天 / 短腳 21–35 天', delta: '長腳 0.70+ / 短腳 0.20–0.30', credit: false,
+        maxProfit: '短腳 Strike − 長腳 Strike − 淨 Debit', risk: '淨 Debit（長腳 Premium − 短腳 Premium）',
+        defaultLegs: [
+          { type: 'long_call',  strike: 0, premium: 0, quantity: 1, iv: 0.35, dte: 150 },
+          { type: 'short_call', strike: 0, premium: 0, quantity: 1, iv: 0.33, dte: 30 },
+        ],
+        detail: {
+          what: '用一張長天期深價內（Deep ITM）Call 模擬持有 100 股，同時賣出短天期 OTM Call 收月租。長腳 Delta 接近 0.70–0.80，走勢幾乎等同持股但成本遠低於買 100 股。短腳每月到期後可反覆賣出新的 OTM Call 持續收租。',
+          when: 'IV 低時長腳便宜，適合看好股票長期走勢但資金不足以買 100 股的投資者。相較 Covered Call 需要整筆持股資金，PMCC 只需 1/3 到 1/5 的成本即可建倉。',
+          risks: '股票大跌時長腳 Call 虧損幅度接近持股但 Theta 還在流失；短腳被 Assign 時需要回補（若短腳 Strike < 長腳 Strike + 淨 Debit 會出現虧損）；長腳到期前需要滾動續約（Roll），增加交易成本。',
+          scenario: 'WULF $5.00，買 150 天 $3.50 Call（深 ITM，Delta ~0.75）付 $1.80，賣 30 天 $5.50 Call 收 $0.20。淨 Debit $1.60 = $160，相較買 100 股需 $500 省下 68%。每月收 $20 租金，4 個月回本。',
+        },
+      },
     ],
   },
   bearish: {
@@ -100,6 +116,38 @@ export const STRATEGIES: StrategyMap = {
           when: 'IV 高（賣方有利）、看跌但不想裸賣 Call 承擔無限風險、希望限定保證金需求。適合高 IV 環境下的防守型看空策略。',
           risks: '股票大漲穿過整個 Spread 區間損失固定；兩腳 Bid-Ask 各吃成本；若股票急漲需要快速調整。',
           scenario: 'WULF $5.00，賣 $5.50 Call / 買 $6.00 Call，淨 Credit ~$0.12。只要 WULF 不漲超過 $5.50 就全賺 $12，最大虧損 $38。',
+        },
+      },
+      {
+        key: 'bear_put_spread_hiv', name: 'Bear Put Spread（高 IV 版）',
+        desc: '買高 Strike Put + 賣低 Strike Put，高 IV 時賣出腳抵銷更多成本。',
+        dte: '21–35 天', delta: '淨 −0.30 ~ −0.45', credit: false,
+        maxProfit: '兩 Strike 差 − 淨 Debit', risk: '淨 Debit',
+        defaultLegs: [
+          { type: 'long_put',  strike: 0, premium: 0, quantity: 1, iv: 0.62, dte: 28 },
+          { type: 'short_put', strike: 0, premium: 0, quantity: 1, iv: 0.58, dte: 28 },
+        ],
+        detail: {
+          what: '買入較高 Strike 的 Put（方向腳）＋賣出較低 Strike 的 Put（降低成本）。高 IV 環境下賣出腳的 Premium 更豐厚，能大幅抵銷買入腳的成本，讓淨 Debit 降低、風險回報比提升。結構與低 IV 版相同，但進場時機更有利。',
+          when: 'IV Rank 高但你看跌不想做賣方（怕被軋空頭），想要有方向性的有限風險策略。高 IV 讓 Spread 的淨成本降低，等 IV 回落時還有額外 Vega 獲利。適合財報前建倉看跌。',
+          risks: '股票不跌反漲，損失全部淨 Debit；IV 持續上升時短腳虧損加大（但有長腳保護）；兩腳 Bid-Ask 各吃一次；需要在到期前主動管理。',
+          scenario: 'WULF $5.00，買 $5.00 Put / 賣 $4.00 Put，高 IV 下淨 Debit 僅 ~$0.22 = $22。最大獲利 $78（$100 − $22），風險回報比 1:3.5。WULF 跌至 $4.00 以下全賺。',
+        },
+      },
+      {
+        key: 'put_ratio_backspread', name: 'Put Ratio Backspread（看跌比率回差）',
+        desc: '賣 1 張 ATM Put + 買 2 張 OTM Put，大跌時爆發性獲利。',
+        dte: '30–45 天', delta: '淨 −0.20 ~ −0.40', credit: false,
+        maxProfit: '理論無限（股票跌至 0）', risk: '淨 Debit 或中間甜蜜區最大虧損',
+        defaultLegs: [
+          { type: 'short_put', strike: 0, premium: 0, quantity: 1, iv: 0.58, dte: 35 },
+          { type: 'long_put',  strike: 0, premium: 0, quantity: 2, iv: 0.62, dte: 35 },
+        ],
+        detail: {
+          what: '賣出 1 張較高 Strike（接近 ATM）的 Put 收 Premium，同時買入 2 張較低 Strike 的 Put。建倉可能是小額 Debit 或甚至 Credit。股票大跌時 2 張長腳 Put 的獲利遠超 1 張短腳的虧損，爆發性獲利。股票不動或小跌時有一個虧損甜蜜區（在兩個 Strike 之間）。',
+          when: '預期可能出現大幅下跌（黑天鵝、重大利空），但不確定時間點。高 IV 環境下短腳收的 Premium 多，能大幅降低建倉成本。適合「大部分時間小虧、偶爾大賺」的交易者。',
+          risks: '股票在兩 Strike 之間到期時會出現最大虧損（通常是 1 個 Strike 寬度 − 淨 Credit）；股票小幅下跌比完全不動更糟；需要「真正的大跌」才能獲利，溫和下跌反而虧最多。',
+          scenario: 'WULF $5.00，賣 1x $5.00 Put 收 $0.45 / 買 2x $4.50 Put 付 $0.25 × 2。淨 Credit $0.00（幾乎零成本）。WULF 跌至 $3.50 → 獲利 $50；收在 $4.50 → 最大虧損 $50。',
         },
       },
     ],
@@ -131,6 +179,22 @@ export const STRATEGIES: StrategyMap = {
           when: '看跌但 IV 不算低、希望降低買 Put 的成本、風險有限的看跌策略。適合有方向判斷但不想全押的交易者。',
           risks: '最大獲利有上限；兩腳 Bid-Ask 各吃一次；若股票反彈需要管理損失。',
           scenario: 'WULF $5.00，買 $5.00 Put / 賣 $4.00 Put，淨 Debit ~$0.30 = $30。最大獲利 $70，跌至 $4.00 以下全賺。風險回報比 1:2.3。',
+        },
+      },
+      {
+        key: 'put_diagonal', name: 'Put Diagonal Spread（看跌對角價差）',
+        desc: '買長天期 ITM Put + 賣短天期 OTM Put，低成本版看跌策略，可反覆收租。',
+        dte: '長腳 90–120 天 / 短腳 21–35 天', delta: '長腳 −0.60 / 短腳 −0.20', credit: false,
+        maxProfit: '長腳 Strike − 短腳 Strike − 淨 Debit', risk: '淨 Debit',
+        defaultLegs: [
+          { type: 'long_put',  strike: 0, premium: 0, quantity: 1, iv: 0.40, dte: 100 },
+          { type: 'short_put', strike: 0, premium: 0, quantity: 1, iv: 0.38, dte: 30 },
+        ],
+        detail: {
+          what: '買入長天期價內 Put（方向腳，Delta −0.60 左右）＋賣出短天期 OTM Put（收租腳）。長腳提供看跌方向性，短腳每月到期後可反覆賣出新的 OTM Put 降低持倉成本。類似 PMCC 的看跌版本。',
+          when: 'IV 低時長天期 Put 便宜，適合中長期看跌但不想一次投入太多 Premium。每月賣短腳收租，逐步降低建倉成本。適合有耐心的看空交易者。',
+          risks: '股票反彈上漲時長腳 Put 虧損且 Theta 持續衰減；短腳被 Assign 時需要處理股票部位；滾動短腳時若 IV 持續走低可收租金額遞減。',
+          scenario: 'WULF $5.00，買 100 天 $5.50 Put（ITM，Delta −0.60）付 $1.00，賣 30 天 $4.50 Put 收 $0.15。淨 Debit $0.85 = $85。每月收 $15 租金，3 個月後 WULF 跌至 $4.00 → 長腳獲利 $1.50 − 短腳虧損 $0.50 = 淨獲利 $1.00。',
         },
       },
     ],
@@ -171,6 +235,23 @@ export const STRATEGIES: StrategyMap = {
           scenario: 'WULF $5.00，賣 $4.25 Put / $5.75 Call，收 Premium ~$0.25 = $25。只要 WULF 在 $4.25–$5.75 之間 → 全賺，超出範圍開始虧損。',
         },
       },
+      {
+        key: 'jade_lizard', name: 'Jade Lizard（翡翠蜥蜴）',
+        desc: 'Short Put + Bear Call Spread，上方無風險、下方有風險。高 IV 偏看漲的中性策略。',
+        dte: '21–35 天', delta: '淨 −0.10 ~ −0.25', credit: true,
+        maxProfit: '淨 Credit', risk: 'Put Strike − 淨 Credit（僅下方）',
+        defaultLegs: [
+          { type: 'short_put',  strike: 0, premium: 0, quantity: 1, iv: 0.58, dte: 30 },
+          { type: 'short_call', strike: 0, premium: 0, quantity: 1, iv: 0.53, dte: 30 },
+          { type: 'long_call',  strike: 0, premium: 0, quantity: 1, iv: 0.50, dte: 30 },
+        ],
+        detail: {
+          what: '賣出 OTM Put（下方）＋建立 Bear Call Spread（上方），三條腿合計收到的淨 Credit 大於 Call Spread 的寬度。這意味著上方完全沒有虧損風險（即使股票大漲也不虧），風險只在下方（股票大跌穿過 Put Strike）。',
+          when: 'IV Rank 高、預期股票偏中性或微漲、想要比 Iron Condor 更寬鬆的上方空間。特別適合你不介意接股的標的——最壞情況就是以低價接股，上方完全免擔心。',
+          risks: '股票大跌穿過 Put Strike 虧損無限（和裸賣 Put 相同）；建倉需要確保淨 Credit > Call Spread 寬度（否則上方仍有風險）；三腳 Bid-Ask 成本較高。',
+          scenario: 'WULF $5.00，賣 $4.50 Put 收 $0.18 + 賣 $5.50 Call / 買 $6.00 Call 收 $0.08，淨 Credit $0.26 > $0.50 Spread 寬度 ✗（此例不成立）。實際需要選擇 Premium 更豐厚的 Strike 組合。高 IV 時容易達成條件。',
+        },
+      },
     ],
     low_iv: [
       {
@@ -189,6 +270,40 @@ export const STRATEGIES: StrategyMap = {
           when: 'IV Rank 低時用 Iron Condor 獲利有限，Butterfly 的 ATM 賣出可以拿到更多 Premium。預期股票「幾乎不動」，甜蜜區非常窄但最大獲利很高。',
           risks: '甜蜜區極窄，稍微移動就進入虧損；管理較複雜需要主動調整；不適合有明確方向預期的股票。',
           scenario: 'WULF $5.00，賣 $5.00 Put + $5.00 Call（ATM），買 $4.50 Put + $5.50 Call 翼，淨 Credit ~$0.35 = $35。WULF 到期收 $5.00 → 最大獲利 $35，偏離 $0.50 → 進入虧損。',
+        },
+      },
+      {
+        key: 'call_calendar_spread', name: 'Calendar Spread（Call 行事曆價差）',
+        desc: '賣近月 ATM Call + 買遠月 ATM Call，賺 Theta 差值。低 IV 時遠月便宜。',
+        dte: '近月 21–30 天 / 遠月 50–60 天', delta: '接近 0', credit: false,
+        maxProfit: '近月到期時股票在 Strike 附近', risk: '淨 Debit',
+        defaultLegs: [
+          { type: 'short_call', strike: 0, premium: 0, quantity: 1, iv: 0.38, dte: 25 },
+          { type: 'long_call',  strike: 0, premium: 0, quantity: 1, iv: 0.36, dte: 55 },
+        ],
+        detail: {
+          what: '賣出近月 ATM Call + 買入遠月相同 Strike 的 Call。近月 Call 的 Theta 衰減比遠月快，時間流逝讓近月 Call 更快貶值，產生獲利。近月到期時若股票在 Strike 附近 → 近月歸零，遠月仍有價值 → 最大獲利。',
+          when: 'IV Rank 低、預期短期不動但中期可能有動作。低 IV 時遠月 Call 便宜，建倉成本低。若 IV 在建倉後上升（Long Vega），遠月 Call 價值增加更多 → 額外獲利。',
+          risks: '股票大幅移動（不管方向）讓兩腳的價值差收窄，虧損淨 Debit；近月到期時若股票遠離 Strike → 兩腳都接近零，損失全部投入；IV 下降對遠月影響更大（Long Vega 逆風）。',
+          scenario: 'WULF $5.00，賣 25 天 $5.00 Call 收 $0.30 / 買 55 天 $5.00 Call 付 $0.50，淨 Debit $0.20 = $20。25 天後 WULF 仍在 $5.00 → 近月歸零，遠月剩 ~$0.35 → 獲利 $15（75%）。',
+        },
+      },
+      {
+        key: 'double_diagonal', name: 'Double Diagonal（雙對角價差）',
+        desc: '同時建立 Put 與 Call 的 Calendar Spread，雙向收 Theta 差值。盤整環境的全方位策略。',
+        dte: '近月 21–30 天 / 遠月 50–60 天', delta: '接近 0', credit: false,
+        maxProfit: '近月到期時股票在兩 Strike 之間', risk: '淨 Debit',
+        defaultLegs: [
+          { type: 'short_put',  strike: 0, premium: 0, quantity: 1, iv: 0.40, dte: 25 },
+          { type: 'long_put',   strike: 0, premium: 0, quantity: 1, iv: 0.38, dte: 55 },
+          { type: 'short_call', strike: 0, premium: 0, quantity: 1, iv: 0.38, dte: 25 },
+          { type: 'long_call',  strike: 0, premium: 0, quantity: 1, iv: 0.36, dte: 55 },
+        ],
+        detail: {
+          what: '同時在 OTM Put 和 OTM Call 各建一組 Calendar Spread。近月兩腳 OTM（Delta 較小，Theta 衰減快）、遠月兩腳 OTM（提供方向保護和 Vega 獲利）。比 Iron Condor 多了遠月保護，比 Calendar Spread 多了第二個方向。',
+          when: 'IV 低、預期短期盤整、想要比 Iron Butterfly 更寬的盈利區間。若 IV 在建倉後上升，四腳中遠月受益更多（Long Vega）。適合有耐心管理多腳策略的交易者。',
+          risks: '四腳策略管理複雜，Bid-Ask 成本高；股票大幅移動讓所有腳的時間差值消失；近月到期時需要決定是否平倉遠月或繼續滾動。',
+          scenario: 'WULF $5.00，賣近月 $4.50 Put + $5.50 Call，買遠月 $4.50 Put + $5.50 Call，淨 Debit 合計 ~$0.30 = $30。近月到期 WULF 在 $4.50–$5.50 之間 → 近月歸零，遠月仍有價值 → 獲利 ~$20。',
         },
       },
     ],
@@ -280,6 +395,41 @@ export function buildLegsForPrice(
       // [long_call(low), short_call×2(ATM), long_call(high)]
       const offsets = [-2, 0, 2]
       strike = Math.round((price + offsets[i] * step) / step) * step
+
+    } else if (template.key === 'jade_lizard') {
+      // [short_put(OTM), short_call(OTM), long_call(further OTM)]
+      const offsets = [-1, 1, 2]
+      strike = Math.round((price + offsets[i] * step * 1.5) / step) * step
+
+    } else if (template.key === 'put_ratio_backspread') {
+      // [short_put(ATM), long_put×2(OTM)]
+      const offsets = [0, -1]
+      strike = Math.round((price + offsets[i] * step) / step) * step
+
+    } else if (template.key === 'double_diagonal') {
+      // [short_put(near OTM), long_put(far OTM), short_call(near OTM), long_call(far OTM)]
+      const offsets = [-1, -1, 1, 1]
+      strike = Math.round((price + offsets[i] * step * 1.5) / step) * step
+
+    } else if (template.key === 'call_calendar_spread') {
+      // Both legs ATM
+      strike = Math.round(price / step) * step
+
+    } else if (template.key === 'pmcc') {
+      // [long_call(deep ITM far), short_call(OTM near)]
+      if (i === 0) {
+        strike = Math.round((price * 0.75) / step) * step // deep ITM
+      } else {
+        strike = Math.round((price * 1.10) / step) * step // OTM
+      }
+
+    } else if (template.key === 'put_diagonal') {
+      // [long_put(ITM far), short_put(OTM near)]
+      if (i === 0) {
+        strike = Math.round((price * 1.10) / step) * step // ITM put
+      } else {
+        strike = Math.round((price * 0.90) / step) * step // OTM put
+      }
 
     } else if (template.defaultLegs.length === 2 && i === 0) {
       strike = leg.type.includes('put')

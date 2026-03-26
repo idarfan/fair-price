@@ -20,7 +20,10 @@ module Api
       # GET /api/v1/options/:symbol/iv_rank
       def iv_rank
         symbol = sanitize_symbol(params[:symbol])
-        render json: mock_iv_rank(symbol)
+        data = Rails.cache.fetch("iv_rank/#{symbol}", expires_in: CACHE_TTL) do
+          IvRankService.new(symbol).call
+        end
+        render json: data
       end
 
       # POST /api/v1/options/analyze_image
@@ -33,7 +36,9 @@ module Api
           return render json: { error: "只接受圖片格式（JPG / PNG / WebP）" }, status: :unprocessable_entity
         end
 
-        result = OptionsOcrService.new(image).call
+        system_data = parse_system_data(params[:system_data])
+        Rails.logger.info("[OptionsOCR] system_data keys=#{system_data.keys} iv_rank=#{system_data['iv_rank']} current_hv=#{system_data['current_hv']}")
+        result = OptionsOcrService.new(image, system_data: system_data).call
         render json: result
       rescue => e
         render json: { error: e.message }, status: :unprocessable_entity
@@ -65,6 +70,13 @@ module Api
         raw.to_s.upcase.gsub(/[^A-Z0-9.\-]/, "").first(10)
       end
 
+      def parse_system_data(raw)
+        return {} if raw.blank?
+        JSON.parse(raw).slice("symbol", "price", "iv_rank", "current_hv", "hv_high", "hv_low", "iv_comment", "peers")
+      rescue JSON::ParserError
+        {}
+      end
+
       # ── Mock data（後續替換為 YahooOptionsService 呼叫）─────────────
 
       def mock_chain(symbol)
@@ -92,19 +104,6 @@ module Api
           otm_call_iv:       0.54,
           skew_comment:      "Put Skew 偏高，市場高度警戒下行風險",
           oi_distribution:   mock_oi(price)
-        }
-      end
-
-      def mock_iv_rank(symbol)
-        {
-          symbol:     symbol,
-          iv_rank:    72.0,
-          iv_comment: "IV Rank 72 — 偏高，賣方策略有利",
-          peers: [
-            { symbol: "AMD",  iv: 0.45, iv_rank: 62 },
-            { symbol: "AVGO", iv: 0.31, iv_rank: 41 },
-            { symbol: "QCOM", iv: 0.28, iv_rank: 35 }
-          ]
         }
       end
 

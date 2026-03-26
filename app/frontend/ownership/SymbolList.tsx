@@ -1,45 +1,10 @@
-import React, { useState } from 'react'
+import StockLogo from '../components/StockLogo'
 
 interface Props {
   symbols:  string[]
   selected: string | null
   loading:  boolean
   onFetch:  (symbol: string) => void
-}
-
-function StockLogo({ symbol }: { symbol: string }) {
-  const [src, setSrc] = useState(
-    `https://assets.parqet.com/logos/symbol/${symbol}?format=jpg`
-  )
-  const [failed, setFailed] = useState(false)
-
-  function handleError() {
-    if (!src.includes('finnhub')) {
-      setSrc(`https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/${symbol}.png`)
-    } else {
-      setFailed(true)
-    }
-  }
-
-  if (failed) {
-    return (
-      <span
-        className="w-7 h-7 rounded-full bg-gray-600 text-white font-bold flex items-center justify-center flex-shrink-0"
-        style={{ fontSize: '8px' }}
-      >
-        {symbol.slice(0, 2)}
-      </span>
-    )
-  }
-
-  return (
-    <img
-      src={src}
-      alt={symbol}
-      onError={handleError}
-      className="w-7 h-7 rounded-full object-contain border border-gray-600 bg-white flex-shrink-0"
-    />
-  )
 }
 
 export default function SymbolList({ symbols, selected, loading, onFetch }: Props) {

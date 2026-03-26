@@ -41,6 +41,62 @@ function legPnl(leg: PayoffLeg, S: number, mode: 'expiry' | 'theory'): number {
   return Math.round(pnl * leg.quantity * MULT * 100) / 100
 }
 
+// ─── Greeks 計算 ──────────────────────────────────────────────────────────────
+
+export interface LegGreeks {
+  delta: number
+  theta: number   // 每日 Theta（負值 = 時間衰減）
+  iv:    number   // 年化 IV（小數）
+}
+
+/** 計算單條腿的 Delta 和 Theta（Black-Scholes） */
+export function calcLegGreeks(leg: PayoffLeg, price: number): LegGreeks | null {
+  const iv  = leg.iv
+  const dte = leg.dte
+  if (!iv || !dte || dte <= 0 || leg.type.includes('stock') || price <= 0) return null
+
+  const T   = dte / 365
+  const r   = 0.043  // 無風險利率
+  const d1  = (Math.log(price / leg.strike) + (r + iv * iv / 2) * T) / (iv * Math.sqrt(T))
+
+  const sign = leg.type.startsWith('long') ? 1 : -1
+  const isCall = leg.type.includes('call')
+
+  // Delta
+  const rawDelta = isCall ? normCDF(d1) : normCDF(d1) - 1
+  const delta = rawDelta * sign * leg.quantity
+
+  // Theta（每日）
+  const nd1 = Math.exp(-d1 * d1 / 2) / Math.sqrt(2 * Math.PI) // N'(d1)
+  const d2 = d1 - iv * Math.sqrt(T)
+  let rawTheta: number
+  if (isCall) {
+    rawTheta = -(price * nd1 * iv) / (2 * Math.sqrt(T)) - r * leg.strike * Math.exp(-r * T) * normCDF(d2)
+  } else {
+    rawTheta = -(price * nd1 * iv) / (2 * Math.sqrt(T)) + r * leg.strike * Math.exp(-r * T) * normCDF(-d2)
+  }
+  const theta = (rawTheta / 365) * sign * leg.quantity * 100  // per contract per day
+
+  return { delta: Math.round(delta * 1000) / 1000, theta: Math.round(theta * 100) / 100, iv }
+}
+
+/** 計算整組策略的 Greeks 彙總 */
+export function calcPositionGreeks(legs: PayoffLeg[], price: number): { netDelta: number; netTheta: number } {
+  let netDelta = 0
+  let netTheta = 0
+  for (const leg of legs) {
+    const g = calcLegGreeks(leg, price)
+    if (g) {
+      netDelta += g.delta
+      netTheta += g.theta
+    }
+  }
+  return {
+    netDelta: Math.round(netDelta * 1000) / 1000,
+    netTheta: Math.round(netTheta * 100) / 100,
+  }
+}
+
 export function buildChartData(legs: PayoffLeg[], price: number): PayoffPoint[] {
   const strikes = legs.map(l => l.strike).filter(s => s > 0)
   const center = strikes.length ? strikes.reduce((a, b) => a + b, 0) / strikes.length : price
