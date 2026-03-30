@@ -94,8 +94,14 @@ Shared infrastructure:
 ```
 ValuationsController#show
   └── StockDataService.fetch(ticker)       → Finnhub /quote, /metric, /profile2, /recommendation
-        └── ValuationService.calculate(data, discount_rate)
-              → classifies stock type → applies DCF/P-E/PEG/DDM/P-B/EV-EBITDA
+        └── ValuationService.analyze(data, discount_rate)
+              → classify() → estimate_growth_rate() → apply_methods(stock_type, growth_rate)
+                    → 一般股:   [DCF, P/E, PEG]
+                    → 金融股:   [ExcessRet, P/E, P/B]
+                    → REITs:    [DDM, DCF, P/B]
+                    → 公用事業: [DDM, DCF, P/E]
+                    → 虧損成長股: [Rev×3, DCF]
+                    → 週期股:   [EV/EBITDA, P/B, DCF]
 ```
 
 Stock type classification drives which valuation methods are used. To add a new method: write a private method returning `{ method:, value:, note:, formula: }` and add it to the relevant `*_methods` array.
@@ -105,9 +111,10 @@ Stock type classification drives which valuation methods are used. To add a new 
 ```
 ReportsController#index
   └── MomentumReportService#call
-        ├── FinnhubService#quote("^VIX")   → vix
+        ├── VixService#fetch               → vix
         ├── FinnhubService#quote(symbol)×N → stocks（symbols from config/watchlist.yml）
-        ├── FinnhubService#market_news     → news
+        ├── YahooFinanceService#chart      → es_change, nq_change（期貨）
+        ├── YahooFinanceService#chart      → 52 週高低點
         └── FinnhubService#earnings_calendar → earnings
 ```
 
@@ -122,8 +129,9 @@ OwnershipApp.tsx（React）
   └── GET  /api/v1/ownership_snapshots/:ticker?range=1w|1m|90d
   └── POST /api/v1/ownership_snapshots/:ticker（手動更新快照）
         └── Api::V1::OwnershipSnapshotsController
-              └── YahooFinanceService#holders → OwnershipSnapshotService#save_snapshot
-                    → OwnershipSnapshot（ticker+quarter 唯一）+ OwnershipHolder
+              └── YahooFinanceService#holders（失敗則 fallback: SecEdgarService#holders）
+                    → OwnershipSnapshotService#save_snapshot
+                          → OwnershipSnapshot（ticker+quarter 唯一）+ OwnershipHolder
 ```
 
 ## Adding a new tool to the sidebar
@@ -138,9 +146,4 @@ OwnershipApp.tsx（React）
 ```bash
 npx chromatic
 ```
-Token 存放位置：**`frontend/.env`**（key: `CHROMATIC_PROJECT_TOKEN`）
-
-> ⚠️ fairprice 尚未建立 Chromatic 專案。需到 chromatic.com 新建，取得專案專屬 token 後寫入 `frontend/.env`。
->
-> 參考 token 格式：`CHROMATIC_PROJECT_TOKEN=chpt_xxxxxxxxxxxxxxx`
-> （x-order-manager-systems 的 token 在 `/home/idarfan/x-order-manager-systems/frontend/.env`，**不可共用**，每個專案有各自獨立的 snapshot 計數與歷史記錄）
+Token 存放位置：**`.env`**（根目錄，key: `CHROMATIC_PROJECT_TOKEN`）
