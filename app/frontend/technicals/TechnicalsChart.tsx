@@ -1,11 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  ComposedChart, Line, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, ReferenceLine, Cell,
-} from 'recharts'
+  createChart,
+  ColorType,
+  LineStyle,
+  CrosshairMode,
+  type IChartApi,
+  type UTCTimestamp,
+  type Time,
+} from 'lightweight-charts'
 
 interface DataPoint {
+  time: string | number
   date: string
+  open: number
+  high: number
+  low: number
   close: number
   volume: number
   ma20: number | null
@@ -47,6 +56,12 @@ const RANGES: { key: Range; label: string }[] = [
   { key: '1y', label: '1Y' },
 ]
 
+const INTRADAY: Range[] = ['1d', '5d']
+
+function toTime(t: string | number): Time {
+  return typeof t === 'number' ? (t as UTCTimestamp) : t
+}
+
 function rsiColor(v: number | null): string {
   if (v === null) return '#94a3b8'
   if (v >= 70) return '#f87171'
@@ -67,10 +82,7 @@ function fmtVol(v: number): string {
 }
 
 function StatCard({ label, value, sub, valueColor }: {
-  label: string
-  value: string
-  sub: string
-  valueColor?: string
+  label: string; value: string; sub: string; valueColor?: string
 }) {
   return (
     <div style={{ background: '#0f172a', borderRadius: 8, padding: '10px 12px' }}>
@@ -81,7 +93,21 @@ function StatCard({ label, value, sub, valueColor }: {
   )
 }
 
-const TICK = { fill: '#64748b', fontSize: 11 }
+const CHART_OPTS = {
+  layout: {
+    background: { type: ColorType.Solid, color: '#1e293b' },
+    textColor: '#64748b',
+  },
+  grid: {
+    vertLines: { color: '#1e293b' },
+    horzLines: { color: '#243347' },
+  },
+  crosshair: { mode: CrosshairMode.Normal },
+  rightPriceScale: { borderColor: '#334155' },
+  timeScale: { borderColor: '#334155' },
+  handleScroll: true,
+  handleScale: true,
+}
 
 export default function TechnicalsChart({ symbol }: { symbol: string }) {
   const [range, setRange] = useState<Range>('1m')
@@ -91,6 +117,11 @@ export default function TechnicalsChart({ symbol }: { symbol: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
+  const priceRef = useRef<HTMLDivElement>(null)
+  const volRef   = useRef<HTMLDivElement>(null)
+  const rsiRef   = useRef<HTMLDivElement>(null)
+
+  // ── Fetch ──────────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true)
     setError(false)
@@ -105,17 +136,172 @@ export default function TechnicalsChart({ symbol }: { symbol: string }) {
         setSr(json.support_resistance ?? { support: [], resistance: [] })
         setLoading(false)
       })
-      .catch(() => {
-        setError(true)
-        setLoading(false)
-      })
+      .catch(() => { setError(true); setLoading(false) })
   }, [symbol, range])
 
-  const volLabel = stats?.vol_label ?? ''
+  // ── Charts ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!priceRef.current || !volRef.current || !rsiRef.current) return
+    if (data.length === 0) return
+
+    const intraday = INTRADAY.includes(range)
+
+    // ── Price chart ──
+    const priceChart: IChartApi = createChart(priceRef.current, {
+      ...CHART_OPTS,
+      height: 280,
+      timeScale: {
+        ...CHART_OPTS.timeScale,
+        timeVisible: intraday,
+        secondsVisible: false,
+      },
+    })
+
+    const candleSeries = priceChart.addCandlestickSeries({
+      upColor: '#4ade80', downColor: '#f87171',
+      borderVisible: false,
+      wickUpColor: '#4ade80', wickDownColor: '#f87171',
+    })
+    candleSeries.setData(data.map(d => ({
+      time: toTime(d.time),
+      open: d.open, high: d.high, low: d.low, close: d.close,
+    })))
+
+    const ma20Data = data.filter(d => d.ma20 != null)
+      .map(d => ({ time: toTime(d.time), value: d.ma20! }))
+    if (ma20Data.length > 0) {
+      const ma20 = priceChart.addLineSeries({
+        color: '#fbbf24', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+      })
+      ma20.setData(ma20Data)
+    }
+
+    const ma50Data = data.filter(d => d.ma50 != null)
+      .map(d => ({ time: toTime(d.time), value: d.ma50! }))
+    if (ma50Data.length > 0) {
+      const ma50 = priceChart.addLineSeries({
+        color: '#f87171', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+      })
+      ma50.setData(ma50Data)
+    }
+
+    // S&R price lines (right on the candlestick axis, with labels)
+    sr.support.forEach(lvl => {
+      candleSeries.createPriceLine({
+        price: lvl, color: '#34d399', lineWidth: 1,
+        lineStyle: LineStyle.Dashed, axisLabelVisible: true,
+        title: `支 $${lvl}`,
+      })
+    })
+    sr.resistance.forEach(lvl => {
+      candleSeries.createPriceLine({
+        price: lvl, color: '#fb923c', lineWidth: 1,
+        lineStyle: LineStyle.Dashed, axisLabelVisible: true,
+        title: `阻 $${lvl}`,
+      })
+    })
+
+    priceChart.timeScale().fitContent()
+
+    // ── Volume chart ──
+    const volChart: IChartApi = createChart(volRef.current, {
+      ...CHART_OPTS,
+      height: 80,
+      timeScale: { ...CHART_OPTS.timeScale, timeVisible: false },
+      rightPriceScale: {
+        ...CHART_OPTS.rightPriceScale,
+        scaleMargins: { top: 0.1, bottom: 0 },
+      },
+    })
+
+    let prevClose: number | null = null
+    const volSeries = volChart.addHistogramSeries({
+      priceFormat: { type: 'volume' },
+      priceLineVisible: false,
+      lastValueVisible: false,
+    })
+    volSeries.setData(data.map(d => {
+      const color = d.close >= (prevClose ?? d.close)
+        ? 'rgba(74,222,128,0.65)' : 'rgba(248,113,113,0.65)'
+      prevClose = d.close
+      return { time: toTime(d.time), value: d.volume, color }
+    }))
+
+    const avgVolSeries = volChart.addLineSeries({
+      color: '#f59e0b', lineWidth: 1, lineStyle: LineStyle.Dashed,
+      priceLineVisible: false, lastValueVisible: false,
+    })
+    avgVolSeries.setData(data.map(d => ({ time: toTime(d.time), value: d.avg_vol })))
+    volChart.timeScale().fitContent()
+
+    // ── RSI chart ──
+    const rsiChart: IChartApi = createChart(rsiRef.current, {
+      ...CHART_OPTS,
+      height: 80,
+      timeScale: { ...CHART_OPTS.timeScale, timeVisible: false },
+      rightPriceScale: {
+        ...CHART_OPTS.rightPriceScale,
+        scaleMargins: { top: 0.1, bottom: 0.1 },
+      },
+    })
+
+    const rsi14Data = data.filter(d => d.rsi14 != null)
+      .map(d => ({ time: toTime(d.time), value: d.rsi14! }))
+    const rsi7Data  = data.filter(d => d.rsi7  != null)
+      .map(d => ({ time: toTime(d.time), value: d.rsi7!  }))
+
+    if (rsi14Data.length > 0) {
+      const rsi14 = rsiChart.addLineSeries({
+        color: '#a78bfa', lineWidth: 2, priceLineVisible: false, lastValueVisible: false,
+      })
+      rsi14.setData(rsi14Data)
+      rsi14.createPriceLine({ price: 70, color: '#f87171', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: '' })
+      rsi14.createPriceLine({ price: 30, color: '#4ade80', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: '' })
+    }
+    if (rsi7Data.length > 0) {
+      const rsi7 = rsiChart.addLineSeries({
+        color: '#38bdf8', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+      })
+      rsi7.setData(rsi7Data)
+    }
+    rsiChart.timeScale().fitContent()
+
+    // ── Sync time scales ──
+    let syncing = false
+    const sync = (src: IChartApi, targets: IChartApi[]) => {
+      src.timeScale().subscribeVisibleLogicalRangeChange(r => {
+        if (syncing || r === null) return
+        syncing = true
+        targets.forEach(c => c.timeScale().setVisibleLogicalRange(r))
+        syncing = false
+      })
+    }
+    sync(priceChart, [volChart, rsiChart])
+    sync(volChart,   [priceChart, rsiChart])
+    sync(rsiChart,   [priceChart, volChart])
+
+    // ── Resize ──
+    const observer = new ResizeObserver(() => {
+      const w = priceRef.current?.offsetWidth ?? 0
+      if (w === 0) return
+      priceChart.applyOptions({ width: w })
+      volChart.applyOptions({ width: w })
+      rsiChart.applyOptions({ width: w })
+    })
+    if (priceRef.current) observer.observe(priceRef.current)
+
+    return () => {
+      observer.disconnect()
+      priceChart.remove()
+      volChart.remove()
+      rsiChart.remove()
+    }
+  }, [data, sr, range])
+
+  const volLabel      = stats?.vol_label ?? ''
   const volBadgeColor =
     volLabel === '爆量' || volLabel === '放量' ? '#4ade80'
-    : volLabel === '縮量' ? '#f87171'
-    : '#94a3b8'
+    : volLabel === '縮量' ? '#f87171' : '#94a3b8'
 
   return (
     <div style={{ background: '#1e293b', borderRadius: 12, padding: 16, fontFamily: 'system-ui, sans-serif' }}>
@@ -167,136 +353,48 @@ export default function TechnicalsChart({ symbol }: { symbol: string }) {
       )}
 
       {loading && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 380, color: '#64748b', fontSize: 13 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 460, color: '#64748b', fontSize: 13 }}>
           載入中...
         </div>
       )}
-
       {error && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 380, color: '#f87171', fontSize: 13 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 460, color: '#f87171', fontSize: 13 }}>
           資料載入失敗，請稍後重試
         </div>
       )}
 
-      {!loading && !error && data.length > 0 && (
-        <>
-          {/* Price chart */}
-          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>收盤價 + MA20 + MA50</div>
-          <ResponsiveContainer width="100%" height={220}>
-            <ComposedChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <XAxis dataKey="date" tick={TICK} tickLine={false} minTickGap={40} />
-              <YAxis tick={TICK} tickLine={false} axisLine={false} width={52}
-                tickFormatter={v => `$${Math.round(v as number)}`} />
-              <Tooltip
-                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 6, fontSize: 12 }}
-                labelStyle={{ color: '#94a3b8' }}
-                itemStyle={{ color: '#e2e8f0' }}
-                formatter={(v: unknown) => [`$${(v as number).toFixed(2)}`]}
-              />
-              {sr.support.map(lvl => (
-                <ReferenceLine key={`s${lvl}`} y={lvl} stroke="#34d399" strokeWidth={1.5}
-                  strokeDasharray="5 3"
-                  label={{ value: `支 $${lvl}`, position: 'insideTopLeft', fill: '#34d399', fontSize: 11, fontWeight: 600 }} />
-              ))}
-              {sr.resistance.map(lvl => (
-                <ReferenceLine key={`r${lvl}`} y={lvl} stroke="#fb923c" strokeWidth={1.5}
-                  strokeDasharray="5 3"
-                  label={{ value: `阻 $${lvl}`, position: 'insideBottomLeft', fill: '#fb923c', fontSize: 11, fontWeight: 600 }} />
-              ))}
-              <Line dataKey="close" stroke="#60a5fa" strokeWidth={2} dot={false} name="收盤價" />
-              <Line dataKey="ma20"  stroke="#fbbf24" strokeWidth={1.5} dot={false} name="MA20" connectNulls />
-              <Line dataKey="ma50"  stroke="#f87171" strokeWidth={1.5} dot={false} name="MA50" connectNulls />
-            </ComposedChart>
-          </ResponsiveContainer>
-          <div style={{ display: 'flex', gap: 14, marginTop: 6, marginBottom: 14, fontSize: 11, color: '#94a3b8', flexWrap: 'wrap' }}>
-            {[['#60a5fa', '收盤價'], ['#fbbf24', 'MA20'], ['#f87171', 'MA50']].map(([c, l]) => (
-              <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ width: 18, height: 2, background: c, borderRadius: 1, display: 'inline-block' }} />
-                {l}
-              </span>
-            ))}
-            {sr.support.length > 0 && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ width: 18, height: 0, borderTop: '2px dashed #34d399', display: 'inline-block' }} />
-                支撐
-              </span>
-            )}
-            {sr.resistance.length > 0 && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ width: 18, height: 0, borderTop: '2px dashed #fb923c', display: 'inline-block' }} />
-                阻力
-              </span>
-            )}
-          </div>
+      {/* Charts — always rendered so refs are available; hidden while loading */}
+      <div style={{ display: loading || error ? 'none' : 'block' }}>
 
-          {/* Volume chart */}
-          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-            成交量
-            <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, fontWeight: 500,
-              background: volLabel === '爆量' || volLabel === '放量' ? 'rgba(74,222,128,0.15)' : volLabel === '縮量' ? 'rgba(248,113,113,0.15)' : 'rgba(148,163,184,0.15)',
-              color: volBadgeColor }}>
-              {volLabel}
-            </span>
-            {stats && <span style={{ fontSize: 11, color: '#64748b' }}>今日 {stats.vol_ratio_pct}% 均量</span>}
-          </div>
-          <ResponsiveContainer width="100%" height={80}>
-            <ComposedChart data={data} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
-              <XAxis dataKey="date" tick={false} tickLine={false} />
-              <YAxis tick={{ ...TICK, fontSize: 10 }} tickLine={false} axisLine={false} width={44}
-                tickFormatter={v => fmtVol(v as number)} />
-              <Tooltip
-                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 6, fontSize: 12 }}
-                labelStyle={{ color: '#94a3b8' }}
-                formatter={(v: unknown) => [fmtVol(v as number)]}
-              />
-              <Bar dataKey="volume" name="成交量" maxBarSize={12}>
-                {data.map((d, i) => (
-                  <Cell key={i} fill={i === 0 || d.close >= (data[i - 1]?.close ?? d.close)
-                    ? 'rgba(74,222,128,0.7)' : 'rgba(248,113,113,0.7)'} />
-                ))}
-              </Bar>
-              <Line dataKey="avg_vol" stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="5 4"
-                dot={false} name="20日均量" />
-            </ComposedChart>
-          </ResponsiveContainer>
-          <div style={{ display: 'flex', gap: 14, marginTop: 6, marginBottom: 14, fontSize: 11, color: '#94a3b8' }}>
-            {[['rgba(74,222,128,0.7)', '漲日'], ['rgba(248,113,113,0.7)', '跌日'], ['#f59e0b', '均量']].map(([c, l]) => (
-              <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ width: 18, height: 2, background: c, borderRadius: 1, display: 'inline-block' }} />
-                {l}
-              </span>
-            ))}
-          </div>
+        {/* Price: candlestick + MA + S/R */}
+        <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+          K線 + MA20 + MA50
+          {sr.support.length > 0 && <span style={{ color: '#34d399' }}>── 支撐</span>}
+          {sr.resistance.length > 0 && <span style={{ color: '#fb923c' }}>── 阻力</span>}
+        </div>
+        <div ref={priceRef} style={{ width: '100%' }} />
 
-          {/* RSI chart */}
-          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>
-            RSI (14) / RSI (7) — 超買 &gt;70 / 超賣 &lt;30
-          </div>
-          <ResponsiveContainer width="100%" height={80}>
-            <ComposedChart data={data} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
-              <XAxis dataKey="date" tick={false} tickLine={false} />
-              <YAxis domain={[0, 100]} tick={{ ...TICK, fontSize: 10 }} tickLine={false}
-                axisLine={false} width={28} ticks={[0, 30, 70, 100]} />
-              <Tooltip
-                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 6, fontSize: 12 }}
-                labelStyle={{ color: '#94a3b8' }}
-              />
-              <ReferenceLine y={70} stroke="#f87171" strokeWidth={1} strokeDasharray="4 4" />
-              <ReferenceLine y={30} stroke="#4ade80" strokeWidth={1} strokeDasharray="4 4" />
-              <Line dataKey="rsi14" stroke="#a78bfa" strokeWidth={2} dot={false} name="RSI14" connectNulls />
-              <Line dataKey="rsi7"  stroke="#38bdf8" strokeWidth={1.5} dot={false} name="RSI7"  connectNulls />
-            </ComposedChart>
-          </ResponsiveContainer>
-          <div style={{ display: 'flex', gap: 14, marginTop: 6, fontSize: 11, color: '#94a3b8' }}>
-            {[['#a78bfa', 'RSI (14) 慢線'], ['#38bdf8', 'RSI (7) 快線']].map(([c, l]) => (
-              <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ width: 18, height: 2, background: c, borderRadius: 1, display: 'inline-block' }} />
-                {l}
-              </span>
-            ))}
-          </div>
-        </>
-      )}
+        {/* Volume */}
+        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 10, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+          成交量
+          <span style={{
+            fontSize: 10, padding: '1px 6px', borderRadius: 4, fontWeight: 500,
+            background: volLabel === '爆量' || volLabel === '放量' ? 'rgba(74,222,128,0.15)' : volLabel === '縮量' ? 'rgba(248,113,113,0.15)' : 'rgba(148,163,184,0.15)',
+            color: volBadgeColor,
+          }}>
+            {volLabel}
+          </span>
+          {stats && <span style={{ fontSize: 11, color: '#64748b' }}>今日 {stats.vol_ratio_pct}% 均量</span>}
+        </div>
+        <div ref={volRef} style={{ width: '100%' }} />
+
+        {/* RSI */}
+        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 10, marginBottom: 4 }}>
+          RSI (14) / RSI (7) — 超買 &gt;70 / 超賣 &lt;30
+        </div>
+        <div ref={rsiRef} style={{ width: '100%' }} />
+
+      </div>
     </div>
   )
 }

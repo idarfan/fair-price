@@ -19,18 +19,28 @@ class YahooFinanceService
     return empty_result unless result
 
     meta       = result["meta"] || {}
-    closes     = (result.dig("indicators", "quote", 0, "close")  || []).compact.map(&:to_f)
-    volumes    = (result.dig("indicators", "quote", 0, "volume") || []).compact.map(&:to_i)
-    timestamps = (result["timestamp"] || []).map(&:to_i)
+    quote = result.dig("indicators", "quote", 0) || {}
+    raw_ts  = result["timestamp"] || []
+    raw_o   = quote["open"]   || []
+    raw_h   = quote["high"]   || []
+    raw_l   = quote["low"]    || []
+    raw_c   = quote["close"]  || []
+    raw_v   = quote["volume"] || []
+
+    # Zip and drop bars where close is nil
+    zipped = raw_ts.zip(raw_o, raw_h, raw_l, raw_c, raw_v).select { |_, _, _, _, c, _| c }
 
     {
       high_52w:   meta["fiftyTwoWeekHigh"]&.to_f&.round(2),
       low_52w:    meta["fiftyTwoWeekLow"]&.to_f&.round(2),
       volume:     meta["regularMarketVolume"]&.to_i,
       change_pct: compute_change_pct(meta),
-      closes:     closes,
-      volumes:    volumes,
-      timestamps: timestamps
+      timestamps: zipped.map { |ts, *| ts.to_i },
+      opens:      zipped.map { |_, o, *| o&.to_f },
+      highs:      zipped.map { |_, _, h, *| h&.to_f },
+      lows:       zipped.map { |_, _, _, l, *| l&.to_f },
+      closes:     zipped.map { |_, _, _, _, c, _| c.to_f },
+      volumes:    zipped.map { |_, _, _, _, _, v| v.to_i }
     }
   rescue StandardError => e
     Rails.logger.warn("[YahooFinance] #{symbol} failed: #{e.message}")
@@ -132,7 +142,8 @@ class YahooFinanceService
   end
 
   def empty_result
-    { high_52w: nil, low_52w: nil, volume: nil, change_pct: nil, closes: [], volumes: [], timestamps: [] }
+    { high_52w: nil, low_52w: nil, volume: nil, change_pct: nil,
+      timestamps: [], opens: [], highs: [], lows: [], closes: [], volumes: [] }
   end
 
   def empty_holders

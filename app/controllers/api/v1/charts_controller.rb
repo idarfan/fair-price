@@ -23,9 +23,13 @@ class Api::V1::ChartsController < ApplicationController
     closes     = raw[:closes]
     volumes    = raw[:volumes]
     timestamps = raw[:timestamps]
+    opens      = raw[:opens]
+    highs      = raw[:highs]
+    lows       = raw[:lows]
 
     intraday = INTRADAY_RANGES.include?(range_key)
-    labels = build_labels(timestamps, closes.length, intraday: intraday, range_key: range_key)
+    labels      = build_labels(timestamps, closes.length, intraday: intraday, range_key: range_key)
+    time_values = build_time_values(timestamps, closes.length, intraday: intraday)
     ma20   = calc_ma(closes, 20)
     ma50   = calc_ma(closes, 50)
     rsi14  = calc_rsi(closes, 14)
@@ -33,9 +37,14 @@ class Api::V1::ChartsController < ApplicationController
     avg_vol = volumes.sum.to_f / volumes.length
 
     data = closes.each_with_index.map do |close, i|
+      c = close.round(2)
       {
+        time:    time_values[i],
         date:    labels[i],
-        close:   close.round(2),
+        open:    opens[i]&.round(2) || c,
+        high:    highs[i]&.round(2) || c,
+        low:     lows[i]&.round(2)  || c,
+        close:   c,
         volume:  volumes[i],
         ma20:    ma20[i]&.round(2),
         ma50:    ma50[i]&.round(2),
@@ -78,6 +87,16 @@ class Api::V1::ChartsController < ApplicationController
   end
 
   private
+
+  def build_time_values(timestamps, count, intraday: false)
+    if timestamps.length == count
+      return timestamps if intraday  # raw Unix seconds for lightweight-charts UTCTimestamp
+
+      timestamps.map { |ts| Time.at(ts).utc.strftime("%Y-%m-%d") }
+    else
+      count.times.map { |i| (Date.today - (count - 1 - i)).strftime("%Y-%m-%d") }
+    end
+  end
 
   def build_labels(timestamps, count, intraday: false, range_key: "1m")
     if timestamps.length == count
