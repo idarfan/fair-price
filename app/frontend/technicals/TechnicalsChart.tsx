@@ -36,9 +36,11 @@ interface SupportResistance {
   resistance: number[]
 }
 
-type Range = '1m' | '3m' | '6m' | '1y'
+type Range = '1d' | '5d' | '1m' | '3m' | '6m' | '1y'
 
 const RANGES: { key: Range; label: string }[] = [
+  { key: '1d', label: '1D' },
+  { key: '5d', label: '5D' },
   { key: '1m', label: '1M' },
   { key: '3m', label: '3M' },
   { key: '6m', label: '6M' },
@@ -192,27 +194,39 @@ export default function TechnicalsChart({ symbol }: { symbol: string }) {
                 formatter={(v: unknown) => [`$${(v as number).toFixed(2)}`]}
               />
               {sr.support.map(lvl => (
-                <ReferenceLine key={`s${lvl}`} y={lvl} stroke="#4ade80" strokeWidth={1}
-                  strokeDasharray="6 3"
-                  label={{ value: `支 $${lvl}`, position: 'insideTopRight', fill: '#4ade80', fontSize: 10 }} />
+                <ReferenceLine key={`s${lvl}`} y={lvl} stroke="#34d399" strokeWidth={1.5}
+                  strokeDasharray="5 3"
+                  label={{ value: `支 $${lvl}`, position: 'insideTopLeft', fill: '#34d399', fontSize: 11, fontWeight: 600 }} />
               ))}
               {sr.resistance.map(lvl => (
-                <ReferenceLine key={`r${lvl}`} y={lvl} stroke="#f87171" strokeWidth={1}
-                  strokeDasharray="6 3"
-                  label={{ value: `阻 $${lvl}`, position: 'insideBottomRight', fill: '#f87171', fontSize: 10 }} />
+                <ReferenceLine key={`r${lvl}`} y={lvl} stroke="#fb923c" strokeWidth={1.5}
+                  strokeDasharray="5 3"
+                  label={{ value: `阻 $${lvl}`, position: 'insideBottomLeft', fill: '#fb923c', fontSize: 11, fontWeight: 600 }} />
               ))}
               <Line dataKey="close" stroke="#60a5fa" strokeWidth={2} dot={false} name="收盤價" />
               <Line dataKey="ma20"  stroke="#fbbf24" strokeWidth={1.5} dot={false} name="MA20" connectNulls />
               <Line dataKey="ma50"  stroke="#f87171" strokeWidth={1.5} dot={false} name="MA50" connectNulls />
             </ComposedChart>
           </ResponsiveContainer>
-          <div style={{ display: 'flex', gap: 14, marginTop: 6, marginBottom: 14, fontSize: 11, color: '#94a3b8' }}>
+          <div style={{ display: 'flex', gap: 14, marginTop: 6, marginBottom: 14, fontSize: 11, color: '#94a3b8', flexWrap: 'wrap' }}>
             {[['#60a5fa', '收盤價'], ['#fbbf24', 'MA20'], ['#f87171', 'MA50']].map(([c, l]) => (
               <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 <span style={{ width: 18, height: 2, background: c, borderRadius: 1, display: 'inline-block' }} />
                 {l}
               </span>
             ))}
+            {sr.support.length > 0 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 18, height: 0, borderTop: '2px dashed #34d399', display: 'inline-block' }} />
+                支撐
+              </span>
+            )}
+            {sr.resistance.length > 0 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 18, height: 0, borderTop: '2px dashed #fb923c', display: 'inline-block' }} />
+                阻力
+              </span>
+            )}
           </div>
 
           {/* Volume chart */}

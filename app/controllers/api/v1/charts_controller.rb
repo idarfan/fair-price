@@ -2,24 +2,30 @@
 
 class Api::V1::ChartsController < ApplicationController
   RANGE_MAP = {
-    "1m" => "1mo",
-    "3m" => "3mo",
-    "6m" => "6mo",
-    "1y" => "1y"
+    "1d" => { range: "1d",  interval: "5m"  },
+    "5d" => { range: "5d",  interval: "15m" },
+    "1m" => { range: "1mo", interval: "1d"  },
+    "3m" => { range: "3mo", interval: "1d"  },
+    "6m" => { range: "6mo", interval: "1d"  },
+    "1y" => { range: "1y",  interval: "1d"  }
   }.freeze
+
+  INTRADAY_RANGES = %w[1d 5d].freeze
 
   def show
     symbol    = params[:symbol].upcase
-    api_range = RANGE_MAP.fetch(params[:range].to_s, "1mo")
+    range_key = params[:range].to_s
+    cfg       = RANGE_MAP.fetch(range_key, RANGE_MAP["1m"])
 
-    raw = YahooFinanceService.new.chart(symbol, range: api_range)
+    raw = YahooFinanceService.new.chart(symbol, range: cfg[:range], interval: cfg[:interval])
     return render json: { error: "no data" }, status: :not_found if raw[:closes].empty?
 
     closes     = raw[:closes]
     volumes    = raw[:volumes]
     timestamps = raw[:timestamps]
 
-    labels = build_labels(timestamps, closes.length)
+    intraday = INTRADAY_RANGES.include?(range_key)
+    labels = build_labels(timestamps, closes.length, intraday: intraday, range_key: range_key)
     ma20   = calc_ma(closes, 20)
     ma50   = calc_ma(closes, 50)
     rsi14  = calc_rsi(closes, 14)
@@ -66,15 +72,24 @@ class Api::V1::ChartsController < ApplicationController
       vol_label:     vol_label(vol_ratio)
     }
 
-    sr = calc_support_resistance(closes)
+    sr = intraday ? { support: [], resistance: [] } : calc_support_resistance(closes)
 
     render json: { symbol: symbol, range: params[:range], data: data, stats: stats, support_resistance: sr }
   end
 
   private
 
-  def build_labels(timestamps, count)
-    return timestamps.map { |ts| Time.at(ts).strftime("%-m/%-d") } if timestamps.length == count
+  def build_labels(timestamps, count, intraday: false, range_key: "1m")
+    if timestamps.length == count
+      fmt = if range_key == "1d"
+              ->(ts) { Time.at(ts).in_time_zone("Eastern Time (US & Canada)").strftime("%H:%M") }
+      elsif range_key == "5d"
+              ->(ts) { Time.at(ts).in_time_zone("Eastern Time (US & Canada)").strftime("%-m/%-d %H:%M") }
+      else
+              ->(ts) { Time.at(ts).strftime("%-m/%-d") }
+      end
+      return timestamps.map(&fmt)
+    end
 
     count.times.map { |i| (Date.today - (count - 1 - i)).strftime("%-m/%-d") }
   end
@@ -147,8 +162,8 @@ class Api::V1::ChartsController < ApplicationController
     support    = cluster.call(pivot_lows).select  { |l| l < last_close }
 
     {
-      support:    support.last(3),
-      resistance: resistance.first(3)
+      support:    support.last(2),
+      resistance: resistance.first(2)
     }
   end
 
