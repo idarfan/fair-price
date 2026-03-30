@@ -125,6 +125,7 @@ export default function TechnicalsChart({ symbol }: { symbol: string }) {
   useEffect(() => {
     setLoading(true)
     setError(false)
+    setData([])
     fetch(`/api/v1/charts/${encodeURIComponent(symbol)}?range=${range}`)
       .then(r => {
         if (!r.ok) throw new Error('fetch failed')
@@ -145,10 +146,12 @@ export default function TechnicalsChart({ symbol }: { symbol: string }) {
     if (data.length === 0) return
 
     const intraday = INTRADAY.includes(range)
+    const w = priceRef.current.offsetWidth || 600
 
     // ── Price chart ──
     const priceChart: IChartApi = createChart(priceRef.current, {
       ...CHART_OPTS,
+      width: w,
       height: 280,
       timeScale: {
         ...CHART_OPTS.timeScale,
@@ -206,6 +209,7 @@ export default function TechnicalsChart({ symbol }: { symbol: string }) {
     // ── Volume chart ──
     const volChart: IChartApi = createChart(volRef.current, {
       ...CHART_OPTS,
+      width: w,
       height: 80,
       timeScale: { ...CHART_OPTS.timeScale, timeVisible: false },
       rightPriceScale: {
@@ -237,6 +241,7 @@ export default function TechnicalsChart({ symbol }: { symbol: string }) {
     // ── RSI chart ──
     const rsiChart: IChartApi = createChart(rsiRef.current, {
       ...CHART_OPTS,
+      width: w,
       height: 80,
       timeScale: { ...CHART_OPTS.timeScale, timeVisible: false },
       rightPriceScale: {
@@ -281,16 +286,19 @@ export default function TechnicalsChart({ symbol }: { symbol: string }) {
     sync(rsiChart,   [priceChart, volChart])
 
     // ── Resize ──
+    let removed = false
     const observer = new ResizeObserver(() => {
-      const w = priceRef.current?.offsetWidth ?? 0
-      if (w === 0) return
-      priceChart.applyOptions({ width: w })
-      volChart.applyOptions({ width: w })
-      rsiChart.applyOptions({ width: w })
+      if (removed) return
+      const rw = priceRef.current?.offsetWidth ?? 0
+      if (rw === 0) return
+      priceChart.applyOptions({ width: rw })
+      volChart.applyOptions({ width: rw })
+      rsiChart.applyOptions({ width: rw })
     })
     if (priceRef.current) observer.observe(priceRef.current)
 
     return () => {
+      removed = true
       observer.disconnect()
       priceChart.remove()
       volChart.remove()
