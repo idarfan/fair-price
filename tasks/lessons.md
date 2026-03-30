@@ -46,6 +46,68 @@ systemctl --user start fairprice
 2. **禁止 `as Record<string, unknown>`** — 這是在掩蓋型別不一致，應該先修正 interface
 3. 修改 callback 簽名時，同時修改所有呼叫處和所有傳入該 callback 的 prop
 
+## 2026-03-30 — 技術圖表重構的五個教訓
+
+### 教訓 1：實作財務指標前必須查標準定義
+
+**過錯：** RSI 用簡單平均（`gains.sum / period`）實作，而非 Wilder's Smoothed Moving Average（EMA）。第一個 RSI 用簡單平均正確，但後續每筆應用 `(prev_avg × (n-1) + current) / n`。簡單平均會讓 RSI 在超買/超賣區域偏差，影響判斷。
+
+**防治：**
+1. 實作任何技術指標（RSI、MACD、Bollinger Bands、ATR 等）前，先查 **Investopedia** 或 **原始論文**確認算法
+2. 關鍵差異：RSI 第一筆用簡單平均，後續用 Wilder's EMA（不是 SMA）
+3. 實作後用已知數值（如 TradingView 同一個股同一天的 RSI）做對照驗證
+
+**通則：** 財務計算有標準規格，不能憑直覺實作。
+
+### 教訓 2：使用圖表函式庫前必須確認顏色衝突
+
+**過錯：** S&R 阻力線用 `#f87171`（紅色），與 MA50 線顏色完全相同，導致使用者無法區分「四條紅色虛線」。部署前沒有做視覺對比檢查。
+
+**防治：**
+1. 同一張圖上所有視覺元素（線色、虛線、參考線）列出顏色表，確認無重複
+2. 新增圖層時，用 Playwright 截圖或 browser snapshot 確認顏色可辨識
+3. 顏色命名規則：MA 系列用暖色（黃/紅），S&R 用獨立冷色（橘/翠綠），RSI 用紫/藍
+
+### 教訓 3：引入新圖表函式庫時必須先確認維度初始化 API
+
+**過錯：** 從 Recharts（`<ResponsiveContainer width="100%">`自動處理寬度）切換到 lightweight-charts 時，忘記 lightweight-charts 需要在 `createChart()` 明確傳入 `width`，否則可能初始化為 0px。
+
+**防治：**
+1. 換函式庫前先讀官方文件的「Responsive layout / Sizing」章節
+2. lightweight-charts 標準模式：`createChart(el, { width: el.offsetWidth || 600, height: N })`，再搭 `ResizeObserver` 動態更新
+3. 每次初始化後用 `console.log(chart.options().width)` 或 DevTools 確認寬度非零
+
+### 教訓 4：非同步資料切換時必須立即清除舊狀態
+
+**過錯：** 切換 range tab 時，`setLoading(true)` 但 `data` 沒有同時清空，導致舊圖表短暫殘留（閃爍）。
+
+**防治：** 凡是「載入新資料替換舊資料」的場景，一律同步清空舊狀態：
+```typescript
+setLoading(true)
+setError(false)
+setData([])       // ← 必須同步清空，不能等新資料才清
+```
+**規則：** loading=true 與 data=[] 必須同一個 tick 執行。
+
+### 教訓 5：使用外部 Observer/Subscription 時必須處理 cleanup 競態
+
+**過錯：** `ResizeObserver` callback 在 `useEffect` cleanup 執行後仍可能觸發，此時 chart 已被 `remove()`，導致對已銷毀物件呼叫方法。
+
+**防治：** 凡是在 `useEffect` 內建立的 Observer/EventListener/Subscription，cleanup 時用 flag 防競態：
+```typescript
+let removed = false
+const observer = new ResizeObserver(() => {
+  if (removed) return  // ← guard
+  chart.applyOptions({ width: el.offsetWidth })
+})
+return () => {
+  removed = true       // ← 先標記
+  observer.disconnect()
+  chart.remove()
+}
+```
+**通則：** React useEffect cleanup 執行時，非同步 callback 可能仍在 queue 中，必須加 guard 防止使用已清理的資源。
+
 ## 2026-03-25 — Storybook + Chromatic：vite-plugin-ruby 路徑污染
 
 ### 症狀
