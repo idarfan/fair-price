@@ -66,7 +66,9 @@ class Api::V1::ChartsController < ApplicationController
       vol_label:     vol_label(vol_ratio)
     }
 
-    render json: { symbol: symbol, range: params[:range], data: data, stats: stats }
+    sr = calc_support_resistance(closes)
+
+    render json: { symbol: symbol, range: params[:range], data: data, stats: stats, support_resistance: sr }
   end
 
   private
@@ -105,6 +107,49 @@ class Api::V1::ChartsController < ApplicationController
     return "超賣" if v >= 20
 
     "強力超賣"
+  end
+
+  def calc_support_resistance(closes)
+    return { support: [], resistance: [] } if closes.length < 5
+
+    # Detect pivot highs and lows using a 2-bar window on each side
+    pivot_highs = []
+    pivot_lows  = []
+
+    (2...(closes.length - 2)).each do |i|
+      window = closes[(i - 2)..(i + 2)]
+      pivot_highs << closes[i] if closes[i] == window.max
+      pivot_lows  << closes[i] if closes[i] == window.min
+    end
+
+    # Cluster nearby levels within 1.5% of each other
+    cluster = lambda do |levels|
+      sorted = levels.sort
+      groups = []
+      sorted.each do |lvl|
+        if groups.last && (lvl - groups.last.last).abs / groups.last.last <= 0.015
+          groups.last << lvl
+        else
+          groups << [ lvl ]
+        end
+      end
+      # Representative: median of each cluster, weighted by cluster size; take strongest 3
+      groups
+        .sort_by { |g| -g.length }
+        .first(4)
+        .map { |g| g.sort[g.length / 2].round(2) }
+        .sort
+    end
+
+    last_close = closes.last
+
+    resistance = cluster.call(pivot_highs).select { |l| l > last_close }
+    support    = cluster.call(pivot_lows).select  { |l| l < last_close }
+
+    {
+      support:    support.last(3),
+      resistance: resistance.first(3)
+    }
   end
 
   def vol_label(ratio)

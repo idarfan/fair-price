@@ -31,6 +31,11 @@ interface Stats {
   vol_label: string
 }
 
+interface SupportResistance {
+  support: number[]
+  resistance: number[]
+}
+
 type Range = '1m' | '3m' | '6m' | '1y'
 
 const RANGES: { key: Range; label: string }[] = [
@@ -80,6 +85,7 @@ export default function TechnicalsChart({ symbol }: { symbol: string }) {
   const [range, setRange] = useState<Range>('1m')
   const [data, setData] = useState<DataPoint[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
+  const [sr, setSr] = useState<SupportResistance>({ support: [], resistance: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
@@ -89,11 +95,12 @@ export default function TechnicalsChart({ symbol }: { symbol: string }) {
     fetch(`/api/v1/charts/${encodeURIComponent(symbol)}?range=${range}`)
       .then(r => {
         if (!r.ok) throw new Error('fetch failed')
-        return r.json() as Promise<{ data: DataPoint[]; stats: Stats }>
+        return r.json() as Promise<{ data: DataPoint[]; stats: Stats; support_resistance: SupportResistance }>
       })
       .then(json => {
         setData(json.data)
         setStats(json.stats)
+        setSr(json.support_resistance ?? { support: [], resistance: [] })
         setLoading(false)
       })
       .catch(() => {
@@ -184,6 +191,16 @@ export default function TechnicalsChart({ symbol }: { symbol: string }) {
                 itemStyle={{ color: '#e2e8f0' }}
                 formatter={(v: unknown) => [`$${(v as number).toFixed(2)}`]}
               />
+              {sr.support.map(lvl => (
+                <ReferenceLine key={`s${lvl}`} y={lvl} stroke="#4ade80" strokeWidth={1}
+                  strokeDasharray="6 3"
+                  label={{ value: `支 $${lvl}`, position: 'insideTopRight', fill: '#4ade80', fontSize: 10 }} />
+              ))}
+              {sr.resistance.map(lvl => (
+                <ReferenceLine key={`r${lvl}`} y={lvl} stroke="#f87171" strokeWidth={1}
+                  strokeDasharray="6 3"
+                  label={{ value: `阻 $${lvl}`, position: 'insideBottomRight', fill: '#f87171', fontSize: 10 }} />
+              ))}
               <Line dataKey="close" stroke="#60a5fa" strokeWidth={2} dot={false} name="收盤價" />
               <Line dataKey="ma20"  stroke="#fbbf24" strokeWidth={1.5} dot={false} name="MA20" connectNulls />
               <Line dataKey="ma50"  stroke="#f87171" strokeWidth={1.5} dot={false} name="MA50" connectNulls />
