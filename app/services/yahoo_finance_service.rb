@@ -18,9 +18,10 @@ class YahooFinanceService
     result = response.parsed_response.dig("chart", "result", 0)
     return empty_result unless result
 
-    meta    = result["meta"] || {}
-    closes  = (result.dig("indicators", "quote", 0, "close")  || []).compact.map(&:to_f)
-    volumes = (result.dig("indicators", "quote", 0, "volume") || []).compact.map(&:to_i)
+    meta       = result["meta"] || {}
+    closes     = (result.dig("indicators", "quote", 0, "close")  || []).compact.map(&:to_f)
+    volumes    = (result.dig("indicators", "quote", 0, "volume") || []).compact.map(&:to_i)
+    timestamps = (result["timestamp"] || []).map(&:to_i)
 
     {
       high_52w:   meta["fiftyTwoWeekHigh"]&.to_f&.round(2),
@@ -28,7 +29,8 @@ class YahooFinanceService
       volume:     meta["regularMarketVolume"]&.to_i,
       change_pct: compute_change_pct(meta),
       closes:     closes,
-      volumes:    volumes
+      volumes:    volumes,
+      timestamps: timestamps
     }
   rescue StandardError => e
     Rails.logger.warn("[YahooFinance] #{symbol} failed: #{e.message}")
@@ -130,7 +132,7 @@ class YahooFinanceService
   end
 
   def empty_result
-    { high_52w: nil, low_52w: nil, volume: nil, change_pct: nil, closes: [], volumes: [] }
+    { high_52w: nil, low_52w: nil, volume: nil, change_pct: nil, closes: [], volumes: [], timestamps: [] }
   end
 
   def empty_holders

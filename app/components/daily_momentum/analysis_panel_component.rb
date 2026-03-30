@@ -79,7 +79,21 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
             var panel = document.createElement('div');
             panel.id        = 'apanel-' + symbol;
             panel.className = 'apanel hidden';
+
+            var chartDiv = document.createElement('div');
+            chartDiv.id = 'apanel-chart-' + symbol;
+            chartDiv.className = 'mb-4';
+            panel.appendChild(chartDiv);
+
+            var textDiv = document.createElement('div');
+            textDiv.id = 'apanel-text-' + symbol;
+            panel.appendChild(textDiv);
+
             contents.appendChild(panel);
+
+            if (typeof window.mountTechChart === 'function') {
+              window.mountTechChart(chartDiv, symbol);
+            }
           }
 
           function activateTab(symbol) {
@@ -102,14 +116,14 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
           // ── SSE streaming ─────────────────────────────────────────────
           function streamAnalysis(symbol) {
             streaming[symbol] = true;
-            var panel = document.getElementById('apanel-' + symbol);
+            var textDiv = document.getElementById('apanel-text-' + symbol);
             var buffer = '';
 
             var pre = document.createElement('pre');
             pre.className = 'whitespace-pre-wrap text-sm text-gray-800 leading-relaxed font-sans';
             pre.textContent = '歐歐思考中... 🐾';
-            panel.innerHTML = '';
-            panel.appendChild(pre);
+            textDiv.innerHTML = '';
+            textDiv.appendChild(pre);
 
             if (typeof NProgress !== 'undefined') { NProgress.start(); NProgress.set(0.2); }
 
@@ -138,7 +152,7 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
               streaming[symbol] = false;
               loaded[symbol]    = false;
               if (typeof NProgress !== 'undefined') NProgress.done();
-              panel.innerHTML =
+              textDiv.innerHTML =
                 '<div class="py-6 text-center">' +
                   '<p class="text-red-400 text-sm mb-3">串流中斷，請重試</p>' +
                   '<button type="button" data-retry-analysis="' + symbol + '" ' +
@@ -152,8 +166,8 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
 
           // ── Markdown rendering (after stream completes) ───────────────
           function renderMarkdown(symbol, text) {
-            var panel = document.getElementById('apanel-' + symbol);
-            if (!panel) return;
+            var textDiv = document.getElementById('apanel-text-' + symbol);
+            if (!textDiv) return;
 
             var csrf = document.querySelector('meta[name="csrf-token"]');
             fetch('/momentum/render_markdown', {
@@ -166,7 +180,7 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
             })
               .then(function (r) { return r.json(); })
               .then(function (data) {
-                panel.innerHTML =
+                textDiv.innerHTML =
                   '<div id="apanel-body-' + symbol + '" class="md-body text-sm text-gray-800 leading-relaxed overflow-x-auto">' + data.html + '</div>' +
                   '<div class="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">' +
                     '<button type="button" data-export-png="' + symbol + '" ' +
@@ -180,7 +194,7 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
                   '</div>';
               })
               .catch(function () {
-                panel.innerHTML =
+                textDiv.innerHTML =
                   '<pre class="whitespace-pre-wrap text-sm text-gray-800 leading-relaxed font-sans">' + text + '</pre>';
               });
           }

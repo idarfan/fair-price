@@ -19,6 +19,10 @@ Rails.application.routes.draw do
            constraints: { symbol: /[A-Za-z0-9.\-]{1,10}/ }
       post "options/strategy_recommend", to: "options#strategy_recommend"
       post "options/analyze_image",      to: "options#analyze_image"
+
+      # Technical chart data (price, volume, MA, RSI)
+      get "charts/:symbol", to: "charts#show",
+          constraints: { symbol: /[A-Za-z0-9.\-]{1,10}/ }
     end
   end
 

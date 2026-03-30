@@ -34,6 +34,9 @@
     <% if controller_name == 'options' %>
       <%= vite_javascript_tag 'options.tsx' %>
     <% end %>
+    <% if controller_name == 'reports' %>
+      <%= vite_javascript_tag 'technicals.tsx' %>
+    <% end %>
   </head>
   <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
 
