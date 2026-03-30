@@ -122,14 +122,26 @@ class Api::V1::ChartsController < ApplicationController
   end
 
   def calc_rsi(closes, period)
-    closes.each_with_index.map do |_, i|
-      next nil if i < period
+    result  = Array.new(closes.length, nil)
+    changes = closes.each_cons(2).map { |a, b| b - a }
+    return result if changes.length < period
 
-      changes = closes[(i - period + 1)..i].each_cons(2).map { |a, b| b - a }
-      gains   = changes.select { |c| c > 0 }.sum.to_f / period
-      losses  = changes.select { |c| c < 0 }.sum.abs.to_f / period
-      losses.zero? ? 100.0 : (100.0 - 100.0 / (1.0 + gains / losses)).round(1)
+    # First RSI: simple average of first `period` changes
+    first   = changes[0, period]
+    avg_g   = first.select { |c| c > 0 }.sum.to_f / period
+    avg_l   = first.select { |c| c < 0 }.sum.abs.to_f / period
+    result[period] = avg_l.zero? ? 100.0 : (100.0 - 100.0 / (1.0 + avg_g / avg_l)).round(1)
+
+    # Subsequent RSIs: Wilder's smoothing (EMA)
+    (period...changes.length).each do |i|
+      g = changes[i] > 0 ? changes[i].to_f : 0.0
+      l = changes[i] < 0 ? changes[i].abs.to_f : 0.0
+      avg_g = (avg_g * (period - 1) + g) / period
+      avg_l = (avg_l * (period - 1) + l) / period
+      result[i + 1] = avg_l.zero? ? 100.0 : (100.0 - 100.0 / (1.0 + avg_g / avg_l)).round(1)
     end
+
+    result
   end
 
   def rsi_label(v)

@@ -257,15 +257,19 @@ export default function TechnicalsChart({ symbol }: { symbol: string }) {
 
     if (rsi14Data.length > 0) {
       const rsi14 = rsiChart.addLineSeries({
-        color: '#a78bfa', lineWidth: 2, priceLineVisible: false, lastValueVisible: false,
+        color: '#a78bfa', lineWidth: 2,
+        priceLineVisible: false, lastValueVisible: true,
+        title: 'RSI14',
       })
       rsi14.setData(rsi14Data)
-      rsi14.createPriceLine({ price: 70, color: '#f87171', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: '' })
-      rsi14.createPriceLine({ price: 30, color: '#4ade80', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: '' })
+      rsi14.createPriceLine({ price: 70, color: '#f87171', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: '超買' })
+      rsi14.createPriceLine({ price: 30, color: '#4ade80', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: '超賣' })
     }
     if (rsi7Data.length > 0) {
       const rsi7 = rsiChart.addLineSeries({
-        color: '#38bdf8', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+        color: '#38bdf8', lineWidth: 1,
+        priceLineVisible: false, lastValueVisible: true,
+        title: 'RSI7',
       })
       rsi7.setData(rsi7Data)
     }
