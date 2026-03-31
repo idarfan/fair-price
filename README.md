@@ -298,3 +298,33 @@ bundle exec rubocop -a   # 自動修正
 | `app/services/ouou_analysis_service.rb` | 新增 `analysis_date_footer` 方法；串流完成後 emit footer chunk 並寫入 cache |
 | `app/views/layouts/application.html.erb` | 新增 `html2canvas@1.4.1` CDN script |
 | `app/components/daily_momentum/analysis_panel_component.rb` | `renderMarkdown` 加入匯出按鈕；新增 `exportPng`、`exportPdf` 函式與 click 委派 |
+
+### 2026-03-31 — 技術圖表：lightweight-charts 蠟燭圖、S&R 線、RSI 雙線
+
+重寫 `TechnicalsChart.tsx`，從 Recharts 改用 lightweight-charts（TradingView 開源）。
+
+**主要功能**
+
+- 蠟燭圖（K 線）取代折線圖
+- 支撐/阻力線：`createPriceLine()` 直接標註在 Y 軸（阻力橘、支撐翠綠）
+- RSI14（紫）/ RSI7（藍）雙線，`lastValueVisible: true` 在軸上顯示即時數值
+- 時間範圍新增 1D（5 分線）、5D（15 分線），日內不顯示 S&R
+- 後端 `calc_rsi` 修正為 Wilder's EMA（非簡單平均）
+- `YahooFinanceService` 補齊 open/high/low 欄位，zip 後過濾 nil-close bars
+
+**防錯工具（同日新增）**
+
+- `eslint.config.js`：`eslint-plugin-react-hooks` — 自動 hook 於每次 TSX 編輯後執行
+- `spec/requests/api/v1/charts_rsi_spec.rb`：鎖定 Wilder's EMA 算法，7 examples
+- `stories/TechnicalsChart.stories.tsx`：Chromatic 三種寬度視覺回歸（1280/768/375px）
+
+**異動檔案**
+
+| 檔案 | 異動類型 |
+|------|----------|
+| `app/frontend/technicals/TechnicalsChart.tsx` | 完整重寫，Recharts → lightweight-charts |
+| `app/controllers/api/v1/charts_controller.rb` | 新增 1D/5D range、open/high/low、Wilder's RSI |
+| `app/services/yahoo_finance_service.rb` | 補齊 OHLC，zip 過濾 nil-close |
+| `eslint.config.js` | 新增（ESLint + react-hooks + typescript-eslint）|
+| `spec/requests/api/v1/charts_rsi_spec.rb` | 新增（RSI 算法單元測試）|
+| `stories/TechnicalsChart.stories.tsx` | 新增（Chromatic 視覺回歸）|
