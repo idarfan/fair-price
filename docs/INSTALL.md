@@ -126,8 +126,8 @@ cp .env.example .env
 # Finnhub API Key（從 https://finnhub.io 免費申請）
 FINNHUB_API_KEY=your_key_here
 
-# Anthropic API Key（歐歐分析功能）
-ANTHROPIC_API_KEY=your_key_here
+# Groq API Key（歐歐分析、持股/期權截圖 OCR，從 https://console.groq.com 免費申請）
+GROQ_API_KEY=your_key_here
 
 # Telegram Bot（價格警示推播，選填）
 TELEGRAM_BOT_TOKEN=your_token_here
