@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
+require "base64"
+
 class PortfolioOcrService
-  ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
-  MODEL         = "claude-sonnet-4-6"
+  GROQ_API     = "https://api.groq.com/openai/v1/chat/completions"
+  VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
   def initialize(image_file)
     @image_file = image_file
@@ -10,28 +12,28 @@ class PortfolioOcrService
 
   # Returns Array<{ symbol:, shares:, unit_cost: }>
   def call
-    image_data = Base64.strict_encode64(@image_file.read)
-    media_type = normalize_media_type(@image_file.content_type)
+    data = @image_file.read
+    b64  = Base64.strict_encode64(data)
+    mime = normalize_media_type(@image_file.content_type)
+
+    api_key = ENV.fetch("GROQ_API_KEY") { raise "GROQ_API_KEY not set" }
 
     response = HTTParty.post(
-      ANTHROPIC_API,
+      GROQ_API,
       headers: {
-        "x-api-key"         => ENV.fetch("ANTHROPIC_API_KEY"),
-        "anthropic-version" => "2023-06-01",
-        "content-type"      => "application/json"
+        "Authorization" => "Bearer #{api_key}",
+        "Content-Type"  => "application/json"
       },
       body: {
-        model:      MODEL,
+        model:      VISION_MODEL,
         max_tokens: 2048,
-        messages:   [
+        stream:     false,
+        messages: [
           {
             role:    "user",
             content: [
-              {
-                type:   "image",
-                source: { type: "base64", media_type: media_type, data: image_data }
-              },
-              { type: "text", text: ocr_prompt }
+              { type: "text", text: ocr_prompt },
+              { type: "image_url", image_url: { url: "data:#{mime};base64,#{b64}" } }
             ]
           }
         ]
@@ -69,7 +71,7 @@ class PortfolioOcrService
   def parse_response(response)
     raise "API error: #{response.code}" unless response.success?
 
-    text = response.parsed_response.dig("content", 0, "text").to_s.strip
+    text     = response.parsed_response.dig("choices", 0, "message", "content").to_s.strip
     json_str = text.match(/\[.*\]/m)&.to_s
     raise "No JSON array found in response" if json_str.blank?
 

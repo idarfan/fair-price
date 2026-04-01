@@ -75,11 +75,6 @@ Rails.application.routes.draw do
   get  "ownership/history", to: "ownership#history", as: :ownership_history
   post "ownership/fetch",   to: "ownership#fetch",   as: :ownership_fetch
 
-  # Flight Expert
-  get  "flight",       to: "flight#index", as: :flight
-  post "flight/chat",  to: "flight#chat",  as: :flight_chat
-  get  "flight/clear", to: "flight#clear", as: :clear_flight
-
   # Lookbook component previews (development only)
   mount Lookbook::Engine, at: "/lookbook" if defined?(Lookbook)
 end

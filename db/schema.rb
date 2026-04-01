@@ -10,26 +10,9 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_25_113759) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_01_090030) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
-
-  create_table "flight_conversations", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.string "token", null: false
-    t.datetime "updated_at", null: false
-    t.index ["token"], name: "index_flight_conversations_on_token", unique: true
-  end
-
-  create_table "flight_messages", force: :cascade do |t|
-    t.text "content", null: false
-    t.datetime "created_at", null: false
-    t.bigint "flight_conversation_id", null: false
-    t.string "role", null: false
-    t.datetime "updated_at", null: false
-    t.index ["flight_conversation_id", "created_at"], name: "index_flight_messages_on_flight_conversation_id_and_created_at"
-    t.index ["flight_conversation_id"], name: "index_flight_messages_on_flight_conversation_id"
-  end
 
   create_table "options_snapshots", force: :cascade do |t|
     t.datetime "cached_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
@@ -109,6 +92,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_25_113759) do
     t.index ["symbol"], name: "index_watchlist_items_on_symbol", unique: true
   end
 
-  add_foreign_key "flight_messages", "flight_conversations"
   add_foreign_key "ownership_holders", "ownership_snapshots"
 end

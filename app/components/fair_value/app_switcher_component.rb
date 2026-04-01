@@ -7,8 +7,7 @@ class FairValue::AppSwitcherComponent < ApplicationComponent
     { icon: "📁", label: "Portfolio",      href: "/portfolio", desc: "個人持股追蹤" },
     { icon: "🔔", label: "Watchlist",      href: "/watchlist",  desc: "自選股到價通知" },
     { icon: "📉", label: "Options",        href: "/options",    desc: "美股期權分析｜策略推薦｜IV Rank" },
-    { icon: "🏦", label: "持股結構",       href: "/ownership",  desc: "Watchlist 持股結構變化圖表" },
-    { icon: "✈️",  label: "航班查詢",       href: "/flight",   desc: "台日航班專家" }
+    { icon: "🏦", label: "持股結構",       href: "/ownership",  desc: "Watchlist 持股結構變化圖表" }
   ].freeze
 
   def initialize(navbar: false)
@@ -59,9 +58,9 @@ class FairValue::AppSwitcherComponent < ApplicationComponent
     panel_class = if @navbar
                     "hidden absolute top-full left-0 mt-1 w-64 bg-white rounded-xl " \
                     "border border-gray-200 shadow-lg overflow-hidden z-50"
-                  else
+    else
                     "hidden mt-1 bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden"
-                  end
+    end
     div(
       id: @dd_id,
       class: panel_class,
