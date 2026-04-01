@@ -51,12 +51,19 @@ npm install -g pm2
 
 ---
 
-## 一、複製專案
+## 一、從 GitHub 下載專案
 
 ```bash
-git clone <repo-url> fairprice
+# SSH（推薦，需先設定 SSH key）
+git clone git@github.com:idarfan/fair-price.git fairprice
+
+# HTTPS（無需 SSH key）
+git clone https://github.com/idarfan/fair-price.git fairprice
+
 cd fairprice
 ```
+
+> 若尚未設定 GitHub SSH key，請參考 [GitHub 官方說明](https://docs.github.com/en/authentication/connecting-to-github-with-ssh)，或改用 HTTPS 方式。
 
 ---
 
