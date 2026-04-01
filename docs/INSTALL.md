@@ -12,9 +12,29 @@
 | pm2 | >= 5（正式環境 process manager）|
 | OS | Linux（建議 Ubuntu 22.04 / Debian 12）|
 
+> **Windows 使用者**：本專案在 WSL2（Windows Subsystem for Linux）環境下開發，建議在 WSL2 的 Ubuntu 中執行以下所有步驟。
+
 ---
 
 ## 零、前置安裝
+
+### WSL2（Windows 使用者）
+
+以**系統管理員**身分開啟 PowerShell，執行：
+
+```powershell
+wsl --install
+```
+
+此指令會自動安裝 WSL2 並下載 Ubuntu。安裝完成後**重新啟動電腦**。
+
+重啟後 Ubuntu 會自動開啟，依提示設定 Linux 使用者名稱與密碼即完成。
+
+> 若已安裝舊版 WSL1，可執行 `wsl --set-default-version 2` 升級為 WSL2。
+>
+> 詳細說明請參考 [Microsoft 官方文件](https://learn.microsoft.com/zh-tw/windows/wsl/install)。
+
+後續所有指令皆在 **WSL2 Ubuntu 終端機**內執行。
 
 ### Ruby（rbenv）
 
