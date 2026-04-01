@@ -40,6 +40,13 @@ docs/*.png
 docs/*.jpg
 docs/*.pdf
 
+# 開發過程產生的暫時檔案
+*.png
+*.jpg
+.playwright-mcp/
+public/tech_prototype.html
+stories/
+
 # Vite Ruby
 /public/vite*
 node_modules

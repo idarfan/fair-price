@@ -262,8 +262,8 @@ export default function TechnicalsChart({ symbol }: { symbol: string }) {
         title: 'RSI14',
       })
       rsi14.setData(rsi14Data)
-      rsi14.createPriceLine({ price: 70, color: '#f87171', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: '超買' })
-      rsi14.createPriceLine({ price: 30, color: '#4ade80', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: '超賣' })
+      rsi14.createPriceLine({ price: 70, color: '#f87171', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: '── 超買 70' })
+      rsi14.createPriceLine({ price: 30, color: '#4ade80', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: '── 超賣 30' })
     }
     if (rsi7Data.length > 0) {
       const rsi7 = rsiChart.addLineSeries({
