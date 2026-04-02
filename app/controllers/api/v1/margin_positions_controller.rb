@@ -4,8 +4,12 @@ module Api
   module V1
     class MarginPositionsController < ApplicationController
       def index
-        positions = MarginPosition.open_positions
-        render json: { positions: positions.map { |p| MarginInterestService.decorate(p) } }
+        open_pos   = MarginPosition.open_positions
+        closed_pos = MarginPosition.closed_positions
+        render json: {
+          positions:        open_pos.map { |p| MarginInterestService.decorate(p) },
+          closed_positions: closed_pos.map { |p| MarginInterestService.decorate(p) }
+        }
       end
 
       def create

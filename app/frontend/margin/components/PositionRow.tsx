@@ -165,16 +165,21 @@ export function PositionRow({ position, onClose, onDelete, onUpdateField }: Prop
       <td className="py-2 pr-3 text-gray-400">{fmtUSD(position.current_period_interest)}</td>
 
       {/* 平倉價 — 可編輯 */}
+      <td className="py-2 pr-3 text-gray-300">
+        <EditableCell
+          value={position.sell_price ?? ''}
+          type="price"
+          display={position.sell_price ? fmtUSD(parseFloat(position.sell_price)) : '—'}
+          onSave={v => onUpdateField(position.id, 'sell_price', v)}
+        />
+      </td>
+
+      {/* 淨獲利（唯讀，由 sell_price 與 accrued_interest 計算） */}
       <td className={`py-2 pr-3 font-medium ${
         netProfit === null ? 'text-gray-500' :
         netProfit >= 0 ? 'text-green-400' : 'text-red-400'
       }`}>
-        <EditableCell
-          value={position.sell_price ?? ''}
-          type="price"
-          display={netProfit !== null ? fmtUSD(netProfit) : '— 填平倉價'}
-          onSave={v => onUpdateField(position.id, 'sell_price', v)}
-        />
+        {netProfit !== null ? fmtUSD(netProfit) : '—'}
       </td>
 
       <td className="py-2">
