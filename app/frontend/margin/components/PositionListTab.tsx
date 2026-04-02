@@ -63,6 +63,22 @@ export function PositionListTab() {
     if (res.ok) await fetchPositions()
   }
 
+  const handleUpdateDate = async (
+    id: number,
+    field: 'opened_on' | 'closed_on',
+    value: string
+  ) => {
+    await fetch(`${API_BASE}/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken(),
+      },
+      body: JSON.stringify({ margin_position: { [field]: value } }),
+    })
+    await fetchPositions()
+  }
+
   const handlePriceLookup = async (symbol: string): Promise<number | null> => {
     const res = await fetch(`${API_BASE}/price_lookup?symbol=${encodeURIComponent(symbol)}`)
     if (!res.ok) return null
@@ -91,6 +107,7 @@ export function PositionListTab() {
                 <th className="py-2 pr-3">代號</th>
                 <th className="py-2 pr-3">建倉價</th>
                 <th className="py-2 pr-3">股數</th>
+                <th className="py-2 pr-3">建倉日</th>
                 <th className="py-2 pr-3">持有天數</th>
                 <th className="py-2 pr-3">累計利息</th>
                 <th className="py-2 pr-3">下次收息日</th>
@@ -106,6 +123,7 @@ export function PositionListTab() {
                   position={p}
                   onClose={handleClose}
                   onDelete={handleDelete}
+                  onUpdateDate={handleUpdateDate}
                 />
               ))}
             </tbody>

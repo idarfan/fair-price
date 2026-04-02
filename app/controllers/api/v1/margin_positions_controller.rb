@@ -74,7 +74,7 @@ module Api
 
       def update_params
         params.require(:margin_position).permit(
-          :sell_price, :status, :closed_on, :position
+          :sell_price, :status, :opened_on, :closed_on, :position
         )
       end
     end
