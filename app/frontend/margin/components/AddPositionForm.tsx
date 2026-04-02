@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { todayISO, fmtUSD, parseFlexDate } from '../utils/format'
-import type { AddPositionPayload } from '../types'
+import { PriceInfoBar } from './PriceInfoBar'
+import type { AddPositionPayload, PriceLookupResult } from '../types'
 
 interface Props {
   onSubmit: (payload: AddPositionPayload) => Promise<void>
@@ -16,7 +17,7 @@ export function AddPositionForm({ onSubmit }: Props) {
   const [openedOnText, setOpenedOnText] = useState(todayISO())
   const [openedOn, setOpenedOn] = useState(todayISO())
   const [loading, setLoading] = useState(false)
-  const [livePrice, setLivePrice] = useState<number | null>(null)
+  const [priceInfo, setPriceInfo] = useState<PriceLookupResult | null>(null)
   const [lookupLoading, setLookupLoading] = useState(false)
   const [lookupError, setLookupError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -35,17 +36,18 @@ export function AddPositionForm({ onSubmit }: Props) {
       setLookupLoading(true)
       try {
         const res = await fetch(`${API_LOOKUP}?symbol=${encodeURIComponent(symbol)}`)
-        const data = await res.json() as { price?: number; error?: string }
+        const data = await res.json() as PriceLookupResult & { error?: string }
         if (!res.ok || !data.price) {
-          setLookupError('找不到此代號')
-          setLivePrice(null)
+          setLookupError(data.error ?? '找不到此代號')
+          setPriceInfo(null)
         } else {
-          setLivePrice(data.price)
+          setPriceInfo(data)
           setBuyPrice(data.price.toFixed(2))
           setLookupError(null)
         }
       } catch {
         setLookupError('網路錯誤')
+        setPriceInfo(null)
       } finally {
         setLookupLoading(false)
       }
@@ -87,7 +89,7 @@ export function AddPositionForm({ onSubmit }: Props) {
     setSellPrice('')
     setOpenedOn(todayISO())
     setOpenedOnText(todayISO())
-    setLivePrice(null)
+    setPriceInfo(null)
   }
 
   const inputClass =
@@ -105,9 +107,9 @@ export function AddPositionForm({ onSubmit }: Props) {
             {lookupLoading && (
               <span className="text-xs text-gray-500 animate-pulse">查詢中…</span>
             )}
-            {!lookupLoading && livePrice !== null && (
+            {!lookupLoading && priceInfo !== null && (
               <span className="text-xs font-semibold text-green-400">
-                現價 {fmtUSD(livePrice)}
+                現價 {fmtUSD(priceInfo.price)}
               </span>
             )}
             {!lookupLoading && lookupError && (
@@ -180,6 +182,7 @@ export function AddPositionForm({ onSubmit }: Props) {
           />
         </div>
       </div>
+      {priceInfo && <PriceInfoBar info={priceInfo} />}
       <button
         type="submit"
         disabled={loading}

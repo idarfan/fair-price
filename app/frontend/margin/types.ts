@@ -52,6 +52,17 @@ export interface MarginPosition {
   current_period_interest: number
 }
 
+export interface PriceLookupResult {
+  symbol:          string
+  company_name:    string
+  price:           number
+  week52_low:      number | null
+  week52_high:     number | null
+  fair_value_low:  number | null
+  fair_value_high: number | null
+  stock_type:      string | null
+}
+
 export interface AddPositionPayload {
   symbol: string
   buy_price: number

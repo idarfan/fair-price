@@ -91,12 +91,35 @@ RSpec.describe "Api::V1::MarginPositions", type: :request do
       expect(response).to have_http_status(:bad_request)
     end
 
-    it "proxies Finnhub quote" do
-      allow_any_instance_of(FinnhubService).to receive(:quote)
-        .with("AAPL").and_return({ "c" => 195.5 })
+    it "returns price, 52-week range and fair value estimate" do
+      stock_data = {
+        name: "Apple Inc.", current_price: 195.5,
+        fifty_two_week_low: 150.0, fifty_two_week_high: 250.0,
+        sector: "Technology", eps_ttm: 6.5, forward_eps: 7.0,
+        book_value: 4.0, roe: 0.15, dividend_rate: 0.0,
+        free_cashflow: 90_000_000_000, total_revenue: 380_000_000_000,
+        ebitda: 120_000_000_000, total_debt: 100_000_000_000,
+        total_cash: 50_000_000_000, earnings_growth: 0.1,
+        revenue_growth: 0.08, earnings_quarterly_growth: 0.1,
+        shares_outstanding: 15_400_000_000, analyst_consensus: nil,
+        symbol: "AAPL", exchange: "NASDAQ", currency: "USD",
+        financial_currency: "USD", currency_note: nil,
+        industry: "Technology", stock_type: nil
+      }
+      allow(StockDataService).to receive(:fetch).with("AAPL").and_return(stock_data)
       get "/api/v1/margin_positions/price_lookup", params: { symbol: "AAPL" }
       expect(response).to have_http_status(:ok)
       expect(json["price"]).to eq(195.5)
+      expect(json["week52_low"]).to eq(150.0)
+      expect(json["week52_high"]).to eq(250.0)
+      expect(json).to have_key("fair_value_low")
+      expect(json).to have_key("fair_value_high")
+    end
+
+    it "returns 404 for unknown symbol" do
+      allow(StockDataService).to receive(:fetch).and_raise(StockDataService::NotFoundError)
+      get "/api/v1/margin_positions/price_lookup", params: { symbol: "ZZZZ" }
+      expect(response).to have_http_status(:not_found)
     end
   end
 end

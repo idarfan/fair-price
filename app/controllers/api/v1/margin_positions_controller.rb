@@ -51,12 +51,29 @@ module Api
           return
         end
 
-        quote = FinnhubService.new.quote(symbol)
-        if quote && quote["c"].to_f > 0
-          render json: { symbol: symbol, price: quote["c"].to_f }
-        else
+        begin
+          stock_data = StockDataService.fetch(symbol)
+        rescue StockDataService::NotFoundError
           render json: { error: "找不到此代號" }, status: :not_found
+          return
+        rescue => e
+          Rails.logger.warn("[MarginPositions#price_lookup] #{e.message}")
+          render json: { error: "查詢失敗，請稍後再試" }, status: :service_unavailable
+          return
         end
+
+        valuation = ValuationService.analyze(stock_data)
+
+        render json: {
+          symbol:          symbol,
+          company_name:    stock_data[:name],
+          price:           stock_data[:current_price],
+          week52_low:      stock_data[:fifty_two_week_low],
+          week52_high:     stock_data[:fifty_two_week_high],
+          fair_value_low:  valuation[:fair_value_low],
+          fair_value_high: valuation[:fair_value_high],
+          stock_type:      valuation[:stock_type]
+        }
       end
 
       private
