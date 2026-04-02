@@ -62,14 +62,20 @@ module Api
           return
         end
 
+        # Yahoo Finance 對 NYSE ADR（如 UMC）回傳正確的 NYSE USD 52 週區間；
+        # Finnhub basic_metrics 對跨掛牌股票可能回傳原始交易所（如 TWSE TWD）數據。
+        yf = YahooFinanceService.new.chart(symbol)
+        week52_low  = yf[:low_52w]  || stock_data[:fifty_two_week_low]
+        week52_high = yf[:high_52w] || stock_data[:fifty_two_week_high]
+
         valuation = ValuationService.analyze(stock_data)
 
         render json: {
           symbol:          symbol,
           company_name:    stock_data[:name],
           price:           stock_data[:current_price],
-          week52_low:      stock_data[:fifty_two_week_low],
-          week52_high:     stock_data[:fifty_two_week_high],
+          week52_low:      week52_low,
+          week52_high:     week52_high,
           fair_value_low:  valuation[:fair_value_low],
           fair_value_high: valuation[:fair_value_high],
           stock_type:      valuation[:stock_type]

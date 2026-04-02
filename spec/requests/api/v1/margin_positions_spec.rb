@@ -107,6 +107,9 @@ RSpec.describe "Api::V1::MarginPositions", type: :request do
         industry: "Technology", stock_type: nil
       }
       allow(StockDataService).to receive(:fetch).with("AAPL").and_return(stock_data)
+      yf_double = instance_double(YahooFinanceService,
+        chart: { low_52w: 150.0, high_52w: 250.0 })
+      allow(YahooFinanceService).to receive(:new).and_return(yf_double)
       get "/api/v1/margin_positions/price_lookup", params: { symbol: "AAPL" }
       expect(response).to have_http_status(:ok)
       expect(json["price"]).to eq(195.5)
