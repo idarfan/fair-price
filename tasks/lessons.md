@@ -108,6 +108,46 @@ return () => {
 ```
 **通則：** React useEffect cleanup 執行時，非同步 callback 可能仍在 queue 中，必須加 guard 防止使用已清理的資源。
 
+## 2026-04-02 — 融資試算器：四個重複性錯誤
+
+### 教訓 1：重構變數名稱後必須 grep 確認無殘留
+
+**過錯：** `AddPositionForm` 把 state `livePrice` 重構為 `priceInfo`，但 `useEffect` 第一行的 `setLivePrice(null)` 漏改，導致 Tab 2 整個 crash（`ReferenceError: setLivePrice is not defined`）。
+
+**防治：**
+1. 改變數名稱後立即執行 `Grep "舊名稱" app/frontend/` 確認零殘留
+2. TypeScript `strict mode` + `noUncheckedIndexedAccess` 本應在編譯時抓到此錯誤 → commit 前必須確實跑 `npx tsc --noEmit`，零 error 才允許 commit
+
+**規則：** 重構後 = grep 確認 + tsc 通過，缺一不可。
+
+### 教訓 2：Tailwind 新 class 不保證即時生效，顏色調整直接用 inline style
+
+**過錯：** 改容器底色 `bg-green-900` → `bg-green-800` → `bg-green-700` 截了三輪截圖都沒變，最後改用 `style={{ backgroundColor: '#166534' }}` 才生效。
+
+**根本原因：** Vite JIT 快取、或該 class 未在其他地方使用被 purge。
+
+**防治：** 顏色微調（尤其是不常用的 class）**直接用 inline style + hex 色碼**，避免 Tailwind purge 或快取問題浪費截圖輪迴。
+
+### 教訓 3：CSS `overflow-hidden` 會裁掉 `absolute` 子元素
+
+**過錯：** PriceInfoBar 的 52WK marker 設為 `absolute`，放在有 `overflow-hidden` 的父容器裡，被完全裁掉不可見，花了多次截圖才診斷出來。
+
+**防治：**
+- 需要 `absolute` 定位的子元素，父容器用 `relative`，**不加 `overflow-hidden`**
+- 或把 marker 移到 `overflow-hidden` 容器之外
+
+### 教訓 4：UI 元件修改後必須先截圖確認再 commit
+
+**過錯：** bar 高度 `h-2` ↔ `h-3` 來回兩次，浪費 4 個 commit；PriceInfoBar 整個重寫後直接 commit，沒有截圖確認。
+
+**防治：** CLAUDE.md 已規定「UI 修改後用 Playwright 截圖驗證」— **這是硬性要求，不是選項**。流程：
+```
+修改 → 截圖確認外觀正確 → commit
+```
+不允許「先 commit 再截圖」。
+
+---
+
 ## 2026-03-25 — Storybook + Chromatic：vite-plugin-ruby 路徑污染
 
 ### 症狀
