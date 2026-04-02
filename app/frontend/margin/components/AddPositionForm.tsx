@@ -25,7 +25,7 @@ export function AddPositionForm({ onSubmit }: Props) {
 
   // Auto-fetch price on symbol change (600ms debounce, same as Tab 1)
   useEffect(() => {
-    setLivePrice(null)
+    setPriceInfo(null)
     setLookupError(null)
 
     if (!symbol) return
