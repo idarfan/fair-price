@@ -40,9 +40,14 @@ class StockDataService
 
   def fetch
     profile, quote, metrics, recommend = fetch_parallel
-    raise NotFoundError, "找不到股票：#{@ticker}（請確認代號正確）" if profile.nil? || profile["name"].nil?
 
-    parse(profile, quote, metrics, recommend)
+    has_name  = profile.is_a?(Hash) && profile["name"].present?
+    has_price = safe_float(quote.is_a?(Hash) ? quote["c"] : nil)&.positive?
+
+    # ETF 等品種 Finnhub profile2 可能無 name，但 quote 仍有效（如 TQQQ、SQQQ）
+    raise NotFoundError, "找不到股票：#{@ticker}（請確認代號正確）" unless has_name || has_price
+
+    parse(profile || {}, quote || {}, metrics, recommend)
   end
 
   private
