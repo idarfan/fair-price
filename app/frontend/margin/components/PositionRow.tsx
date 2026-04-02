@@ -6,14 +6,20 @@ interface Props {
   position: MarginPosition
   onClose: (id: number) => void
   onDelete: (id: number) => void
-  onUpdateDate: (id: number, field: 'opened_on' | 'closed_on', value: string) => void
+  onUpdateField: (id: number, field: string, value: string) => void
 }
 
-function EditableDate({
+type CellType = 'date' | 'price'
+
+function EditableCell({
   value,
+  type,
+  display,
   onSave,
 }: {
   value: string
+  type: CellType
+  display: string
   onSave: (v: string) => void
 }) {
   const [editing, setEditing] = useState(false)
@@ -27,8 +33,10 @@ function EditableDate({
   if (editing) {
     return (
       <input
-        type="date"
+        type={type === 'date' ? 'date' : 'number'}
         value={draft}
+        step={type === 'price' ? '0.01' : undefined}
+        min={type === 'price' ? '0' : undefined}
         autoFocus
         onChange={e => setDraft(e.target.value)}
         onBlur={commit}
@@ -36,7 +44,7 @@ function EditableDate({
           if (e.key === 'Enter') commit()
           if (e.key === 'Escape') { setDraft(value); setEditing(false) }
         }}
-        className="bg-gray-700 border border-blue-500 rounded px-1 py-0.5 text-white text-xs w-28"
+        className="bg-gray-700 border border-blue-500 rounded px-1 py-0.5 text-white text-xs w-24"
       />
     )
   }
@@ -44,17 +52,17 @@ function EditableDate({
   return (
     <button
       type="button"
-      title="點擊編輯日期"
+      title="點擊編輯"
       onClick={() => { setDraft(value); setEditing(true) }}
-      className="text-gray-400 hover:text-blue-400 hover:underline underline-offset-2
+      className="hover:text-blue-400 hover:underline underline-offset-2
                  decoration-dashed cursor-pointer text-left"
     >
-      {fmtDate(value)}
+      {display}
     </button>
   )
 }
 
-export function PositionRow({ position, onClose, onDelete, onUpdateDate }: Props) {
+export function PositionRow({ position, onClose, onDelete, onUpdateField }: Props) {
   const isClosed = position.status === 'closed'
 
   const netProfit = position.sell_price
@@ -65,14 +73,26 @@ export function PositionRow({ position, onClose, onDelete, onUpdateDate }: Props
   return (
     <tr className={`border-b border-gray-800 text-sm ${isClosed ? 'opacity-50' : ''}`}>
       <td className="py-2 pr-3 font-semibold text-white">{position.symbol}</td>
-      <td className="py-2 pr-3 text-gray-300">{fmtUSD(parseFloat(position.buy_price))}</td>
+
+      {/* 建倉價 — 可編輯 */}
+      <td className="py-2 pr-3 text-gray-300">
+        <EditableCell
+          value={position.buy_price}
+          type="price"
+          display={fmtUSD(parseFloat(position.buy_price))}
+          onSave={v => onUpdateField(position.id, 'buy_price', v)}
+        />
+      </td>
+
       <td className="py-2 pr-3 text-gray-300">{parseFloat(position.shares).toLocaleString()}</td>
 
       {/* 建倉日 — 可編輯 */}
-      <td className="py-2 pr-3">
-        <EditableDate
+      <td className="py-2 pr-3 text-gray-400">
+        <EditableCell
           value={position.opened_on}
-          onSave={v => onUpdateDate(position.id, 'opened_on', v)}
+          type="date"
+          display={fmtDate(position.opened_on)}
+          onSave={v => onUpdateField(position.id, 'opened_on', v)}
         />
       </td>
 
@@ -80,12 +100,20 @@ export function PositionRow({ position, onClose, onDelete, onUpdateDate }: Props
       <td className="py-2 pr-3 text-yellow-400">{fmtUSD(position.accrued_interest)}</td>
       <td className="py-2 pr-3 text-gray-400">{fmtDate(position.next_charge_date)}</td>
       <td className="py-2 pr-3 text-gray-400">{fmtUSD(position.current_period_interest)}</td>
+
+      {/* 平倉價 — 可編輯 */}
       <td className={`py-2 pr-3 font-medium ${
         netProfit === null ? 'text-gray-500' :
         netProfit >= 0 ? 'text-green-400' : 'text-red-400'
       }`}>
-        {netProfit !== null ? fmtUSD(netProfit) : '—'}
+        <EditableCell
+          value={position.sell_price ?? ''}
+          type="price"
+          display={netProfit !== null ? fmtUSD(netProfit) : '— 填平倉價'}
+          onSave={v => onUpdateField(position.id, 'sell_price', v)}
+        />
       </td>
+
       <td className="py-2">
         <div className="flex gap-1 flex-wrap">
           {!isClosed && (
@@ -104,13 +132,14 @@ export function PositionRow({ position, onClose, onDelete, onUpdateDate }: Props
               </button>
             </>
           )}
-          {/* 已平倉：可修改平倉日 */}
           {isClosed && position.closed_on && (
             <div className="flex items-center gap-1 text-xs text-gray-500">
               <span>平倉日：</span>
-              <EditableDate
+              <EditableCell
                 value={position.closed_on}
-                onSave={v => onUpdateDate(position.id, 'closed_on', v)}
+                type="date"
+                display={fmtDate(position.closed_on)}
+                onSave={v => onUpdateField(position.id, 'closed_on', v)}
               />
             </div>
           )}

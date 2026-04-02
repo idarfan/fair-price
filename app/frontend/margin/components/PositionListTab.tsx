@@ -63,11 +63,7 @@ export function PositionListTab() {
     if (res.ok) await fetchPositions()
   }
 
-  const handleUpdateDate = async (
-    id: number,
-    field: 'opened_on' | 'closed_on',
-    value: string
-  ) => {
+  const handleUpdateField = async (id: number, field: string, value: string) => {
     await fetch(`${API_BASE}/${id}`, {
       method: 'PATCH',
       headers: {
@@ -123,7 +119,7 @@ export function PositionListTab() {
                   position={p}
                   onClose={handleClose}
                   onDelete={handleDelete}
-                  onUpdateDate={handleUpdateDate}
+                  onUpdateField={handleUpdateField}
                 />
               ))}
             </tbody>
