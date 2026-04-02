@@ -37,6 +37,9 @@
     <% if controller_name == 'reports' %>
       <%= vite_javascript_tag 'technicals.tsx' %>
     <% end %>
+    <% if controller_name == 'margin' %>
+      <%= vite_javascript_tag 'margin.tsx' %>
+    <% end %>
   </head>
   <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
 
@@ -46,7 +49,7 @@
           show_search:   @ticker.present?
         ) %>
 
-    <% if controller_name == 'ownership' || controller_name == 'options' %>
+    <% if controller_name == 'ownership' || controller_name == 'options' || controller_name == 'margin' %>
       <main class="flex-1 overflow-hidden flex flex-col">
         <%= yield %>
       </main>

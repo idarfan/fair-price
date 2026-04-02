@@ -10,9 +10,24 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_01_090030) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_02_091533) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "margin_positions", force: :cascade do |t|
+    t.decimal "buy_price", precision: 15, scale: 4, null: false
+    t.date "closed_on"
+    t.datetime "created_at", null: false
+    t.date "opened_on", null: false
+    t.integer "position", default: 0, null: false
+    t.decimal "sell_price", precision: 15, scale: 4
+    t.decimal "shares", precision: 15, scale: 5, null: false
+    t.string "status", default: "open", null: false
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.index ["status", "opened_on"], name: "index_margin_positions_on_status_and_opened_on"
+    t.index ["status"], name: "index_margin_positions_on_status"
+  end
 
   create_table "options_snapshots", force: :cascade do |t|
     t.datetime "cached_at", default: -> { "CURRENT_TIMESTAMP" }, null: false

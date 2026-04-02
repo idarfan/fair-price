@@ -23,6 +23,11 @@ Rails.application.routes.draw do
       # Technical chart data (price, volume, MA, RSI)
       get "charts/:symbol", to: "charts#show",
           constraints: { symbol: /[A-Za-z0-9.\-]{1,10}/ }
+
+      # Margin Trade Calculator
+      get "margin_positions/price_lookup", to: "margin_positions#price_lookup"
+      resources :margin_positions, only: [ :index, :create, :update, :destroy ]
+      post "margin_positions/:id/close",    to: "margin_positions#close"
     end
   end
 
@@ -69,6 +74,9 @@ Rails.application.routes.draw do
   get "options",         to: "options#index", as: :options
   get "options/:symbol", to: "options#show",  as: :option_detail,
       constraints: { symbol: /[A-Za-z0-9.\-]{1,10}/ }
+
+  # Margin Trade Calculator
+  get "margin", to: "margin#index", as: :margin
 
   # Ownership Structure
   get  "ownership",         to: "ownership#index",   as: :ownership

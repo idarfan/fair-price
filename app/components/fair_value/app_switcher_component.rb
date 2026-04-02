@@ -7,7 +7,8 @@ class FairValue::AppSwitcherComponent < ApplicationComponent
     { icon: "📁", label: "Portfolio",      href: "/portfolio", desc: "個人持股追蹤" },
     { icon: "🔔", label: "Watchlist",      href: "/watchlist",  desc: "自選股到價通知" },
     { icon: "📉", label: "Options",        href: "/options",    desc: "美股期權分析｜策略推薦｜IV Rank" },
-    { icon: "🏦", label: "持股結構",       href: "/ownership",  desc: "Watchlist 持股結構變化圖表" }
+    { icon: "🏦", label: "持股結構",       href: "/ownership",  desc: "Watchlist 持股結構變化圖表" },
+    { icon: "💹", label: "融資試算",       href: "/margin",     desc: "美股融資交易獲利試算與持股管理" }
   ].freeze
 
   def initialize(navbar: false)
