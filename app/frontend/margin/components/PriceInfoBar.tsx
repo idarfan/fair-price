@@ -17,9 +17,11 @@ interface RangeBarProps {
   current: number
   /** true = fill from left to current (Day's Range); false = marker only (52W) */
   filled?: boolean
+  /** override track background color */
+  trackColor?: string
 }
 
-function RangeBar({ label, low, high, current, filled = false }: RangeBarProps) {
+function RangeBar({ label, low, high, current, filled = false, trackColor }: RangeBarProps) {
   const pct = pctInRange(current, low, high)
 
   return (
@@ -34,7 +36,10 @@ function RangeBar({ label, low, high, current, filled = false }: RangeBarProps) 
       {/* Bar + triangle container */}
       <div className="relative pb-3">
         {/* Track */}
-        <div className="relative h-3 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.35)' }}>
+        <div
+          className="relative h-3 rounded-full bg-gray-500"
+          style={trackColor ? { backgroundColor: trackColor } : undefined}
+        >
           {filled ? (
             /* Day range: red fill from left to current price */
             <div
@@ -83,7 +88,7 @@ export function PriceInfoBar({ info }: Props) {
   if (!hasDayRange && !has52w) return null
 
   return (
-    <div className="mt-2 space-y-3 rounded-lg px-3 pt-2.5 pb-2" style={{ backgroundColor: '#166534' }}>
+    <div className="mt-2 space-y-3 bg-gray-700 rounded-lg px-3 pt-2.5 pb-2">
       {hasDayRange && (
         <RangeBar
           label="Day's Range"
@@ -100,6 +105,7 @@ export function PriceInfoBar({ info }: Props) {
           low={week52_low!}
           high={week52_high!}
           current={price}
+          trackColor="#4ade80"
         />
       )}
 
