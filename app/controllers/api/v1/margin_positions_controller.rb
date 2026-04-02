@@ -74,6 +74,8 @@ module Api
           symbol:          symbol,
           company_name:    stock_data[:name],
           price:           stock_data[:current_price],
+          day_low:         stock_data[:day_low],
+          day_high:        stock_data[:day_high],
           week52_low:      week52_low,
           week52_high:     week52_high,
           fair_value_low:  valuation[:fair_value_low],

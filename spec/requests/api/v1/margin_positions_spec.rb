@@ -94,6 +94,7 @@ RSpec.describe "Api::V1::MarginPositions", type: :request do
     it "returns price, 52-week range and fair value estimate" do
       stock_data = {
         name: "Apple Inc.", current_price: 195.5,
+        day_low: 193.0, day_high: 197.0,
         fifty_two_week_low: 150.0, fifty_two_week_high: 250.0,
         sector: "Technology", eps_ttm: 6.5, forward_eps: 7.0,
         book_value: 4.0, roe: 0.15, dividend_rate: 0.0,
@@ -113,6 +114,8 @@ RSpec.describe "Api::V1::MarginPositions", type: :request do
       get "/api/v1/margin_positions/price_lookup", params: { symbol: "AAPL" }
       expect(response).to have_http_status(:ok)
       expect(json["price"]).to eq(195.5)
+      expect(json["day_low"]).to eq(193.0)
+      expect(json["day_high"]).to eq(197.0)
       expect(json["week52_low"]).to eq(150.0)
       expect(json["week52_high"]).to eq(250.0)
       expect(json).to have_key("fair_value_low")

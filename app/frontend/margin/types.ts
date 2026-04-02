@@ -56,6 +56,8 @@ export interface PriceLookupResult {
   symbol:          string
   company_name:    string
   price:           number
+  day_low:         number | null
+  day_high:        number | null
   week52_low:      number | null
   week52_high:     number | null
   fair_value_low:  number | null

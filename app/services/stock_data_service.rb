@@ -9,17 +9,17 @@ class StockDataService
 
   # Finnhub finnhubIndustry → 我們的 sector 分類
   SECTOR_MAP = [
-    [/bank|insurance|financial|thrift|mortgage|capital market|brokerage/i, "Financial Services"],
-    [/real estate|reit/i,                                                    "Real Estate"],
-    [/electric util|gas util|water util|multi.util|independent power|util/i, "Utilities"],
-    [/oil|petroleum|gas & consumable|energy/i,                               "Energy"],
-    [/steel|mining|metal|chemical|copper|coal|material|aluminum/i,           "Basic Materials"],
-    [/software|semiconductor|hardware|internet|tech|computer|electron/i,     "Technology"],
-    [/health|pharma|biotech|medical|hospital|life science/i,                 "Healthcare"],
-    [/telecom|media|communication|entertainment|broadcast/i,                 "Communication Services"],
-    [/retail|automobile|hotel|restaurant|apparel|leisure|consumer discret/i, "Consumer Cyclical"],
-    [/food|beverage|tobacco|household|consumer staple|supermarket/i,         "Consumer Defensive"],
-    [/aerospace|defense|industrial|transport|airline|machinery|construct/i,  "Industrials"],
+    [ /bank|insurance|financial|thrift|mortgage|capital market|brokerage/i, "Financial Services" ],
+    [ /real estate|reit/i,                                                    "Real Estate" ],
+    [ /electric util|gas util|water util|multi.util|independent power|util/i, "Utilities" ],
+    [ /oil|petroleum|gas & consumable|energy/i,                               "Energy" ],
+    [ /steel|mining|metal|chemical|copper|coal|material|aluminum/i,           "Basic Materials" ],
+    [ /software|semiconductor|hardware|internet|tech|computer|electron/i,     "Technology" ],
+    [ /health|pharma|biotech|medical|hospital|life science/i,                 "Healthcare" ],
+    [ /telecom|media|communication|entertainment|broadcast/i,                 "Communication Services" ],
+    [ /retail|automobile|hotel|restaurant|apparel|leisure|consumer discret/i, "Consumer Cyclical" ],
+    [ /food|beverage|tobacco|household|consumer staple|supermarket/i,         "Consumer Defensive" ],
+    [ /aerospace|defense|industrial|transport|airline|machinery|construct/i,  "Industrials" ]
   ].freeze
 
   def self.fetch(ticker)
@@ -56,8 +56,8 @@ class StockDataService
       metrics:    Thread.new { api_get("/stock/metric",        symbol: @ticker, metric: "all") },
       recommend:  Thread.new { api_get_safe("/stock/recommendation", symbol: @ticker) }
     }
-    [threads[:profile].value, threads[:quote].value,
-     threads[:metrics].value, threads[:recommend].value]
+    [ threads[:profile].value, threads[:quote].value,
+     threads[:metrics].value, threads[:recommend].value ]
   end
 
   def api_get(path, params = {})
@@ -130,6 +130,8 @@ class StockDataService
       earnings_growth:           eps_growth,
       revenue_growth:            rev_growth,
       earnings_quarterly_growth: eps_q_growth,
+      day_low:                   safe_float(quote["l"]),
+      day_high:                  safe_float(quote["h"]),
       fifty_two_week_low:        safe_float(m["52WeekLow"]),
       fifty_two_week_high:       safe_float(m["52WeekHigh"]),
       analyst_consensus:         parse_recommendations(recommend_resp)
