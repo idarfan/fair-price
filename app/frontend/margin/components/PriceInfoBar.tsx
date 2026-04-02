@@ -15,7 +15,8 @@ interface RangeBarProps {
   low: number
   high: number
   current: number
-  filled?: boolean   // true = fill from left to current (day range); false = marker only (52W)
+  /** true = fill from left to current (Day's Range); false = marker only (52W) */
+  filled?: boolean
 }
 
 function RangeBar({ label, low, high, current, filled = false }: RangeBarProps) {
@@ -23,39 +24,44 @@ function RangeBar({ label, low, high, current, filled = false }: RangeBarProps) 
 
   return (
     <div>
+      {/* Values + label row */}
       <div className="flex items-baseline justify-between mb-1.5">
         <span className="text-gray-200 text-xs font-medium tabular-nums">{fmtUSD(low)}</span>
         <span className="text-gray-400 text-[10px] tracking-widest uppercase">{label}</span>
         <span className="text-gray-200 text-xs font-medium tabular-nums">{fmtUSD(high)}</span>
       </div>
 
-      {/* Bar + triangle marker */}
-      <div className="relative pb-2.5">
-        {/* Track */}
-        <div className="h-1.5 bg-gray-600 rounded-full overflow-hidden">
+      {/* Bar + triangle container */}
+      <div className="relative pb-3">
+        {/* Gray track */}
+        <div className="relative h-3 bg-gray-500 rounded-full">
           {filled ? (
-            /* Day range: fill from left edge to current price */
+            /* Day range: red fill from left to current price */
             <div
-              className="h-full bg-red-400 rounded-full"
-              style={{ width: `${pct}%` }}
+              className="absolute top-0 left-0 h-full rounded-full"
+              style={{ width: `${pct}%`, backgroundColor: '#f87171' }}
             />
           ) : (
-            /* 52W range: small square marker at current price */
+            /* 52W range: small red square at current price */
             <div
-              className="absolute top-0 h-1.5 w-2 bg-red-400 rounded-sm -translate-x-1/2"
-              style={{ left: `${pct}%` }}
+              className="absolute top-0 h-full w-3 rounded-sm"
+              style={{ left: `calc(${pct}% - 6px)`, backgroundColor: '#f87171' }}
             />
           )}
         </div>
 
-        {/* Triangle (▲) below bar at current price position */}
+        {/* Triangle marker (▲) below bar */}
         <div
-          className="absolute bottom-0 w-0 h-0 -translate-x-1/2"
+          className="absolute"
           style={{
-            left: `${pct}%`,
-            borderLeft:   '4px solid transparent',
-            borderRight:  '4px solid transparent',
-            borderBottom: '6px solid #9ca3af',   // gray-400
+            left:        `${pct}%`,
+            bottom:      0,
+            transform:   'translateX(-50%)',
+            width:        0,
+            height:       0,
+            borderLeft:  '5px solid transparent',
+            borderRight: '5px solid transparent',
+            borderBottom: '6px solid #9ca3af',
           }}
         />
       </div>
@@ -64,7 +70,11 @@ function RangeBar({ label, low, high, current, filled = false }: RangeBarProps) 
 }
 
 export function PriceInfoBar({ info }: Props) {
-  const { price, day_low, day_high, week52_low, week52_high, fair_value_low, fair_value_high, stock_type } = info
+  const {
+    price, day_low, day_high,
+    week52_low, week52_high,
+    fair_value_low, fair_value_high, stock_type,
+  } = info
 
   const hasDayRange = day_low != null && day_high != null && day_high > day_low
   const has52w      = week52_low != null && week52_high != null
@@ -73,7 +83,7 @@ export function PriceInfoBar({ info }: Props) {
   if (!hasDayRange && !has52w) return null
 
   return (
-    <div className="mt-2 space-y-3 text-xs bg-gray-700 rounded-lg px-3 pt-2.5 pb-1.5">
+    <div className="mt-2 space-y-3 bg-gray-700 rounded-lg px-3 pt-2.5 pb-2">
       {hasDayRange && (
         <RangeBar
           label="Day's Range"
@@ -90,12 +100,11 @@ export function PriceInfoBar({ info }: Props) {
           low={week52_low!}
           high={week52_high!}
           current={price}
-          filled={false}
         />
       )}
 
       {hasFairV && (
-        <div className="flex items-center gap-1.5 text-gray-400 pb-0.5">
+        <div className="flex items-center gap-1.5 text-gray-400 text-xs pb-0.5">
           <span className="w-2 h-2 rounded-sm bg-blue-400 opacity-70 inline-block flex-shrink-0" />
           <span>
             公允估值
