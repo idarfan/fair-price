@@ -33,8 +33,8 @@ function RangeBar({ label, low, high, current, filled = false }: RangeBarProps) 
 
       {/* Bar + triangle container */}
       <div className="relative pb-3">
-        {/* Gray track */}
-        <div className="relative h-3 bg-gray-500 rounded-full">
+        {/* Track */}
+        <div className="relative h-3 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.35)' }}>
           {filled ? (
             /* Day range: red fill from left to current price */
             <div
@@ -83,7 +83,7 @@ export function PriceInfoBar({ info }: Props) {
   if (!hasDayRange && !has52w) return null
 
   return (
-    <div className="mt-2 space-y-3 bg-gray-700 rounded-lg px-3 pt-2.5 pb-2">
+    <div className="mt-2 space-y-3 rounded-lg px-3 pt-2.5 pb-2" style={{ backgroundColor: '#166534' }}>
       {hasDayRange && (
         <RangeBar
           label="Day's Range"
