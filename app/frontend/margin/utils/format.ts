@@ -21,6 +21,14 @@ export function fmtDate(isoDate: string): string {
   return d.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
+// Accepts YYYYMMDD or YYYY-MM-DD, returns YYYY-MM-DD or null if invalid
+export function parseFlexDate(s: string): string | null {
+  const clean = s.replace(/-/g, '').trim()
+  if (!/^\d{8}$/.test(clean)) return null
+  const iso = `${clean.slice(0, 4)}-${clean.slice(4, 6)}-${clean.slice(6, 8)}`
+  return isNaN(Date.parse(iso)) ? null : iso
+}
+
 export function todayISO(): string {
   return new Date().toISOString().split('T')[0]
 }

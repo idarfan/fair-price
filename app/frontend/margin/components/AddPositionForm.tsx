@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { todayISO, fmtUSD } from '../utils/format'
+import { todayISO, fmtUSD, parseFlexDate } from '../utils/format'
 import type { AddPositionPayload } from '../types'
 
 interface Props {
@@ -13,6 +13,7 @@ export function AddPositionForm({ onSubmit }: Props) {
   const [buyPrice, setBuyPrice] = useState('')
   const [shares, setShares] = useState('')
   const [sellPrice, setSellPrice] = useState('')
+  const [openedOnText, setOpenedOnText] = useState(todayISO())
   const [openedOn, setOpenedOn] = useState(todayISO())
   const [loading, setLoading] = useState(false)
   const [livePrice, setLivePrice] = useState<number | null>(null)
@@ -85,6 +86,7 @@ export function AddPositionForm({ onSubmit }: Props) {
     setShares('')
     setSellPrice('')
     setOpenedOn(todayISO())
+    setOpenedOnText(todayISO())
     setLivePrice(null)
   }
 
@@ -122,11 +124,22 @@ export function AddPositionForm({ onSubmit }: Props) {
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-400 mb-1">建倉日期</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs text-gray-400">建倉日期</label>
+            {openedOnText && !parseFlexDate(openedOnText) && openedOnText !== todayISO() && (
+              <span className="text-xs text-red-400">格式錯誤</span>
+            )}
+          </div>
           <input
-            type="date"
-            value={openedOn}
-            onChange={e => setOpenedOn(e.target.value)}
+            type="text"
+            value={openedOnText}
+            placeholder="20260401"
+            maxLength={10}
+            onChange={e => {
+              setOpenedOnText(e.target.value)
+              const parsed = parseFlexDate(e.target.value)
+              if (parsed) setOpenedOn(parsed)
+            }}
             className={`${inputClass} w-full`}
           />
         </div>

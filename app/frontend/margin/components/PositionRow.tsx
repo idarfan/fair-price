@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { fmtUSD, fmtDate } from '../utils/format'
+import { fmtUSD, fmtDate, parseFlexDate } from '../utils/format'
 import type { MarginPosition } from '../types'
 
 interface Props {
@@ -9,10 +9,6 @@ interface Props {
   onUpdateField: (id: number, field: string, value: string) => void
 }
 
-// Validates YYYY-MM-DD format
-function isValidDate(s: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s))
-}
 
 type CellType = 'date' | 'price'
 
@@ -38,11 +34,12 @@ function EditableCell({
   }
 
   const commitText = () => {
-    if (isValidDate(textDraft)) {
-      setDraft(textDraft)
-      commit(textDraft)
+    const parsed = parseFlexDate(textDraft)
+    if (parsed) {
+      setDraft(parsed)
+      commit(parsed)
     } else {
-      commit(draft)
+      commit(draft)  // fall back to last known good value
     }
   }
 
@@ -53,12 +50,13 @@ function EditableCell({
         <input
           type="text"
           value={textDraft}
-          placeholder="YYYY-MM-DD"
+          placeholder="20260401"
           autoFocus
           maxLength={10}
           onChange={e => {
             setTextDraft(e.target.value)
-            if (isValidDate(e.target.value)) setDraft(e.target.value)
+            const parsed = parseFlexDate(e.target.value)
+            if (parsed) setDraft(parsed)
           }}
           onBlur={commitText}
           onKeyDown={e => {
