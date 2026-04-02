@@ -75,16 +75,9 @@ export function PositionListTab() {
     await fetchPositions()
   }
 
-  const handlePriceLookup = async (symbol: string): Promise<number | null> => {
-    const res = await fetch(`${API_BASE}/price_lookup?symbol=${encodeURIComponent(symbol)}`)
-    if (!res.ok) return null
-    const data = await res.json()
-    return data.price ?? null
-  }
-
   return (
     <div className="space-y-4">
-      <AddPositionForm onSubmit={handleAdd} onPriceLookup={handlePriceLookup} />
+      <AddPositionForm onSubmit={handleAdd} />
 
       {loading && (
         <p className="text-gray-500 text-sm text-center py-4">載入中…</p>

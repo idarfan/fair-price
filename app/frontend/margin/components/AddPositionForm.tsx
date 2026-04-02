@@ -1,29 +1,57 @@
-import { useState } from 'react'
-import { todayISO } from '../utils/format'
+import { useState, useEffect, useRef } from 'react'
+import { todayISO, fmtUSD } from '../utils/format'
 import type { AddPositionPayload } from '../types'
 
 interface Props {
   onSubmit: (payload: AddPositionPayload) => Promise<void>
-  onPriceLookup: (symbol: string) => Promise<number | null>
 }
 
-export function AddPositionForm({ onSubmit, onPriceLookup }: Props) {
+const API_LOOKUP = '/api/v1/margin_positions/price_lookup'
+
+export function AddPositionForm({ onSubmit }: Props) {
   const [symbol, setSymbol] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
   const [shares, setShares] = useState('')
   const [sellPrice, setSellPrice] = useState('')
   const [openedOn, setOpenedOn] = useState(todayISO())
   const [loading, setLoading] = useState(false)
+  const [livePrice, setLivePrice] = useState<number | null>(null)
   const [lookupLoading, setLookupLoading] = useState(false)
+  const [lookupError, setLookupError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const handleLookup = async () => {
+  // Auto-fetch price on symbol change (600ms debounce, same as Tab 1)
+  useEffect(() => {
+    setLivePrice(null)
+    setLookupError(null)
+
     if (!symbol) return
-    setLookupLoading(true)
-    const price = await onPriceLookup(symbol)
-    setLookupLoading(false)
-    if (price !== null) setBuyPrice(price.toFixed(2))
-  }
+
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+
+    debounceRef.current = setTimeout(async () => {
+      setLookupLoading(true)
+      try {
+        const res = await fetch(`${API_LOOKUP}?symbol=${encodeURIComponent(symbol)}`)
+        const data = await res.json() as { price?: number; error?: string }
+        if (!res.ok || !data.price) {
+          setLookupError('找不到此代號')
+          setLivePrice(null)
+        } else {
+          setLivePrice(data.price)
+          setBuyPrice(data.price.toFixed(2))
+          setLookupError(null)
+        }
+      } catch {
+        setLookupError('網路錯誤')
+      } finally {
+        setLookupLoading(false)
+      }
+    }, 600)
+
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [symbol])
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -52,12 +80,12 @@ export function AddPositionForm({ onSubmit, onPriceLookup }: Props) {
     })
     setLoading(false)
 
-    // Reset form
     setSymbol('')
     setBuyPrice('')
     setShares('')
     setSellPrice('')
     setOpenedOn(todayISO())
+    setLivePrice(null)
   }
 
   const inputClass =
@@ -67,30 +95,31 @@ export function AddPositionForm({ onSubmit, onPriceLookup }: Props) {
   return (
     <form onSubmit={handleSubmit} className="bg-gray-800 rounded-xl p-4 space-y-3">
       <h3 className="text-sm font-semibold text-gray-200">新增融資持倉</h3>
-      {error && (
-        <p className="text-xs text-red-400">{error}</p>
-      )}
+      {error && <p className="text-xs text-red-400">{error}</p>}
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-xs text-gray-400 mb-1">股票代號</label>
-          <div className="flex gap-1">
-            <input
-              type="text"
-              value={symbol}
-              onChange={e => setSymbol(e.target.value.toUpperCase())}
-              placeholder="TQQQ"
-              maxLength={10}
-              className={`${inputClass} flex-1 uppercase`}
-            />
-            <button
-              type="button"
-              onClick={handleLookup}
-              disabled={lookupLoading || !symbol}
-              className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 disabled:opacity-50"
-            >
-              {lookupLoading ? '…' : '查價'}
-            </button>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs text-gray-400">股票代號</label>
+            {lookupLoading && (
+              <span className="text-xs text-gray-500 animate-pulse">查詢中…</span>
+            )}
+            {!lookupLoading && livePrice !== null && (
+              <span className="text-xs font-semibold text-green-400">
+                現價 {fmtUSD(livePrice)}
+              </span>
+            )}
+            {!lookupLoading && lookupError && (
+              <span className="text-xs text-red-400">{lookupError}</span>
+            )}
           </div>
+          <input
+            type="text"
+            value={symbol}
+            onChange={e => setSymbol(e.target.value.toUpperCase())}
+            placeholder="TQQQ"
+            maxLength={10}
+            className={`${inputClass} w-full uppercase`}
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-400 mb-1">建倉日期</label>
@@ -98,7 +127,7 @@ export function AddPositionForm({ onSubmit, onPriceLookup }: Props) {
             type="date"
             value={openedOn}
             onChange={e => setOpenedOn(e.target.value)}
-            className={inputClass + ' w-full'}
+            className={`${inputClass} w-full`}
           />
         </div>
         <div>
