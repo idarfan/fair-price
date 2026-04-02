@@ -93,7 +93,7 @@ RSpec.describe "Api::V1::MarginPositions", type: :request do
 
     it "proxies Finnhub quote" do
       allow_any_instance_of(FinnhubService).to receive(:quote)
-        .with("AAPL").and_return({ c: 195.5 })
+        .with("AAPL").and_return({ "c" => 195.5 })
       get "/api/v1/margin_positions/price_lookup", params: { symbol: "AAPL" }
       expect(response).to have_http_status(:ok)
       expect(json["price"]).to eq(195.5)

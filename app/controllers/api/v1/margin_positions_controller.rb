@@ -48,10 +48,10 @@ module Api
         end
 
         quote = FinnhubService.new.quote(symbol)
-        if quote && quote[:c].to_f > 0
-          render json: { symbol: symbol, price: quote[:c].to_f }
+        if quote && quote["c"].to_f > 0
+          render json: { symbol: symbol, price: quote["c"].to_f }
         else
-          render json: { error: "無法取得 #{symbol} 的報價" }, status: :not_found
+          render json: { error: "找不到此代號" }, status: :not_found
         end
       end
 
