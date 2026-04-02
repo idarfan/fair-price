@@ -1,15 +1,17 @@
+import { fmtUSD } from '../utils/format'
+
 interface Props {
   ticker: string
   buyPrice: number | null
   shares: number | null
   sellPrice: number | null
-  lookupLoading?: boolean
-  lookupError?: string | null
+  livePrice: number | null
+  lookupLoading: boolean
+  lookupError: string | null
   onTickerChange: (v: string) => void
   onBuyPriceChange: (v: number | null) => void
   onSharesChange: (v: number | null) => void
   onSellPriceChange: (v: number | null) => void
-  onPriceLookup?: () => void
 }
 
 function numInput(
@@ -37,40 +39,36 @@ function numInput(
 
 export function PriceInput({
   ticker, buyPrice, shares, sellPrice,
-  lookupLoading = false, lookupError = null,
+  livePrice, lookupLoading, lookupError,
   onTickerChange, onBuyPriceChange, onSharesChange, onSellPriceChange,
-  onPriceLookup,
 }: Props) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <div>
-        <label className="block text-xs text-gray-400 mb-1">股票代號</label>
-        <div className="flex gap-1">
-          <input
-            type="text"
-            value={ticker}
-            placeholder="TQQQ"
-            onChange={e => onTickerChange(e.target.value.toUpperCase())}
-            onKeyDown={e => { if (e.key === 'Enter' && onPriceLookup) onPriceLookup() }}
-            maxLength={10}
-            className="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
-                       placeholder-gray-500 focus:outline-none focus:border-blue-500 uppercase"
-          />
-          {onPriceLookup && (
-            <button
-              type="button"
-              onClick={onPriceLookup}
-              disabled={lookupLoading || !ticker}
-              className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded-lg
-                         text-gray-300 disabled:opacity-50 whitespace-nowrap"
-            >
-              {lookupLoading ? '…' : '查價'}
-            </button>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs text-gray-400">股票代號</label>
+          {/* Live price badge shown next to label */}
+          {lookupLoading && (
+            <span className="text-xs text-gray-500 animate-pulse">查詢中…</span>
+          )}
+          {!lookupLoading && livePrice !== null && (
+            <span className="text-xs font-semibold text-green-400">
+              現價 {fmtUSD(livePrice)}
+            </span>
+          )}
+          {!lookupLoading && lookupError && (
+            <span className="text-xs text-red-400">{lookupError}</span>
           )}
         </div>
-        {lookupError && (
-          <p className="text-xs text-red-400 mt-1">{lookupError}</p>
-        )}
+        <input
+          type="text"
+          value={ticker}
+          placeholder="TQQQ"
+          onChange={e => onTickerChange(e.target.value.toUpperCase())}
+          maxLength={10}
+          className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
+                     placeholder-gray-500 focus:outline-none focus:border-blue-500 uppercase"
+        />
       </div>
       <div>
         <label className="block text-xs text-gray-400 mb-1">股數</label>

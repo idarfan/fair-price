@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { PriceInput } from './PriceInput'
 import { DaysSelector } from './DaysSelector'
 import { ResultSummary } from './ResultSummary'
@@ -14,29 +14,47 @@ export function CalculatorTab() {
   const [shares, setShares] = useState<number | null>(100)
   const [sellPrice, setSellPrice] = useState<number | null>(null)
   const [days, setDays] = useState(30)
+  const [livePrice, setLivePrice] = useState<number | null>(null)
   const [lookupLoading, setLookupLoading] = useState(false)
   const [lookupError, setLookupError] = useState<string | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const handlePriceLookup = async () => {
-    if (!ticker) return
-    setLookupLoading(true)
+  // Auto-fetch price whenever ticker changes, with 600ms debounce
+  useEffect(() => {
+    setLivePrice(null)
     setLookupError(null)
-    try {
-      const res = await fetch(
-        `/api/v1/margin_positions/price_lookup?symbol=${encodeURIComponent(ticker)}`
-      )
-      const data = await res.json() as { price?: number; error?: string }
-      if (!res.ok || !data.price) {
-        setLookupError(data.error ?? `無法取得 ${ticker} 報價`)
-      } else {
-        setBuyPrice(data.price)
+
+    if (!ticker) return
+
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+
+    debounceRef.current = setTimeout(async () => {
+      setLookupLoading(true)
+      try {
+        const res = await fetch(
+          `/api/v1/margin_positions/price_lookup?symbol=${encodeURIComponent(ticker)}`
+        )
+        const data = await res.json() as { price?: number; error?: string }
+        if (!res.ok || !data.price) {
+          setLookupError('找不到此代號')
+          setLivePrice(null)
+        } else {
+          setLivePrice(data.price)
+          setBuyPrice(data.price)
+          setLookupError(null)
+        }
+      } catch {
+        setLookupError('網路錯誤')
+        setLivePrice(null)
+      } finally {
+        setLookupLoading(false)
       }
-    } catch {
-      setLookupError('網路錯誤，請稍後再試')
-    } finally {
-      setLookupLoading(false)
+    }, 600)
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }
+  }, [ticker])
 
   const results: CalcResults | null = (() => {
     if (!buyPrice || !shares || !sellPrice || buyPrice <= 0 || shares <= 0) return null
@@ -59,13 +77,13 @@ export function CalculatorTab() {
         buyPrice={buyPrice}
         shares={shares}
         sellPrice={sellPrice}
+        livePrice={livePrice}
         lookupLoading={lookupLoading}
         lookupError={lookupError}
         onTickerChange={setTicker}
         onBuyPriceChange={setBuyPrice}
         onSharesChange={setShares}
         onSellPriceChange={setSellPrice}
-        onPriceLookup={handlePriceLookup}
       />
       <DaysSelector days={days} onDaysChange={setDays} />
       <hr className="border-gray-700" />
