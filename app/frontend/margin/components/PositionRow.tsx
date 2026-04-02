@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { fmtUSD, fmtDate } from '../utils/format'
 import type { MarginPosition } from '../types'
 
@@ -7,6 +7,11 @@ interface Props {
   onClose: (id: number) => void
   onDelete: (id: number) => void
   onUpdateField: (id: number, field: string, value: string) => void
+}
+
+// Validates YYYY-MM-DD format
+function isValidDate(s: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s))
 }
 
 type CellType = 'date' | 'price'
@@ -24,22 +29,82 @@ function EditableCell({
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
+  const [textDraft, setTextDraft] = useState(value) // for date: text side
+  const pickerRef = useRef<HTMLInputElement>(null)
 
-  const commit = () => {
+  const commit = (val = draft) => {
     setEditing(false)
-    if (draft && draft !== value) onSave(draft)
+    if (val && val !== value) onSave(val)
   }
 
-  if (editing) {
+  const commitText = () => {
+    if (isValidDate(textDraft)) {
+      setDraft(textDraft)
+      commit(textDraft)
+    } else {
+      commit(draft)
+    }
+  }
+
+  if (editing && type === 'date') {
+    return (
+      <div className="flex items-center gap-1">
+        {/* Text input — direct typing */}
+        <input
+          type="text"
+          value={textDraft}
+          placeholder="YYYY-MM-DD"
+          autoFocus
+          maxLength={10}
+          onChange={e => {
+            setTextDraft(e.target.value)
+            if (isValidDate(e.target.value)) setDraft(e.target.value)
+          }}
+          onBlur={commitText}
+          onKeyDown={e => {
+            if (e.key === 'Enter') commitText()
+            if (e.key === 'Escape') { setEditing(false); setDraft(value); setTextDraft(value) }
+          }}
+          className="bg-gray-700 border border-blue-500 rounded px-1 py-0.5 text-white text-xs w-28"
+        />
+        {/* Hidden date picker — triggered by calendar icon */}
+        <input
+          ref={pickerRef}
+          type="date"
+          value={draft}
+          tabIndex={-1}
+          onChange={e => {
+            if (e.target.value) {
+              setDraft(e.target.value)
+              setTextDraft(e.target.value)
+              commit(e.target.value)
+            }
+          }}
+          className="sr-only"
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          title="開啟日曆"
+          onMouseDown={e => { e.preventDefault(); pickerRef.current?.showPicker?.() }}
+          className="text-gray-400 hover:text-blue-400 text-sm leading-none"
+        >
+          📅
+        </button>
+      </div>
+    )
+  }
+
+  if (editing && type === 'price') {
     return (
       <input
-        type={type === 'date' ? 'date' : 'number'}
+        type="number"
         value={draft}
-        step={type === 'price' ? '0.01' : undefined}
-        min={type === 'price' ? '0' : undefined}
+        step="0.01"
+        min="0"
         autoFocus
         onChange={e => setDraft(e.target.value)}
-        onBlur={commit}
+        onBlur={() => commit()}
         onKeyDown={e => {
           if (e.key === 'Enter') commit()
           if (e.key === 'Escape') { setDraft(value); setEditing(false) }
@@ -53,7 +118,7 @@ function EditableCell({
     <button
       type="button"
       title="點擊編輯"
-      onClick={() => { setDraft(value); setEditing(true) }}
+      onClick={() => { setDraft(value); setTextDraft(value); setEditing(true) }}
       className="hover:text-blue-400 hover:underline underline-offset-2
                  decoration-dashed cursor-pointer text-left"
     >
