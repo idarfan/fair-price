@@ -96,6 +96,7 @@ export function PriceInfoBar({ info }: Props) {
           high={day_high!}
           current={price}
           filled
+          trackColor="#4ade80"
         />
       )}
 
