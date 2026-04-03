@@ -2,6 +2,10 @@
 
 # Fetches stock data from Yahoo Finance (free, no API key required)
 class YahooFinanceService
+  HTTP_ERRORS = [
+    HTTParty::Error, Net::ReadTimeout, Net::OpenTimeout,
+    SocketError, Errno::ECONNREFUSED, OpenSSL::SSL::SSLError
+  ].freeze
   BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
   HEADERS  = { "User-Agent" => "Mozilla/5.0" }.freeze
 
@@ -42,8 +46,8 @@ class YahooFinanceService
       closes:     zipped.map { |_, _, _, _, c, _| c.to_f },
       volumes:    zipped.map { |_, _, _, _, _, v| v.to_i }
     }
-  rescue StandardError => e
-    Rails.logger.warn("[YahooFinance] #{symbol} failed: #{e.message}")
+  rescue *HTTP_ERRORS => e
+    Rails.logger.warn("[YahooFinance] chart #{symbol}: #{e.class} #{e.message}")
     empty_result
   end
 
@@ -101,8 +105,8 @@ class YahooFinanceService
     end
 
     { summary: summary, top_holders: top_holders, source: "Yahoo Finance" }
-  rescue StandardError => e
-    Rails.logger.warn("[YahooFinance] holders #{symbol} failed: #{e.message}")
+  rescue *HTTP_ERRORS => e
+    Rails.logger.warn("[YahooFinance] holders #{symbol}: #{e.class} #{e.message}")
     nil
   end
 
@@ -136,8 +140,8 @@ class YahooFinanceService
     return [ nil, nil ] if crumb.empty?
 
     [ crumb, cookie ]
-  rescue StandardError => e
-    Rails.logger.warn("[YahooFinance] fetch_crumb failed: #{e.message}")
+  rescue *HTTP_ERRORS => e
+    Rails.logger.warn("[YahooFinance] fetch_crumb: #{e.class} #{e.message}")
     [ nil, nil ]
   end
 

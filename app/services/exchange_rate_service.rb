@@ -1,9 +1,9 @@
 class ExchangeRateService
   include HTTParty
 
-  CACHE_PATH = "/tmp/.fairprice_fx_cache"
-  CACHE_TTL  = 3600
-  FALLBACK   = 32.50
+  CACHE_KEY = "exchange_rates_usd"
+  CACHE_TTL = 3600
+  FALLBACK  = 32.50
 
   URLS = %w[
     https://open.er-api.com/v6/latest/USD
@@ -21,8 +21,8 @@ class ExchangeRateService
   private
 
   def fetch_rates
-    cached = read_cache
-    return [cached, :cache] if cached
+    cached = Rails.cache.read(CACHE_KEY)
+    return [ cached, :cache ] if cached
 
     URLS.each do |url|
       response = self.class.get(url, headers: { "User-Agent" => "FairPrice/2.0" }, timeout: 4)
@@ -32,27 +32,13 @@ class ExchangeRateService
               response.parsed_response["conversion_rates"] || {}
       next if rates.empty?
 
-      write_cache(rates)
-      return [rates, :live]
-    rescue
+      Rails.cache.write(CACHE_KEY, rates, expires_in: CACHE_TTL.seconds)
+      return [ rates, :live ]
+    rescue => e
+      Rails.logger.warn("[ExchangeRateService] #{e.class}: #{e.message}")
       next
     end
 
-    [{}, :failed]
-  end
-
-  def read_cache
-    return nil unless File.exist?(CACHE_PATH)
-    return nil if Time.now - File.mtime(CACHE_PATH) > CACHE_TTL
-
-    JSON.parse(File.read(CACHE_PATH))
-  rescue
-    nil
-  end
-
-  def write_cache(rates)
-    File.write(CACHE_PATH, rates.to_json)
-  rescue
-    nil
+    [ {}, :failed ]
   end
 end

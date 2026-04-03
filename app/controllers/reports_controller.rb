@@ -41,7 +41,15 @@ class ReportsController < ApplicationController
       end
     end
 
-    render json: { symbol: symbol, news: threads.map(&:value) }
+    render json: {
+      symbol: symbol,
+      news: threads.map do |t|
+        t.value
+      rescue => e
+        Rails.logger.warn("[ReportsController#company_news] thread error: #{e.class} #{e.message}")
+        { error: "translation failed" }
+      end
+    }
   rescue ActionController::ParameterMissing
     render json: { error: "missing symbol" }, status: :bad_request
   end

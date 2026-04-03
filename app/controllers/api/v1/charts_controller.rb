@@ -13,7 +13,9 @@ class Api::V1::ChartsController < ApplicationController
   INTRADAY_RANGES = %w[1d 5d].freeze
 
   def show
-    symbol    = params[:symbol].upcase
+    symbol = params[:symbol].to_s.upcase.strip
+    return render json: { error: "Invalid symbol" }, status: :unprocessable_entity unless symbol.match?(/\A[A-Z0-9.\-]{1,10}\z/)
+
     range_key = params[:range].to_s
     cfg       = RANGE_MAP.fetch(range_key, RANGE_MAP["1m"])
 

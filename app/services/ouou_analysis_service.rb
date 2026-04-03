@@ -80,7 +80,8 @@ class OuouAnalysisService
       parsed = JSON.parse(data)
       text = parsed.dig("choices", 0, "delta", "content")
       block.call(text) if text&.present?
-    rescue JSON::ParserError
+    rescue JSON::ParserError => e
+      Rails.logger.debug("[OuouAnalysis] SSE parse error: #{e.message}")
       next
     end
   end
