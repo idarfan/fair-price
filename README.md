@@ -299,6 +299,30 @@ bundle exec rubocop -a   # 自動修正
 | `app/views/layouts/application.html.erb` | 新增 `html2canvas@1.4.1` CDN script |
 | `app/components/daily_momentum/analysis_panel_component.rb` | `renderMarkdown` 加入匯出按鈕；新增 `exportPng`、`exportPdf` 函式與 click 委派 |
 
+### 2026-04-03 — routes.rb 重構：抽常數、改用 resources
+
+整理 `config/routes.rb`，消除重複定義與手動展開的 REST 路由。
+
+**異動內容**
+
+- 抽出 `TICKER_CONSTRAINT` 常數，取代原本分散在 7 處的相同正規表達式
+- `api/v1/margin_positions`：手動 `get price_lookup` + 手動 `post close` 改用 `resources` + `collection`/`member` block
+- `watchlist`：9 條手動路由改用 `resources :watchlist_alerts, controller: :stock_alerts`
+- `portfolio`：8 條手動路由改用 `resources :portfolios`，collection 補上 `ocr_import`/`reorder`/`quotes`/`ownership`
+- 同步更新 named route helper：`watchlist_path` → `watchlist_alerts_path`、`portfolio_index_path` → `portfolios_path`
+
+**異動檔案**
+
+| 檔案 | 異動類型 |
+|------|----------|
+| `config/routes.rb` | 重構 |
+| `app/controllers/stock_alerts_controller.rb` | 更新 named route helper |
+| `app/controllers/portfolios_controller.rb` | 更新 named route helper |
+| `app/components/stock_alert/alert_form_component.rb` | 更新 named route helper |
+| `app/components/stock_alert/alert_list_component.rb` | 更新 named route helper |
+
+---
+
 ### 2026-03-31 — 技術圖表：lightweight-charts 蠟燭圖、S&R 線、RSI 雙線
 
 重寫 `TechnicalsChart.tsx`，從 Recharts 改用 lightweight-charts（TradingView 開源）。
