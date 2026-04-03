@@ -111,11 +111,11 @@ bundle exec rubocop -a   # 自動修正
 
 ### 2026-03-16 — 安全性強化：CSP 啟用、ValuationService 測試、open_timeout 修正
 
-**動機：** Rails 審計發現三項安全/品質問題：CSP header 未啟用、核心估值邏輯 0% 測試覆蓋率、Anthropic API 連線無 open_timeout 可能永久阻塞 worker。
+**動機：** Rails 審計發現三項安全/品質問題：CSP header 未啟用、核心估值邏輯 0% 測試覆蓋率、Groq API 連線無 open_timeout 可能永久阻塞 worker。
 
 **異動內容：**
 - `config/initializers/content_security_policy.rb`：啟用 Content Security Policy，設定 `default_src :self`、`script_src/style_src` 允許 `cdn.jsdelivr.net` 及 `unsafe_inline`（NProgress inline script）、`connect_src :self`（SSE streaming）、`object_src/frame_ancestors :none`
-- `app/services/ouou_analysis_service.rb`：`Net::HTTP.start` 加入 `open_timeout: 10`，防止 Anthropic API 不可達時 worker 永久阻塞
+- `app/services/ouou_analysis_service.rb`：`Net::HTTP.start` 加入 `open_timeout: 10`，防止 Groq API 不可達時 worker 永久阻塞
 - `spec/services/valuation_service_spec.rb`：新增 ValuationService 測試，33 個 examples 涵蓋股票分類、成長率估算、估值方法選擇、nil 邊界條件、整合測試及 judgment 判斷邏輯
 
 ### 2026-03-12 — Portfolio 持股點擊浮動面板（機構/大戶持股佔比）
@@ -259,7 +259,7 @@ bundle exec rubocop -a   # 自動修正
 
 ### 2026-03-11 — 歐歐分析結果 3 小時 Cache
 
-**動機：** 同一股票在 1 小時內重複按下分析按鈕，不應重新呼叫 Anthropic API，直接回傳快取內容，節省 API 費用並提升回應速度。
+**動機：** 同一股票在 1 小時內重複按下分析按鈕，不應重新呼叫 Groq API，直接回傳快取內容，節省 API 費用並提升回應速度。
 
 **實作方式（純 server 端，JS 無需改動）：**
 

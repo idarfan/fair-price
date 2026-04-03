@@ -19,7 +19,7 @@
 | CSS | Tailwind CSS v4（tailwindcss-rails，本地編譯） |
 | Markdown | kramdown + kramdown-parser-gfm（伺服器端） |
 | HTTP 客戶端 | HTTParty |
-| AI 分析 | Anthropic Claude API（SSE 串流） |
+| AI 分析 | Groq API（llama-3.3-70b-versatile，SSE 串流） |
 | 元件預覽 | Lookbook |
 | Lint | RuboCop（rubocop-rails-omakase） |
 | 程序管理 | systemd user service |
@@ -143,7 +143,7 @@ ReportsController#index
 ReportsController#analysis（SSE endpoint）
   └── OuouAnalysisService#call
         ├── [Cache hit]  Rails.cache 讀取 → 直接 yield 全文（TTL 3 小時）
-        └── [Cache miss] Anthropic Claude API（claude-opus-4-6）
+        └── [Cache miss] Groq API（llama-3.3-70b-versatile）
               → 組合 prompt（含 Ruby 預建 Markdown 表格）
               → SSE 串流逐 chunk yield
               → 串流完成後寫入 Rails.cache

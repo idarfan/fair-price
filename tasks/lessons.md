@@ -148,6 +148,54 @@ return () => {
 
 ---
 
+## 2026-04-03 — 排程、文件同步、快取模式：三個重複性陷阱
+
+### 教訓 1：推薦新方案前必須先確認現有基礎設施模式
+
+**過錯：** 實作 Telegram 收息提醒的排程機制時，直接建議 crontab，但專案早已用 `systemctl --user` 管理 `fairprice.service` 和 `fairprice-vite.service`。使用者必須反問「沒有更好的方法嗎？」才改正。
+
+**根本原因：** 給出方案前沒有先問「這個專案目前用什麼方式做類似的事？」
+
+**防治：** 凡是涉及以下類型的新增，先用 `Glob`/`Grep` 確認現有模式：
+- 排程任務 → 先看有沒有 `.service`、`.timer`、`schedule.rb`、`Procfile`
+- 快取 → 先看 `Rails.cache`、Redis、Memcached 哪個是主流
+- 後台工作 → 先看有沒有 Sidekiq、Solid Queue、Active Job
+- 日誌 → 先看 `Rails.logger` 慣用的 prefix 格式
+
+**規則：** 同類問題的解法必須與現有基礎設施一致，除非有明確理由引入新模式。
+
+---
+
+### 教訓 2：修改實作後必須同步搜尋並更新所有提及舊技術的文件
+
+**過錯：** 應用早已從 Anthropic Claude API 切換到 Groq，但 `docs/ARCHITECTURE.md`、`RAILS_AUDIT_REPORT.md`、`README.md`、`config/initializers/content_security_policy.rb` 仍寫著「Anthropic Claude API / claude-opus-4-6」，直到使用者主動要求確認才一次清除。
+
+**根本原因：** 每次修改程式碼只改了實作，沒有把「搜尋並更新相關文件」納入完成定義。
+
+**防治：** 凡是涉及以下類型的技術替換，完成後必須執行：
+```bash
+grep -rn "舊技術名稱" docs/ README.md config/ app/ --include="*.md" --include="*.rb"
+```
+並逐一更新所有參考。技術替換的完成定義 = **程式碼改完 + 文件同步 + grep 零殘留**。
+
+---
+
+### 教訓 3：新增 service 時必須確認快取模式與現有程式碼一致
+
+**過錯：** `ExchangeRateService` 用 `File.write("/tmp/...")` 做快取，而整個 app 其他 service（`OuouAnalysisService`、`FinnhubService` 等）一律用 `Rails.cache`。這個不一致在寫入時沒被察覺，直到審計才發現並修正。
+
+**根本原因：** 讀取 service 程式碼時沒有主動比對「這個快取模式和其他 service 一樣嗎？」
+
+**防治：**
+1. 新增或審查任何 service 時，確認快取方式是否使用 `Rails.cache`（本專案標準）
+2. 看到 `File.write`、`File.read` 用於快取時，立即標記為需要替換
+3. `Rails.cache.fetch` 是標準寫法，兼顧讀取+寫入+TTL，一行解決：
+   ```ruby
+   Rails.cache.fetch("key", expires_in: 1.hour) { fetch_from_api }
+   ```
+
+---
+
 ## 2026-03-25 — Storybook + Chromatic：vite-plugin-ruby 路徑污染
 
 ### 症狀

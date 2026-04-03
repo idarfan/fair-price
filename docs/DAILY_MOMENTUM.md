@@ -82,8 +82,8 @@ OuouAnalysisService#call 內部：
     ├── build_momentum_table                 → Ruby 預建 Markdown 表格
     │     含：5 日動量%、20 日動量%、成交量 vs 20日均量
     ├── build_prompt                         → 組合完整 prompt（含表格與數據）
-    └── stream_request（HTTP POST to Anthropic API）
-          模型：claude-opus-4-6
+    └── stream_request（HTTP POST to Groq API）
+          模型：llama-3.3-70b-versatile
           max_tokens：4096
           → 解析 SSE content_block_delta 事件
           → 逐 chunk yield 給 controller
@@ -271,12 +271,6 @@ th { "成交量"; css_class "hidden md:table-cell" }
 ```
 
 ---
-
-### 7. AI 模型標示不一致（優先順序：低）
-
-**現況：** `ARCHITECTURE.md` 寫 `claude-sonnet-4-6`，但 `OuouAnalysisService` 實際呼叫 `claude-opus-4-6`。
-
-**建議：** 更新 `ARCHITECTURE.md` 中 AI 分析段落的模型名稱；或在分析面板 footer 顯示「由 Claude Opus 4.6 分析」，讓使用者清楚目前使用的模型等級。
 
 ---
 

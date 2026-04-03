@@ -17,14 +17,14 @@ Rails.application.configure do
     policy.script_src *policy.script_src, :unsafe_eval, "http://#{ViteRuby.config.host_with_port}" if Rails.env.development?
 
     # unsafe_inline：部分元件可能使用 inline style；cdn.jsdelivr.net：nprogress.css
-    policy.style_src   :self, :unsafe_inline, "https://cdn.jsdelivr.net"
+    policy.style_src :self, :unsafe_inline, "https://cdn.jsdelivr.net"
     # Allow @vite/client to hot reload style changes in development
     policy.style_src *policy.style_src, :unsafe_inline if Rails.env.development?
 
     policy.img_src     :self, :https, :data
     policy.font_src    :self, :https, :data
     # self：SSE streaming（/momentum/analysis）及一般 AJAX 呼叫
-    # Anthropic/Finnhub 等外部 API 皆從 server 端呼叫，不需列於此
+    # Groq/Finnhub 等外部 API 皆從 server 端呼叫，不需列於此
     policy.connect_src :self
     # Allow @vite/client to hot reload changes in development
     policy.connect_src *policy.connect_src, "ws://#{ViteRuby.config.host_with_port}" if Rails.env.development?
