@@ -6,6 +6,19 @@ This file provides guidance to Claude Code when working with this repository.
 
 - **Always review `tasks/lessons.md`** for relevant project patterns and past corrections.
 
+## MCP Tools
+
+本專案已設定 `rails-mcp-server`，修改 model / route / controller **之前**先用以下工具確認現有結構：
+
+```
+switch_project fairprice       # 切換到本專案
+execute_tool project_info      # 查看專案結構
+execute_tool analyze_models    # 分析 model 關聯
+execute_tool get_routes        # 查看路由
+execute_tool get_schema        # 查看資料庫 schema
+load_guide rails               # 查詢 Rails 官方文件
+```
+
 ## Work Habits
 
 - **Plan Mode Default**：非瑣碎任務（3+ 步驟或架構決策）一律先進 plan mode；出問題立刻停下重新規劃
