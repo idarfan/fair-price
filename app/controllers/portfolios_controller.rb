@@ -10,32 +10,32 @@ class PortfoliosController < ApplicationController
   def create
     @holding = Portfolio.new(portfolio_params.merge(position: Portfolio.next_position))
     if @holding.save
-      redirect_to portfolio_index_path, notice: "已新增 #{@holding.symbol}"
+      redirect_to portfolios_path, notice: "已新增 #{@holding.symbol}"
     else
-      redirect_to portfolio_index_path, alert: @holding.errors.full_messages.join(", ")
+      redirect_to portfolios_path, alert: @holding.errors.full_messages.join(", ")
     end
   end
 
   def update
     @holding = Portfolio.find(params[:id])
     if @holding.update(portfolio_params)
-      redirect_to portfolio_index_path, notice: "已更新"
+      redirect_to portfolios_path, notice: "已更新"
     else
-      redirect_to portfolio_index_path, alert: @holding.errors.full_messages.join(", ")
+      redirect_to portfolios_path, alert: @holding.errors.full_messages.join(", ")
     end
   end
 
   def destroy
     Portfolio.find(params[:id]).destroy
-    redirect_to portfolio_index_path, notice: "已刪除"
+    redirect_to portfolios_path, notice: "已刪除"
   end
 
   def ocr_import
     file = params[:image]
-    return redirect_to(portfolio_index_path, alert: "請選擇圖片檔案") if file.blank?
+    return redirect_to(portfolios_path, alert: "請選擇圖片檔案") if file.blank?
 
     holdings = PortfolioOcrService.new(file).call
-    return redirect_to(portfolio_index_path, alert: "無法從圖片辨識持股資料，請確認圖片清晰度") if holdings.empty?
+    return redirect_to(portfolios_path, alert: "無法從圖片辨識持股資料，請確認圖片清晰度") if holdings.empty?
 
     Portfolio.transaction do
       Portfolio.delete_all
@@ -49,9 +49,9 @@ class PortfoliosController < ApplicationController
       end
     end
 
-    redirect_to portfolio_index_path, notice: "✅ 已從圖片匯入 #{holdings.size} 筆持股"
+    redirect_to portfolios_path, notice: "✅ 已從圖片匯入 #{holdings.size} 筆持股"
   rescue StandardError => e
-    redirect_to portfolio_index_path, alert: "匯入失敗：#{e.message}"
+    redirect_to portfolios_path, alert: "匯入失敗：#{e.message}"
   end
 
   def quotes

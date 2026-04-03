@@ -63,7 +63,7 @@ class StockAlert::AlertFormComponent < ApplicationComponent
             class: "px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
           ) { plain("儲存") }
           a(
-            href: watchlist_path,
+            href: watchlist_alerts_path,
             class: "px-5 py-2 border border-gray-200 text-gray-500 text-sm rounded-lg hover:bg-gray-50 transition-colors"
           ) { plain("取消") }
         end

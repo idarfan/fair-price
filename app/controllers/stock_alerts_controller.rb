@@ -15,7 +15,7 @@ class StockAlertsController < ApplicationController
   def create
     @alert = PriceAlert.new(alert_params)
     if @alert.save
-      redirect_to watchlist_path, notice: "已建立 #{@alert.symbol} 的到價通知"
+      redirect_to watchlist_alerts_path, notice: "已建立 #{@alert.symbol} 的到價通知"
     else
       render :new, status: :unprocessable_entity
     end
@@ -25,7 +25,7 @@ class StockAlertsController < ApplicationController
 
   def update
     if @alert.update(alert_params)
-      redirect_to watchlist_path, notice: "已更新 #{@alert.symbol} 的設定"
+      redirect_to watchlist_alerts_path, notice: "已更新 #{@alert.symbol} 的設定"
     else
       render :edit, status: :unprocessable_entity
     end
@@ -33,18 +33,18 @@ class StockAlertsController < ApplicationController
 
   def destroy
     @alert.destroy
-    redirect_to watchlist_path, notice: "已刪除通知"
+    redirect_to watchlist_alerts_path, notice: "已刪除通知"
   end
 
   def toggle
     @alert.update!(active: !@alert.active)
-    redirect_to watchlist_path
+    redirect_to watchlist_alerts_path
   end
 
   def toggle_condition
     new_condition = @alert.condition == "above" ? "below" : "above"
     @alert.update!(condition: new_condition)
-    redirect_to watchlist_path
+    redirect_to watchlist_alerts_path
   end
 
   def reorder

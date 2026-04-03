@@ -40,7 +40,7 @@ class StockAlert::AlertListComponent < ApplicationComponent
     div(class: "bg-white rounded-xl border border-gray-100 shadow-sm p-5") do
       h2(class: "text-sm font-semibold text-gray-600 mb-3") { plain("新增通知") }
       form(
-        action: watchlist_path,
+        action: watchlist_alerts_path,
         method: "post",
         class: "flex flex-wrap gap-2 items-end"
       ) do

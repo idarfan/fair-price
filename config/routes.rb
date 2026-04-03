@@ -1,33 +1,36 @@
 # frozen_string_literal: true
 
+TICKER_CONSTRAINT = /[A-Za-z0-9.\-]{1,10}/
+
 Rails.application.routes.draw do
   # JSON API (for external/programmatic access)
   namespace :api do
     namespace :v1 do
       get "valuations/:ticker", to: "valuations#show",
-          constraints: { ticker: /[A-Za-z0-9.\-]{1,10}/ }
+          constraints: { ticker: TICKER_CONSTRAINT }
 
       get  "ownership_snapshots/:ticker", to: "ownership_snapshots#index",  as: :ownership_snapshots
       post "ownership_snapshots/:ticker", to: "ownership_snapshots#create"
 
       # Options Analyzer API
       get  "options/:symbol/chain",      to: "options#chain",
-           constraints: { symbol: /[A-Za-z0-9.\-]{1,10}/ }
+           constraints: { symbol: TICKER_CONSTRAINT }
       get  "options/:symbol/sentiment",  to: "options#sentiment",
-           constraints: { symbol: /[A-Za-z0-9.\-]{1,10}/ }
+           constraints: { symbol: TICKER_CONSTRAINT }
       get  "options/:symbol/iv_rank",    to: "options#iv_rank",
-           constraints: { symbol: /[A-Za-z0-9.\-]{1,10}/ }
+           constraints: { symbol: TICKER_CONSTRAINT }
       post "options/strategy_recommend", to: "options#strategy_recommend"
       post "options/analyze_image",      to: "options#analyze_image"
 
       # Technical chart data (price, volume, MA, RSI)
       get "charts/:symbol", to: "charts#show",
-          constraints: { symbol: /[A-Za-z0-9.\-]{1,10}/ }
+          constraints: { symbol: TICKER_CONSTRAINT }
 
       # Margin Trade Calculator
-      get "margin_positions/price_lookup", to: "margin_positions#price_lookup"
-      resources :margin_positions, only: [ :index, :create, :update, :destroy ]
-      post "margin_positions/:id/close",    to: "margin_positions#close"
+      resources :margin_positions, only: [ :index, :create, :update, :destroy ] do
+        collection { get :price_lookup }
+        member      { post :close }
+      end
     end
   end
 
@@ -36,29 +39,27 @@ Rails.application.routes.draw do
 
   # HTML app
   get "valuations/:ticker", to: "valuations#show", as: :valuation,
-      constraints: { ticker: /[A-Za-z0-9.\-]{1,10}/ }
+      constraints: { ticker: TICKER_CONSTRAINT }
   root "valuations#index"
 
   # Watchlist / Price Alerts
-  get    "watchlist",                          to: "stock_alerts#index",            as: :watchlist
-  post   "watchlist",                          to: "stock_alerts#create"
-  get    "watchlist/new",                      to: "stock_alerts#new",              as: :new_watchlist_alert
-  patch  "watchlist/reorder",                  to: "stock_alerts#reorder",          as: :reorder_watchlist
-  get    "watchlist/:id/edit",                 to: "stock_alerts#edit",             as: :edit_watchlist_alert
-  patch  "watchlist/:id",                      to: "stock_alerts#update",           as: :watchlist_alert
-  delete "watchlist/:id",                      to: "stock_alerts#destroy"
-  patch  "watchlist/:id/toggle",               to: "stock_alerts#toggle"
-  patch  "watchlist/:id/toggle_condition",     to: "stock_alerts#toggle_condition"
+  resources :watchlist_alerts, path: :watchlist, controller: :stock_alerts, except: [ :show ] do
+    collection { patch :reorder }
+    member do
+      patch :toggle
+      patch :toggle_condition
+    end
+  end
 
   # Portfolio
-  get   "portfolio",                to: "portfolios#index",      as: :portfolio_index
-  post  "portfolio",                to: "portfolios#create"
-  post  "portfolio/ocr_import",     to: "portfolios#ocr_import", as: :ocr_import_portfolio
-  patch "portfolio/reorder",        to: "portfolios#reorder",    as: :reorder_portfolio
-  get   "portfolio/quotes",         to: "portfolios#quotes",     as: :portfolio_quotes
-  get   "portfolio/ownership",      to: "portfolios#ownership",  as: :portfolio_ownership
-  patch "portfolio/:id",            to: "portfolios#update",     as: :portfolio_holding
-  delete "portfolio/:id",           to: "portfolios#destroy"
+  resources :portfolios, path: :portfolio, except: [ :new, :edit, :show ] do
+    collection do
+      post  :ocr_import
+      patch :reorder
+      get   :quotes
+      get   :ownership
+    end
+  end
 
   # Daily Momentum
   get   "momentum",                       to: "reports#index",              as: :momentum_report
@@ -73,7 +74,7 @@ Rails.application.routes.draw do
   # Options Analyzer
   get "options",         to: "options#index", as: :options
   get "options/:symbol", to: "options#show",  as: :option_detail,
-      constraints: { symbol: /[A-Za-z0-9.\-]{1,10}/ }
+      constraints: { symbol: TICKER_CONSTRAINT }
 
   # Margin Trade Calculator
   get "margin", to: "margin#index", as: :margin
