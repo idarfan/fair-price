@@ -81,6 +81,11 @@ export function PositionListTab() {
     <div className="space-y-6">
       <AddPositionForm onSubmit={handleAdd} />
 
+      <div className="flex items-center gap-3">
+        <h2 className="text-sm font-semibold text-gray-300">實際融資持股清單</h2>
+        <hr className="flex-1 border-gray-700" />
+      </div>
+
       {loading && <p className="text-gray-500 text-sm text-center py-4">載入中…</p>}
       {error   && <p className="text-red-400 text-sm text-center py-4">{error}</p>}
 

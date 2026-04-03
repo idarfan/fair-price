@@ -15,6 +15,7 @@ export function CalculatorTab() {
   const [shares, setShares] = useState<number | null>(100)
   const [sellPrice, setSellPrice] = useState<number | null>(null)
   const [days, setDays] = useState(30)
+  const [customRate, setCustomRate] = useState<number | null>(null)
   const [priceInfo, setPriceInfo] = useState<PriceLookupResult | null>(null)
   const [lookupLoading, setLookupLoading] = useState(false)
   const [lookupError, setLookupError] = useState<string | null>(null)
@@ -57,7 +58,7 @@ export function CalculatorTab() {
   const results: CalcResults | null = (() => {
     if (!buyPrice || !shares || !sellPrice || buyPrice <= 0 || shares <= 0) return null
     const balance = buyPrice * shares
-    const annualRate = getAnnualRate(balance)
+    const annualRate = customRate != null ? customRate / 100 : getAnnualRate(balance)
     const marginInterest = calcMarginInterest(balance, annualRate, days)
     const spreadProfit = (sellPrice - buyPrice) * shares
     const netProfit = calcNetProfit(buyPrice, sellPrice, shares, marginInterest)
@@ -84,7 +85,7 @@ export function CalculatorTab() {
         />
         {priceInfo && <PriceInfoBar info={priceInfo} />}
       </div>
-      <DaysSelector days={days} onDaysChange={setDays} />
+      <DaysSelector days={days} onDaysChange={setDays} customRate={customRate} onCustomRateChange={setCustomRate} />
       <hr className="border-gray-700" />
       <ResultSummary results={results} />
       {results && <InterestScheduleTable schedule={results.schedule} />}
