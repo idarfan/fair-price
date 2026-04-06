@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "rails-mcp-server": {
+      "command": "/home/idarfan/.rbenv/versions/4.0.1/bin/rails-mcp-server",
+      "args": [],
+      "env": {}
+    }
+  }
+}

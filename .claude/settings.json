@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 120,
+            "statusMessage": "🧪 執行對應 RSpec...",
+            "command": "jq -r '.tool_input.file_path // \"\"' | { read -r f; echo \"$f\" | grep -qE '/app/.+\\.rb$' || exit 0; spec=$(echo \"$f\" | sed 's|/app/|/spec/|;s|\\.rb$|_spec.rb|'); test -f \"$spec\" || exit 0; export HOME=/home/idarfan RBENV_ROOT=/home/idarfan/.rbenv; eval \"$(/home/idarfan/.rbenv/bin/rbenv init -)\"; cd /home/idarfan/fairprice && bundle exec rspec \"$spec\" --format progress 2>&1 | tail -8; }"
+          }
+        ]
+      }
+    ]
+  }
+}
