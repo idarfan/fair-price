@@ -46,6 +46,7 @@ docs/*.pdf
 *.png
 *.jpg
 .playwright-mcp/
+mcp_temp_picture/
 public/tech_prototype.html
 stories/
 
