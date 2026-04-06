@@ -5,9 +5,9 @@
 class TelegramService
   BASE_URL = "https://api.telegram.org"
 
-  def initialize
+  def initialize(chat_id: nil)
     @token   = ENV.fetch("TELEGRAM_BOT_TOKEN", nil)
-    @chat_id = ENV.fetch("TELEGRAM_CHAT_ID", nil)
+    @chat_id = chat_id || ENV.fetch("TELEGRAM_CHAT_ID", nil)
     raise "TELEGRAM_BOT_TOKEN is not set" if @token.blank?
     raise "TELEGRAM_CHAT_ID is not set"   if @chat_id.blank?
   end
