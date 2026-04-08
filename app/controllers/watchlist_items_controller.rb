@@ -5,7 +5,7 @@ class WatchlistItemsController < ApplicationController
     symbol = params.require(:symbol).upcase.strip
     quote  = FinnhubService.new.quote(symbol)
 
-    unless quote && quote["c"].to_f.positive?
+    unless quote && (quote["c"].to_f.positive? || quote["pc"].to_f.positive?)
       redirect_to momentum_report_path, alert: "找不到「#{symbol}」的報價，請確認代號正確"
       return
     end
@@ -26,7 +26,7 @@ class WatchlistItemsController < ApplicationController
     symbol = params.require(:symbol).upcase.strip
     quote  = FinnhubService.new.quote(symbol)
 
-    unless quote && quote["c"].to_f.positive?
+    unless quote && (quote["c"].to_f.positive? || quote["pc"].to_f.positive?)
       redirect_to momentum_report_path, alert: "找不到「#{symbol}」的報價，請確認代號正確"
       return
     end

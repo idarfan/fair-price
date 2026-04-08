@@ -55,13 +55,13 @@ class MomentumReportService
   def fetch_stock(symbol)
     Rails.cache.fetch("momentum_quote:#{symbol}", expires_in: 60.seconds) do
       quote = @finnhub.quote(symbol)
-      next nil if quote.nil? || quote["c"].to_f.zero?
+      next nil if quote.nil? || (quote["c"].to_f.zero? && quote["pc"].to_f.zero?)
 
       candle_data = fetch_candles(symbol)
       {
         symbol:     symbol,
         name:       nil,
-        price:      quote["c"].to_f,
+        price:      (quote["c"].to_f.nonzero? || quote["pc"].to_f),
         change:     quote["d"].to_f,
         change_pct: quote["dp"].to_f / 100.0,
         volume:     candle_data[:volume],
