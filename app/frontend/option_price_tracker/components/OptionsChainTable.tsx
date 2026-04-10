@@ -74,8 +74,8 @@ export default function OptionsChainTable({
             <th className={thBase}>持倉量</th>
             <th className={thBase}>交易量</th>
             <th className={thBase}>IV</th>
-            <th className={thBase}>賣出</th>
-            <th className={thBase}>買入</th>
+            <th className={thBase}>要價</th>
+            <th className={thBase}>出價</th>
             <th className={`${thBase} border-r border-gray-700`}>價格</th>
             {/* Strike */}
             <th className="px-3 py-1.5 text-center text-xs font-semibold text-gray-300 bg-gray-750"></th>
@@ -83,8 +83,8 @@ export default function OptionsChainTable({
             <th className={`${thBase} border-l border-gray-700 text-left`}>
               價格
             </th>
-            <th className={thBase}>買入</th>
-            <th className={thBase}>賣出</th>
+            <th className={thBase}>出價</th>
+            <th className={thBase}>要價</th>
             <th className={thBase}>IV</th>
             <th className={thBase}>交易量</th>
             <th className={thBase}>持倉量</th>

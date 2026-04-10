@@ -116,6 +116,7 @@ export default function PremiumTrendChart({ data, contractSymbol }: Props) {
             yAxisId="price"
             type="monotone"
             dataKey="bid"
+            name="出價"
             stroke="#60a5fa"
             dot={false}
             strokeWidth={1.5}
@@ -124,6 +125,7 @@ export default function PremiumTrendChart({ data, contractSymbol }: Props) {
             yAxisId="price"
             type="monotone"
             dataKey="ask"
+            name="要價"
             stroke="#34d399"
             dot={false}
             strokeWidth={1.5}
