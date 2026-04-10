@@ -105,16 +105,16 @@ export default function OptionsChainTable({
               "border-b border-gray-800 hover:bg-gray-750 transition-colors";
             // 選中時整行淡橘色，否則依 ITM 狀態上色
             const callBg = rowSelected
-              ? "bg-orange-500/25"
+              ? "opt-row-selected"
               : callItm
-                ? "bg-green-950/30"
+                ? "opt-call-itm"
                 : "bg-gray-900";
             const putBg = rowSelected
-              ? "bg-orange-500/25"
+              ? "opt-row-selected"
               : putItm
-                ? "bg-red-950/30"
+                ? "opt-put-itm"
                 : "bg-gray-900";
-            const strikeBg = rowSelected ? "bg-orange-500/25" : "bg-gray-800";
+            const strikeBg = rowSelected ? "opt-row-selected" : "bg-gray-800";
 
             return (
               <tr
@@ -123,31 +123,31 @@ export default function OptionsChainTable({
               >
                 {/* Call cells — reversed order (OI, Vol, IV, Ask, Bid, Last) */}
                 <td
-                  className={`px-2 py-1.5 text-right tabular-nums text-gray-400 ${callBg}`}
+                  className={`px-2 py-1.5 text-right tabular-nums text-gray-400 ${callBg} cursor-pointer`}
                   onClick={() => call && onSelect(call.contract_symbol)}
                 >
                   {fmtInt(call?.open_interest ?? null)}
                 </td>
                 <td
-                  className={`px-2 py-1.5 text-right tabular-nums text-gray-400 ${callBg}`}
+                  className={`px-2 py-1.5 text-right tabular-nums text-gray-400 ${callBg} cursor-pointer`}
                   onClick={() => call && onSelect(call.contract_symbol)}
                 >
                   {fmtInt(call?.volume ?? null)}
                 </td>
                 <td
-                  className={`px-2 py-1.5 text-right tabular-nums text-purple-300 ${callBg}`}
+                  className={`px-2 py-1.5 text-right tabular-nums text-purple-300 ${callBg} cursor-pointer`}
                   onClick={() => call && onSelect(call.contract_symbol)}
                 >
                   {fmtIv(call?.implied_volatility ?? null)}
                 </td>
                 <td
-                  className={`px-2 py-1.5 text-right tabular-nums text-green-300 ${callBg}`}
+                  className={`px-2 py-1.5 text-right tabular-nums text-green-300 ${callBg} cursor-pointer`}
                   onClick={() => call && onSelect(call.contract_symbol)}
                 >
                   {fmtPrice(call?.ask ?? null)}
                 </td>
                 <td
-                  className={`px-2 py-1.5 text-right tabular-nums text-blue-300 ${callBg}`}
+                  className={`px-2 py-1.5 text-right tabular-nums text-blue-300 ${callBg} cursor-pointer`}
                   onClick={() => call && onSelect(call.contract_symbol)}
                 >
                   {fmtPrice(call?.bid ?? null)}
@@ -196,31 +196,31 @@ export default function OptionsChainTable({
                   {fmtPrice(put?.last_price ?? null)}
                 </td>
                 <td
-                  className={`px-2 py-1.5 text-right tabular-nums text-blue-300 ${putBg}`}
+                  className={`px-2 py-1.5 text-right tabular-nums text-blue-300 ${putBg} cursor-pointer`}
                   onClick={() => put && onSelect(put.contract_symbol)}
                 >
                   {fmtPrice(put?.bid ?? null)}
                 </td>
                 <td
-                  className={`px-2 py-1.5 text-right tabular-nums text-green-300 ${putBg}`}
+                  className={`px-2 py-1.5 text-right tabular-nums text-green-300 ${putBg} cursor-pointer`}
                   onClick={() => put && onSelect(put.contract_symbol)}
                 >
                   {fmtPrice(put?.ask ?? null)}
                 </td>
                 <td
-                  className={`px-2 py-1.5 text-right tabular-nums text-purple-300 ${putBg}`}
+                  className={`px-2 py-1.5 text-right tabular-nums text-purple-300 ${putBg} cursor-pointer`}
                   onClick={() => put && onSelect(put.contract_symbol)}
                 >
                   {fmtIv(put?.implied_volatility ?? null)}
                 </td>
                 <td
-                  className={`px-2 py-1.5 text-right tabular-nums text-gray-400 ${putBg}`}
+                  className={`px-2 py-1.5 text-right tabular-nums text-gray-400 ${putBg} cursor-pointer`}
                   onClick={() => put && onSelect(put.contract_symbol)}
                 >
                   {fmtInt(put?.volume ?? null)}
                 </td>
                 <td
-                  className={`px-2 py-1.5 text-right tabular-nums text-gray-400 ${putBg}`}
+                  className={`px-2 py-1.5 text-right tabular-nums text-gray-400 ${putBg} cursor-pointer`}
                   onClick={() => put && onSelect(put.contract_symbol)}
                 >
                   {fmtInt(put?.open_interest ?? null)}
