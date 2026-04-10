@@ -1,0 +1,79 @@
+# frozen_string_literal: true
+
+class Api::V1::OptionSnapshotsController < ApplicationController
+  # GET /api/v1/option_snapshots/:symbol
+  # params: type (put|call), days (integer), expiration (date)
+  def index
+    ticker = find_ticker
+    return render json: { error: "找不到追蹤代號 #{params[:symbol].upcase}" }, status: :not_found unless ticker
+
+    days       = (params[:days] || 60).to_i.clamp(1, 90)
+    scope      = ticker.option_snapshots.recent_days(days).order(:snapshot_date, :expiration, :strike)
+    scope      = scope.where(option_type: params[:type]) if %w[put call].include?(params[:type])
+    scope      = scope.where(expiration: params[:expiration]) if params[:expiration].present?
+
+    render json: {
+      symbol:      ticker.symbol,
+      snapshots:   scope.map { |s| serialize_snapshot(s) },
+      expirations: ticker.option_snapshots.recent_days(days).distinct.order(:expiration).pluck(:expiration)
+    }
+  end
+
+  # GET /api/v1/option_snapshots/:symbol/premium_trend
+  # params: contract_symbol OR (strike + expiration + type)
+  def premium_trend
+    ticker = find_ticker
+    return render json: { error: "找不到追蹤代號 #{params[:symbol].upcase}" }, status: :not_found unless ticker
+
+    rows = if params[:contract_symbol].present?
+             ticker.option_snapshots
+                   .where(contract_symbol: params[:contract_symbol])
+                   .order(:snapshot_date)
+    else
+             OptionSnapshot.premium_trend(
+               ticker_id:   ticker.id,
+               strike:      params[:strike].to_f,
+               expiration:  params[:expiration],
+               option_type: params[:type] || "put"
+             )
+    end
+
+    render json: rows.map { |s|
+      {
+        date:               s.snapshot_date,
+        bid:                s.bid&.to_f,
+        ask:                s.ask&.to_f,
+        last_price:         s.last_price&.to_f,
+        implied_volatility: s.implied_volatility&.to_f,
+        volume:             s.volume,
+        open_interest:      s.open_interest,
+        underlying_price:   s.underlying_price&.to_f
+      }
+    }
+  end
+
+  private
+
+  def find_ticker
+    TrackedTicker.find_by(symbol: params[:symbol].to_s.upcase)
+  end
+
+  def serialize_snapshot(s)
+    {
+      id:                 s.id,
+      contract_symbol:    s.contract_symbol,
+      option_type:        s.option_type,
+      expiration:         s.expiration,
+      strike:             s.strike.to_f,
+      bid:                s.bid&.to_f,
+      ask:                s.ask&.to_f,
+      last_price:         s.last_price&.to_f,
+      implied_volatility: s.implied_volatility&.to_f,
+      volume:             s.volume,
+      open_interest:      s.open_interest,
+      in_the_money:       s.in_the_money,
+      underlying_price:   s.underlying_price&.to_f,
+      snapshot_date:      s.snapshot_date
+    }
+  end
+end

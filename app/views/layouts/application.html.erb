@@ -40,6 +40,9 @@
     <% if controller_name == 'margin' %>
       <%= vite_javascript_tag 'margin.tsx' %>
     <% end %>
+    <% if controller_name == 'option_price_tracker' %>
+      <%= vite_javascript_tag 'option_price_tracker.tsx' %>
+    <% end %>
   </head>
   <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
 
@@ -49,7 +52,7 @@
           show_search:   @ticker.present?
         ) %>
 
-    <% if controller_name == 'ownership' || controller_name == 'options' || controller_name == 'margin' %>
+    <% if controller_name == 'ownership' || controller_name == 'options' || controller_name == 'margin' || controller_name == 'option_price_tracker' %>
       <main class="flex-1 overflow-hidden flex flex-col">
         <%= yield %>
       </main>

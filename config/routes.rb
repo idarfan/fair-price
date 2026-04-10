@@ -26,6 +26,13 @@ Rails.application.routes.draw do
       get "charts/:symbol", to: "charts#show",
           constraints: { symbol: TICKER_CONSTRAINT }
 
+      # Option Price History Tracker
+      resources :tracked_tickers, only: [ :index, :create, :update, :destroy ]
+      get "option_snapshots/:symbol",               to: "option_snapshots#index",
+          constraints: { symbol: TICKER_CONSTRAINT }
+      get "option_snapshots/:symbol/premium_trend", to: "option_snapshots#premium_trend",
+          constraints: { symbol: TICKER_CONSTRAINT }
+
       # Margin Trade Calculator
       resources :margin_positions, only: [ :index, :create, :update, :destroy ] do
         collection { get :price_lookup }
@@ -78,6 +85,9 @@ Rails.application.routes.draw do
 
   # Margin Trade Calculator
   get "margin", to: "margin#index", as: :margin
+
+  # Option Price History Tracker
+  get "option_price_tracker", to: "option_price_tracker#index", as: :option_price_tracker
 
   # Ownership Structure
   get  "ownership",         to: "ownership#index",   as: :ownership

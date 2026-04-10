@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_02_091533) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_10_075747) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -27,6 +27,30 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_02_091533) do
     t.datetime "updated_at", null: false
     t.index ["status", "opened_on"], name: "index_margin_positions_on_status_and_opened_on"
     t.index ["status"], name: "index_margin_positions_on_status"
+  end
+
+  create_table "option_snapshots", force: :cascade do |t|
+    t.decimal "ask", precision: 10, scale: 4
+    t.decimal "bid", precision: 10, scale: 4
+    t.string "contract_symbol", null: false
+    t.datetime "created_at", null: false
+    t.date "expiration", null: false
+    t.decimal "implied_volatility", precision: 8, scale: 6
+    t.boolean "in_the_money", default: false, null: false
+    t.decimal "last_price", precision: 10, scale: 4
+    t.integer "open_interest"
+    t.string "option_type", null: false
+    t.date "snapshot_date", null: false
+    t.decimal "strike", precision: 10, scale: 4, null: false
+    t.bigint "tracked_ticker_id", null: false
+    t.decimal "underlying_price", precision: 10, scale: 4
+    t.datetime "updated_at", null: false
+    t.integer "volume"
+    t.index ["expiration"], name: "index_option_snapshots_on_expiration"
+    t.index ["option_type", "strike"], name: "index_option_snapshots_on_option_type_and_strike"
+    t.index ["snapshot_date"], name: "index_option_snapshots_on_snapshot_date"
+    t.index ["tracked_ticker_id", "snapshot_date", "contract_symbol"], name: "idx_option_snapshots_unique", unique: true
+    t.index ["tracked_ticker_id"], name: "index_option_snapshots_on_tracked_ticker_id"
   end
 
   create_table "options_snapshots", force: :cascade do |t|
@@ -97,6 +121,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_02_091533) do
     t.index ["symbol"], name: "index_price_alerts_on_symbol"
   end
 
+  create_table "tracked_tickers", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.jsonb "config", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.string "name"
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.index ["active"], name: "index_tracked_tickers_on_active"
+    t.index ["symbol"], name: "index_tracked_tickers_on_symbol", unique: true
+  end
+
   create_table "watchlist_items", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name"
@@ -107,5 +142,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_02_091533) do
     t.index ["symbol"], name: "index_watchlist_items_on_symbol", unique: true
   end
 
+  add_foreign_key "option_snapshots", "tracked_tickers"
   add_foreign_key "ownership_holders", "ownership_snapshots"
 end
