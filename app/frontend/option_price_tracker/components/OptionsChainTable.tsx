@@ -97,24 +97,29 @@ export default function OptionsChainTable({
             const isAtm =
               Math.abs(strike - underlyingPrice) <= underlyingPrice * 0.01;
 
-            const rowSelected =
-              call?.contract_symbol === selectedContract ||
-              put?.contract_symbol === selectedContract;
+            const callSelected = call?.contract_symbol === selectedContract;
+            const putSelected = put?.contract_symbol === selectedContract;
 
             const rowBase =
               "border-b border-gray-800 hover:bg-gray-750 transition-colors";
-            // 選中時整行淡橘色，否則依 ITM 狀態上色
-            const callBg = rowSelected
-              ? "opt-row-selected"
+            // call 選中 → call 側亮綠；put 選中 → put 側亮紅；否則依 ITM 狀態
+            const callBg = callSelected
+              ? "opt-call-selected"
               : callItm
                 ? "opt-call-itm"
                 : "bg-gray-900";
-            const putBg = rowSelected
-              ? "opt-row-selected"
+            const putBg = putSelected
+              ? "opt-put-selected"
               : putItm
                 ? "opt-put-itm"
                 : "bg-gray-900";
-            const strikeBg = rowSelected ? "opt-row-selected" : "bg-gray-800";
+            // 行權價格欄：左半跟隨 call，右半跟隨 put
+            const strikeCallBg = callSelected
+              ? "opt-call-selected"
+              : "bg-gray-800";
+            const strikePutBg = putSelected
+              ? "opt-put-selected"
+              : "bg-gray-800";
 
             return (
               <tr
@@ -159,11 +164,11 @@ export default function OptionsChainTable({
                   {fmtPrice(call?.last_price ?? null)}
                 </td>
 
-                {/* Strike — left half selects call, right half selects put */}
-                <td className={`py-1.5 ${strikeBg} text-sm`}>
+                {/* Strike — 左半跟 call 同色，右半跟 put 同色 */}
+                <td className="py-1.5 text-sm">
                   <div className="flex items-center">
                     <div
-                      className={`flex-1 text-right pr-1 font-mono font-semibold text-white tabular-nums select-none
+                      className={`flex-1 py-1.5 text-right pr-1 font-mono font-semibold text-white tabular-nums select-none ${strikeCallBg}
                         ${call ? "cursor-pointer hover:text-green-300 transition-colors" : "opacity-40"}`}
                       title={
                         call
@@ -176,7 +181,7 @@ export default function OptionsChainTable({
                     </div>
                     <div className="w-px h-4 bg-gray-600 shrink-0" />
                     <div
-                      className={`flex-1 text-left pl-1 font-mono font-semibold text-white tabular-nums select-none
+                      className={`flex-1 py-1.5 text-left pl-1 font-mono font-semibold text-white tabular-nums select-none ${strikePutBg}
                         ${put ? "cursor-pointer hover:text-red-300 transition-colors" : "opacity-40"}`}
                       title={
                         put ? `選 Put ${put.contract_symbol}` : "無 Put 資料"
