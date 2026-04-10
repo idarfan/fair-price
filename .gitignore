@@ -18,6 +18,9 @@ config/credentials/*.key
 # Bundler
 /vendor/bundle
 
+# Python venv（options collector）
+/scripts/venv/
+
 # Windows WSL2 Zone.Identifier
 *:Zone.Identifier
 
