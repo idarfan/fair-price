@@ -148,15 +148,33 @@ export default function OptionsChainTable({
                   {fmtPrice(call?.last_price ?? null)}
                 </td>
 
-                {/* Strike — clickable: selects put first, falls back to call */}
-                <td
-                  className="px-3 py-1.5 text-center font-mono font-semibold text-white bg-gray-800 text-sm cursor-pointer hover:bg-gray-700 transition-colors"
-                  onClick={() => {
-                    const sym = put?.contract_symbol ?? call?.contract_symbol;
-                    if (sym) onSelect(sym);
-                  }}
-                >
-                  {strike.toFixed(2)}
+                {/* Strike — left half selects call, right half selects put */}
+                <td className="py-1.5 bg-gray-800 text-sm">
+                  <div className="flex items-center">
+                    <div
+                      className={`flex-1 text-right pr-1 font-mono font-semibold text-white tabular-nums select-none
+                        ${call ? "cursor-pointer hover:text-green-300 transition-colors" : "opacity-40"}`}
+                      title={
+                        call
+                          ? `選 Call ${call.contract_symbol}`
+                          : "無 Call 資料"
+                      }
+                      onClick={() => call && onSelect(call.contract_symbol)}
+                    >
+                      {strike.toFixed(2)}
+                    </div>
+                    <div className="w-px h-4 bg-gray-600 shrink-0" />
+                    <div
+                      className={`flex-1 text-left pl-1 font-mono font-semibold text-white tabular-nums select-none
+                        ${put ? "cursor-pointer hover:text-red-300 transition-colors" : "opacity-40"}`}
+                      title={
+                        put ? `選 Put ${put.contract_symbol}` : "無 Put 資料"
+                      }
+                      onClick={() => put && onSelect(put.contract_symbol)}
+                    >
+                      {strike.toFixed(2)}
+                    </div>
+                  </div>
                 </td>
 
                 {/* Put cells */}
