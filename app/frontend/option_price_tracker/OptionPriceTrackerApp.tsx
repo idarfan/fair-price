@@ -113,7 +113,8 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
   }
 
   async function handleAdd(symbol: string) {
-    const res = await fetch("/api/v1/tracked_tickers", {
+    // 1. 建立追蹤代號
+    const createRes = await fetch("/api/v1/tracked_tickers", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -122,14 +123,49 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
       },
       body: JSON.stringify({ symbol }),
     });
-    const json = (await res.json()) as TrackedTicker & { error?: string };
-    if (!res.ok) throw new Error(json.error ?? "新增失敗");
+    const newTicker = (await createRes.json()) as TrackedTicker & {
+      error?: string;
+    };
+    if (!createRes.ok) throw new Error(newTicker.error ?? "新增失敗");
+
+    // 2. 加入清單並立即選取
     setTickers((prev) => {
-      const exists = prev.some((t) => t.id === json.id);
+      const exists = prev.some((t) => t.id === newTicker.id);
       return exists
-        ? prev.map((t) => (t.id === json.id ? json : t))
-        : [...prev, json].sort((a, b) => a.symbol.localeCompare(b.symbol));
+        ? prev.map((t) => (t.id === newTicker.id ? newTicker : t))
+        : [...prev, newTicker].sort((a, b) => a.symbol.localeCompare(b.symbol));
     });
+    setSelected(newTicker);
+    setSnapshots([]);
+    setExpirations([]);
+    setSelectedExp("");
+
+    // 3. 自動抓取期權資料（呼叫 Python collector）
+    setLoading(true);
+    setError(null);
+    try {
+      const collectRes = await fetch(
+        `/api/v1/tracked_tickers/${newTicker.id}/collect`,
+        {
+          method: "POST",
+          headers: {
+            "X-CSRF-Token": csrfToken(),
+            "X-Requested-With": "XMLHttpRequest",
+          },
+        },
+      );
+      if (!collectRes.ok) {
+        const err = (await collectRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        setError(err.error ?? "資料抓取失敗");
+        return;
+      }
+      // 4. 抓完自動載入期權鏈
+      await loadSnapshots(newTicker);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleDelete(id: number) {

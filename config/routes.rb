@@ -27,7 +27,9 @@ Rails.application.routes.draw do
           constraints: { symbol: TICKER_CONSTRAINT }
 
       # Option Price History Tracker
-      resources :tracked_tickers, only: [ :index, :create, :update, :destroy ]
+      resources :tracked_tickers, only: [ :index, :create, :update, :destroy ] do
+        member { post :collect }
+      end
       get "option_snapshots/:symbol",               to: "option_snapshots#index",
           constraints: { symbol: TICKER_CONSTRAINT }
       get "option_snapshots/:symbol/premium_trend", to: "option_snapshots#premium_trend",
