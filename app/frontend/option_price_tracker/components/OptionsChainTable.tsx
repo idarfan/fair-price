@@ -59,7 +59,7 @@ export default function OptionsChainTable({
             </th>
             {/* Strike */}
             <th className="px-3 py-1.5 text-center text-gray-300 text-xs font-bold bg-gray-750">
-              行使價
+              行權價格
             </th>
             {/* Puts header */}
             <th
@@ -148,8 +148,14 @@ export default function OptionsChainTable({
                   {fmtPrice(call?.last_price ?? null)}
                 </td>
 
-                {/* Strike */}
-                <td className="px-3 py-1.5 text-center font-mono font-semibold text-white bg-gray-800 text-sm">
+                {/* Strike — clickable: selects put first, falls back to call */}
+                <td
+                  className="px-3 py-1.5 text-center font-mono font-semibold text-white bg-gray-800 text-sm cursor-pointer hover:bg-gray-700 transition-colors"
+                  onClick={() => {
+                    const sym = put?.contract_symbol ?? call?.contract_symbol;
+                    if (sym) onSelect(sym);
+                  }}
+                >
                   {strike.toFixed(2)}
                 </td>
 
