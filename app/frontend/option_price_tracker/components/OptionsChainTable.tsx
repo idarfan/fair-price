@@ -1,0 +1,200 @@
+import type { OptionSnapshotRow } from "../types";
+
+export interface StrikeRow {
+  strike: number;
+  call: OptionSnapshotRow | null;
+  put: OptionSnapshotRow | null;
+}
+
+interface Props {
+  rows: StrikeRow[];
+  underlyingPrice: number;
+  selectedContract: string | null;
+  onSelect: (contractSymbol: string) => void;
+}
+
+function fmtPrice(v: number | null) {
+  if (v == null || v === 0) return <span className="text-gray-600">0.00</span>;
+  return <span>{v.toFixed(2)}</span>;
+}
+
+function fmtIv(v: number | null) {
+  if (v == null || v === 0) return <span className="text-gray-600">—</span>;
+  return <span>{(v * 100).toFixed(0)}%</span>;
+}
+
+function fmtInt(v: number | null) {
+  if (v == null || v === 0) return <span className="text-gray-600">0</span>;
+  return <span>{v.toLocaleString()}</span>;
+}
+
+export default function OptionsChainTable({
+  rows,
+  underlyingPrice,
+  selectedContract,
+  onSelect,
+}: Props) {
+  if (rows.length === 0) {
+    return (
+      <div className="text-center text-gray-500 text-sm py-8">
+        此到期日無資料
+      </div>
+    );
+  }
+
+  const thBase =
+    "px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right";
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-xs">
+        <thead>
+          <tr className="border-b border-gray-700">
+            {/* Calls header */}
+            <th
+              colSpan={6}
+              className="py-1.5 text-center text-green-400 text-xs font-semibold border-r border-gray-700"
+            >
+              CALLS
+            </th>
+            {/* Strike */}
+            <th className="px-3 py-1.5 text-center text-gray-300 text-xs font-bold bg-gray-750">
+              行使價
+            </th>
+            {/* Puts header */}
+            <th
+              colSpan={6}
+              className="py-1.5 text-center text-red-400 text-xs font-semibold border-l border-gray-700"
+            >
+              PUTS
+            </th>
+          </tr>
+          <tr className="border-b border-gray-700 bg-gray-800">
+            {/* Call columns */}
+            <th className={thBase}>持倉量</th>
+            <th className={thBase}>交易量</th>
+            <th className={thBase}>IV</th>
+            <th className={thBase}>賣出</th>
+            <th className={thBase}>買入</th>
+            <th className={`${thBase} border-r border-gray-700`}>價格</th>
+            {/* Strike */}
+            <th className="px-3 py-1.5 text-center text-xs font-semibold text-gray-300 bg-gray-750"></th>
+            {/* Put columns */}
+            <th className={`${thBase} border-l border-gray-700 text-left`}>
+              價格
+            </th>
+            <th className={thBase}>買入</th>
+            <th className={thBase}>賣出</th>
+            <th className={thBase}>IV</th>
+            <th className={thBase}>交易量</th>
+            <th className={thBase}>持倉量</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ strike, call, put }) => {
+            const callItm = call?.in_the_money ?? strike < underlyingPrice;
+            const putItm = put?.in_the_money ?? strike > underlyingPrice;
+            const isAtm =
+              Math.abs(strike - underlyingPrice) <= underlyingPrice * 0.01;
+
+            const callSelected = call?.contract_symbol === selectedContract;
+            const putSelected = put?.contract_symbol === selectedContract;
+
+            const rowBase =
+              "border-b border-gray-800 hover:bg-gray-750 transition-colors";
+            const callBg = callItm ? "bg-green-950/30" : "bg-gray-900";
+            const putBg = putItm ? "bg-red-950/30" : "bg-gray-900";
+
+            return (
+              <tr
+                key={strike}
+                className={`${rowBase} ${isAtm ? "ring-1 ring-inset ring-yellow-600/40" : ""}`}
+              >
+                {/* Call cells — reversed order (OI, Vol, IV, Ask, Bid, Last) */}
+                <td
+                  className={`px-2 py-1.5 text-right tabular-nums text-gray-400 ${callBg} ${callSelected ? "bg-blue-900/40" : ""}`}
+                  onClick={() => call && onSelect(call.contract_symbol)}
+                >
+                  {fmtInt(call?.open_interest ?? null)}
+                </td>
+                <td
+                  className={`px-2 py-1.5 text-right tabular-nums text-gray-400 ${callBg} ${callSelected ? "bg-blue-900/40" : ""}`}
+                  onClick={() => call && onSelect(call.contract_symbol)}
+                >
+                  {fmtInt(call?.volume ?? null)}
+                </td>
+                <td
+                  className={`px-2 py-1.5 text-right tabular-nums text-purple-300 ${callBg} ${callSelected ? "bg-blue-900/40" : ""}`}
+                  onClick={() => call && onSelect(call.contract_symbol)}
+                >
+                  {fmtIv(call?.implied_volatility ?? null)}
+                </td>
+                <td
+                  className={`px-2 py-1.5 text-right tabular-nums text-green-300 ${callBg} ${callSelected ? "bg-blue-900/40" : ""}`}
+                  onClick={() => call && onSelect(call.contract_symbol)}
+                >
+                  {fmtPrice(call?.ask ?? null)}
+                </td>
+                <td
+                  className={`px-2 py-1.5 text-right tabular-nums text-blue-300 ${callBg} ${callSelected ? "bg-blue-900/40" : ""}`}
+                  onClick={() => call && onSelect(call.contract_symbol)}
+                >
+                  {fmtPrice(call?.bid ?? null)}
+                </td>
+                <td
+                  className={`px-2 py-1.5 text-right tabular-nums text-yellow-300 border-r border-gray-700 ${callBg} ${callSelected ? "bg-blue-900/40" : ""} cursor-pointer`}
+                  onClick={() => call && onSelect(call.contract_symbol)}
+                >
+                  {fmtPrice(call?.last_price ?? null)}
+                </td>
+
+                {/* Strike */}
+                <td className="px-3 py-1.5 text-center font-mono font-semibold text-white bg-gray-800 text-sm">
+                  {strike.toFixed(2)}
+                </td>
+
+                {/* Put cells */}
+                <td
+                  className={`px-2 py-1.5 text-right tabular-nums text-yellow-300 border-l border-gray-700 ${putBg} ${putSelected ? "bg-blue-900/40" : ""} cursor-pointer`}
+                  onClick={() => put && onSelect(put.contract_symbol)}
+                >
+                  {fmtPrice(put?.last_price ?? null)}
+                </td>
+                <td
+                  className={`px-2 py-1.5 text-right tabular-nums text-blue-300 ${putBg} ${putSelected ? "bg-blue-900/40" : ""}`}
+                  onClick={() => put && onSelect(put.contract_symbol)}
+                >
+                  {fmtPrice(put?.bid ?? null)}
+                </td>
+                <td
+                  className={`px-2 py-1.5 text-right tabular-nums text-green-300 ${putBg} ${putSelected ? "bg-blue-900/40" : ""}`}
+                  onClick={() => put && onSelect(put.contract_symbol)}
+                >
+                  {fmtPrice(put?.ask ?? null)}
+                </td>
+                <td
+                  className={`px-2 py-1.5 text-right tabular-nums text-purple-300 ${putBg} ${putSelected ? "bg-blue-900/40" : ""}`}
+                  onClick={() => put && onSelect(put.contract_symbol)}
+                >
+                  {fmtIv(put?.implied_volatility ?? null)}
+                </td>
+                <td
+                  className={`px-2 py-1.5 text-right tabular-nums text-gray-400 ${putBg} ${putSelected ? "bg-blue-900/40" : ""}`}
+                  onClick={() => put && onSelect(put.contract_symbol)}
+                >
+                  {fmtInt(put?.volume ?? null)}
+                </td>
+                <td
+                  className={`px-2 py-1.5 text-right tabular-nums text-gray-400 ${putBg} ${putSelected ? "bg-blue-900/40" : ""}`}
+                  onClick={() => put && onSelect(put.contract_symbol)}
+                >
+                  {fmtInt(put?.open_interest ?? null)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}

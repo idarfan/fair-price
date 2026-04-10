@@ -7,15 +7,25 @@ class Api::V1::OptionSnapshotsController < ApplicationController
     ticker = find_ticker
     return render json: { error: "找不到追蹤代號 #{params[:symbol].upcase}" }, status: :not_found unless ticker
 
-    days       = (params[:days] || 60).to_i.clamp(1, 90)
-    scope      = ticker.option_snapshots.recent_days(days).order(:snapshot_date, :expiration, :strike)
-    scope      = scope.where(option_type: params[:type]) if %w[put call].include?(params[:type])
-    scope      = scope.where(expiration: params[:expiration]) if params[:expiration].present?
+    days  = (params[:days] || 60).to_i.clamp(1, 90)
+    scope = ticker.option_snapshots.recent_days(days).order(:expiration, :strike)
+    scope = scope.where(option_type: params[:type]) if %w[put call].include?(params[:type])
+    scope = scope.where(expiration: params[:expiration]) if params[:expiration].present?
+
+    if params[:latest_only] == "true"
+      latest_date = ticker.option_snapshots.maximum(:snapshot_date)
+      scope = scope.where(snapshot_date: latest_date) if latest_date
+    end
+
+    base        = ticker.option_snapshots.recent_days(days)
+    expirations = base.where(snapshot_date: base.maximum(:snapshot_date))
+                      .distinct.order(:expiration).pluck(:expiration)
 
     render json: {
-      symbol:      ticker.symbol,
-      snapshots:   scope.map { |s| serialize_snapshot(s) },
-      expirations: ticker.option_snapshots.recent_days(days).distinct.order(:expiration).pluck(:expiration)
+      symbol:             ticker.symbol,
+      snapshots:          scope.map { |s| serialize_snapshot(s) },
+      expirations:        expirations,
+      latest_snapshot_date: ticker.option_snapshots.maximum(:snapshot_date)
     }
   end
 

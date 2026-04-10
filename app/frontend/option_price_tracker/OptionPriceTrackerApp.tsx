@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import TickerSidebar from "./components/TickerSidebar";
-import FilterBar from "./components/FilterBar";
+import ExpirationTabs from "./components/ExpirationTabs";
+import OptionsChainTable, {
+  type StrikeRow,
+} from "./components/OptionsChainTable";
 import PremiumTrendChart from "./components/PremiumTrendChart";
-import ContractsTable from "./components/ContractsTable";
 import type {
   TrackedTicker,
   OptionSnapshotRow,
   PremiumTrendPoint,
-  OptionType,
 } from "./types";
 
 function csrfToken(): string {
@@ -15,6 +16,32 @@ function csrfToken(): string {
     (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
       ?.content ?? ""
   );
+}
+
+function calcDte(expiration: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const exp = new Date(expiration);
+  return Math.round((exp.getTime() - today.getTime()) / 86_400_000);
+}
+
+function buildChainRows(
+  snapshots: OptionSnapshotRow[],
+  expiration: string,
+): StrikeRow[] {
+  const filtered = snapshots.filter((s) => s.expiration === expiration);
+  const strikes = [...new Set(filtered.map((s) => s.strike))].sort(
+    (a, b) => a - b,
+  );
+  return strikes.map((strike) => ({
+    strike,
+    call:
+      filtered.find((s) => s.strike === strike && s.option_type === "call") ??
+      null,
+    put:
+      filtered.find((s) => s.strike === strike && s.option_type === "put") ??
+      null,
+  }));
 }
 
 interface Props {
@@ -27,54 +54,50 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
     initialTickers[0] ?? null,
   );
 
-  const [optionType, setOptionType] = useState<OptionType>("put");
-  const [expiration, setExpiration] = useState("");
-  const [days, setDays] = useState(60);
-  const [expirations, setExpirations] = useState<string[]>([]);
-
   const [snapshots, setSnapshots] = useState<OptionSnapshotRow[]>([]);
+  const [expirations, setExpirations] = useState<string[]>([]);
+  const [selectedExp, setSelectedExp] = useState("");
+  const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
+  const [underlyingPrice, setUnderlyingPrice] = useState(0);
+
   const [selectedContract, setSelectedContract] = useState<string | null>(null);
   const [trendData, setTrendData] = useState<PremiumTrendPoint[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load snapshots for selected ticker
-  const loadSnapshots = useCallback(
-    async (ticker: TrackedTicker, type: OptionType, exp: string, d: number) => {
-      setLoading(true);
-      setError(null);
-      setSelectedContract(null);
-      setTrendData([]);
-      try {
-        const params = new URLSearchParams({ days: String(d) });
-        if (type !== "all") params.set("type", type);
-        if (exp) params.set("expiration", exp);
-        const res = await fetch(
-          `/api/v1/option_snapshots/${encodeURIComponent(ticker.symbol)}?${params}`,
-        );
-        if (!res.ok) {
-          const json = (await res.json().catch(() => ({}))) as {
-            error?: string;
-          };
-          setError(json.error ?? "載入失敗");
-          return;
-        }
-        const json = (await res.json()) as {
-          snapshots: OptionSnapshotRow[];
-          expirations: string[];
-        };
-        setSnapshots(json.snapshots);
-        setExpirations(json.expirations);
-      } catch {
-        setError("網路錯誤，請稍後再試");
-      } finally {
-        setLoading(false);
+  const loadSnapshots = useCallback(async (ticker: TrackedTicker) => {
+    setLoading(true);
+    setError(null);
+    setSelectedContract(null);
+    setTrendData([]);
+    try {
+      const res = await fetch(
+        `/api/v1/option_snapshots/${encodeURIComponent(ticker.symbol)}?latest_only=true`,
+      );
+      if (!res.ok) {
+        const json = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(json.error ?? "載入失敗");
+        return;
       }
-    },
-    [],
-  );
+      const json = (await res.json()) as {
+        snapshots: OptionSnapshotRow[];
+        expirations: string[];
+        latest_snapshot_date: string | null;
+      };
+      setSnapshots(json.snapshots);
+      setExpirations(json.expirations);
+      setSnapshotDate(json.latest_snapshot_date);
+      setSelectedExp(json.expirations[0] ?? "");
+      const price = json.snapshots[0]?.underlying_price ?? 0;
+      setUnderlyingPrice(price);
+    } catch {
+      setError("網路錯誤，請稍後再試");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  // Load premium trend for a specific contract
   async function loadTrend(contractSymbol: string) {
     if (!selected) return;
     setSelectedContract(contractSymbol);
@@ -89,7 +112,6 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
     }
   }
 
-  // API: add ticker
   async function handleAdd(symbol: string) {
     const res = await fetch("/api/v1/tracked_tickers", {
       method: "POST",
@@ -110,7 +132,6 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
     });
   }
 
-  // API: delete ticker
   async function handleDelete(id: number) {
     if (!confirm("確定要移除此追蹤代號？所有快照資料也會一併刪除。")) return;
     const res = await fetch(`/api/v1/tracked_tickers/${id}`, {
@@ -128,7 +149,6 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
     }
   }
 
-  // API: toggle active
   async function handleToggle(ticker: TrackedTicker) {
     const res = await fetch(`/api/v1/tracked_tickers/${ticker.id}`, {
       method: "PATCH",
@@ -148,28 +168,18 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
   function handleSelect(ticker: TrackedTicker) {
     if (ticker.id === selected?.id) return;
     setSelected(ticker);
-    setExpiration("");
-    loadSnapshots(ticker, optionType, "", days);
-  }
-
-  function handleOptionTypeChange(t: OptionType) {
-    setOptionType(t);
-    if (selected) loadSnapshots(selected, t, expiration, days);
-  }
-
-  function handleExpirationChange(exp: string) {
-    setExpiration(exp);
-    if (selected) loadSnapshots(selected, optionType, exp, days);
-  }
-
-  function handleDaysChange(d: number) {
-    setDays(d);
-    if (selected) loadSnapshots(selected, optionType, expiration, d);
+    setSnapshots([]);
+    setExpirations([]);
+    setSelectedExp("");
+    loadSnapshots(ticker);
   }
 
   useEffect(() => {
-    if (selected) loadSnapshots(selected, optionType, expiration, days);
+    if (selected) loadSnapshots(selected);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const chainRows = selectedExp ? buildChainRows(snapshots, selectedExp) : [];
+  const dte = selectedExp ? calcDte(selectedExp) : null;
 
   return (
     <div className="flex h-full min-h-screen bg-gray-900 text-white overflow-hidden">
@@ -189,53 +199,73 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
           </div>
         ) : (
           <>
-            {/* Header */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-700">
-              <h2 className="text-base font-semibold font-mono">
-                {selected.symbol}
-              </h2>
-              <span className="text-xs text-gray-400">期權歷史價格追蹤</span>
-              {loading && (
-                <span className="text-xs text-blue-400 ml-auto">載入中…</span>
-              )}
-              {error && (
-                <span className="text-xs text-red-400 ml-auto">{error}</span>
-              )}
-            </div>
-
-            <FilterBar
-              optionType={optionType}
-              expiration={expiration}
+            {/* Expiration tabs */}
+            <ExpirationTabs
               expirations={expirations}
-              days={days}
-              onOptionTypeChange={handleOptionTypeChange}
-              onExpirationChange={handleExpirationChange}
-              onDaysChange={handleDaysChange}
+              selected={selectedExp}
+              onSelect={(exp) => {
+                setSelectedExp(exp);
+                setSelectedContract(null);
+                setTrendData([]);
+              }}
             />
 
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-              {/* Premium Trend Chart */}
-              <div className="bg-gray-800 rounded-lg p-4">
-                <p className="text-xs text-gray-400 font-semibold mb-3">
-                  Premium 趨勢圖
-                </p>
-                <PremiumTrendChart
-                  data={trendData}
-                  contractSymbol={selectedContract ?? ""}
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-700 shrink-0">
+              <span className="text-xs text-gray-400 font-medium">
+                Calls / Puts
+              </span>
+              <span className="font-mono font-bold text-sm">
+                {selected.symbol}
+              </span>
+              {selectedExp && (
+                <span className="text-xs text-gray-300">{selectedExp}</span>
+              )}
+              {dte != null && (
+                <span className="text-xs text-yellow-400">
+                  距離到期日還有 {dte} 天
+                </span>
+              )}
+              {underlyingPrice > 0 && (
+                <span className="text-xs text-gray-500 ml-auto">
+                  現價 ${underlyingPrice.toFixed(2)}
+                </span>
+              )}
+              {snapshotDate && (
+                <span className="text-xs text-gray-600">
+                  快照 {snapshotDate}
+                </span>
+              )}
+              {loading && (
+                <span className="text-xs text-blue-400">載入中…</span>
+              )}
+              {error && <span className="text-xs text-red-400">{error}</span>}
+            </div>
+
+            {/* Main content */}
+            <div className="flex-1 overflow-y-auto">
+              {/* Chain table */}
+              <div className="p-2">
+                <OptionsChainTable
+                  rows={chainRows}
+                  underlyingPrice={underlyingPrice}
+                  selectedContract={selectedContract}
+                  onSelect={loadTrend}
                 />
               </div>
 
-              {/* Contracts Table */}
-              <div className="bg-gray-800 rounded-lg p-4">
-                <p className="text-xs text-gray-400 font-semibold mb-3">
-                  合約快照列表
-                </p>
-                <ContractsTable
-                  snapshots={snapshots}
-                  selectedContract={selectedContract}
-                  onSelectContract={loadTrend}
-                />
-              </div>
+              {/* Premium trend chart — appears when a contract is selected */}
+              {selectedContract && (
+                <div className="mx-2 mb-4 bg-gray-800 rounded-lg p-4">
+                  <p className="text-xs text-gray-400 font-semibold mb-3">
+                    Premium 歷史趨勢
+                  </p>
+                  <PremiumTrendChart
+                    data={trendData}
+                    contractSymbol={selectedContract}
+                  />
+                </div>
+              )}
             </div>
           </>
         )}
