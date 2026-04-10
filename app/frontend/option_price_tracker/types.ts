@@ -31,6 +31,7 @@ export interface SnapshotsResponse {
 
 export interface PremiumTrendPoint {
   date: string;
+  snapped_at: string; // ISO 8601 UTC datetime, e.g. "2026-04-09T19:30:00.000Z"
   bid: number | null;
   ask: number | null;
   last_price: number | null;

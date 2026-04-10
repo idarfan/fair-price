@@ -26,7 +26,7 @@ import json
 import time
 import logging
 import argparse
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -197,6 +197,7 @@ def fetch_options_chain(symbol: str, config: dict) -> list[dict]:
 
                 snapshots.append({
                     "snapshot_date": today,
+                    "snapped_at": datetime.now(timezone.utc),
                     "contract_symbol": str(row.get("contractSymbol", "")),
                     "option_type": opt_type,
                     "expiration": exp_date,
@@ -227,12 +228,12 @@ def upsert_snapshots(conn, ticker_id: int, snapshots: list[dict]):
 
     sql = """
         INSERT INTO option_snapshots (
-            tracked_ticker_id, snapshot_date, contract_symbol, option_type,
+            tracked_ticker_id, snapshot_date, snapped_at, contract_symbol, option_type,
             expiration, strike, last_price, bid, ask, volume,
             open_interest, implied_volatility, in_the_money, underlying_price,
             created_at, updated_at
         ) VALUES %s
-        ON CONFLICT (tracked_ticker_id, snapshot_date, contract_symbol)
+        ON CONFLICT (tracked_ticker_id, date_trunc('hour', snapped_at), contract_symbol)
         DO UPDATE SET
             last_price = EXCLUDED.last_price,
             bid = EXCLUDED.bid,
@@ -242,14 +243,16 @@ def upsert_snapshots(conn, ticker_id: int, snapshots: list[dict]):
             implied_volatility = EXCLUDED.implied_volatility,
             in_the_money = EXCLUDED.in_the_money,
             underlying_price = EXCLUDED.underlying_price,
+            snapped_at = EXCLUDED.snapped_at,
             updated_at = EXCLUDED.updated_at
     """
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     values = [
         (
             ticker_id,
             s["snapshot_date"],
+            s["snapped_at"],
             s["contract_symbol"],
             s["option_type"],
             s["expiration"],

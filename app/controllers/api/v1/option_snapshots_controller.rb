@@ -31,26 +31,35 @@ class Api::V1::OptionSnapshotsController < ApplicationController
 
   # GET /api/v1/option_snapshots/:symbol/premium_trend
   # params: contract_symbol OR (strike + expiration + type)
+  #         hours=N — return only the last N hours of data (e.g. hours=30 for yesterday's session)
   def premium_trend
     ticker = find_ticker
     return render json: { error: "找不到追蹤代號 #{params[:symbol].upcase}" }, status: :not_found unless ticker
 
-    rows = if params[:contract_symbol].present?
-             ticker.option_snapshots
-                   .where(contract_symbol: params[:contract_symbol])
-                   .order(:snapshot_date)
+    scope = if params[:contract_symbol].present?
+              ticker.option_snapshots
+                    .where(contract_symbol: params[:contract_symbol])
     else
-             OptionSnapshot.premium_trend(
-               ticker_id:   ticker.id,
-               strike:      params[:strike].to_f,
-               expiration:  params[:expiration],
-               option_type: params[:type] || "put"
-             )
+              OptionSnapshot.where(
+                tracked_ticker_id: ticker.id,
+                strike:            params[:strike].to_f,
+                expiration:        params[:expiration],
+                option_type:       params[:type] || "put"
+              )
     end
+
+    # Intraday filter: last N hours (e.g. hours=36 covers yesterday's US session)
+    if params[:hours].present?
+      cutoff = params[:hours].to_i.clamp(1, 168).hours.ago
+      scope = scope.where("snapped_at >= ?", cutoff)
+    end
+
+    rows = scope.order(:snapped_at)
 
     render json: rows.map { |s|
       {
         date:               s.snapshot_date,
+        snapped_at:         s.snapped_at&.utc&.iso8601(0),
         bid:                s.bid&.to_f,
         ask:                s.ask&.to_f,
         last_price:         s.last_price&.to_f,

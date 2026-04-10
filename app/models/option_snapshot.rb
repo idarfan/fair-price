@@ -20,6 +20,6 @@ class OptionSnapshot < ApplicationRecord
       strike:            strike,
       expiration:        expiration,
       option_type:       option_type
-    ).order(:snapshot_date)
+    ).order(:snapped_at)
   end
 end

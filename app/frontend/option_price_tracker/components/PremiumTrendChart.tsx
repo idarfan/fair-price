@@ -15,6 +15,29 @@ interface Props {
   contractSymbol: string;
 }
 
+/** Returns true if all points are from the same calendar date (intraday). */
+function isIntraday(data: PremiumTrendPoint[]): boolean {
+  if (data.length < 2) return false;
+  const first = data[0];
+  if (!first) return false;
+  const firstDate = first.snapped_at.slice(0, 10); // "YYYY-MM-DD"
+  return data.every((d) => d.snapped_at.slice(0, 10) === firstDate);
+}
+
+function fmtXAxis(snapped_at: string, intraday: boolean): string {
+  const d = new Date(snapped_at);
+  if (intraday) {
+    // Convert UTC → US Eastern (ET) for display
+    return d.toLocaleTimeString("en-US", {
+      timeZone: "America/New_York",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  }
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 export default function PremiumTrendChart({ data, contractSymbol }: Props) {
   if (data.length === 0) {
     return (
@@ -24,8 +47,10 @@ export default function PremiumTrendChart({ data, contractSymbol }: Props) {
     );
   }
 
+  const intraday = isIntraday(data);
+
   const chartData = data.map((d) => ({
-    date: d.date,
+    label: fmtXAxis(d.snapped_at, intraday),
     bid: d.bid,
     ask: d.ask,
     last: d.last_price,
@@ -37,7 +62,14 @@ export default function PremiumTrendChart({ data, contractSymbol }: Props) {
 
   return (
     <div>
-      <p className="text-xs text-gray-400 mb-2 font-mono">{contractSymbol}</p>
+      <div className="flex items-center gap-3 mb-2">
+        <p className="text-xs text-gray-400 font-mono">{contractSymbol}</p>
+        {intraday && (
+          <span className="text-xs text-yellow-400 bg-yellow-900/30 px-1.5 py-0.5 rounded">
+            盤中 (ET)
+          </span>
+        )}
+      </div>
       <ResponsiveContainer width="100%" height={220}>
         <LineChart
           data={chartData}
@@ -45,10 +77,11 @@ export default function PremiumTrendChart({ data, contractSymbol }: Props) {
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
           <XAxis
-            dataKey="date"
+            dataKey="label"
             tick={{ fontSize: 10, fill: "#9ca3af" }}
             tickLine={false}
             axisLine={false}
+            interval="preserveStartEnd"
           />
           <YAxis
             yAxisId="price"
