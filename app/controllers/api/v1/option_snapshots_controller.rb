@@ -14,7 +14,13 @@ class Api::V1::OptionSnapshotsController < ApplicationController
 
     if params[:latest_only] == "true"
       latest_date = ticker.option_snapshots.maximum(:snapshot_date)
-      scope = scope.where(snapshot_date: latest_date) if latest_date
+      if latest_date
+        # DISTINCT ON: 每個合約只取 snapped_at 最新的一筆
+        scope = ticker.option_snapshots
+                      .where(snapshot_date: latest_date)
+                      .select("DISTINCT ON (contract_symbol) option_snapshots.*")
+                      .order("contract_symbol, snapped_at DESC")
+      end
     end
 
     base        = ticker.option_snapshots.recent_days(days)
