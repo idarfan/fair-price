@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_10_075747) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_10_085440) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -40,16 +40,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_10_075747) do
     t.decimal "last_price", precision: 10, scale: 4
     t.integer "open_interest"
     t.string "option_type", null: false
+    t.datetime "snapped_at", null: false
     t.date "snapshot_date", null: false
     t.decimal "strike", precision: 10, scale: 4, null: false
     t.bigint "tracked_ticker_id", null: false
     t.decimal "underlying_price", precision: 10, scale: 4
     t.datetime "updated_at", null: false
     t.integer "volume"
+    t.index "tracked_ticker_id, date_trunc('hour'::text, snapped_at), contract_symbol", name: "idx_option_snapshots_hourly", unique: true
     t.index ["expiration"], name: "index_option_snapshots_on_expiration"
     t.index ["option_type", "strike"], name: "index_option_snapshots_on_option_type_and_strike"
     t.index ["snapshot_date"], name: "index_option_snapshots_on_snapshot_date"
-    t.index ["tracked_ticker_id", "snapshot_date", "contract_symbol"], name: "idx_option_snapshots_unique", unique: true
     t.index ["tracked_ticker_id"], name: "index_option_snapshots_on_tracked_ticker_id"
   end
 
