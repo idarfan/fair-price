@@ -28,10 +28,28 @@ import logging
 import argparse
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 
 import yfinance as yf
 import psycopg2
 from psycopg2.extras import execute_values
+
+# Load .env from project root (same directory logic as database.yml lookup)
+def _load_dotenv():
+    env_path = Path(__file__).parent.parent / ".env"
+    if not env_path.exists():
+        return
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            os.environ.setdefault(key, val)
+
+_load_dotenv()
 
 # ── Logging ──────────────────────────────────────────────────────────
 logging.basicConfig(
