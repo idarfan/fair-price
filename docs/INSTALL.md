@@ -1,24 +1,23 @@
 # INSTALL.md — FairPrice 安裝指南
 
-## 系統需求
-
-| 項目 | 版本 |
-|------|------|
-| Ruby | >= 3.2（建議用 rbenv 管理）|
-| Rails | ~> 8.1.2 |
-| Node.js | >= 18（Tailwind CLI、Vite 需要）|
-| npm | >= 9 |
-| PostgreSQL | >= 14 |
-| pm2 | >= 5（正式環境 process manager）|
-| OS | Linux（建議 Ubuntu 22.04 / Debian 12）|
-
-> **Windows 使用者**：本專案在 WSL2（Windows Subsystem for Linux）環境下開發，建議在 WSL2 的 Ubuntu 中執行以下所有步驟。
+FairPrice 提供一鍵互動式安裝程式（`install.sh`），可在任何裝好 WSL2 的 Windows 電腦上自動完成所有環境設定。
 
 ---
 
-## 零、前置安裝
+## 系統需求
 
-### WSL2（Windows 使用者）
+| 項目 | 需求 |
+|------|------|
+| 作業系統 | Windows 10（21H2 以上）或 Windows 11 |
+| WSL2 | Ubuntu 22.04 LTS（建議）|
+| 磁碟空間 | 至少 4 GB 可用空間 |
+| 網路 | 安裝過程需要網路（下載 Ruby、Node.js 等依賴）|
+
+> 安裝程式會自動安裝 Ruby 4.0.1、Node.js LTS、PostgreSQL、pm2，**無需事先手動安裝**。
+
+---
+
+## 一、在 Windows 安裝 WSL2（新電腦必做）
 
 以**系統管理員**身分開啟 PowerShell，執行：
 
@@ -26,235 +25,271 @@
 wsl --install
 ```
 
-此指令會自動安裝 WSL2 並下載 Ubuntu。安裝完成後**重新啟動電腦**。
+安裝完成後**重新啟動電腦**，Ubuntu 會在重啟後自動開啟。
+依提示設定 Linux 使用者名稱與密碼即完成。
 
-重啟後 Ubuntu 會自動開啟，依提示設定 Linux 使用者名稱與密碼即完成。
+> 若已安裝舊版 WSL1，執行 `wsl --set-default-version 2` 升級。
+> 詳細說明：[Microsoft WSL 官方文件](https://learn.microsoft.com/zh-tw/windows/wsl/install)
 
-> 若已安裝舊版 WSL1，可執行 `wsl --set-default-version 2` 升級為 WSL2。
->
-> 詳細說明請參考 [Microsoft 官方文件](https://learn.microsoft.com/zh-tw/windows/wsl/install)。
+---
 
-後續所有指令皆在 **WSL2 Ubuntu 終端機**內執行。
+## 二、（建議）啟用 WSL2 systemd
 
-### Ruby（rbenv）
+開啟 Ubuntu 終端機，執行：
 
 ```bash
-# 安裝 rbenv
-curl -fsSL https://github.com/rbenv/rbenv-installer/raw/main/bin/rbenv-installer | bash
-
-# 加入 shell 設定（以 bash 為例）
-echo 'export PATH="$HOME/.rbenv/bin:$PATH"' >> ~/.bashrc
-echo 'eval "$(rbenv init -)"' >> ~/.bashrc
-source ~/.bashrc
-
-# 安裝專案所需版本（確認 .ruby-version 中的版本號）
-rbenv install $(cat .ruby-version)
+echo -e '[boot]\nsystemd=true' | sudo tee /etc/wsl.conf
 ```
 
-### Node.js（nvm）
+然後在 PowerShell 重啟 WSL：
 
-```bash
-# 安裝 nvm
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-source ~/.bashrc
-
-# 安裝 Node 18+
-nvm install 18
-nvm use 18
+```powershell
+wsl --shutdown
 ```
 
-### pm2（正式環境）
+重新開啟 Ubuntu。啟用 systemd 後，FairPrice 服務可在開機後自動啟動。
+
+---
+
+## 三、取得安裝包
+
+向提供者取得 `fairprice-bundle.tar.gz`，複製到 WSL2 家目錄。
+
+**常見複製方式：**
 
 ```bash
-npm install -g pm2
+# 方式 A：從 Windows 檔案總管拖放到 WSL 家目錄
+# 路徑：\\wsl$\Ubuntu\home\<你的使用者名稱>
+
+# 方式 B：SCP（從提供者的機器下載）
+scp <提供者IP>:~/fairprice-bundle.tar.gz ~/
 ```
 
 ---
 
-## 一、從 GitHub 下載專案
+## 四、執行安裝程式
 
-此為公開 repo，直接用 HTTPS 下載即可，不需要 GitHub 帳號或 SSH key：
+在 WSL2 Ubuntu 終端機中執行：
 
 ```bash
-git clone https://github.com/idarfan/fair-price.git fairprice
-cd fairprice
+cd ~
+tar xzf fairprice-bundle.tar.gz
+cd fairprice-bundle
+bash install.sh
 ```
+
+安裝程式將以互動方式引導你完成所有步驟。
 
 ---
 
-## 二、安裝 Ruby 相依套件
+## 五、安裝過程說明
 
-```bash
-bundle install
+安裝程式會依序執行以下步驟，每步驟完成後顯示 `[ OK ]`。
+
+### 步驟 1–3：自動安裝（無需操作）
+- 安裝系統套件（`build-essential`、`libpq-dev` 等）
+- 編譯安裝 Ruby 4.0.1（**約需 10–20 分鐘**，依電腦速度而定）
+- 安裝 Node.js LTS 與 pm2
+
+### 步驟 4：填入 API Keys（必須操作）
+
+安裝程式會顯示申請連結並逐一詢問：
+
+```
+━━━ API Keys 設定 ━━━
+FINNHUB_API_KEY：至 https://finnhub.io 免費申請
+GROQ_API_KEY：  至 https://console.groq.com 免費申請
+
+[必填] FINNHUB_API_KEY: （輸入後不顯示）
+[必填] GROQ_API_KEY:
+[選填] TELEGRAM_BOT_TOKEN  (直接 Enter 跳過):
+[選填] TELEGRAM_CHAT_ID:
+[選填] OUOU_TELEGRAM_CHAT_ID:
+
+━━━ 資料庫設定 ━━━
+DB_HOST [localhost]:
+DB_PORT [5432]:
+DB_USER [你的使用者名稱]:
+DB_PASSWORD (可留空):
 ```
 
-主要 gem：
+- **FINNHUB_API_KEY** 和 **GROQ_API_KEY** 為必填，皆提供免費方案
+- Telegram 相關為選填，略過則停用價格警示與盤前報告功能
+- 資料庫設定保持預設值（直接 Enter）即可
 
-| Gem | 用途 |
-|-----|------|
-| `rails ~> 8.1` | 框架本體 |
-| `propshaft` | 靜態資源管線 |
-| `phlex-rails ~> 2.0` | UI 元件系統 |
-| `tailwindcss-rails ~> 4.0` | Tailwind CSS 本地編譯 |
-| `kramdown` + `kramdown-parser-gfm` | 伺服器端 Markdown 渲染 |
-| `httparty ~> 0.22` | HTTP 客戶端（呼叫 Finnhub / Yahoo Finance）|
-| `pg ~> 1.5` | PostgreSQL 連線（Watchlist / Portfolio）|
-| `lookbook >= 2.3` | 元件預覽（開發環境）|
-| `ruby-lsp` | Ruby 語言伺服器（開發環境）|
+### 步驟 5–10：自動完成（無需操作）
+- 安裝 Ruby gem 與 npm 套件
+- 建立並初始化 PostgreSQL 資料庫
+- 建置 Tailwind CSS
+- 啟動 pm2 服務
 
 ---
 
-## 三、安裝前端相依套件
+## 六、確認安裝成功
 
-```bash
-npm install
+安裝完成後畫面會顯示：
+
 ```
+╔══════════════════════════════════════════════════╗
+║          FairPrice 安裝完成！                    ║
+╠══════════════════════════════════════════════════╣
+║  App:      http://localhost:3003                 ║
+║  Vite:     http://localhost:3036                 ║
+║  Lookbook: http://localhost:3003/lookbook        ║
+╠══════════════════════════════════════════════════╣
+║  pm2 list                  查看服務狀態          ║
+║  pm2 logs fairprice-rails  Rails log             ║
+╚══════════════════════════════════════════════════╝
+```
+
+開啟 Windows 瀏覽器，前往：
+
+```
+http://localhost:3003
+```
+
+即可使用 FairPrice。
 
 ---
 
-## 四、設定環境變數
+## 七、設定開機自動啟動（有 systemd）
 
-複製範本並填入實際值：
+若已依第二步啟用 systemd，安裝完成後畫面會顯示一行指令，例如：
 
-```bash
-cp .env.example .env
+```
+sudo env PATH=$PATH:/usr/bin /home/idarfan/.npm-global/bin/pm2 startup systemd -u idarfan --hp /home/idarfan
 ```
 
-`.env` 必填項目：
-
-```env
-# Finnhub API Key（從 https://finnhub.io 免費申請）
-FINNHUB_API_KEY=your_key_here
-
-# Groq API Key（歐歐分析、持股/期權截圖 OCR，從 https://console.groq.com 免費申請）
-GROQ_API_KEY=your_key_here
-
-# Telegram Bot（價格警示推播，選填）
-TELEGRAM_BOT_TOKEN=your_token_here
-TELEGRAM_CHAT_ID=your_chat_id_here
-
-# PostgreSQL（Watchlist / Portfolio 功能）
-DATABASE_URL=postgresql://user:password@localhost/fairprice_development
-```
+**將此指令複製貼上並執行**，pm2 便會在每次 WSL2 啟動後自動開啟所有服務。
 
 ---
 
-## 五、資料庫初始化
+## 八、日常操作指令
 
 ```bash
-bundle exec rails db:create
-bundle exec rails db:migrate
-```
-
----
-
-## 六、編譯 Tailwind CSS
-
-```bash
-bundle exec rails tailwindcss:build
-```
-
----
-
-## 七、啟動伺服器
-
-### 開發環境（foreman，單機本地）
-
-```bash
-bin/dev
-```
-
-`bin/dev` 會透過 `Procfile.dev` 同時啟動 Rails（port 3003）、Tailwind watch、Vite dev server（port 3036）。
-
-### 正式環境（pm2）
-
-專案使用 pm2 統一管理 Rails 與 Vite，設定檔為 `ecosystem.config.cjs`。
-
-#### 1. 調整路徑設定
-
-`ecosystem.config.cjs` 與 `bin/start-rails.sh` 內含硬編碼的絕對路徑，**在他處安裝時必須修改**：
-
-`ecosystem.config.cjs`：
-```js
-cwd: '/home/<your-user>/fairprice',   // 改成實際路徑
-PATH: '/home/<your-user>/.rbenv/shims:/home/<your-user>/.rbenv/bin:/usr/bin:/bin',
-RBENV_ROOT: '/home/<your-user>/.rbenv',
-```
-
-`bin/start-rails.sh`：
-```bash
-APP_DIR="/home/<your-user>/fairprice"  // 改成實際路徑
-```
-
-#### 2. 啟動
-
-```bash
-pm2 start ecosystem.config.cjs
-pm2 save          # 儲存 process 清單，重開機後自動恢復
-pm2 startup       # 依照提示執行輸出的指令，設定開機自啟
-```
-
-服務啟動後監聽於 **port 3003**（Rails）和 **port 3036**（Vite）。
-
----
-
-## 八、確認安裝成功
-
-```bash
-# Boot 檢查
-bundle exec rails runner "puts 'Boot OK'"
-
-# pm2 狀態
+# 查看所有服務狀態
 pm2 list
-pm2 logs fairprice-rails --lines 15 --nostream
 
-# 確認路由
-bundle exec rails routes
-```
+# 查看 Rails log（即時）
+pm2 logs fairprice-rails
 
-開啟瀏覽器：
-- 主頁：`http://localhost:3003`
-- 元件預覽：`http://localhost:3003/lookbook`（開發環境）
+# 查看 Vite log
+pm2 logs fairprice-vite
 
----
-
-## 九、Lint 檢查
-
-```bash
-bundle exec rubocop        # 檢查
-bundle exec rubocop -a     # 自動修正
-```
-
----
-
-## 常見問題
-
-### Tailwind 樣式沒有套用
-
-確認已執行 `bundle exec rails tailwindcss:build`，並在 `app/views/layouts/application.html.erb` 引用 `stylesheet_link_tag "tailwind"`。
-
-### Markdown 表格顯示異常
-
-確認 `kramdown-parser-gfm` 已安裝，且所有呼叫皆使用 `input: "GFM"` 選項：
-```ruby
-Kramdown::Document.new(text, input: "GFM").to_html
-```
-
-修改渲染邏輯後需重啟 server 並清除 cache：
-```bash
+# 重啟 Rails
 pm2 restart fairprice-rails
-bundle exec rails runner "Rails.cache.clear"
+
+# 停止所有服務
+pm2 stop all
+
+# 重新啟動所有服務
+pm2 restart all
 ```
 
-### Finnhub API 回應 403
+---
 
-確認 `.env` 中 `FINNHUB_API_KEY` 填寫正確，且帳號尚在免費額度內。
+## 九、重新安裝或更新
+
+如需重新執行安裝（例如取得新版本的 bundle），直接再次執行：
+
+```bash
+cd fairprice-bundle
+bash install.sh
+```
+
+安裝程式為冪等（idempotent）設計，已完成的步驟會自動跳過。
+執行到 API Keys 設定時，選擇 `N` 可保留原本的 Key。
+
+---
+
+## 十、常見問題
+
+### Ruby 4.0.1 編譯失敗
+
+**原因**：缺少 OpenSSL 3.x 或其他編譯依賴。
+
+**解法**：確認 Ubuntu 版本為 22.04 以上（執行 `lsb_release -rs` 確認）。若版本過舊，建議重新安裝 Ubuntu 22.04：
+
+```powershell
+# PowerShell
+wsl --install -d Ubuntu-22.04
+```
+
+---
 
 ### pm2 啟動後 Rails 無回應
 
-查看啟動日誌：
+**診斷**：
+
 ```bash
 pm2 logs fairprice-rails --lines 30 --nostream
 ```
 
-常見原因：`ecosystem.config.cjs` 路徑未更新、rbenv 未正確初始化、PostgreSQL 未啟動。
+**常見原因與解法**：
+
+| 原因 | 解法 |
+|------|------|
+| PostgreSQL 未啟動 | `sudo service postgresql start` |
+| .env 遺失 | 重新執行 `bash install.sh` |
+| Port 3003 被佔用 | `ss -tlnp \| grep 3003` 確認 |
+
+---
+
+### Finnhub API 回應 403
+
+確認 `.env` 中的 `FINNHUB_API_KEY` 正確，且帳號仍在免費額度內（每分鐘 60 次請求上限）。
+
+---
+
+### Tailwind 樣式沒有套用
+
+確認 Tailwind CSS 已完成建置：
+
+```bash
+cd ~/fairprice-bundle
+bash -c 'source ~/.bashrc && bundle exec rails tailwindcss:build'
+pm2 restart fairprice-rails
+```
+
+---
+
+### 如何修改 API Keys
+
+直接編輯 `.env` 檔案後重啟 Rails：
+
+```bash
+nano ~/fairprice-bundle/.env   # 修改後 Ctrl+X → Y → Enter 儲存
+pm2 restart fairprice-rails
+```
+
+---
+
+## 附錄：API Keys 申請說明
+
+### FINNHUB_API_KEY（必填）
+
+1. 前往 [https://finnhub.io](https://finnhub.io)
+2. 點選右上角 **Sign Up**，選擇 Free 方案
+3. 登入後至 [Dashboard](https://finnhub.io/dashboard) 複製 API Key
+
+免費方案限制：每分鐘 60 次請求，已足夠個人使用。
+
+### GROQ_API_KEY（必填）
+
+1. 前往 [https://console.groq.com](https://console.groq.com)
+2. Sign Up（可用 Google 帳號登入）
+3. 左側選單 **API Keys** → **Create API Key** → 複製
+
+免費方案提供每日 Token 額度，供 AI 分析與 OCR 功能使用。
+
+### TELEGRAM_BOT_TOKEN（選填）
+
+1. 在 Telegram 搜尋 **@BotFather**
+2. 發送 `/newbot`，依提示設定 Bot 名稱
+3. 複製提供的 token（格式：`1234567890:ABC...`）
+
+### TELEGRAM_CHAT_ID（選填）
+
+1. 與你的 Bot 發送任意訊息
+2. 開啟瀏覽器前往：`https://api.telegram.org/bot<你的TOKEN>/getUpdates`
+3. 在 JSON 回應中找到 `"chat":{"id":...}` 的數字即為 Chat ID
