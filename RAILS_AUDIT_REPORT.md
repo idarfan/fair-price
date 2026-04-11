@@ -2,7 +2,7 @@
 
 # Rails Application Audit Report
 
-**Generated**: 2026-04-03
+**Generated**: 2026-04-11
 **Application**: FairPrice / Daily Momentum
 **Rails Version**: 8.1.2
 **Ruby Version**: 4.0.1
@@ -12,34 +12,24 @@
 
 ## Executive Summary
 
-| Category | Critical | High | Medium | Low | Total |
-|----------|----------|------|--------|-----|-------|
-| Testing | 1 | 2 | 1 | 0 | 4 |
-| Code Quality | 0 | 4 | 3 | 2 | 9 |
-| Security | 0 | 0 | 0 | 1 | 1 |
+| 分類 | Critical | High | Medium | Low | Total |
+|------|----------|------|--------|-----|-------|
+| Testing | 1 | 2 | 0 | 0 | 3 |
+| Code Quality | 0 | 5 | 12 | 1 | 18 |
+| Security | 0 | 0 | 1 | 0 | 1 |
 | Models | 0 | 0 | 0 | 0 | 0 |
-| Controllers | 0 | 1 | 1 | 0 | 2 |
-| Code Design | 0 | 0 | 2 | 1 | 3 |
-| Views | 0 | 0 | 0 | 0 | 0 |
-| External Services | 0 | 1 | 2 | 1 | 4 |
-| Database & Performance | 0 | 0 | 0 | 1 | 1 |
-| **Total** | **1** | **8** | **9** | **6** | **24** |
+| Controllers | 0 | 1 | 2 | 0 | 3 |
+| Code Design | 0 | 2 | 1 | 0 | 3 |
+| Views / Components | 0 | 2 | 3 | 0 | 5 |
+| External Services | 0 | 0 | 1 | 0 | 1 |
+| Database & Performance | 0 | 0 | 1 | 0 | 1 |
+| **Total** | **1** | **12** | **21** | **1** | **35** |
 
 ### Key Findings
 
-1. **整體測試行覆蓋率僅 7.5%**：129 個測試全部通過，但 78 個 Ruby 檔案中只有 16 個有覆蓋。`app/components/`（34 個 Phlex 元件、3,495 行）完全 0% 覆蓋率，是最大缺口。
-2. **RubyCritic 評分 69.63/100，4 個 F 級、10 個 D 級檔案**：`charts_controller.rb`（複雜度 361）、`valuation_service.rb`（複雜度 330.6）是最複雜的兩個檔案，重複方法呼叫（DuplicateMethodCall）出現 180 次。
-3. **ExchangeRateService 三重裸 rescue**：三個 `rescue` 區塊完全靜默，匯率取得失敗時無任何日誌或通知，線上排查困難。
-
-### 整體評分
-
-| 面向 | 評分 |
-|------|------|
-| 安全性 | 🟢 優秀（無 SQL injection、CSRF bypass、permit! 等問題）|
-| 外部服務處理 | 🟡 良好（所有 HTTP 均有 timeout，但部分 rescue 靜默）|
-| 資料庫設計 | 🟢 優秀（索引完整、遷移乾淨）|
-| 測試覆蓋率 | 🔴 嚴重不足（7.5%，目標 80%）|
-| 程式碼品質 | 🟡 需改善（69.63/100，含 14 個 D/F 評等檔案）|
+1. **測試覆蓋率僅 6.9%** — 86 個 Ruby 檔案中有 70 個完全沒有測試，幾乎整個 components 層（34 個）、大多數 controller 與 services 都毫無覆蓋。
+2. **`ValuationService` 是全案最複雜的類別**（F 級，379 行，21 個 method，complexity 330）— 需要拆解為領域物件。
+3. **22 個 Service Object 命名模式不符合 thoughtbot PORO 原則** — 全部以 `*Service` 結尾，缺乏領域語義。
 
 ---
 
@@ -49,105 +39,78 @@
 
 - **Test Framework**: RSpec
 - **Coverage Method**: SimpleCov（實際量測）
-- **Overall Line Coverage**: 7.5%
-- **Overall Branch Coverage**: 41.7%
-- **Files with Coverage**: 16 / 78（20.5%）
-- **Test Suite**: 129 examples, 0 failures ✅
+- **Overall Line Coverage**: 6.9%
+- **Overall Branch Coverage**: 41.47%
+- **Files with Tests**: 16 / 86（18.6%）
 
 | Directory | Files | Line Coverage | 目標 | 狀態 |
 |-----------|-------|---------------|------|------|
-| app/models/ | 7 | 36.0% | 90% | 🔴 不足 |
-| app/controllers/ | 15 | 13.6% | 80% | 🔴 嚴重不足 |
-| app/services/ | 19 | 21.7% | 90% | 🔴 嚴重不足 |
-| app/helpers/ | 1 | 33.3% | 70% | 🔴 不足 |
-| app/components/ | 34 | 0.0% | 80% | 🔴 完全未覆蓋 |
-| app/jobs/ | 2 | 0.0% | 70% | 🔴 完全未覆蓋 |
+| app/models/ | 4 / 9 | 25.2% | 90% | 嚴重不足 |
+| app/controllers/ | 3 / 18 | 11.3% | 80% | 嚴重不足 |
+| app/services/ | 7 / 22 | 17.5% | 95% | 嚴重不足 |
+| app/helpers/ | 1 / 1 | 33.3% | 70% | 不足 |
+| app/components/ | 0 / 34 | 0.0% | 80% | 零覆蓋 |
 
 **Coverage vs Targets:**
 
 | File Type | Target | Actual | Delta |
 |-----------|--------|--------|-------|
-| Model | 90% | 36.0% | -54.0% |
-| Controller | 80% | 13.6% | -66.4% |
-| Service/PORO | 90% | 21.7% | -68.3% |
+| Model | 90% | 25.2% | -64.8% |
+| Controller | 80% | 11.3% | -68.7% |
+| Service/PORO | 95% | 17.5% | -77.5% |
 | Helper | 70% | 33.3% | -36.7% |
 | Component | 80% | 0.0% | -80.0% |
 
-### Critical Issues
+**Lowest Coverage Files (non-zero):**
 
-#### [T-01] 整體測試覆蓋率嚴重不足（7.5%）
+| File | Coverage |
+|------|----------|
+| `app/services/sec_edgar_service.rb` | 15.4% |
+| `app/services/yahoo_finance_service.rb` | 21.3% |
+| `app/controllers/api/v1/charts_controller.rb` | 23.9% |
+| `app/services/stock_data_service.rb` | 27.2% |
+| `app/helpers/application_helper.rb` | 33.3% |
 
-**Impact**: 任何重構或新功能均有極高回歸風險，無法安全進行大型改動。
-**Details**: 目前 78 個 Ruby 檔案中僅 16 個被測試觸及。`app/components/`（34 個 Phlex 元件、3,495 行）是最大缺口，是前端 UI 的核心卻毫無保護。
+### Critical
 
-**Zero Coverage Files（高優先）:**
-- `app/services/ouou_analysis_service.rb`（核心 AI 分析，235 行）
-- `app/services/finnhub_service.rb`（主要資料來源）
+#### TEST-01 整體測試覆蓋率 6.9%（目標 80%+）
+
+**影響**: 程式碼改動幾乎無安全網，regression 風險極高
+**詳情**: 86 個 Ruby 檔案中僅 16 個有任何測試。所有 Phlex components（34 個）、12 個 controller、15 個 service 完全沒有測試。
+
+**建議**: 制定覆蓋率提升計畫，優先順序：
+1. 核心計算邏輯 — `ValuationService`、`ChartsController` 計算方法
+2. 關鍵 API endpoints — ownership、margin、options
+3. 所有 Model validations
+4. Components 的 render 邏輯
+
+### High
+
+#### TEST-02 所有 Phlex Components 零覆蓋（34 個檔案）
+
+**影響**: UI 渲染邏輯完全無回歸測試保護
+**建議**: 使用 Lookbook preview + RSpec component tests：
+
+```ruby
+# spec/components/fair_value/valuation_table_component_spec.rb
+RSpec.describe FairValue::ValuationTableComponent, type: :component do
+  it "renders valuation rows" do
+    render described_class.new(methods: [...])
+    expect(page).to have_css("table")
+  end
+end
+```
+
+#### TEST-03 零覆蓋重點檔案（70 個，依優先順序）
+
+**高優先（核心業務邏輯）**:
 - `app/services/momentum_report_service.rb`
+- `app/services/finnhub_service.rb`
+- `app/services/ouou_analysis_service.rb`
 - `app/controllers/reports_controller.rb`
-- `app/controllers/api/v1/valuations_controller.rb`
-- `app/components/daily_momentum/*`（10 個元件）
-- `app/components/fair_value/*`（10 個元件）
-
-**Recommendation**: 建立三個月覆蓋率提升計畫：
-- 第一個月：補齊所有 service 的 unit tests（目標 60%）
-- 第二個月：補齊 controller request specs（目標 70%）
-- 第三個月：Phlex 元件 system tests / Lookbook snapshots（目標 80%）
-
-### High Severity
-
-#### [T-02] 核心 AI 分析服務無測試
-
-**File**: `app/services/ouou_analysis_service.rb`（235 行，complexity 235.7）
-**Impact**: Groq API 整合、SSE 串流解析、Markdown 快取機制均無保護，任何改動均可能靜默破壞功能。
-
-**Recommendation**: 優先補齊：
-```ruby
-# spec/services/ouou_analysis_service_spec.rb
-RSpec.describe OuouAnalysisService do
-  describe "#call" do
-    context "when cache hit" do
-      it "yields cached content without API call"
-    end
-
-    context "when cache miss" do
-      it "streams from Groq API and writes to cache"
-    end
-  end
-end
-```
-
-#### [T-03] 所有控制器缺乏 Request Specs
-
-**Files**: `app/controllers/reports_controller.rb`、`app/controllers/api/v1/charts_controller.rb` 等 15 個控制器均無測試。
-**Impact**: 路由變更、回應格式異動均無保護。
-
-**Recommendation**: 從最複雜的開始：
-```ruby
-# spec/requests/api/v1/charts_spec.rb
-RSpec.describe "GET /api/v1/charts/:symbol" do
-  it "returns OHLCV data with MA5/MA20/RSI"
-  it "returns 422 for invalid symbol"
-end
-```
-
-### Medium Severity
-
-#### [T-04] Phlex 元件完全無測試
-
-**Files**: `app/components/**/*.rb`（34 個檔案，3,495 行）
-**Details**: Phlex 元件可透過 Lookbook preview + RSpec component tests 測試。
-
-**Recommendation**: 至少對高複雜度元件添加 Lookbook snapshot：
-```ruby
-# spec/components/portfolio/holding_list_component_spec.rb
-RSpec.describe Portfolio::HoldingListComponent, type: :component do
-  it "renders holding rows" do
-    render_inline described_class.new(holdings: build_list(:portfolio, 3))
-    expect(page).to have_css(".holding-row", count: 3)
-  end
-end
-```
+- `app/controllers/api/v1/options_controller.rb`
+- `app/models/tracked_ticker.rb`
+- `app/models/price_alert.rb`
 
 ---
 
@@ -156,461 +119,364 @@ end
 ### Overview
 
 - **Analysis Tool**: RubyCritic（Reek + Flay + Flog）
-- **Overall Score**: 69.63 / 100
-- **Total Files Analyzed**: 79
+- **Overall Score**: 67.87 / 100
+- **Total Files Analyzed**: 87
 
 | Rating | Count | Percentage |
 |--------|-------|------------|
-| A（優秀） | 30 | 38% |
-| B（良好） | 20 | 25% |
-| C（需改善） | 15 | 19% |
-| D（不良） | 10 | 13% |
-| F（嚴重） | 4 | 5% |
+| A（優秀） | 34 | 39% |
+| B（良好） | 20 | 23% |
+| C（待改善） | 16 | 18% |
+| D（不良） | 12 | 14% |
+| F（嚴重） | 5 | 6% |
 
 **Ratings by Directory:**
 
 | Directory | Avg Score | A | B | C | D | F |
 |-----------|-----------|---|---|---|---|---|
-| app/models/ | 0.2 | 7 | 0 | 0 | 0 | 0 |
-| app/helpers/ | 0.4 | 1 | 0 | 0 | 0 | 0 |
-| app/jobs/ | 0.2 | 2 | 0 | 0 | 0 | 0 |
-| lib/ | 0.0 | 1 | 0 | 0 | 0 | 0 |
-| app/services/ | 5.4 | 6 | 3 | 5 | 4 | 1 |
-| app/controllers/ | 4.4 | 4 | 4 | 5 | 2 | 0 |
-| app/components/ | 6.7 | 9 | 13 | 5 | 4 | 3 |
+| app/models/ | 0.21 | 9 | 0 | 0 | 0 | 0 |
+| app/controllers/ | 3.56 | 5 | 2 | 3 | 1 | 0 |
+| app/controllers/api/v1/ | 6.60 | 0 | 2 | 3 | 2 | 0 |
+| app/services/ | 6.41 | 7 | 3 | 6 | 4 | 2 |
+| app/components/daily_momentum/ | 6.23 | 3 | 4 | 0 | 2 | 1 |
+| app/components/fair_value/ | 4.15 | 2 | 7 | 4 | 1 | 0 |
+| app/components/portfolio/ | 27.33 | 0 | 0 | 0 | 1 | 1 |
+| app/components/stock_alert/ | 17.54 | 0 | 1 | 0 | 1 | 1 |
 
-**Worst Rated Files（D 和 F）:**
+**Worst Rated Files (D & F):**
 
 | File | Rating | Cost | Complexity | Smells |
 |------|--------|------|------------|--------|
-| `app/components/portfolio/holding_list_component.rb` | F | 38.9 | 196.7 | 20 |
-| `app/components/stock_alert/alert_list_component.rb` | F | 37.5 | 188.4 | 19 |
-| `app/components/daily_momentum/watchlist_manager_component.rb` | F | 22.0 | 275.5 | 29 |
-| `app/services/valuation_service.rb` | F | 20.2 | 330.6 | 74 |
-| `app/components/portfolio/holding_row_component.rb` | D | 15.8 | 269.5 | 24 |
-| `app/components/daily_momentum/watchlist_row_component.rb` | D | 15.3 | 108.5 | 14 |
-| `app/controllers/api/v1/charts_controller.rb` | D | 14.4 | 361.0 | 69 |
-| `app/services/options_ocr_service.rb` | D | 13.6 | 263.8 | 34 |
-| `app/components/stock_alert/alert_row_component.rb` | D | 11.5 | 161.3 | 19 |
-| `app/controllers/reports_controller.rb` | D | 10.7 | 191.3 | 30 |
-| `app/services/ouou_analysis_service.rb` | D | 9.4 | 235.7 | 34 |
-| `app/services/yahoo_finance_service.rb` | D | 8.6 | 165.1 | 27 |
-| `app/components/fair_value/analyst_consensus_component.rb` | D | 8.5 | 188.5 | 22 |
-| `app/services/stock_data_service.rb` | D | 8.4 | 183.8 | 23 |
+| `app/components/portfolio/holding_list_component.rb` | F | 38.87 | 196.74 | 20 |
+| `app/components/stock_alert/alert_list_component.rb` | F | 37.54 | 188.38 | 19 |
+| `app/services/ouou_pre_market_service.rb` | F | 23.48 | 187.02 | 29 |
+| `app/components/daily_momentum/watchlist_manager_component.rb` | F | 22.02 | 275.54 | 29 |
+| `app/services/valuation_service.rb` | F | 20.22 | 330.60 | 74 |
+| `app/components/portfolio/holding_row_component.rb` | D | 15.78 | 269.54 | 24 |
+| `app/components/daily_momentum/watchlist_row_component.rb` | D | 15.34 | 108.55 | 14 |
+| `app/controllers/reports_controller.rb` | D | 14.95 | 198.81 | 32 |
+| `app/controllers/api/v1/charts_controller.rb` | D | 14.66 | 366.39 | 69 |
+| `app/services/telegram_bot_handler_service.rb` | D | 14.54 | 138.42 | 28 |
+| `app/services/options_ocr_service.rb` | D | 13.55 | 263.79 | 34 |
+| `app/components/stock_alert/alert_row_component.rb` | D | 11.45 | 161.33 | 19 |
+| `app/components/daily_momentum/market_stance_component.rb` | D | 9.82 | 70.62 | 11 |
+| `app/services/ouou_analysis_service.rb` | D | 9.58 | 239.47 | 35 |
+| `app/components/fair_value/analyst_consensus_component.rb` | D | 8.54 | 188.50 | 22 |
+| `app/controllers/api/v1/option_snapshots_controller.rb` | D | 8.46 | 161.46 | 17 |
+| `app/services/stock_data_service.rb` | D | 8.35 | 183.84 | 23 |
 
 **Most Common Code Smells:**
 
 | Smell Type | Occurrences | Analyzer |
 |------------|-------------|----------|
-| DuplicateMethodCall | 180 | Reek |
-| TooManyStatements | 158 | Reek |
-| UncommunicativeVariableName | 104 | Reek |
-| IrresponsibleModule | 69 | Reek |
-| UtilityFunction | 67 | Reek |
-| HighComplexity | 58 | Flog |
-| DuplicateCode | 51 | Flay |
-| FeatureEnvy | 36 | Reek |
+| DuplicateMethodCall | 205 | Reek |
+| TooManyStatements | 173 | Reek |
+| UncommunicativeVariableName | 125 | Reek |
+| UtilityFunction | 78 | Reek |
+| IrresponsibleModule | 74 | Reek |
+| HighComplexity | 61 | Flog |
+| DuplicateCode | 58 | Flay |
+| FeatureEnvy | 40 | Reek |
+| NilCheck | 25 | Reek |
 | BooleanParameter | 25 | Reek |
-| NilCheck | 23 | Reek |
 
-**Most Complex Files（top 10）:**
+**Most Complex Files (top 10):**
 
-| File | Complexity | Methods | Complexity/Method |
-|------|------------|---------|-------------------|
-| `app/controllers/api/v1/charts_controller.rb` | 361.0 | 8 | 45.1 |
-| `app/services/valuation_service.rb` | 330.6 | 21 | 15.7 |
-| `app/components/daily_momentum/watchlist_manager_component.rb` | 275.5 | 11 | 25.0 |
-| `app/components/portfolio/holding_row_component.rb` | 269.5 | 21 | 12.8 |
-| `app/services/options_ocr_service.rb` | 263.8 | 8 | 33.0 |
-| `app/services/ouou_analysis_service.rb` | 235.7 | 16 | 14.7 |
-| `app/components/portfolio/holding_list_component.rb` | 196.7 | 10 | 19.7 |
-| `app/controllers/api/v1/options_controller.rb` | 195.1 | 14 | 13.9 |
-| `app/controllers/reports_controller.rb` | 191.3 | 11 | 17.4 |
-| `app/components/fair_value/analyst_consensus_component.rb` | 188.5 | 6 | 31.4 |
-
-### High Severity
-
-#### [CQ-01] valuation_service.rb 評等 F（74 個 smell）
-
-**File**: `app/services/valuation_service.rb`（cost: 20.2，complexity: 330.6）
-**Details**: 74 個 smell，包含大量 `TooManyStatements`、`DuplicateMethodCall`。每種估值方法（DCF、P/E、PEG、DDM 等）邏輯類似但分散在多個 private methods，有大量重複。
-**Recommendation**: 將每種估值方法提取為獨立的 PORO（Value Object）：
-```ruby
-# app/models/valuations/dcf_method.rb
-module Valuations
-  class DcfMethod
-    def initialize(stock_data, growth_rate:, discount_rate:)
-      @data = stock_data
-      @growth_rate = growth_rate
-      @discount_rate = discount_rate
-    end
-
-    def calculate
-      { method: "DCF", value: compute_value, note: note, formula: formula_string }
-    end
-  end
-end
-```
-
-#### [CQ-02] charts_controller.rb 複雜度 361（每方法 45.1）
-
-**File**: `app/controllers/api/v1/charts_controller.rb`（8 個方法，complexity 361）
-**Details**: 技術指標計算（MA、RSI、支撐/阻力）直接寫在 controller 中，與 HTTP request/response 邏輯混雜。
-**Recommendation**: 提取 `TechnicalAnalysisService`（或 `TechnicalAnalysis` PORO）：
-```ruby
-# app/models/technical_analysis.rb
-class TechnicalAnalysis
-  def initialize(ohlcv_data)
-    @data = ohlcv_data
-  end
-
-  def ma(period)
-    @data.each_cons(period).map { |w| w.sum / period.to_f }
-  end
-
-  def rsi(period: 14)
-    # RSI 計算邏輯移至此
-  end
-end
-```
-
-#### [CQ-03] watchlist_manager_component.rb 複雜度 275.5（F 級）
-
-**File**: `app/components/daily_momentum/watchlist_manager_component.rb`（29 個 smell）
-**Details**: Phlex 元件兼顧 UI 渲染和業務邏輯（watchlist CRUD），職責過多。
-**Recommendation**: 分離資料邏輯到 presenter/form object，元件僅負責渲染。
-
-#### [CQ-04] 180 次 DuplicateMethodCall（最高頻 smell）
-
-**Details**: 同一方法的結果在 method body 中被呼叫多次而非先暫存。常見模式：
-```ruby
-# Bad: position.buy_price 呼叫 3 次
-total = position.buy_price * position.shares
-cost = position.buy_price * 1.02
-```
-```ruby
-# Good: 暫存結果
-buy_price = position.buy_price
-total = buy_price * position.shares
-cost = buy_price * 1.02
-```
-
-### Medium Severity
-
-#### [CQ-05] 104 次 UncommunicativeVariableName
-
-**Details**: 大量單字母或縮寫變數（`p`、`r`、`k`、`v`），在複雜計算中降低可讀性。
-
-#### [CQ-06] 67 次 UtilityFunction
-
-**Details**: 部分 private methods 不使用任何 instance variables，應提取為 module 方法或獨立 class。
-
-#### [CQ-07] 51 次 DuplicateCode（Flay）
-
-**Details**: Phlex 元件之間有明顯重複的表格渲染邏輯，應提取共用 component 或 mixin。
-
-### Low Severity
-
-#### [CQ-08] 69 次 IrresponsibleModule
-
-**Details**: 部分 module/class 的頂層 comment 說明不足，降低可發現性。
-
-#### [CQ-09] 25 次 BooleanParameter
-
-**Details**: 方法接受 boolean 參數通常代表需要拆成兩個方法：
-```ruby
-# Bad
-def fetch(symbol, force_refresh = false)
-
-# Good
-def fetch(symbol)
-def fetch_fresh(symbol)
-```
+| File | Complexity | Methods | Avg/Method |
+|------|------------|---------|------------|
+| `app/controllers/api/v1/charts_controller.rb` | 366.39 | 8 | 45.8 |
+| `app/services/valuation_service.rb` | 330.60 | 21 | 15.7 |
+| `app/components/daily_momentum/watchlist_manager_component.rb` | 275.54 | 11 | 25.1 |
+| `app/components/portfolio/holding_row_component.rb` | 269.54 | 21 | 12.8 |
+| `app/services/options_ocr_service.rb` | 263.79 | 8 | 33.0 |
+| `app/services/ouou_analysis_service.rb` | 239.47 | 16 | 15.0 |
+| `app/controllers/reports_controller.rb` | 198.81 | 11 | 18.1 |
+| `app/components/portfolio/holding_list_component.rb` | 196.74 | 10 | 19.7 |
+| `app/controllers/api/v1/options_controller.rb` | 195.05 | 14 | 13.9 |
+| `app/components/fair_value/analyst_consensus_component.rb` | 188.50 | 6 | 31.4 |
 
 ---
 
 ## 3. Security Issues
 
-### Medium Severity
+### Medium
 
-> 無中嚴重性安全問題。
+#### SEC-01 CSRF 保護設為 `null_session`（全域停用）
 
-### Low Severity
+**File**: `app/controllers/application_controller.rb:2`
+**影響**: 惡意第三方網站可以代表使用者提交表單，修改 watchlist、portfolio、stock alerts 等資料
 
-#### [SEC-01] api_key 未納入日誌過濾清單
-
-**File**: `config/initializers/filter_parameter_logging.rb`
-**Details**: `FINNHUB_API_KEY`、`GROQ_API_KEY` 以環境變數傳入，本身不會出現在日誌。但若有 bug 導致 API key 被放入 params 或 body 中，目前過濾清單無法擋截。
-
-**Current**:
 ```ruby
-Rails.application.config.filter_parameters += [
-  :passw, :email, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn, :cvv, :cvc
-]
+# 現況 — null_session 不拒絕無效 token，只清空 session
+protect_from_forgery with: :null_session
 ```
 
-**Recommendation**: 加入 `api_key` 作為額外防線（`:_key` 已能匹配部分，但不完整）。
+`null_session` 策略等同對整個應用的 CSRF 完全不設防。對 JSON API 這是可接受的，但對 HTML 表單類的 controller 應使用較嚴格的保護。
 
-### Security Checklist
+**建議**:
+```ruby
+# app/controllers/application_controller.rb
+class ApplicationController < ActionController::Base
+  protect_from_forgery with: :exception  # HTML forms 使用 exception
+end
 
-| 項目 | 狀態 |
-|------|------|
-| SQL Injection | ✅ 無風險（全用 parameterized queries）|
-| Mass Assignment（permit!）| ✅ 安全（所有 strong params 明確列出欄位）|
-| CSRF Protection | ✅ 啟用（無 skip_before_action）|
-| XSS | ✅ 安全（Phlex 自動 escape，Kramdown GFM 處理 AI 輸出）|
-| Session Security | ✅ 無敏感物件存入 session |
-| Content Security Policy | ✅ 已啟用（config/initializers/content_security_policy.rb）|
-| 敏感參數過濾 | ✅ 配置合理（見 [SEC-01]）|
-| 外部 API 超時 | ✅ 所有 HTTP 呼叫均有 timeout |
+# app/controllers/api/v1/base_controller.rb（新建）
+module Api
+  module V1
+    class BaseController < ApplicationController
+      protect_from_forgery with: :null_session  # API 保留 null_session
+    end
+  end
+end
+```
 
 ---
 
 ## 4. Models Issues
 
-> 🟢 **整體健康**：7 個 model 均評等 A，設計簡潔，職責單一。
+### 總體評價：優良
 
-**Good Practices 觀察：**
-- 驗證完整（`MarginPosition`、`PriceAlert`、`OwnershipSnapshot` 均有完善驗證）
-- 使用 scope 抽象常用查詢（`open_positions`、`closed_positions`、`for_ticker` 等）
-- 關聯有 `dependent: :destroy` 保護（`OwnershipSnapshot#ownership_holders`）
-- 計算邏輯以 `balance`、`open?` 等方法封裝在 model 中，不洩漏到 controller
+所有 9 個 model 均為 A 級（平均 score 0.21），結構精簡、職責清晰。
+
+**值得保留的良好模式**:
+- 索引設計完善：所有 foreign key 均有索引
+- `before_save` callbacks 保持簡單（symbol 正規化），不含業務邏輯
+- 使用 `acts_as_list` 的 position 欄位有適當索引
 
 ---
 
 ## 5. Controllers Issues
 
-### High Severity
+### High
 
-#### [CON-01] ReportsController — 執行緒例外未捕獲
+#### CTL-01 `Api::V1::ChartsController` — 業務邏輯混入 Controller
 
-**File**: `app/controllers/reports_controller.rb`（約第 31-42 行）
-**Impact**: 若翻譯執行緒拋出例外，`threads.map(&:value)` 會將例外重新拋出，導致整個 `/news` 請求失敗，且錯誤訊息不明確。
+**File**: `app/controllers/api/v1/charts_controller.rb`
+**RubyCritic**: D 級，complexity 366.39，8 個 method
+**影響**: Controller 包含大量 DSP 計算邏輯（MA、RSI、支撐阻力），難以測試與複用
 
-**Current Code**:
+**Details**: `show` 以外的 7 個 private method 全為金融計算（`calc_ma`、`calc_rsi`、`find_support_resistance`、`build_labels` 等），這些邏輯應抽取為獨立計算物件。
+
+**建議**: 抽取為 `app/models/charts/technical_indicators.rb`：
+
 ```ruby
-threads = items.map do |item|
-  Thread.new do
-    md = translator.translate_as_markdown(item["summary"].to_s)
-    { headline: translator.translate(item["headline"].to_s), ... }
+module Charts
+  class TechnicalIndicators
+    def initialize(closes:, volumes:, timestamps:)
+      @closes, @volumes, @timestamps = closes, volumes, timestamps
+    end
+
+    def ma(period) = ... # 從 ChartsController 移入
+    def rsi(period) = ...
+    def support_resistance = ...
   end
 end
-render json: { symbol: symbol, news: threads.map(&:value) }
 ```
 
-**Recommendation**:
+### Medium
+
+#### CTL-02 `ReportsController` — 工具方法應提取為 Concern
+
+**File**: `app/controllers/reports_controller.rb`
+**影響**: `normalize_llama_output`、`normalize_md_tables`、`render_gfm` 等 Markdown 處理邏輯與 HTTP 無關
+
+**建議**: 提取為 `app/controllers/concerns/markdown_rendering.rb`
+
+#### CTL-03 `TrackedTickersController#update` — 缺少 Strong Parameters 包裝
+
+**File**: `app/controllers/api/v1/tracked_tickers_controller.rb:27`
+**Current Code**: `ticker.update(active: params[:active])` — 直接使用 raw params
+
+**建議**:
 ```ruby
-render json: {
-  symbol: symbol,
-  news: threads.map do |t|
-    t.value
-  rescue => e
-    Rails.logger.warn("[ReportsController#news] thread error: #{e.class} #{e.message}")
-    { error: "translation failed" }
-  end
-}
-```
-
-### Medium Severity
-
-#### [CON-02] ChartsController — 缺乏輸入驗證
-
-**File**: `app/controllers/api/v1/charts_controller.rb`（約第 16 行）
-**Details**: `params[:symbol].upcase` 未驗證格式，空字串或超長字串會直接傳給 YahooFinanceService。
-
-**Recommendation**:
-```ruby
-symbol = params[:symbol].to_s.upcase.strip
-return render json: { error: "Invalid symbol" }, status: :unprocessable_entity unless symbol.match?(/\A[A-Z0-9.\-]{1,10}\z/)
+def ticker_params
+  params.require(:tracked_ticker).permit(:active)
+end
 ```
 
 ---
 
 ## 6. Code Design Issues
 
-### Medium Severity
+### High
 
-#### [DES-01] app/services/ 命名不符 PORO 慣例
+#### DES-01 `ValuationService` — 應拆解為領域物件（Strategy Pattern）
 
-**Details**: 依 thoughtbot Ruby Science 建議，`*Service` 命名隱藏了業務領域概念。現有 service objects 多數可重命名為領域名詞：
+**File**: `app/services/valuation_service.rb`
+**RubyCritic**: F 級，379 行，21 個 method，complexity 330.60，74 個 smell
+**影響**: 單一類別承擔股票分類、成長率估算、6 種估值方法計算、公允價值彙總等職責
 
-| 現有名稱 | 建議重命名 | 說明 |
-|---------|-----------|------|
-| `ValuationService` | `Valuation` | 即估值本身 |
-| `MomentumReportService` | `MomentumReport` | 即動量報告 |
-| `MarginInterestService` | `MarginInterestCalculator` 或 `MarginInterest` | 計算器模式 |
-| `TelegramService` | `TelegramNotification` | 即 Telegram 通知 |
-| `OuouAnalysisService` | `OuouAnalysis` | 即分析結果 |
-
-> **注意**：重命名屬低優先級，現有程式碼可正常運作，可在自然重構時同步調整。
-
-#### [DES-02] ExchangeRateService — 檔案系統快取應改為 Rails.cache
-
-**File**: `app/services/exchange_rate_service.rb`
-**Details**: 使用 `File.write` / `File.read` 實作快取，在多 worker 環境可能有競態條件，且不支援分散式部署。
-
-**Recommendation**: 替換為 `Rails.cache.fetch`：
-```ruby
-def fetch_rates
-  Rails.cache.fetch("exchange_rates_twd", expires_in: 12.hours) do
-    fetch_from_api
-  end
-end
+**建議目錄結構**:
+```
+app/models/valuation/
+├── fair_value.rb         # 入口，取代 ValuationService
+├── classifier.rb         # classify(), estimate_growth_rate()
+├── methods/dcf.rb
+├── methods/ddm.rb
+├── methods/pe.rb
+├── strategies/general.rb # [DCF, PE, PEG]
+├── strategies/reit.rb    # [DDM, DCF, PB]
+└── strategies/financial.rb
 ```
 
-### Low Severity
+#### DES-02 `OuouPreMarketService` — 混合三個職責
 
-#### [DES-03] ApplicationComponent 格式化 helpers 可提取為 module
+**File**: `app/services/ouou_pre_market_service.rb`
+**RubyCritic**: F 級，206 行，complexity 187.02，29 個 smell
+**影響**: 資料收集、Claude API 呼叫、Telegram 發送混在一起，無法單獨測試各職責
 
-**File**: `app/components/application_component.rb`
-**Details**: `fmt_currency`、`fmt_percent`、`fmt_large` 等 helper 直接定義在 ApplicationComponent，無法被非元件類別（如 presenter）使用。建議提取為 `Formattable` module。
+**建議**:
+```
+app/models/pre_market/
+├── data_collector.rb    # 收集市場資料
+├── report_generator.rb  # 呼叫 Claude 生成報告
+└── publisher.rb         # 發送到 Telegram
+```
+
+### Medium
+
+#### DES-03 22 個 Service Objects 違反 PORO 命名原則
+
+**影響**: `*Service` 後綴隱藏領域語義，`call` 是通用動詞缺乏表達力
+
+**建議重命名（高優先）**:
+
+| 現在 | 建議 | 位置 |
+|------|------|------|
+| `ValuationService` | `Valuation::FairValue` | `app/models/valuation/` |
+| `MomentumReportService` | `DailyMomentum::Report` | `app/models/daily_momentum/` |
+| `OuouAnalysisService` | `Analysis::StreamingReport` | `app/models/analysis/` |
+| `OwnershipSnapshotService` | `Ownership::SnapshotCapture` | `app/models/ownership/` |
+| `StockPriceChecker` | `PriceAlert::Checker` | `app/models/price_alert/` |
+| `TelegramBotHandlerService` | `Telegram::CommandHandler` | `app/models/telegram/` |
 
 ---
 
-## 7. Views Issues
+## 7. Views / Components Issues
 
-> 🟢 **整體健康**：應用採用 Phlex 元件取代 ERB 模板，邏輯封裝在 Ruby 類別中，PHPitis 問題不存在。
+### High
+
+#### VIEW-01 `HoldingListComponent` — F 級，包含過多業務邏輯
+
+**File**: `app/components/portfolio/holding_list_component.rb`
+**RubyCritic**: F 級，cost 38.87，complexity 196.74，20 個 smell
+**建議**: 提取 `Portfolio::HoldingPresenter` 處理計算邏輯，component 只負責渲染
+
+#### VIEW-02 `AlertListComponent` — F 級
+
+**File**: `app/components/stock_alert/alert_list_component.rb`
+**RubyCritic**: F 級，cost 37.54，188.38 complexity
+**建議**: 抽取 `PriceAlert::AlertPresenter` 處理狀態顯示邏輯
+
+### Medium
+
+#### VIEW-03 `WatchlistManagerComponent` — F 級（全案第三複雜）
+
+**File**: `app/components/daily_momentum/watchlist_manager_component.rb`
+**RubyCritic**: F 級，complexity 275.54，29 個 smell
+**建議**: 拆分為顯示 component + Stimulus controller（JavaScript）
+
+#### VIEW-04 `WatchlistRowComponent`、`MarketStanceComponent` — D 級
+
+各自提取 Presenter 處理條件邏輯。
+
+#### VIEW-05 `AnalystConsensusComponent` — D 級（每個 method 平均複雜度 31.4）
+
+**File**: `app/components/fair_value/analyst_consensus_component.rb`
+**建議**: 提取 `FairValue::ConsensusPresenter`
 
 ---
 
 ## 8. External Services Issues
 
-### High Severity
+### 整體 Timeout 設定：優良
 
-#### [EXT-01] ExchangeRateService — 三個裸 rescue 靜默失敗
+所有 HTTP service 均已正確設置 timeout：FinnhubService 10s、YahooFinanceService 10s、VixService 8s、TelegramService 10s、SecEdgarService 15s、TranslationService 6s、IvRankService 8s、ExchangeRateService 4s。
 
-**File**: `app/services/exchange_rate_service.rb`（第 37、49、55 行）
-**Impact**: 外匯匯率取得或解析失敗時，系統繼續運作但使用 stale 或預設匯率，且沒有任何日誌，無法在生產環境中排查問題。
+### Medium
+
+#### EXT-01 `ReportsController#company_news` — 無上限 Thread 生成
+
+**File**: `app/controllers/reports_controller.rb`
+**影響**: 每次請求為每則新聞啟動獨立 Thread，無數量上限控制
 
 **Current Code**:
 ```ruby
-# 三處相同模式
-rescue
-  next  # 完全靜默
-end
-
-rescue
-  nil   # 完全靜默
+threads = items.map do |item|
+  Thread.new { translator.translate_as_markdown(item["summary"].to_s) }
 end
 ```
 
-**Recommendation**:
+**建議**: 限制處理數量：
 ```ruby
-rescue => e
-  Rails.logger.warn("[ExchangeRateService] #{e.class}: #{e.message}")
-  nil
-end
+items = items.first(10)  # 最多處理 10 則
 ```
-
-### Medium Severity
-
-#### [EXT-02] OuouAnalysisService — JSON::ParserError 靜默略過
-
-**File**: `app/services/ouou_analysis_service.rb`（約第 83-84 行）
-**Details**: SSE chunk 解析失敗時靜默 `next`，若 Groq API 回應格式異常，使用者看到截斷的分析結果，且無任何日誌。
-
-**Recommendation**:
-```ruby
-rescue JSON::ParserError => e
-  Rails.logger.debug("[OuouAnalysis] SSE parse error: #{e.message}")
-  next
-end
-```
-
-#### [EXT-03] YahooFinanceService — StandardError 攔截範圍過廣
-
-**File**: `app/services/yahoo_finance_service.rb`（多處）
-**Details**: `rescue StandardError` 會攔截包含程式 bug 在內的所有例外，建議改為具體的 HTTP 例外類型。
-
-**Recommendation**:
-```ruby
-HTTP_ERRORS = [
-  HTTParty::Error, Net::ReadTimeout, Net::OpenTimeout,
-  SocketError, Errno::ECONNREFUSED, OpenSSL::SSL::SSLError
-].freeze
-
-rescue *HTTP_ERRORS => e
-  Rails.logger.warn("[YahooFinance] #{symbol}: #{e.class} #{e.message}")
-  empty_result
-end
-```
-
-### Low Severity
-
-#### [EXT-04] ExchangeRateService — 建議改用 Rails.cache
-
-詳見 [DES-02]。
+或使用 `Concurrent::FixedThreadPool.new(5)` 限制並行度。
 
 ---
 
 ## 9. Database & Performance Issues
 
-> 🟢 **整體健康**：索引設計完善，所有外鍵均有索引，唯一性驗證均有對應 DB unique constraint，遷移乾淨無 model class 引用。
+### 整體評價：良好
 
-### Low Severity
+Schema 索引設計合理，所有 foreign key 均有對應索引與 constraint。
 
-#### [DB-01] MarginPositions — 大量持倉時計算效能
+### Medium
 
-**File**: `app/controllers/api/v1/margin_positions_controller.rb`（第 10-11 行）
-**Details**: `MarginInterestService.decorate(p)` 對每筆持倉執行多次日期計算。目前持倉量小，無效能問題，但若持倉超過 50 筆可能感受到延遲。
+#### DB-01 `company_news` 翻譯缺少快取層
 
-**Current Code**:
-```ruby
-open_pos.map { |p| MarginInterestService.decorate(p) }
-```
+**影響**: 相同新聞每次都重新翻譯，可能造成不必要的 API 費用與延遲
 
-**Recommendation**: 若持倉量增加，考慮將 `next_charge_date`、`accrued_interest` 儲存至資料庫並定期更新，而非每次請求即時計算。
+**建議**: 以 summary 的 hash 為 key，Redis 快取翻譯結果（TTL 24 小時）。
 
 ---
 
 ## Recommendations Summary
 
-### Quick Wins（立即處理，各 < 30 分鐘）
+### 立即行動（Quick Wins）
 
-- [ ] **[EXT-01]** `ExchangeRateService`：三處 `rescue` 加入 logger（30 分鐘）
-- [ ] **[CON-01]** `ReportsController#news`：執行緒例外加 rescue + log（20 分鐘）
-- [ ] **[EXT-02]** `OuouAnalysisService`：JSON parse error 加 logger（10 分鐘）
-- [ ] **[CON-02]** `ChartsController`：symbol 格式驗證（15 分鐘）
+1. [ ] `ApplicationController` CSRF 策略改為 `:exception`，API base controller 設 `:null_session`
+2. [ ] `TrackedTickersController#update` 加入 strong parameters
+3. [ ] `ReportsController` Markdown 工具方法提取為 Concern
+4. [ ] `company_news` 加入 `items.first(10)` 上限
 
-### Short-term（本月內）
+### 本週期（Short-term）
 
-- [ ] **[T-02]** 補齊 `OuouAnalysisService` spec（mock Groq API）
-- [ ] **[T-03]** 補齊 `ChartsController` 和 `ReportsController` request specs
-- [ ] **[EXT-03]** `YahooFinanceService`：改用具體 exception 類型
-- [ ] **[DES-02]** `ExchangeRateService`：改用 `Rails.cache.fetch`
+1. [ ] 為所有 Model 補齊測試（5 個零覆蓋 model）
+2. [ ] `ChartsController` 技術指標計算提取為 `Charts::TechnicalIndicators`
+3. [ ] `HoldingListComponent` 和 `AlertListComponent` 提取 Presenter
+4. [ ] 設立 CI 覆蓋率 gate：`SimpleCov.minimum_coverage 30`（逐步提高）
 
-### Long-term（技術債）
+### 長期技術債
 
-- [ ] **[T-01]** 達成 80% 測試覆蓋率（建議三個月計畫）
-- [ ] **[CQ-01]** `ValuationService`：將各估值方法提取為 PORO Value Objects
-- [ ] **[CQ-02]** `ChartsController`：提取 `TechnicalAnalysis` 計算類
-- [ ] **[T-04]** Phlex 元件添加 Lookbook snapshot tests
+1. [ ] `ValuationService` 拆解為 `Valuation::` namespace Strategy Pattern（最高優先）
+2. [ ] `OuouPreMarketService` 拆分為 Collector / ReportGenerator / Publisher
+3. [ ] 22 個 `*Service` 類別按 PORO 原則重新命名
+4. [ ] 測試覆蓋率達到 80%（目前 6.9%）
 
 ---
 
 ## Files Analyzed
 
-| Directory | Files | Issues Found |
-|-----------|-------|--------------|
-| app/models/ | 7 | 0 |
-| app/controllers/ | 15 | 2 |
-| app/services/ | 19 | 4 |
-| app/components/ | 34 | 2 |
-| app/helpers/ | 1 | 0 |
-| app/jobs/ | 2 | 0 |
-| db/migrate/ | 13 | 0 |
-| config/ | 5 | 1 |
-| spec/ | 32 | — |
-| **Total** | **128** | **9 直接問題，24 發現項** |
+| Directory | Files Analyzed | Issues Found |
+|-----------|----------------|--------------|
+| `app/models/` | 9 | 0 |
+| `app/controllers/` | 18 | 3 |
+| `app/services/` | 22 | 3 |
+| `app/components/` | 34 | 5 |
+| `db/schema.rb` | 1 | 0 |
+| `config/` | 參考 | 1 |
+| `spec/` | 10 | — |
+| **Total** | **86+** | **35** |
 
 ---
 
 ## Appendix: Tools Recommendations
 
-1. **RuboCop** — 已使用（rubocop-rails-omakase）✅
-2. **Brakeman** — 建議加入 CI，靜態安全掃描
-3. **SimpleCov** — SimpleCov 已用於本次審計，建議永久加入測試套件並設定最低覆蓋率門檻（如 `minimum_coverage 80`）
-4. **RubyCritic** — RubyCritic 已用於本次審計，建議每季執行追蹤品質趨勢，目標分數 > 80
-5. **Bullet** — 建議在 development 環境加入 N+1 偵測（目前架構複雜度增加有此風險）
-6. **bundler-audit** — 建議加入 CI，自動掃描 gem 已知漏洞
-7. **database_consistency** — 建議執行一次，驗證 model 驗證與 DB constraint 一致性
+1. **SimpleCov** — 本次審計使用。建議永久加入測試套件持續追蹤覆蓋率。
+2. **RubyCritic** — 本次審計使用。建議定期執行追蹤複雜度趨勢。
+3. **Brakeman** — 已在 Gemfile ✅，建議加入 CI：`bundle exec brakeman -q`
+4. **bundler-audit** — 已在 Gemfile ✅，建議加入 CI：`bundle exec bundler-audit check --update`
+5. **Bullet** — 建議加入開發環境，偵測 N+1 問題。
+6. **database_consistency** — 建議加入，驗證 DB 約束與 Rails validations 一致性。
+7. **strong_migrations** — 建議加入，防止危險 migration 操作。
