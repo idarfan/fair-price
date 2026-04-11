@@ -61,9 +61,8 @@ for s in ".env" "config/master.key" "config/credentials.yml.enc"; do
   fi
 done
 
-# 確保腳本可執行
-chmod +x "${OUTPUT_DIR}/install.sh" 2>/dev/null || true
-chmod +x "${OUTPUT_DIR}/package.sh" 2>/dev/null || true
+# 確保所有 .sh 可執行
+find "${OUTPUT_DIR}" -name "*.sh" -exec chmod +x {} \;
 
 # 結果
 SIZE=$(du -sh "$OUTPUT_DIR" | cut -f1)

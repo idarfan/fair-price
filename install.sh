@@ -88,6 +88,9 @@ DB_PASSWORD=""
 phase0_preflight() {
   step "環境確認"
 
+  # 修復從隨身碟複製後可能遺失的執行權限
+  find "$(pwd)" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+
   # 確認在 WSL2
   if ! grep -qi "microsoft" /proc/version 2>/dev/null; then
     warn "未偵測到 WSL2 環境，繼續安裝可能遇到問題"
