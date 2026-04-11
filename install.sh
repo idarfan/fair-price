@@ -1,0 +1,786 @@
+#!/usr/bin/env bash
+# ============================================================
+#  FairPrice — WSL2 互動式安裝程式
+#  用法：cd fairprice-bundle && bash install.sh
+#  需要：WSL2 Ubuntu 22.04+，sudo 權限，網路連線
+# ============================================================
+set -euo pipefail
+
+# ── 版本常數 ────────────────────────────────────────────────
+readonly SCRIPT_VERSION="1.0.0"
+readonly RUBY_VERSION="4.0.1"
+readonly BUNDLER_VERSION="4.0.7"
+readonly MIN_NODE_MAJOR=20
+readonly RAILS_PORT=3003
+readonly VITE_PORT=3036
+
+# ── 顏色 ────────────────────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# ── 輸出工具 ────────────────────────────────────────────────
+info()    { echo -e "${CYAN}[INFO]${NC}  $*"; }
+ok()      { echo -e "${GREEN}[ OK ]${NC}  $*"; }
+skip()    { echo -e "        ${CYAN}[SKIP]${NC} $* （已完成）"; }
+warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
+error()   { echo -e "${RED}[FAIL]${NC}  $*" >&2; }
+step()    { echo -e "\n${BOLD}${BLUE}━━━ $* ━━━${NC}"; }
+hr()      { echo -e "${BLUE}────────────────────────────────────────${NC}"; }
+
+ask() {
+  # ask VAR_NAME "提示文字" [預設值]
+  local var="$1" msg="$2" default="${3:-}"
+  local input
+  if [[ -n "$default" ]]; then
+    echo -en "${YELLOW}[?]${NC} ${msg} [${default}]: "
+  else
+    echo -en "${YELLOW}[?]${NC} ${msg}: "
+  fi
+  read -r input
+  printf -v "$var" '%s' "${input:-$default}"
+}
+
+ask_secret() {
+  # ask_secret VAR_NAME "提示文字"
+  local var="$1" msg="$2"
+  echo -en "${YELLOW}[?]${NC} ${msg}: "
+  local input
+  read -rs input
+  echo
+  printf -v "$var" '%s' "$input"
+}
+
+ask_yn() {
+  # ask_yn "提示" → 回傳 0=yes, 1=no
+  local msg="$1" default="${2:-n}"
+  local prompt_hint
+  [[ "$default" == "y" ]] && prompt_hint="Y/n" || prompt_hint="y/N"
+  echo -en "${YELLOW}[?]${NC} ${msg} (${prompt_hint}): "
+  local input
+  read -r input
+  input="${input:-$default}"
+  [[ "${input,,}" == "y" ]]
+}
+
+# ── 全局變數（由互動輸入填入）──────────────────────────────
+INSTALL_USER=""
+HOME_DIR=""
+APP_DIR=""
+HAS_SYSTEMD=false
+FINNHUB_API_KEY=""
+GROQ_API_KEY=""
+TELEGRAM_BOT_TOKEN=""
+TELEGRAM_CHAT_ID=""
+OUOU_TELEGRAM_CHAT_ID=""
+DB_HOST="localhost"
+DB_PORT="5432"
+DB_USER=""
+DB_PASSWORD=""
+
+# ============================================================
+# PHASE 0：環境確認
+# ============================================================
+phase0_preflight() {
+  step "環境確認"
+
+  # 確認在 WSL2
+  if ! grep -qi "microsoft" /proc/version 2>/dev/null; then
+    warn "未偵測到 WSL2 環境，繼續安裝可能遇到問題"
+    ask_yn "確定繼續？" "n" || { info "安裝中止"; exit 0; }
+  else
+    ok "WSL2 環境確認"
+  fi
+
+  # 偵測 systemd
+  if [[ "$(cat /proc/1/comm 2>/dev/null)" == "systemd" ]]; then
+    HAS_SYSTEMD=true
+    ok "systemd 可用"
+  else
+    warn "systemd 未啟用（建議在 /etc/wsl.conf 加入 [boot] systemd=true 後重啟 WSL）"
+  fi
+
+  # 確認在 app 目錄
+  if [[ ! -f "Gemfile" ]]; then
+    error "找不到 Gemfile！請在 fairprice-bundle 目錄內執行此腳本"
+    error "用法：cd fairprice-bundle && bash install.sh"
+    exit 1
+  fi
+
+  # 確認 sudo 可用
+  if ! sudo -v 2>/dev/null; then
+    error "此安裝程式需要 sudo 權限，請確認使用者在 sudoers 中"
+    exit 1
+  fi
+
+  INSTALL_USER="$USER"
+  HOME_DIR="$HOME"
+  APP_DIR="$(pwd)"
+
+  hr
+  echo -e "  安裝使用者：${BOLD}${INSTALL_USER}${NC}"
+  echo -e "  Home 目錄：${BOLD}${HOME_DIR}${NC}"
+  echo -e "  App 目錄：${BOLD}${APP_DIR}${NC}"
+  echo -e "  systemd：$(${HAS_SYSTEMD} && echo '可用' || echo '不可用')"
+  hr
+}
+
+# ============================================================
+# PHASE 1：系統套件
+# ============================================================
+phase1_system_deps() {
+  step "系統套件安裝"
+  info "更新套件清單..."
+  sudo apt-get update -q
+
+  local pkgs=(
+    git curl wget build-essential
+    libssl-dev libreadline-dev zlib1g-dev libyaml-dev
+    libffi-dev libgdbm-dev libgmp-dev libpq-dev
+    postgresql postgresql-contrib
+  )
+
+  local missing=()
+  for pkg in "${pkgs[@]}"; do
+    dpkg -l "$pkg" &>/dev/null || missing+=("$pkg")
+  done
+
+  if [[ ${#missing[@]} -eq 0 ]]; then
+    skip "所有系統套件已安裝"
+  else
+    info "安裝缺少的套件：${missing[*]}"
+    sudo apt-get install -y "${missing[@]}"
+    ok "系統套件安裝完成"
+  fi
+}
+
+# ============================================================
+# PHASE 2：rbenv + Ruby 4.0.1
+# ============================================================
+phase2_ruby() {
+  step "rbenv + Ruby ${RUBY_VERSION}"
+
+  # rbenv
+  if [[ -d "${HOME_DIR}/.rbenv" ]]; then
+    info "更新 rbenv..."
+    git -C "${HOME_DIR}/.rbenv" pull --quiet
+  else
+    info "安裝 rbenv..."
+    git clone https://github.com/rbenv/rbenv.git "${HOME_DIR}/.rbenv" --quiet
+    ok "rbenv 安裝完成"
+  fi
+
+  # ruby-build plugin
+  local plugin_dir="${HOME_DIR}/.rbenv/plugins/ruby-build"
+  if [[ -d "$plugin_dir" ]]; then
+    info "更新 ruby-build..."
+    git -C "$plugin_dir" pull --quiet
+  else
+    info "安裝 ruby-build..."
+    git clone https://github.com/rbenv/ruby-build.git "$plugin_dir" --quiet
+  fi
+  ok "ruby-build 更新完成"
+
+  # PATH（只加一次）
+  if ! grep -q 'rbenv init' "${HOME_DIR}/.bashrc" 2>/dev/null; then
+    cat >> "${HOME_DIR}/.bashrc" << 'BASHRC'
+
+# rbenv（由 fairprice install.sh 加入）
+export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"
+eval "$(~/.rbenv/bin/rbenv init - --no-rehash bash)"
+BASHRC
+    ok "rbenv PATH 加入 .bashrc"
+  fi
+
+  # 啟用 rbenv（當前 session）
+  export PATH="${HOME_DIR}/.rbenv/bin:${HOME_DIR}/.rbenv/shims:$PATH"
+  eval "$("${HOME_DIR}/.rbenv/bin/rbenv" init - --no-rehash bash)"
+
+  # Ruby 4.0.1
+  if rbenv versions 2>/dev/null | grep -q "${RUBY_VERSION}"; then
+    skip "Ruby ${RUBY_VERSION} 已安裝"
+  else
+    warn "即將編譯 Ruby ${RUBY_VERSION}，約需 10–20 分鐘，請耐心等待..."
+    RUBY_CONFIGURE_OPTS="--enable-shared" rbenv install "${RUBY_VERSION}" 2>&1 | \
+      while IFS= read -r line; do echo "    $line"; done
+    ok "Ruby ${RUBY_VERSION} 安裝完成"
+  fi
+
+  rbenv global "${RUBY_VERSION}"
+  rbenv rehash
+
+  # bundler
+  if gem list bundler | grep -q "${BUNDLER_VERSION}"; then
+    skip "bundler ${BUNDLER_VERSION} 已安裝"
+  else
+    gem install bundler -v "${BUNDLER_VERSION}" --no-document
+    ok "bundler ${BUNDLER_VERSION} 安裝完成"
+  fi
+}
+
+# ============================================================
+# PHASE 3：Node.js + pm2
+# ============================================================
+phase3_nodejs() {
+  step "Node.js + pm2"
+
+  # Node.js
+  if command -v node &>/dev/null; then
+    local node_major
+    node_major=$(node -e "process.stdout.write(String(parseInt(process.version.slice(1))))")
+    if [[ "$node_major" -ge "$MIN_NODE_MAJOR" ]]; then
+      skip "Node.js $(node --version) 已符合需求（>= v${MIN_NODE_MAJOR}）"
+    else
+      warn "Node.js $(node --version) 版本過舊，需要 v${MIN_NODE_MAJOR}+，重新安裝..."
+      _install_nodejs
+    fi
+  else
+    _install_nodejs
+  fi
+
+  # npm global prefix（避免 sudo npm install -g）
+  if ! npm config get prefix 2>/dev/null | grep -q "npm-global"; then
+    mkdir -p "${HOME_DIR}/.npm-global"
+    npm config set prefix "${HOME_DIR}/.npm-global"
+    if ! grep -q 'npm-global' "${HOME_DIR}/.bashrc" 2>/dev/null; then
+      echo -e '\n# npm global（由 fairprice install.sh 加入）\nexport PATH="$HOME/.npm-global/bin:$PATH"' >> "${HOME_DIR}/.bashrc"
+    fi
+    ok "npm global prefix 設定完成"
+  fi
+  export PATH="${HOME_DIR}/.npm-global/bin:$PATH"
+
+  # pm2
+  if command -v pm2 &>/dev/null; then
+    skip "pm2 $(pm2 --version 2>/dev/null | head -1) 已安裝"
+  else
+    npm install -g pm2
+    ok "pm2 安裝完成"
+  fi
+}
+
+_install_nodejs() {
+  info "安裝 Node.js LTS（透過 NodeSource）..."
+  curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - &>/dev/null
+  sudo apt-get install -y nodejs &>/dev/null
+  ok "Node.js $(node --version) 安裝完成"
+}
+
+# ============================================================
+# PHASE 4：互動式 API Key 收集 → .env
+# ============================================================
+phase4_env() {
+  step "API Keys 設定"
+
+  if [[ -f ".env" ]]; then
+    warn ".env 已存在"
+    if ! ask_yn "重新設定 API Keys？" "n"; then
+      skip ".env 保留，跳過設定"
+      # 從現有 .env 讀取 DB 設定供後續使用
+      _load_existing_env
+      return 0
+    fi
+  fi
+
+  echo ""
+  hr
+  echo -e "  請先在以下網站免費申請 API Key："
+  echo -e "  ${CYAN}FINNHUB_API_KEY${NC} → https://finnhub.io （右上角 Sign Up → Free plan）"
+  echo -e "  ${CYAN}GROQ_API_KEY${NC}    → https://console.groq.com （Sign Up → API Keys）"
+  hr
+  echo ""
+
+  # 必填
+  while true; do
+    ask_secret FINNHUB_API_KEY "[必填] FINNHUB_API_KEY"
+    [[ -n "$FINNHUB_API_KEY" ]] && break
+    warn "FINNHUB_API_KEY 為必填項目，請輸入"
+  done
+
+  while true; do
+    ask_secret GROQ_API_KEY "[必填] GROQ_API_KEY"
+    [[ -n "$GROQ_API_KEY" ]] && break
+    warn "GROQ_API_KEY 為必填項目，請輸入"
+  done
+
+  # 選填
+  echo ""
+  echo -e "  以下為選填（直接按 Enter 跳過，Telegram 功能將停用）："
+  ask_secret TELEGRAM_BOT_TOKEN "[選填] TELEGRAM_BOT_TOKEN"
+  ask_secret TELEGRAM_CHAT_ID   "[選填] TELEGRAM_CHAT_ID"
+  ask_secret OUOU_TELEGRAM_CHAT_ID "[選填] OUOU_TELEGRAM_CHAT_ID"
+
+  # 資料庫
+  echo ""
+  echo -e "  ${BOLD}資料庫設定${NC}（一般情況下保留預設值即可）："
+  ask DB_HOST "DB_HOST" "localhost"
+  ask DB_PORT "DB_PORT" "5432"
+  ask DB_USER "DB_USER" "${INSTALL_USER}"
+  ask_secret DB_PASSWORD "[選填] DB_PASSWORD（PostgreSQL 密碼，可留空）"
+
+  # 寫入 .env
+  cat > .env << EOF
+# FairPrice 環境變數（由 install.sh 生成於 $(date '+%Y-%m-%d %H:%M:%S')）
+# ⚠️  請勿提交此檔案至 git
+
+# API Keys（必填）
+FINNHUB_API_KEY=${FINNHUB_API_KEY}
+GROQ_API_KEY=${GROQ_API_KEY}
+
+# Telegram Bot（選填，未填則停用 Bot 與盤前報告功能）
+TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+OUOU_TELEGRAM_CHAT_ID=${OUOU_TELEGRAM_CHAT_ID:-}
+
+# 資料庫
+DB_HOST=${DB_HOST}
+DB_PORT=${DB_PORT}
+DB_USER=${DB_USER}
+DB_PASSWORD=${DB_PASSWORD:-}
+
+# Rails
+RAILS_ENV=development
+EOF
+
+  chmod 600 .env
+  ok ".env 建立完成"
+}
+
+_load_existing_env() {
+  # 讀取既有 .env 的 DB 設定（靜默，供後續 db:create 使用）
+  local envfile=".env"
+  DB_HOST=$(grep '^DB_HOST=' "$envfile" | cut -d= -f2 || echo "localhost")
+  DB_PORT=$(grep '^DB_PORT=' "$envfile" | cut -d= -f2 || echo "5432")
+  DB_USER=$(grep '^DB_USER=' "$envfile" | cut -d= -f2 || echo "$INSTALL_USER")
+  DB_PASSWORD=$(grep '^DB_PASSWORD=' "$envfile" | cut -d= -f2 || echo "")
+  TELEGRAM_BOT_TOKEN=$(grep '^TELEGRAM_BOT_TOKEN=' "$envfile" | cut -d= -f2 || echo "")
+}
+
+# ============================================================
+# PHASE 5：master.key 處理
+# ============================================================
+phase5_master_key() {
+  step "Rails credentials 處理"
+
+  if [[ -f "config/master.key" ]]; then
+    skip "config/master.key 已存在"
+    return 0
+  fi
+
+  warn "config/master.key 不存在（新機器正常現象）"
+  echo ""
+  echo -e "  如果你有${BOLD}舊機器的 master.key${NC}，請貼上其 32 字元 hex 內容："
+  echo -e "  （此 app 不使用 encrypted credentials，可以安全重新生成，直接按 Enter 即可）"
+  echo -en "${YELLOW}[?]${NC} master.key 內容（留空則自動重新生成）: "
+  read -r MASTER_KEY_INPUT
+
+  if [[ -n "$MASTER_KEY_INPUT" ]]; then
+    echo "$MASTER_KEY_INPUT" > config/master.key
+    chmod 600 config/master.key
+    ok "master.key 從輸入還原"
+  else
+    info "重新生成 Rails credentials..."
+    rm -f config/credentials.yml.enc
+    EDITOR=true bundle exec rails credentials:edit &>/dev/null || true
+    ok "新 credentials 生成完成"
+  fi
+}
+
+# ============================================================
+# PHASE 6：bundle install + npm install
+# ============================================================
+phase6_deps() {
+  step "安裝依賴套件"
+
+  info "執行 bundle install..."
+  bundle install 2>&1 | tail -5
+  ok "bundle install 完成"
+
+  info "執行 npm install..."
+  npm install --silent
+  ok "npm install 完成"
+}
+
+# ============================================================
+# PHASE 7：PostgreSQL 設定 + 資料庫建立
+# ============================================================
+phase7_database() {
+  step "資料庫設定"
+
+  # 啟動 PostgreSQL
+  if $HAS_SYSTEMD; then
+    sudo systemctl start postgresql &>/dev/null || true
+  else
+    sudo service postgresql start &>/dev/null || true
+  fi
+  ok "PostgreSQL 服務已啟動"
+
+  # 確保 localhost TCP 連線允許 md5 或 scram-sha-256
+  _configure_pg_hba
+
+  # 取得 PostgreSQL 版本
+  local pg_ver
+  pg_ver=$(psql --version 2>/dev/null | grep -oP '\d+' | head -1 || echo "")
+
+  # 建立 DB user（若不存在）
+  local user_exists
+  user_exists=$(sudo -u postgres psql -tAc \
+    "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" 2>/dev/null || echo "")
+
+  if [[ "$user_exists" != "1" ]]; then
+    info "建立 PostgreSQL 使用者 '${DB_USER}'..."
+    if [[ -n "${DB_PASSWORD:-}" ]]; then
+      sudo -u postgres psql -c \
+        "CREATE USER \"${DB_USER}\" WITH PASSWORD '${DB_PASSWORD}' CREATEDB;" &>/dev/null
+    else
+      sudo -u postgres createuser --createdb "${DB_USER}" 2>/dev/null || true
+    fi
+    ok "PostgreSQL 使用者 '${DB_USER}' 建立完成"
+  else
+    skip "PostgreSQL 使用者 '${DB_USER}' 已存在"
+  fi
+
+  # 載入 .env 供 rails 指令使用
+  set -a; source .env; set +a
+
+  info "建立資料庫並執行 migrate..."
+  bundle exec rails db:create 2>/dev/null || info "資料庫已存在，略過建立"
+  bundle exec rails db:migrate
+  ok "資料庫 migrate 完成"
+}
+
+_configure_pg_hba() {
+  local pg_ver
+  pg_ver=$(psql --version 2>/dev/null | grep -oP '\d+' | head -1 || echo "")
+  [[ -z "$pg_ver" ]] && return
+
+  local hba_file="/etc/postgresql/${pg_ver}/main/pg_hba.conf"
+  [[ ! -f "$hba_file" ]] && return
+
+  if grep -qP '^host\s+all\s+all\s+127\.0\.0\.1' "$hba_file" 2>/dev/null; then
+    skip "pg_hba.conf TCP 認證已設定"
+    return
+  fi
+
+  info "設定 PostgreSQL TCP 認證（md5）..."
+  sudo sed -i \
+    '/^# IPv4 local connections:/a host    all             all             127.0.0.1\/32            md5' \
+    "$hba_file" 2>/dev/null || true
+
+  if $HAS_SYSTEMD; then
+    sudo systemctl reload postgresql &>/dev/null || true
+  else
+    sudo service postgresql reload &>/dev/null || true
+  fi
+  ok "pg_hba.conf 設定完成"
+}
+
+# ============================================================
+# PHASE 8：覆寫硬寫路徑的設定檔
+# ============================================================
+phase8_fix_paths() {
+  step "更新設定檔路徑"
+
+  local rbenv_root="${HOME_DIR}/.rbenv"
+  local npm_global_bin="${HOME_DIR}/.npm-global/bin"
+  local node_bin_dir
+  node_bin_dir="$(dirname "$(which node)" 2>/dev/null || echo "/usr/bin")"
+  local full_path="${rbenv_root}/shims:${rbenv_root}/bin:${npm_global_bin}:${node_bin_dir}:/usr/local/bin:/usr/bin:/bin"
+
+  # 是否啟用 Telegram Bot
+  local telegram_apps=""
+  if [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]]; then
+    telegram_apps=$(cat << TELEGRAM_BLOCK
+
+    // ── 歐歐 Telegram Bot
+    {
+      name: 'ouou-telegram-bot',
+      script: 'bin/rails',
+      args: 'runner "TelegramBotPollingService.new.run"',
+      cwd: '${APP_DIR}',
+      interpreter: 'none',
+      env: {
+        RAILS_ENV: 'development',
+        HOME: '${HOME_DIR}',
+        PATH: '${full_path}',
+        RBENV_ROOT: '${rbenv_root}',
+      },
+      autorestart: true,
+      watch: false,
+      max_restarts: 10,
+      min_uptime: '10s',
+      restart_delay: 5000,
+    },
+TELEGRAM_BLOCK
+)
+  fi
+
+  # ── ecosystem.config.cjs ─────────────────────────────────
+  cat > ecosystem.config.cjs << ECOSYSTEM
+module.exports = {
+  apps: [
+    // ── Rails（Puma on :${RAILS_PORT}）
+    {
+      name: 'fairprice-rails',
+      script: './bin/start-rails.sh',
+      cwd: '${APP_DIR}',
+      interpreter: '/bin/bash',
+      env: {
+        RAILS_ENV: 'development',
+        HOME: '${HOME_DIR}',
+        PATH: '${full_path}',
+        RBENV_ROOT: '${rbenv_root}',
+      },
+      autorestart: true,
+      watch: false,
+      max_restarts: 5,
+      min_uptime: '10s',
+      restart_delay: 5000,
+    },
+
+    // ── Vite dev server（:${VITE_PORT}）
+    {
+      name: 'fairprice-vite',
+      script: 'npm',
+      args: 'exec vite -- --mode development',
+      cwd: '${APP_DIR}',
+      interpreter: 'none',
+      autorestart: true,
+      watch: false,
+      max_restarts: 5,
+      restart_delay: 3000,
+    },
+${telegram_apps}
+    // ── 歐歐每日盤前報告（週一至五 13:00 UTC）
+    {
+      name: 'ouou-pre-market',
+      script: './bin/ouou-pre-market.sh',
+      cwd: '${APP_DIR}',
+      interpreter: '/bin/bash',
+      env: {
+        RAILS_ENV: 'development',
+        HOME: '${HOME_DIR}',
+        PATH: '${full_path}',
+        RBENV_ROOT: '${rbenv_root}',
+      },
+      cron_restart: '0 13 * * 1-5',
+      autorestart: false,
+      watch: false,
+    },
+  ],
+}
+ECOSYSTEM
+  ok "ecosystem.config.cjs 更新完成"
+
+  # ── bin/start-rails.sh ──────────────────────────────────
+  cat > bin/start-rails.sh << RAILS_SCRIPT
+#!/bin/bash
+set -e
+
+APP_DIR="${APP_DIR}"
+PID_FILE="\$APP_DIR/tmp/pids/server.pid"
+HEALTH_URL="http://localhost:${RAILS_PORT}/up"
+MAX_WAIT=30
+
+# 載入 .env
+if [ -f "\$APP_DIR/.env" ]; then
+  set -a; source "\$APP_DIR/.env"; set +a
+fi
+
+# 清除 stale pid
+rm -f "\$PID_FILE"
+
+# 啟動 Rails（前景，讓 pm2 追蹤）
+bundle exec rails server -p ${RAILS_PORT} -b 0.0.0.0 &
+RAILS_PID=\$!
+
+echo "[start-rails] Waiting for Rails to be ready..."
+for i in \$(seq 1 \$MAX_WAIT); do
+  sleep 1
+  if curl -sf "\$HEALTH_URL" > /dev/null 2>&1; then
+    echo "[start-rails] Rails is up (\${i}s)"
+    wait \$RAILS_PID
+    exit \$?
+  fi
+done
+
+echo "[start-rails] ERROR: Rails did not respond within \${MAX_WAIT}s"
+kill "\$RAILS_PID" 2>/dev/null
+exit 1
+RAILS_SCRIPT
+  chmod +x bin/start-rails.sh
+  ok "bin/start-rails.sh 更新完成"
+
+  # ── bin/ouou-pre-market.sh ──────────────────────────────
+  cat > bin/ouou-pre-market.sh << PRE_MARKET
+#!/bin/bash
+# 歐歐每日盤前報告
+# 由 pm2 cron 每週一至五 13:00 UTC 自動執行
+
+set -e
+
+export HOME="${HOME_DIR}"
+export RBENV_ROOT="\$HOME/.rbenv"
+export PATH="\$RBENV_ROOT/shims:\$RBENV_ROOT/bin:/usr/bin:/bin"
+
+eval "\$(rbenv init -)"
+
+cd "${APP_DIR}"
+
+# 載入 .env
+if [ -f .env ]; then
+  set -a; source .env; set +a
+fi
+
+exec bundle exec rake ouou:pre_market
+PRE_MARKET
+  chmod +x bin/ouou-pre-market.sh
+  ok "bin/ouou-pre-market.sh 更新完成"
+}
+
+# ============================================================
+# PHASE 9：建置 Tailwind CSS
+# ============================================================
+phase9_build_assets() {
+  step "建置 Tailwind CSS"
+  set -a; source .env; set +a
+  bundle exec rails tailwindcss:build
+  ok "Tailwind CSS 建置完成"
+}
+
+# ============================================================
+# PHASE 10：pm2 啟動
+# ============================================================
+phase10_pm2() {
+  step "pm2 服務啟動"
+
+  # 停止舊的 fairprice 相關 process（若存在）
+  for proc in fairprice-rails fairprice-vite ouou-pre-market ouou-telegram-bot; do
+    pm2 delete "$proc" &>/dev/null || true
+  done
+
+  set -a; source .env; set +a
+
+  pm2 start ecosystem.config.cjs
+  pm2 save
+  ok "pm2 processes 已啟動並儲存"
+
+  # 開機自啟
+  echo ""
+  if $HAS_SYSTEMD; then
+    warn "設定 pm2 開機自啟需要 sudo，請手動執行以下指令："
+    echo ""
+    local node_path
+    node_path="$(dirname "$(which node)")"
+    local pm2_bin
+    pm2_bin="$(which pm2)"
+    echo -e "  ${BOLD}sudo env PATH=\$PATH:${node_path} ${pm2_bin} startup systemd -u ${INSTALL_USER} --hp ${HOME_DIR}${NC}"
+    echo ""
+  else
+    # 無 systemd：.bashrc hook
+    if ! grep -q 'pm2 resurrect' "${HOME_DIR}/.bashrc" 2>/dev/null; then
+      cat >> "${HOME_DIR}/.bashrc" << 'BASHRC_PM2'
+
+# pm2 auto-resurrect（由 fairprice install.sh 加入）
+if command -v pm2 >/dev/null 2>&1; then
+  pm2 resurrect >/dev/null 2>&1 || true
+fi
+BASHRC_PM2
+      ok ".bashrc pm2 resurrect hook 加入完成"
+    fi
+    warn "無 systemd：開新 WSL terminal 時 pm2 會自動恢復服務"
+    warn "建議在 /etc/wsl.conf 加入 [boot] systemd=true 以取得完整開機自啟支援"
+  fi
+}
+
+# ============================================================
+# PHASE 11：健康檢查
+# ============================================================
+phase11_health_check() {
+  step "健康檢查"
+
+  info "等待 Rails 啟動（最多 60 秒）..."
+  local rails_ok=false
+  for i in $(seq 1 60); do
+    if curl -sf "http://localhost:${RAILS_PORT}/up" &>/dev/null; then
+      ok "Rails server 就緒（${i}s）"
+      rails_ok=true
+      break
+    fi
+    printf "."
+    sleep 1
+  done
+  echo ""
+
+  if ! $rails_ok; then
+    error "Rails server 60 秒內未回應"
+    error "請執行：pm2 logs fairprice-rails --lines 50"
+    exit 1
+  fi
+
+  info "等待 Vite dev server 啟動（最多 30 秒）..."
+  for i in $(seq 1 30); do
+    if curl -sf "http://localhost:${VITE_PORT}" &>/dev/null; then
+      ok "Vite dev server 就緒（${i}s）"
+      break
+    fi
+    printf "."
+    sleep 1
+  done
+  echo ""
+}
+
+# ============================================================
+# PHASE 12：完成畫面
+# ============================================================
+phase12_summary() {
+  echo ""
+  echo -e "${GREEN}${BOLD}"
+  echo "  ╔══════════════════════════════════════════════════╗"
+  echo "  ║          FairPrice 安裝完成！                    ║"
+  echo "  ╠══════════════════════════════════════════════════╣"
+  printf "  ║  App:      ${CYAN}http://localhost:%-4s${GREEN}${BOLD}                   ║\n" "${RAILS_PORT}"
+  printf "  ║  Vite:     ${CYAN}http://localhost:%-4s${GREEN}${BOLD}                   ║\n" "${VITE_PORT}"
+  printf "  ║  Lookbook: ${CYAN}http://localhost:%s/lookbook${GREEN}${BOLD}          ║\n" "${RAILS_PORT}"
+  echo "  ╠══════════════════════════════════════════════════╣"
+  echo "  ║  pm2 list                  查看服務狀態          ║"
+  echo "  ║  pm2 logs fairprice-rails  Rails log             ║"
+  echo "  ║  pm2 logs fairprice-vite   Vite log              ║"
+  echo "  ╚══════════════════════════════════════════════════╝"
+  echo -e "${NC}"
+
+  echo ""
+  pm2 list
+}
+
+# ============================================================
+# main
+# ============================================================
+main() {
+  clear
+  echo -e "${BOLD}${BLUE}"
+  echo "  ╔══════════════════════════════════════════════╗"
+  echo "  ║   FairPrice WSL2 安裝程式  v${SCRIPT_VERSION}          ║"
+  echo "  ║   Rails 8.1 + Vite + React + PostgreSQL      ║"
+  echo "  ╚══════════════════════════════════════════════╝"
+  echo -e "${NC}"
+
+  phase0_preflight
+  phase1_system_deps
+  phase2_ruby
+  phase3_nodejs
+  phase4_env
+  phase5_master_key
+  phase6_deps
+  phase7_database
+  phase8_fix_paths
+  phase9_build_assets
+  phase10_pm2
+  phase11_health_check
+  phase12_summary
+}
+
+main "$@"
