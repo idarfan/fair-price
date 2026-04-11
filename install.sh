@@ -275,58 +275,133 @@ _install_nodejs() {
 # ============================================================
 # PHASE 4：互動式 API Key 收集 → .env
 # ============================================================
+
+# 從 .env 讀取單一欄位值
+_env_get() {
+  local key="$1"
+  grep "^${key}=" .env 2>/dev/null | cut -d= -f2- || echo ""
+}
+
+# 顯示目前狀態標籤
+_env_status() {
+  local val="$1"
+  if [[ -n "$val" ]]; then
+    echo -e "${GREEN}已設定${NC}"
+  else
+    echo -e "${YELLOW}未填${NC}"
+  fi
+}
+
+# 詢問一個 secret 欄位，保留現有值或輸入新值
+# ask_secret_update VAR "標籤" "目前值" "是否必填(required/optional)"
+ask_secret_update() {
+  local var="$1" label="$2" current="$3" required="${4:-optional}"
+  local status hint input
+
+  if [[ -n "$current" ]]; then
+    status="${GREEN}已設定${NC}"
+    hint="Enter 保留，或輸入新值覆蓋"
+  else
+    status="${YELLOW}未填${NC}"
+    [[ "$required" == "required" ]] && hint="必填，請輸入" || hint="選填，Enter 跳過"
+  fi
+
+  echo -en "${YELLOW}[?]${NC} ${label} [${status}，${hint}]: "
+  read -rs input
+  echo
+
+  if [[ -n "$input" ]]; then
+    printf -v "$var" '%s' "$input"
+  else
+    printf -v "$var" '%s' "$current"
+  fi
+}
+
+# 詢問一個普通欄位，保留現有值或輸入新值
+ask_update() {
+  local var="$1" label="$2" current="$3"
+  local status
+
+  [[ -n "$current" ]] && status="${GREEN}${current}${NC}" || status="${YELLOW}未填${NC}"
+  echo -en "${YELLOW}[?]${NC} ${label} [${status}]: "
+  local input
+  read -r input
+
+  if [[ -n "$input" ]]; then
+    printf -v "$var" '%s' "$input"
+  else
+    printf -v "$var" '%s' "$current"
+  fi
+}
+
 phase4_env() {
   step "API Keys 設定"
 
+  echo ""
+  hr
+  echo -e "  申請連結（皆免費，無需信用卡）："
+  echo -e "  ${CYAN}FINNHUB_API_KEY${NC} → https://finnhub.io"
+  echo -e "  ${CYAN}GROQ_API_KEY${NC}    → https://console.groq.com"
+  hr
+  echo ""
+
+  # ── 讀取現有值（首次安裝全為空）────────────────────────
+  local cur_finnhub cur_groq cur_tg_token cur_tg_chat cur_ouou_chat
+  local cur_db_host cur_db_port cur_db_user cur_db_pass
   if [[ -f ".env" ]]; then
-    warn ".env 已存在"
-    if ! ask_yn "重新設定 API Keys？" "n"; then
-      skip ".env 保留，跳過設定"
-      # 從現有 .env 讀取 DB 設定供後續使用
-      _load_existing_env
-      return 0
-    fi
+    cur_finnhub=$(_env_get "FINNHUB_API_KEY")
+    cur_groq=$(_env_get "GROQ_API_KEY")
+    cur_tg_token=$(_env_get "TELEGRAM_BOT_TOKEN")
+    cur_tg_chat=$(_env_get "TELEGRAM_CHAT_ID")
+    cur_ouou_chat=$(_env_get "OUOU_TELEGRAM_CHAT_ID")
+    cur_db_host=$(_env_get "DB_HOST")
+    cur_db_port=$(_env_get "DB_PORT")
+    cur_db_user=$(_env_get "DB_USER")
+    cur_db_pass=$(_env_get "DB_PASSWORD")
+    info ".env 已存在，逐項確認（Enter 保留現有值）"
+  else
+    cur_db_host="localhost"
+    cur_db_port="5432"
+    cur_db_user="${INSTALL_USER}"
+    info "首次設定，請依提示填入各項目"
   fi
-
-  echo ""
-  hr
-  echo -e "  請先在以下網站免費申請 API Key："
-  echo -e "  ${CYAN}FINNHUB_API_KEY${NC} → https://finnhub.io （右上角 Sign Up → Free plan）"
-  echo -e "  ${CYAN}GROQ_API_KEY${NC}    → https://console.groq.com （Sign Up → API Keys）"
-  hr
   echo ""
 
-  # 必填
-  while true; do
-    ask_secret FINNHUB_API_KEY "[必填] FINNHUB_API_KEY"
-    [[ -n "$FINNHUB_API_KEY" ]] && break
-    warn "FINNHUB_API_KEY 為必填項目，請輸入"
+  # ── 必填 ────────────────────────────────────────────────
+  echo -e "  ${BOLD}【必填】核心功能 API Keys${NC}"
+
+  ask_secret_update FINNHUB_API_KEY "FINNHUB_API_KEY" "$cur_finnhub" "required"
+  while [[ -z "$FINNHUB_API_KEY" ]]; do
+    warn "FINNHUB_API_KEY 為必填，請輸入（至 https://finnhub.io 申請）"
+    ask_secret_update FINNHUB_API_KEY "FINNHUB_API_KEY" "" "required"
   done
 
-  while true; do
-    ask_secret GROQ_API_KEY "[必填] GROQ_API_KEY"
-    [[ -n "$GROQ_API_KEY" ]] && break
-    warn "GROQ_API_KEY 為必填項目，請輸入"
+  ask_secret_update GROQ_API_KEY "GROQ_API_KEY" "$cur_groq" "required"
+  while [[ -z "$GROQ_API_KEY" ]]; do
+    warn "GROQ_API_KEY 為必填，請輸入（至 https://console.groq.com 申請）"
+    ask_secret_update GROQ_API_KEY "GROQ_API_KEY" "" "required"
   done
 
-  # 選填
+  # ── 選填 ────────────────────────────────────────────────
   echo ""
-  echo -e "  以下為選填（直接按 Enter 跳過，Telegram 功能將停用）："
-  ask_secret TELEGRAM_BOT_TOKEN "[選填] TELEGRAM_BOT_TOKEN"
-  ask_secret TELEGRAM_CHAT_ID   "[選填] TELEGRAM_CHAT_ID"
-  ask_secret OUOU_TELEGRAM_CHAT_ID "[選填] OUOU_TELEGRAM_CHAT_ID"
+  echo -e "  ${BOLD}【選填】Telegram 推播功能${NC}（未填則停用，日後可重跑安裝程式補填）"
 
-  # 資料庫
+  ask_secret_update TELEGRAM_BOT_TOKEN  "TELEGRAM_BOT_TOKEN"     "$cur_tg_token"  "optional"
+  ask_secret_update TELEGRAM_CHAT_ID    "TELEGRAM_CHAT_ID"       "$cur_tg_chat"   "optional"
+  ask_secret_update OUOU_TELEGRAM_CHAT_ID "OUOU_TELEGRAM_CHAT_ID" "$cur_ouou_chat" "optional"
+
+  # ── 資料庫 ───────────────────────────────────────────────
   echo ""
-  echo -e "  ${BOLD}資料庫設定${NC}（一般情況下保留預設值即可）："
-  ask DB_HOST "DB_HOST" "localhost"
-  ask DB_PORT "DB_PORT" "5432"
-  ask DB_USER "DB_USER" "${INSTALL_USER}"
-  ask_secret DB_PASSWORD "[選填] DB_PASSWORD（PostgreSQL 密碼，可留空）"
+  echo -e "  ${BOLD}【資料庫】${NC}（保留預設值即可）"
 
-  # 寫入 .env
+  ask_update DB_HOST     "DB_HOST"     "${cur_db_host:-localhost}"
+  ask_update DB_PORT     "DB_PORT"     "${cur_db_port:-5432}"
+  ask_update DB_USER     "DB_USER"     "${cur_db_user:-$INSTALL_USER}"
+  ask_secret_update DB_PASSWORD "DB_PASSWORD（可留空）" "${cur_db_pass:-}" "optional"
+
+  # ── 寫入 .env ────────────────────────────────────────────
   cat > .env << EOF
-# FairPrice 環境變數（由 install.sh 生成於 $(date '+%Y-%m-%d %H:%M:%S')）
+# FairPrice 環境變數（由 install.sh 更新於 $(date '+%Y-%m-%d %H:%M:%S')）
 # ⚠️  請勿提交此檔案至 git
 
 # API Keys（必填）
@@ -349,17 +424,17 @@ RAILS_ENV=development
 EOF
 
   chmod 600 .env
-  ok ".env 建立完成"
-}
 
-_load_existing_env() {
-  # 讀取既有 .env 的 DB 設定（靜默，供後續 db:create 使用）
-  local envfile=".env"
-  DB_HOST=$(grep '^DB_HOST=' "$envfile" | cut -d= -f2 || echo "localhost")
-  DB_PORT=$(grep '^DB_PORT=' "$envfile" | cut -d= -f2 || echo "5432")
-  DB_USER=$(grep '^DB_USER=' "$envfile" | cut -d= -f2 || echo "$INSTALL_USER")
-  DB_PASSWORD=$(grep '^DB_PASSWORD=' "$envfile" | cut -d= -f2 || echo "")
-  TELEGRAM_BOT_TOKEN=$(grep '^TELEGRAM_BOT_TOKEN=' "$envfile" | cut -d= -f2 || echo "")
+  # 顯示最終狀態摘要
+  echo ""
+  echo -e "  ${BOLD}設定完成摘要：${NC}"
+  echo -e "  FINNHUB_API_KEY       $(_env_status "$FINNHUB_API_KEY")"
+  echo -e "  GROQ_API_KEY          $(_env_status "$GROQ_API_KEY")"
+  echo -e "  TELEGRAM_BOT_TOKEN    $(_env_status "${TELEGRAM_BOT_TOKEN:-}")"
+  echo -e "  TELEGRAM_CHAT_ID      $(_env_status "${TELEGRAM_CHAT_ID:-}")"
+  echo -e "  OUOU_TELEGRAM_CHAT_ID $(_env_status "${OUOU_TELEGRAM_CHAT_ID:-}")"
+  echo ""
+  ok ".env 更新完成"
 }
 
 # ============================================================
