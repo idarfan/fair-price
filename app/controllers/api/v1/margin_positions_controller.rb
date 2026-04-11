@@ -2,7 +2,7 @@
 
 module Api
   module V1
-    class MarginPositionsController < ApplicationController
+    class MarginPositionsController < Api::V1::BaseController
       def index
         open_pos   = MarginPosition.open_positions
         closed_pos = MarginPosition.closed_positions

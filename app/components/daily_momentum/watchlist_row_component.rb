@@ -19,10 +19,10 @@ class DailyMomentum::WatchlistRowComponent < ApplicationComponent
     @change     = change
     @change_pct = change_pct
     @volume     = volume
-    @day_high   = day_high
-    @day_low    = day_low
-    @high_52w   = high_52w
-    @low_52w    = low_52w
+    @presenter  = DailyMomentum::WatchlistRowPresenter.new(
+      symbol: symbol, name: name, price: price, change: change, change_pct: change_pct,
+      volume: volume, day_high: day_high, day_low: day_low, high_52w: high_52w, low_52w: low_52w
+    )
   end
 
   def view_template
@@ -61,20 +61,21 @@ class DailyMomentum::WatchlistRowComponent < ApplicationComponent
   end
 
   def render_range
-    has_day = @day_high && @day_low && @day_high > @day_low
-    has_52w = @high_52w && @low_52w
+    return plain("—") unless @presenter.has_day_range? || @presenter.has_52w_range?
 
-    return plain("—") unless has_day || has_52w
+    day_high = @presenter.day_high
+    day_low  = @presenter.day_low
+    high_52w = @presenter.high_52w
+    low_52w  = @presenter.low_52w
 
     div(class: "min-w-44 text-xs text-gray-500 space-y-2") do
-      render_range_bar("當日價格範圍", @day_low, @day_high, "bg-red-400", "text-red-500") if has_day
-      render_range_bar("52週範圍", @low_52w, @high_52w, "bg-gray-400", "text-gray-500") if has_52w
+      render_range_bar("當日價格範圍", day_low, day_high, "bg-red-400", "text-red-500") if @presenter.has_day_range?
+      render_range_bar("52週範圍", low_52w, high_52w, "bg-gray-400", "text-gray-500") if @presenter.has_52w_range?
     end
   end
 
   def render_range_bar(label, low, high, fill_class, marker_class)
-    range = high - low
-    pct   = range > 0 && @price ? ((@price - low) / range * 100).clamp(0, 100).round(1) : nil
+    pct = @presenter.range_position_pct(low, high)
 
     div do
       div(class: "text-center text-gray-400 mb-0.5") { plain(label) }

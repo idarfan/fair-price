@@ -4,8 +4,9 @@ class StockAlert::AlertRowComponent < ApplicationComponent
   # @param alert       [PriceAlert]
   # @param market_data [Hash] symbol => Finnhub quote hash
   def initialize(alert:, market_data: {})
-    @alert       = alert
-    @market_data = market_data
+    @alert     = alert
+    current_price = market_data[alert.symbol]&.dig("c")
+    @presenter = PriceAlert::AlertPresenter.new(alert: alert, current_price: current_price)
   end
 
   def view_template
@@ -63,11 +64,9 @@ class StockAlert::AlertRowComponent < ApplicationComponent
 
   def render_current_price
     td(class: "px-3 py-3 text-right") do
-      quote = @market_data[@alert.symbol]
-      price = quote&.dig("c")&.to_f
-      if price&.positive?
-        color = price_vs_target_color(price)
-        span(class: "font-semibold #{color}") { plain("$#{sprintf("%.2f", price)}") }
+      price = @presenter.current_price_display
+      if price
+        span(class: "font-semibold #{@presenter.price_color}") { plain("$#{sprintf("%.2f", price)}") }
       else
         span(class: "text-gray-300") { plain("—") }
       end
@@ -146,44 +145,8 @@ class StockAlert::AlertRowComponent < ApplicationComponent
     end
   end
 
-  def condition_label
-    @alert.condition == "above" ? "高於 ▲" : "低於 ▼"
-  end
-
-  def condition_button_class
-    base = "text-xs px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer "
-    base + (@alert.condition == "above" ? "bg-green-50 text-green-600 hover:bg-green-100" : "bg-red-50 text-red-500 hover:bg-red-100")
-  end
-
-  def status_label
-    if @alert.triggered?
-      "已觸發"
-    elsif @alert.active?
-      "監控中"
-    else
-      "已停用"
-    end
-  end
-
-  def status_button_class
-    base = "text-xs px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer "
-    if @alert.triggered?
-      base + "bg-purple-50 text-purple-500"
-    elsif @alert.active?
-      base + "bg-blue-50 text-blue-600 hover:bg-blue-100"
-    else
-      base + "bg-gray-100 text-gray-400 hover:bg-gray-200"
-    end
-  end
-
-  def price_vs_target_color(price)
-    target = @alert.target_price.to_f
-    return "text-gray-700" if target.zero?
-
-    if @alert.condition == "above"
-      price >= target ? "text-green-600" : "text-gray-700"
-    else
-      price <= target ? "text-red-500" : "text-gray-700"
-    end
-  end
+  def condition_label        = @presenter.condition_label
+  def condition_button_class = @presenter.condition_button_class
+  def status_label           = @presenter.status_label
+  def status_button_class    = @presenter.status_button_class
 end

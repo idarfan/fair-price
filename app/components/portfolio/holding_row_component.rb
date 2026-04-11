@@ -4,8 +4,8 @@ class Portfolio::HoldingRowComponent < ApplicationComponent
   # @param holding [Portfolio]
   # @param quote   [Hash, nil]  Finnhub quote { "c", "d", "dp", ... }
   def initialize(holding:, quote: nil)
-    @holding = holding
-    @quote   = quote
+    @holding   = holding
+    @presenter = Portfolio::HoldingPresenter.new(holding: holding, quote: quote)
   end
 
   def view_template
@@ -33,25 +33,10 @@ class Portfolio::HoldingRowComponent < ApplicationComponent
 
   private
 
-  def price
-    @price ||= @quote&.dig("c")&.to_f
-  end
-
-  def market_value
-    return nil unless price&.positive?
-    price * @holding.shares
-  end
-
-  def pnl_amount
-    return nil unless market_value
-    market_value - @holding.total_cost
-  end
-
-  def pnl_pct
-    return nil unless pnl_amount && @holding.total_cost.positive?
-    pnl_amount / @holding.total_cost * 100
-  end
-
+  def price         = @presenter.price
+  def market_value  = @presenter.market_value
+  def pnl_amount    = @presenter.pnl_amount
+  def pnl_pct       = @presenter.pnl_pct
 
   TD = "px-2 py-2 text-right"
 
@@ -86,7 +71,7 @@ class Portfolio::HoldingRowComponent < ApplicationComponent
   end
 
   def render_shares
-    td(class: "#{TD} text-gray-700 text-xs") { plain(fmt_shares(@holding.shares)) }
+    td(class: "#{TD} text-gray-700 text-xs") { plain(fmt_shares) }
   end
 
   def render_price
@@ -222,7 +207,7 @@ class Portfolio::HoldingRowComponent < ApplicationComponent
     end
   end
 
-  def fmt_shares(val)
-    val == val.floor ? val.to_i.to_s : sprintf("%.5g", val)
+  def fmt_shares
+    @presenter.fmt_shares
   end
 end

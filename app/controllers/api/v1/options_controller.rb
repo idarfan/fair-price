@@ -2,7 +2,7 @@
 
 module Api
   module V1
-    class OptionsController < ApplicationController
+    class OptionsController < Api::V1::BaseController
       CACHE_TTL = 5.minutes
 
       # GET /api/v1/options/:symbol/chain?date=YYYY-MM-DD

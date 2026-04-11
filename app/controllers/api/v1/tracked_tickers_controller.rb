@@ -2,7 +2,7 @@
 
 require "open3"
 
-class Api::V1::TrackedTickersController < ApplicationController
+class Api::V1::TrackedTickersController < Api::V1::BaseController
   def index
     tickers = TrackedTicker.order(:symbol).map { |t| serialize_ticker(t) }
     render json: tickers
@@ -24,7 +24,7 @@ class Api::V1::TrackedTickersController < ApplicationController
 
   def update
     ticker = TrackedTicker.find(params[:id])
-    if ticker.update(active: params[:active])
+    if ticker.update(ticker_params)
       render json: serialize_ticker(ticker)
     else
       render json: { error: ticker.errors.full_messages.join(", ") }, status: :unprocessable_entity
@@ -55,6 +55,10 @@ class Api::V1::TrackedTickersController < ApplicationController
   end
 
   private
+
+  def ticker_params
+    params.require(:tracked_ticker).permit(:active)
+  end
 
   def serialize_ticker(ticker)
     {

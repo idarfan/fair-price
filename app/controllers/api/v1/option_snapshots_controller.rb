@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Api::V1::OptionSnapshotsController < ApplicationController
+class Api::V1::OptionSnapshotsController < Api::V1::BaseController
   # GET /api/v1/option_snapshots/:symbol
   # params: type (put|call), days (integer), expiration (date)
   def index

@@ -1,6 +1,6 @@
 module Api
   module V1
-    class ValuationsController < ApplicationController
+    class ValuationsController < Api::V1::BaseController
       def show
         ticker        = params[:ticker].to_s.upcase.strip
         discount_rate = parse_discount_rate(params[:discount_rate])

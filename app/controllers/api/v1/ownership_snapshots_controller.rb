@@ -2,7 +2,7 @@
 
 module Api
   module V1
-    class OwnershipSnapshotsController < ApplicationController
+    class OwnershipSnapshotsController < Api::V1::BaseController
       def index
         ticker    = sanitize_ticker(params[:ticker])
         snapshots = service.load_history(ticker, since: range_start)
