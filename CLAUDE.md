@@ -6,6 +6,16 @@ This file provides guidance to Claude Code when working with this repository.
 
 - **Always review `tasks/lessons.md`** for relevant project patterns and past corrections.
 
+## UI 修改強制流程（違反即重做）
+
+任何前端/樣式修改，**必須按順序執行**：
+
+1. **改之前**：用 `mcp__playwright-chrome__browser_navigate` + `browser_take_screenshot` 截圖現況
+2. **改完**：重建 CSS（`bundle exec rails tailwindcss:build`）+ 刷新頁面再截圖
+3. **比對**：截圖與目標對齊後才算完成
+
+跳過任何一步 = 沒完成。
+
 ## MCP Tools
 
 本專案已設定 `rails-mcp-server`，修改 model / route / controller **之前**先用以下工具確認現有結構：
