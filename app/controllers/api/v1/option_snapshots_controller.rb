@@ -7,31 +7,41 @@ class Api::V1::OptionSnapshotsController < Api::V1::BaseController
     ticker = find_ticker
     return render json: { error: "找不到追蹤代號 #{params[:symbol].upcase}" }, status: :not_found unless ticker
 
-    days  = (params[:days] || 60).to_i.clamp(1, 90)
-    scope = ticker.option_snapshots.recent_days(days).order(:expiration, :strike)
-    scope = scope.where(option_type: params[:type]) if %w[put call].include?(params[:type])
-    scope = scope.where(expiration: params[:expiration]) if params[:expiration].present?
+    # 所有可用快照日期（新到舊）
+    available_dates = ticker.option_snapshots
+                            .distinct
+                            .order(snapshot_date: :desc)
+                            .pluck(:snapshot_date)
+                            .map(&:to_s)
 
-    if params[:latest_only] == "true"
-      latest_date = ticker.option_snapshots.maximum(:snapshot_date)
-      if latest_date
-        # DISTINCT ON: 每個合約只取 snapped_at 最新的一筆
-        scope = ticker.option_snapshots
-                      .where(snapshot_date: latest_date)
-                      .select("DISTINCT ON (contract_symbol) option_snapshots.*")
-                      .order("contract_symbol, snapped_at DESC")
-      end
+    # 決定要查哪一天
+    target_date = if params[:snapshot_date].present? && available_dates.include?(params[:snapshot_date])
+                    params[:snapshot_date]
+    else
+                    available_dates.first
     end
 
-    base        = ticker.option_snapshots.recent_days(days)
-    expirations = base.where(snapshot_date: base.maximum(:snapshot_date))
-                      .distinct.order(:expiration).pluck(:expiration)
+    if target_date
+      # DISTINCT ON：每個合約只取該日期內 snapped_at 最新一筆
+      scope = ticker.option_snapshots
+                    .where(snapshot_date: target_date)
+                    .select("DISTINCT ON (contract_symbol) option_snapshots.*")
+                    .order("contract_symbol, snapped_at DESC")
+
+      expirations = ticker.option_snapshots
+                          .where(snapshot_date: target_date)
+                          .distinct.order(:expiration).pluck(:expiration)
+    else
+      scope       = OptionSnapshot.none
+      expirations = []
+    end
 
     render json: {
-      symbol:             ticker.symbol,
-      snapshots:          scope.map { |s| serialize_snapshot(s) },
-      expirations:        expirations,
-      latest_snapshot_date: ticker.option_snapshots.maximum(:snapshot_date)
+      symbol:               ticker.symbol,
+      snapshots:            scope.map { |s| serialize_snapshot(s) },
+      expirations:          expirations,
+      latest_snapshot_date: target_date,
+      available_dates:      available_dates
     }
   end
 

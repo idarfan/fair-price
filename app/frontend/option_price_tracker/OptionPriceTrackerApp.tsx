@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import TickerSidebar from "./components/TickerSidebar";
 import ExpirationTabs from "./components/ExpirationTabs";
+import SnapshotDateTabs from "./components/SnapshotDateTabs";
 import OptionsChainTable, {
   type StrikeRow,
 } from "./components/OptionsChainTable";
@@ -58,6 +59,7 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
   const [expirations, setExpirations] = useState<string[]>([]);
   const [selectedExp, setSelectedExp] = useState("");
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [underlyingPrice, setUnderlyingPrice] = useState(0);
 
   const [selectedContract, setSelectedContract] = useState<string | null>(null);
@@ -66,37 +68,50 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadSnapshots = useCallback(async (ticker: TrackedTicker) => {
-    setLoading(true);
-    setError(null);
-    setSelectedContract(null);
-    setTrendData([]);
-    try {
-      const res = await fetch(
-        `/api/v1/option_snapshots/${encodeURIComponent(ticker.symbol)}?latest_only=true`,
-      );
-      if (!res.ok) {
-        const json = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(json.error ?? "載入失敗");
-        return;
+  const loadSnapshots = useCallback(
+    async (ticker: TrackedTicker, date?: string) => {
+      setLoading(true);
+      setError(null);
+      setSelectedContract(null);
+      setTrendData([]);
+      try {
+        const params = new URLSearchParams();
+        if (date) {
+          params.set("snapshot_date", date);
+        } else {
+          params.set("latest_only", "true");
+        }
+        const res = await fetch(
+          `/api/v1/option_snapshots/${encodeURIComponent(ticker.symbol)}?${params}`,
+        );
+        if (!res.ok) {
+          const json = (await res.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          setError(json.error ?? "載入失敗");
+          return;
+        }
+        const json = (await res.json()) as {
+          snapshots: OptionSnapshotRow[];
+          expirations: string[];
+          latest_snapshot_date: string | null;
+          available_dates: string[];
+        };
+        setSnapshots(json.snapshots);
+        setExpirations(json.expirations);
+        setSnapshotDate(json.latest_snapshot_date);
+        setAvailableDates(json.available_dates ?? []);
+        setSelectedExp(json.expirations[0] ?? "");
+        const price = json.snapshots[0]?.underlying_price ?? 0;
+        setUnderlyingPrice(price);
+      } catch {
+        setError("網路錯誤，請稍後再試");
+      } finally {
+        setLoading(false);
       }
-      const json = (await res.json()) as {
-        snapshots: OptionSnapshotRow[];
-        expirations: string[];
-        latest_snapshot_date: string | null;
-      };
-      setSnapshots(json.snapshots);
-      setExpirations(json.expirations);
-      setSnapshotDate(json.latest_snapshot_date);
-      setSelectedExp(json.expirations[0] ?? "");
-      const price = json.snapshots[0]?.underlying_price ?? 0;
-      setUnderlyingPrice(price);
-    } catch {
-      setError("網路錯誤，請稍後再試");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   async function loadTrend(contractSymbol: string) {
     if (!selected) return;
@@ -114,7 +129,6 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
   }
 
   async function handleAdd(symbol: string) {
-    // 1. 建立追蹤代號
     const createRes = await fetch("/api/v1/tracked_tickers", {
       method: "POST",
       headers: {
@@ -129,7 +143,6 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
     };
     if (!createRes.ok) throw new Error(newTicker.error ?? "新增失敗");
 
-    // 2. 加入清單並立即選取
     setTickers((prev) => {
       const exists = prev.some((t) => t.id === newTicker.id);
       return exists
@@ -140,8 +153,8 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
     setSnapshots([]);
     setExpirations([]);
     setSelectedExp("");
+    setAvailableDates([]);
 
-    // 3. 自動抓取期權資料（呼叫 Python collector）
     setLoading(true);
     setError(null);
     try {
@@ -162,7 +175,6 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
         setError(err.error ?? "資料抓取失敗");
         return;
       }
-      // 4. 抓完自動載入期權鏈
       await loadSnapshots(newTicker);
     } finally {
       setLoading(false);
@@ -192,7 +204,13 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
     setSnapshots([]);
     setExpirations([]);
     setSelectedExp("");
+    setAvailableDates([]);
     loadSnapshots(ticker);
+  }
+
+  function handleDateSelect(date: string) {
+    if (!selected || date === snapshotDate) return;
+    loadSnapshots(selected, date);
   }
 
   useEffect(() => {
@@ -219,6 +237,13 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
           </div>
         ) : (
           <>
+            {/* Snapshot date tabs — only shown when multiple dates available */}
+            <SnapshotDateTabs
+              dates={availableDates}
+              selected={snapshotDate ?? ""}
+              onSelect={handleDateSelect}
+            />
+
             {/* Expiration tabs */}
             <ExpirationTabs
               expirations={expirations}
@@ -251,11 +276,6 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
                   現價 ${underlyingPrice.toFixed(2)}
                 </span>
               )}
-              {snapshotDate && (
-                <span className="text-xs text-gray-400">
-                  快照 {snapshotDate}
-                </span>
-              )}
               {loading && (
                 <span className="text-xs text-blue-600">載入中…</span>
               )}
@@ -264,7 +284,6 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
 
             {/* Main content */}
             <div className="flex-1 overflow-y-auto">
-              {/* Chain table */}
               <div className="p-2">
                 <OptionsChainTable
                   rows={chainRows}
@@ -274,7 +293,6 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
                 />
               </div>
 
-              {/* Premium trend chart — appears when a contract is selected */}
               {selectedContract && (
                 <div className="mx-2 mb-4 bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
                   <p className="text-xs text-gray-600 font-semibold mb-3">
