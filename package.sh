@@ -53,8 +53,8 @@ for f in "${ALL_FILES[@]}"; do
   fi
 done
 
-# 確保敏感檔案不在輸出目錄
-for s in ".env" "config/master.key" "config/credentials.yml.enc"; do
+# 確保敏感檔案與不需要的設定不在輸出目錄
+for s in ".env" "config/master.key" "config/credentials.yml.enc" ".github/dependabot.yml"; do
   if [[ -f "${OUTPUT_DIR}/${s}" ]]; then
     rm -f "${OUTPUT_DIR}/${s}"
     warn "已排除敏感檔案：${s}"
