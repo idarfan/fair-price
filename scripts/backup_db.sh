@@ -8,7 +8,7 @@ set -euo pipefail
 
 BACKUP_DIR="${HOME}/fairprice-backups"
 DB_NAME="fairprice_development"
-DB_USER="mygame"
+DB_USER="${DB_USER:-idarfan}"
 KEEP_DAYS=7
 
 mkdir -p "$BACKUP_DIR"
@@ -19,7 +19,7 @@ BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${TIMESTAMP}.sql.gz"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 開始備份 ${DB_NAME}..."
 
 # pg_dump 壓縮輸出
-PGPASSWORD="${DB_PASSWORD:-mygame123}" pg_dump \
+PGPASSWORD="${DB_PASSWORD:-}" pg_dump \
   -h 127.0.0.1 \
   -U "$DB_USER" \
   "$DB_NAME" \
