@@ -418,12 +418,20 @@ DB_HOST=${DB_HOST}
 DB_PORT=${DB_PORT}
 DB_USER=${DB_USER}
 DB_PASSWORD=${DB_PASSWORD:-}
+DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD:-}@${DB_HOST}:${DB_PORT}/fairprice_development
 
 # Rails
 RAILS_ENV=development
 EOF
 
   chmod 600 .env
+
+  # ── .env.test（測試環境獨立連線，避免 rspec 誤操作開發資料）─
+  cat > .env.test << EOF
+DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD:-}@${DB_HOST}:${DB_PORT}/fairprice_test
+EOF
+  chmod 600 .env.test
+  ok ".env.test 建立完成（test 環境指向 fairprice_test）"
 
   # 顯示最終狀態摘要
   echo ""
@@ -528,6 +536,11 @@ phase7_database() {
   RAILS_ENV=development bundle exec rails db:create 2>/dev/null || info "資料庫已存在，略過建立"
   RAILS_ENV=development bundle exec rails db:migrate
   ok "資料庫 migrate 完成"
+
+  info "建立測試資料庫（rspec 用）..."
+  RAILS_ENV=test bundle exec rails db:create 2>/dev/null || info "測試資料庫已存在，略過建立"
+  RAILS_ENV=test bundle exec rails db:schema:load 2>/dev/null
+  ok "測試資料庫建立完成（fairprice_test）"
 }
 
 _configure_pg_hba() {
@@ -632,7 +645,7 @@ module.exports = {
       restart_delay: 3000,
     },
 ${telegram_apps}
-    // ── 歐歐每日盤前報告（週一至五 13:00 UTC）
+    // ── 歐歐每日盤前報告（台灣時間 21:00 & 22:00，腳本內部偵測 EDT/EST）
     {
       name: 'ouou-pre-market',
       script: './bin/ouou-pre-market.sh',
@@ -644,7 +657,22 @@ ${telegram_apps}
         PATH: '${full_path}',
         RBENV_ROOT: '${rbenv_root}',
       },
-      cron_restart: '0 13 * * 1-5',
+      cron_restart: '0 21,22 * * 1-5',
+      autorestart: false,
+      watch: false,
+    },
+
+    // ── 每日資料庫備份（台灣時間 22:00，保留 7 天）
+    {
+      name: 'fairprice-db-backup',
+      script: './scripts/backup_db.sh',
+      cwd: '${APP_DIR}',
+      interpreter: '/bin/bash',
+      env: {
+        HOME: '${HOME_DIR}',
+        DB_PASSWORD: '${DB_PASSWORD:-}',
+      },
+      cron_restart: '0 22 * * *',
       autorestart: false,
       watch: false,
     },
@@ -693,20 +721,34 @@ RAILS_SCRIPT
   ok "bin/start-rails.sh 更新完成"
 
   # ── bin/ouou-pre-market.sh ──────────────────────────────
-  cat > bin/ouou-pre-market.sh << PRE_MARKET
+  cat > bin/ouou-pre-market.sh << 'PRE_MARKET'
 #!/bin/bash
 # 歐歐每日盤前報告
-# 由 pm2 cron 每週一至五 13:00 UTC 自動執行
+# pm2 cron: 0 21,22 * * 1-5（台灣時間 21:00 & 22:00，週一至五）
+# 腳本自動偵測美東時間（EDT/EST），僅在紐約時間 09:00–09:04 執行。
+# 夏令（EDT, UTC-4）: 21:00 TWN = 09:00 EDT → 執行
+# 冬令（EST, UTC-5）: 22:00 TWN = 09:00 EST → 執行
 
 set -e
 
-export HOME="${HOME_DIR}"
-export RBENV_ROOT="\$HOME/.rbenv"
-export PATH="\$RBENV_ROOT/shims:\$RBENV_ROOT/bin:/usr/bin:/bin"
+export HOME=HOME_DIR_PLACEHOLDER
+export RBENV_ROOT="$HOME/.rbenv"
+export PATH="$RBENV_ROOT/shims:$RBENV_ROOT/bin:/usr/bin:/bin"
 
-eval "\$(rbenv init -)"
+# ── DST 自動偵測：只在紐約時間 09:00–09:04 執行 ──────────────────
+NY_HOUR=$(TZ=America/New_York date +%H)
+NY_MIN=$(TZ=America/New_York date +%M)
 
-cd "${APP_DIR}"
+if [[ "$NY_HOUR" != "09" || "$NY_MIN" -gt 4 ]]; then
+  echo "[ouou-pre-market] 跳過：紐約時間 ${NY_HOUR}:${NY_MIN}（非盤前窗口）"
+  exit 0
+fi
+
+echo "[ouou-pre-market] 啟動：紐約時間 ${NY_HOUR}:${NY_MIN} ($(TZ=America/New_York date +%Z))"
+
+eval "$(rbenv init -)"
+
+cd APP_DIR_PLACEHOLDER
 
 # 載入 .env
 if [ -f .env ]; then
@@ -715,8 +757,48 @@ fi
 
 exec bundle exec rake ouou:pre_market
 PRE_MARKET
+  # 替換 placeholder（避免 heredoc 與 bash 變數混用）
+  sed -i "s|HOME_DIR_PLACEHOLDER|${HOME_DIR}|g" bin/ouou-pre-market.sh
+  sed -i "s|APP_DIR_PLACEHOLDER|${APP_DIR}|g"   bin/ouou-pre-market.sh
   chmod +x bin/ouou-pre-market.sh
-  ok "bin/ouou-pre-market.sh 更新完成"
+  ok "bin/ouou-pre-market.sh 更新完成（DST 自動偵測）"
+
+  # ── scripts/backup_db.sh ────────────────────────────────
+  mkdir -p scripts
+  cat > scripts/backup_db.sh << 'BACKUP_SCRIPT'
+#!/usr/bin/env bash
+# FairPrice — 每日資料庫備份
+# 由 pm2 cron 每天 22:00 台灣時間自動執行，保留最近 7 份
+set -euo pipefail
+
+BACKUP_DIR="${HOME}/fairprice-backups"
+DB_NAME="fairprice_development"
+DB_USER_PLACEHOLDER=""
+KEEP_DAYS=7
+
+mkdir -p "$BACKUP_DIR"
+
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${TIMESTAMP}.sql.gz"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] 開始備份 ${DB_NAME}..."
+
+PGPASSWORD="${DB_PASSWORD:-}" pg_dump \
+  -h 127.0.0.1 \
+  -U "$DB_USER_PLACEHOLDER" \
+  "$DB_NAME" \
+  | gzip > "$BACKUP_FILE"
+
+SIZE=$(du -sh "$BACKUP_FILE" | cut -f1)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] 備份完成：${BACKUP_FILE}（${SIZE}）"
+
+find "$BACKUP_DIR" -name "${DB_NAME}_*.sql.gz" -mtime "+${KEEP_DAYS}" -delete
+REMAINING=$(find "$BACKUP_DIR" -name "${DB_NAME}_*.sql.gz" | wc -l)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] 保留 ${REMAINING} 份（超過 ${KEEP_DAYS} 天自動刪除）"
+BACKUP_SCRIPT
+  sed -i "s|DB_USER_PLACEHOLDER|${DB_USER}|g" scripts/backup_db.sh
+  chmod +x scripts/backup_db.sh
+  ok "scripts/backup_db.sh 建立完成"
 }
 
 # ============================================================
@@ -736,7 +818,7 @@ phase10_pm2() {
   step "pm2 服務啟動"
 
   # 停止舊的 fairprice 相關 process（若存在）
-  for proc in fairprice-rails fairprice-vite ouou-pre-market ouou-telegram-bot; do
+  for proc in fairprice-rails fairprice-vite ouou-pre-market ouou-telegram-bot fairprice-db-backup; do
     pm2 delete "$proc" &>/dev/null || true
   done
 
@@ -827,6 +909,10 @@ phase12_summary() {
   echo "  ║  pm2 list                  查看服務狀態          ║"
   echo "  ║  pm2 logs fairprice-rails  Rails log             ║"
   echo "  ║  pm2 logs fairprice-vite   Vite log              ║"
+  echo "  ╠══════════════════════════════════════════════════╣"
+  echo "  ║  資料庫備份：每天 22:00 自動執行                 ║"
+  printf "  ║  備份位置：${CYAN}~/fairprice-backups/${GREEN}${BOLD}                  ║\n"
+  echo "  ║  保留天數：7 天（自動清除舊備份）                ║"
   echo "  ╚══════════════════════════════════════════════════╝"
   echo -e "${NC}"
 
