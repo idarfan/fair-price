@@ -191,7 +191,7 @@ def fetch_options_chain(symbol: str, config: dict) -> list[dict]:
                     continue
 
                 # Filter by open interest
-                oi = int(row.get("openInterest", 0) or 0)
+                oi = _safe_int(row.get("openInterest"))
                 if oi < min_oi:
                     continue
 

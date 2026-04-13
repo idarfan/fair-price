@@ -104,7 +104,7 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
     try {
       const res = await fetch(
         `/api/v1/option_snapshots/${encodeURIComponent(selected.symbol)}/premium_trend` +
-          `?contract_symbol=${encodeURIComponent(contractSymbol)}&hours=36`,
+          `?contract_symbol=${encodeURIComponent(contractSymbol)}`,
       );
       const json = (await res.json()) as PremiumTrendPoint[];
       setTrendData(Array.isArray(json) ? json : []);
