@@ -1,13 +1,26 @@
 #!/bin/bash
 # 歐歐每日盤前報告
-# 由 pm2 cron 每週一至五 21:00 台灣時間（= 美東夏令 09:00 EDT，美股盤前 30 分鐘）
-# ⚠️  冬令時間（EST，約 11 月初至 3 月中）美股改 22:30 開盤，屆時需手動改為 22:00
+# pm2 cron: 0 21,22 * * 1-5（台灣時間 21:00 & 22:00，週一至五）
+# 腳本自動偵測美東時間（EDT/EST 自動切換），僅在紐約時間 09:00–09:04 執行。
+# 夏令（EDT, UTC-4）: 21:00 TWN = 09:00 EDT → 執行
+# 冬令（EST, UTC-5）: 22:00 TWN = 09:00 EST → 執行
 
 set -e
 
 export HOME=/home/idarfan
 export RBENV_ROOT="$HOME/.rbenv"
 export PATH="$RBENV_ROOT/shims:$RBENV_ROOT/bin:/usr/bin:/bin"
+
+# ── DST 自動偵測：只在紐約時間 09:00–09:04 執行 ──────────────────
+NY_HOUR=$(TZ=America/New_York date +%H)
+NY_MIN=$(TZ=America/New_York date +%M)
+
+if [[ "$NY_HOUR" != "09" || "$NY_MIN" -gt 4 ]]; then
+  echo "[ouou-pre-market] 跳過：紐約時間 ${NY_HOUR}:${NY_MIN}（非盤前窗口）"
+  exit 0
+fi
+
+echo "[ouou-pre-market] 啟動：紐約時間 ${NY_HOUR}:${NY_MIN}（$(TZ=America/New_York date +%Z)）"
 
 eval "$(rbenv init -)"
 
