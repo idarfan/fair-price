@@ -26,7 +26,7 @@ export default function ExpirationTabs({
   onSelect,
 }: Props) {
   return (
-    <div className="flex items-center gap-1 px-3 py-2 overflow-x-auto border-b border-gray-700 bg-gray-850 shrink-0">
+    <div className="flex items-center gap-1 px-3 py-2 overflow-x-auto border-b border-gray-200 bg-gray-100 shrink-0">
       {expirations.map((exp) => {
         const dte = calcDte(exp);
         const isSelected = exp === selected;
@@ -36,15 +36,15 @@ export default function ExpirationTabs({
             onClick={() => onSelect(exp)}
             className={`shrink-0 px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
               isSelected
-                ? "bg-blue-600 text-white"
+                ? "bg-orange-500 text-white"
                 : dte <= 7
-                  ? "bg-gray-700 text-red-300 hover:bg-gray-600"
-                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  ? "bg-white border border-red-200 text-red-600 hover:bg-red-50"
+                  : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
             }`}
           >
             {fmtDate(exp)}
             <span
-              className={`ml-1 text-xs ${isSelected ? "text-blue-200" : "text-gray-500"}`}
+              className={`ml-1 text-xs ${isSelected ? "text-orange-100" : "text-gray-400"}`}
             >
               {dte}d
             </span>

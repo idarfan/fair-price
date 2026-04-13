@@ -186,22 +186,6 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
     }
   }
 
-  async function handleToggle(ticker: TrackedTicker) {
-    const res = await fetch(`/api/v1/tracked_tickers/${ticker.id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken(),
-        "X-Requested-With": "XMLHttpRequest",
-      },
-      body: JSON.stringify({ active: !ticker.active }),
-    });
-    const json = (await res.json()) as TrackedTicker;
-    if (!res.ok) return;
-    setTickers((prev) => prev.map((t) => (t.id === json.id ? json : t)));
-    if (selected?.id === json.id) setSelected(json);
-  }
-
   function handleSelect(ticker: TrackedTicker) {
     if (ticker.id === selected?.id) return;
     setSelected(ticker);
@@ -219,19 +203,18 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
   const dte = selectedExp ? calcDte(selectedExp) : null;
 
   return (
-    <div className="flex h-full min-h-screen bg-gray-900 text-white overflow-hidden">
+    <div className="flex h-full min-h-screen bg-gray-50 text-gray-800 overflow-hidden">
       <TickerSidebar
         tickers={tickers}
         selected={selected}
         onSelect={handleSelect}
         onAdd={handleAdd}
         onDelete={handleDelete}
-        onToggle={handleToggle}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {!selected ? (
-          <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+          <div className="flex items-center justify-center h-full text-gray-400 text-sm">
             從左側新增並選擇追蹤代號
           </div>
         ) : (
@@ -248,18 +231,18 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
             />
 
             {/* Header */}
-            <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-700 shrink-0">
-              <span className="text-xs text-gray-400 font-medium">
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-200 bg-white shrink-0">
+              <span className="text-xs text-gray-500 font-medium">
                 Calls / Puts
               </span>
-              <span className="font-mono font-bold text-sm">
+              <span className="font-mono font-bold text-sm text-gray-800">
                 {selected.symbol}
               </span>
               {selectedExp && (
-                <span className="text-xs text-gray-300">{selectedExp}</span>
+                <span className="text-xs text-gray-500">{selectedExp}</span>
               )}
               {dte != null && (
-                <span className="text-xs text-yellow-400">
+                <span className="text-xs text-amber-600 font-medium">
                   距離到期日還有 {dte} 天
                 </span>
               )}
@@ -269,14 +252,14 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
                 </span>
               )}
               {snapshotDate && (
-                <span className="text-xs text-gray-600">
+                <span className="text-xs text-gray-400">
                   快照 {snapshotDate}
                 </span>
               )}
               {loading && (
-                <span className="text-xs text-blue-400">載入中…</span>
+                <span className="text-xs text-blue-600">載入中…</span>
               )}
-              {error && <span className="text-xs text-red-400">{error}</span>}
+              {error && <span className="text-xs text-red-500">{error}</span>}
             </div>
 
             {/* Main content */}
@@ -293,8 +276,8 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
 
               {/* Premium trend chart — appears when a contract is selected */}
               {selectedContract && (
-                <div className="mx-2 mb-4 bg-gray-800 rounded-lg p-4">
-                  <p className="text-xs text-gray-400 font-semibold mb-3">
+                <div className="mx-2 mb-4 bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                  <p className="text-xs text-gray-600 font-semibold mb-3">
                     Premium 歷史趨勢
                   </p>
                   <PremiumTrendChart

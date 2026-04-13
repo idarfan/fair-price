@@ -63,9 +63,9 @@ export default function PremiumTrendChart({ data, contractSymbol }: Props) {
   return (
     <div>
       <div className="flex items-center gap-3 mb-2">
-        <p className="text-xs text-gray-400 font-mono">{contractSymbol}</p>
+        <p className="text-xs text-gray-600 font-mono">{contractSymbol}</p>
         {intraday && (
-          <span className="text-xs text-yellow-400 bg-yellow-900/30 px-1.5 py-0.5 rounded">
+          <span className="text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
             盤中 (ET)
           </span>
         )}
@@ -75,17 +75,17 @@ export default function PremiumTrendChart({ data, contractSymbol }: Props) {
           data={chartData}
           margin={{ top: 4, right: 40, left: 0, bottom: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 10, fill: "#9ca3af" }}
+            tick={{ fontSize: 10, fill: "#6b7280" }}
             tickLine={false}
             axisLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
             yAxisId="price"
-            tick={{ fontSize: 10, fill: "#9ca3af" }}
+            tick={{ fontSize: 10, fill: "#4b5563" }}
             tickLine={false}
             axisLine={false}
             tickFormatter={(v: number) => `$${v.toFixed(2)}`}
@@ -93,16 +93,17 @@ export default function PremiumTrendChart({ data, contractSymbol }: Props) {
           <YAxis
             yAxisId="iv"
             orientation="right"
-            tick={{ fontSize: 10, fill: "#a78bfa" }}
+            tick={{ fontSize: 10, fill: "#6d28d9" }}
             tickLine={false}
             axisLine={false}
             tickFormatter={(v: number) => `${v}%`}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "#1f2937",
-              border: "1px solid #374151",
+              backgroundColor: "#ffffff",
+              border: "1px solid #e5e7eb",
               fontSize: 11,
+              color: "#111827",
             }}
             formatter={(value, name) => {
               if (typeof value !== "number")
@@ -117,7 +118,7 @@ export default function PremiumTrendChart({ data, contractSymbol }: Props) {
             type="monotone"
             dataKey="bid"
             name="出價"
-            stroke="#60a5fa"
+            stroke="#2563eb"
             dot={false}
             strokeWidth={1.5}
           />
@@ -126,7 +127,7 @@ export default function PremiumTrendChart({ data, contractSymbol }: Props) {
             type="monotone"
             dataKey="ask"
             name="要價"
-            stroke="#34d399"
+            stroke="#059669"
             dot={false}
             strokeWidth={1.5}
           />
@@ -134,7 +135,7 @@ export default function PremiumTrendChart({ data, contractSymbol }: Props) {
             yAxisId="price"
             type="monotone"
             dataKey="last"
-            stroke="#fbbf24"
+            stroke="#d97706"
             dot={false}
             strokeWidth={1.5}
           />
@@ -142,7 +143,7 @@ export default function PremiumTrendChart({ data, contractSymbol }: Props) {
             yAxisId="iv"
             type="monotone"
             dataKey="iv"
-            stroke="#a78bfa"
+            stroke="#7c3aed"
             dot={false}
             strokeWidth={1}
             strokeDasharray="4 2"
