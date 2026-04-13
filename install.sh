@@ -525,8 +525,8 @@ phase7_database() {
   set -a; source .env; set +a
 
   info "建立資料庫並執行 migrate..."
-  bundle exec rails db:create 2>/dev/null || info "資料庫已存在，略過建立"
-  bundle exec rails db:migrate
+  RAILS_ENV=development bundle exec rails db:create 2>/dev/null || info "資料庫已存在，略過建立"
+  RAILS_ENV=development bundle exec rails db:migrate
   ok "資料庫 migrate 完成"
 }
 
