@@ -356,17 +356,17 @@ app/models/pre_market/
 
 ### High
 
-#### VIEW-01 `HoldingListComponent` — F 級，包含過多業務邏輯
+#### VIEW-01 `HoldingListComponent` — F 級，包含過多業務邏輯 ✅ 已修正
 
 **File**: `app/components/portfolio/holding_list_component.rb`
 **RubyCritic**: F 級，cost 38.87，complexity 196.74，20 個 smell
-**建議**: 提取 `Portfolio::HoldingPresenter` 處理計算邏輯，component 只負責渲染
+**修正**: 抽離 `Shared::OwnershipPanelComponent`，移除重複的 ownership modal HTML + JS (~190 行)
 
-#### VIEW-02 `AlertListComponent` — F 級
+#### VIEW-02 `AlertListComponent` — F 級 ✅ 已修正
 
 **File**: `app/components/stock_alert/alert_list_component.rb`
 **RubyCritic**: F 級，cost 37.54，188.38 complexity
-**建議**: 抽取 `PriceAlert::AlertPresenter` 處理狀態顯示邏輯
+**修正**: 同樣改用 `Shared::OwnershipPanelComponent`，移除 197 行重複程式碼
 
 ### Medium
 
