@@ -32,6 +32,7 @@ from pathlib import Path
 
 import yfinance as yf
 import psycopg2
+import pandas_market_calendars as mcal
 from psycopg2.extras import execute_values
 
 # Load .env from project root (same directory logic as database.yml lookup)
@@ -65,6 +66,26 @@ DEFAULT_MAX_DTE = 90
 DEFAULT_STRIKE_RANGE = 0.30  # ±30% of underlying price
 DEFAULT_MIN_OI = 0
 INTER_TICKER_DELAY = 2  # seconds between tickers to avoid rate limiting
+
+# ── Market hours guard ────────────────────────────────────────────────
+_NYSE = mcal.get_calendar("NYSE")
+
+def is_market_session(buffer_minutes: int = 30) -> bool:
+    """
+    Return True if we are within NYSE regular trading hours (plus a grace buffer
+    after close so the EOD snapshot is captured).
+
+    buffer_minutes: how many minutes after official close to still allow collection.
+    Returns False on weekends, US market holidays, and outside trading hours.
+    """
+    now_utc = datetime.now(timezone.utc)
+    today_str = now_utc.strftime("%Y-%m-%d")
+    schedule = _NYSE.schedule(start_date=today_str, end_date=today_str)
+    if schedule.empty:
+        return False  # weekend or holiday
+    market_open  = schedule.iloc[0]["market_open"].to_pydatetime()
+    market_close = schedule.iloc[0]["market_close"].to_pydatetime()
+    return market_open <= now_utc <= market_close + timedelta(minutes=buffer_minutes)
 
 
 def get_db_url() -> str:
@@ -318,6 +339,7 @@ def main():
     parser.add_argument("--list", action="store_true", help="List all tracked tickers and exit")
     parser.add_argument("--min-dte", type=int, default=None, help="Override min DTE filter")
     parser.add_argument("--max-dte", type=int, default=None, help="Override max DTE filter")
+    parser.add_argument("--force", action="store_true", help="Bypass market hours guard (for testing or backfill)")
     args = parser.parse_args()
 
     db_url = get_db_url()
@@ -355,6 +377,14 @@ def main():
                 log.error(f"Error adding {sym_upper}: {e}")
         conn.commit()
         cur.close()
+        conn.close()
+        return
+
+    # ── Market hours guard ──
+    # Skip collection outside NYSE trading hours (+ 30 min EOD buffer).
+    # Use --force to bypass (e.g. for manual backfill or testing).
+    if not args.force and not args.dry_run and not is_market_session(buffer_minutes=30):
+        log.info("Outside NYSE trading hours — skipping collection. Use --force to override.")
         conn.close()
         return
 
