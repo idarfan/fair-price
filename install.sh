@@ -848,7 +848,7 @@ phase10_pm2() {
     node_path="$(dirname "$(which node)")"
     local pm2_bin
     pm2_bin="$(which pm2)"
-    echo -e "  ${BOLD}sudo env PATH=\$PATH:${node_path} ${pm2_bin} startup systemd -u ${INSTALL_USER} --hp ${HOME_DIR}${NC}"
+    echo -e "  ${BOLD}sudo env \"PATH=\$PATH:${node_path}\" ${pm2_bin} startup systemd -u ${INSTALL_USER} --hp ${HOME_DIR}${NC}"
     echo ""
   else
     # 無 systemd：.bashrc hook
