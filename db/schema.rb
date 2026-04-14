@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_14_041150) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_14_042936) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -52,6 +52,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_14_041150) do
     t.index ["option_type", "strike"], name: "index_option_snapshots_on_option_type_and_strike"
     t.index ["snapshot_date"], name: "index_option_snapshots_on_snapshot_date"
     t.index ["tracked_ticker_id"], name: "index_option_snapshots_on_tracked_ticker_id"
+    t.check_constraint "bid > 0::numeric OR ask > 0::numeric OR last_price > 0::numeric", name: "chk_option_has_market_quote"
   end
 
   create_table "options_snapshots", force: :cascade do |t|
