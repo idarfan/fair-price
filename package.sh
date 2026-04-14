@@ -23,10 +23,17 @@ fi
 echo -e "${BOLD}FairPrice 打包工具${NC}"
 echo ""
 
-# 若輸出目錄已存在則先刪除
+# 若輸出目錄已存在則先清除（保留 .git 避免歷史紀錄遺失）
 if [[ -d "$OUTPUT_DIR" ]]; then
   warn "舊的安裝目錄已存在，清除中..."
-  rm -rf "$OUTPUT_DIR"
+  if [[ -d "$OUTPUT_DIR/.git" ]]; then
+    mv "$OUTPUT_DIR/.git" /tmp/_fairprice_installer_git_bak
+    rm -rf "$OUTPUT_DIR"
+    mkdir -p "$OUTPUT_DIR"
+    mv /tmp/_fairprice_installer_git_bak "$OUTPUT_DIR/.git"
+  else
+    rm -rf "$OUTPUT_DIR"
+  fi
 fi
 mkdir -p "$OUTPUT_DIR"
 
