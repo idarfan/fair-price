@@ -25,8 +25,18 @@ PGPASSWORD="${DB_PASSWORD:-}" pg_dump \
   "$DB_NAME" \
   | gzip > "$BACKUP_FILE"
 
+# 驗證備份非空（pg_dump 失敗時 gzip 仍會建立 0B 空檔）
+if [[ ! -s "$BACKUP_FILE" ]]; then
+  rm -f "$BACKUP_FILE"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] 備份失敗或空檔，已刪除 ${BACKUP_FILE}" >&2
+  exit 1
+fi
+
 SIZE=$(du -sh "$BACKUP_FILE" | cut -f1)
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 備份完成：${BACKUP_FILE}（${SIZE}）"
+
+# 清除 0B 殘留檔（防禦性清理）
+find "$BACKUP_DIR" -name "*.sql.gz" -size 0 -delete 2>/dev/null
 
 # 清除超過 KEEP_DAYS 天的舊備份
 find "$BACKUP_DIR" -name "${DB_NAME}_*.sql.gz" -mtime "+${KEEP_DAYS}" -delete
