@@ -562,9 +562,11 @@ _configure_pg_hba() {
     return
   fi
 
-  info "設定 PostgreSQL TCP 認證（md5）..."
+  local auth_method="trust"
+  [[ -n "${DB_PASSWORD:-}" ]] && auth_method="md5"
+  info "設定 PostgreSQL TCP 認證（${auth_method}）..."
   sudo sed -i \
-    '/^# IPv4 local connections:/a host    all             all             127.0.0.1\/32            md5' \
+    "/^# IPv4 local connections:/a host    all             all             127.0.0.1\/32            ${auth_method}" \
     "$hba_file" 2>/dev/null || true
 
   if $HAS_SYSTEMD; then
