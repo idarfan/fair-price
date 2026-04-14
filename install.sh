@@ -491,9 +491,9 @@ phase6_deps() {
   bundle install 2>&1 | tail -5
   ok "bundle install 完成"
 
-  info "執行 npm install..."
-  npm install --silent
-  ok "npm install 完成"
+  info "執行 npm ci..."
+  npm ci --silent
+  ok "npm ci 完成"
 }
 
 # ============================================================
