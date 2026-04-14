@@ -152,17 +152,24 @@ return () => {
 
 ### 教訓 1：推薦新方案前必須先確認現有基礎設施模式
 
-**過錯：** 實作 Telegram 收息提醒的排程機制時，直接建議 crontab，但專案早已用 `systemctl --user` 管理 `fairprice.service` 和 `fairprice-vite.service`。使用者必須反問「沒有更好的方法嗎？」才改正。
+**過錯（2026-04-03）：** 實作 Telegram 收息提醒的排程機制時，直接建議 crontab，但專案早已用 `systemctl --user` 管理 `fairprice.service` 和 `fairprice-vite.service`。
 
-**根本原因：** 給出方案前沒有先問「這個專案目前用什麼方式做類似的事？」
+**重複犯罪（2026-04-14）：** 同樣的錯誤再犯——使用者說「精簡 crontab」，直接改 crontab，沒有先確認已有 systemd timer（`options-collector.timer`、`options-intraday.timer`），導致同一隻腳本被 crontab 和 systemd 雙重執行。
 
-**防治：** 凡是涉及以下類型的新增，先用 `Glob`/`Grep` 確認現有模式：
-- 排程任務 → 先看有沒有 `.service`、`.timer`、`schedule.rb`、`Procfile`
-- 快取 → 先看 `Rails.cache`、Redis、Memcached 哪個是主流
-- 後台工作 → 先看有沒有 Sidekiq、Solid Queue、Active Job
-- 日誌 → 先看 `Rails.logger` 慣用的 prefix 格式
+**根本原因：** 教訓停留在原則層面（「先看有沒有 .timer」），沒有轉化為操作前強制執行的具體指令。
 
-**規則：** 同類問題的解法必須與現有基礎設施一致，除非有明確理由引入新模式。
+**強制查核 SOP（碰到排程任務必須先跑這兩行）：**
+```bash
+crontab -l                                        # 看既有 crontab
+systemctl --user list-units --type=timer          # 看既有 systemd timer
+```
+
+**其他類型的強制查核：**
+- 快取 → `grep -r "Rails.cache\|Redis\|File.write" app/services/ | head -5`
+- 後台工作 → `grep -r "perform_later\|perform_async" app/ | head -5`
+- 日誌格式 → `grep -r "Rails.logger" app/ | head -3`
+
+**規則：** 任何「新增排程/快取/背景工作」任務，**查核指令必須在第一步執行，結果必須貼出來確認後才能繼續**。看到輸出才知道現有模式是什麼。
 
 ---
 
