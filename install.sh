@@ -557,24 +557,27 @@ _configure_pg_hba() {
   local hba_file="/etc/postgresql/${pg_ver}/main/pg_hba.conf"
   [[ ! -f "$hba_file" ]] && return
 
-  if grep -qP '^host\s+all\s+all\s+127\.0\.0\.1' "$hba_file" 2>/dev/null; then
-    skip "pg_hba.conf TCP 認證已設定"
-    return
-  fi
-
   local auth_method="trust"
   [[ -n "${DB_PASSWORD:-}" ]] && auth_method="md5"
+
   info "設定 PostgreSQL TCP 認證（${auth_method}）..."
-  sudo sed -i \
-    "/^# IPv4 local connections:/a host    all             all             127.0.0.1\/32            ${auth_method}" \
-    "$hba_file" 2>/dev/null || true
+  # 若已有 127.0.0.1 那行，直接把認證方式改掉；否則插入新行
+  if grep -qP '^host\s+all\s+all\s+127\.0\.0\.1' "$hba_file" 2>/dev/null; then
+    sudo sed -i -E \
+      "s|^(host\s+all\s+all\s+127\.0\.0\.1/32\s+)\S+|\1${auth_method}|" \
+      "$hba_file"
+  else
+    sudo sed -i \
+      "/^# IPv4 local connections:/a host    all             all             127.0.0.1\/32            ${auth_method}" \
+      "$hba_file"
+  fi
 
   if $HAS_SYSTEMD; then
     sudo systemctl reload postgresql &>/dev/null || true
   else
     sudo service postgresql reload &>/dev/null || true
   fi
-  ok "pg_hba.conf 設定完成"
+  ok "pg_hba.conf 設定完成（${auth_method}）"
 }
 
 # ============================================================
