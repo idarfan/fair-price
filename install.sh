@@ -647,7 +647,7 @@ module.exports = {
     {
       name: 'fairprice-vite',
       script: 'npm',
-      args: 'exec vite -- --mode development',
+      args: 'exec vite -- --mode development --host 0.0.0.0',
       cwd: '${APP_DIR}',
       interpreter: 'none',
       autorestart: true,
