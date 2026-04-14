@@ -360,9 +360,15 @@ phase4_env() {
     cur_db_pass=$(_env_get "DB_PASSWORD")
     info ".env 已存在，逐項確認（Enter 保留現有值）"
   else
+    cur_finnhub=""
+    cur_groq=""
+    cur_tg_token=""
+    cur_tg_chat=""
+    cur_ouou_chat=""
     cur_db_host="localhost"
     cur_db_port="5432"
     cur_db_user="${INSTALL_USER}"
+    cur_db_pass=""
     info "首次設定，請依提示填入各項目"
   fi
   echo ""
