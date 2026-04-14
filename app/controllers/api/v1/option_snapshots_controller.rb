@@ -70,7 +70,7 @@ class Api::V1::OptionSnapshotsController < Api::V1::BaseController
       scope = scope.where("snapped_at >= ?", cutoff)
     end
 
-    rows = scope.order(:snapped_at)
+    rows = scope.where("NOT (bid = 0 AND ask = 0)").order(:snapped_at)
 
     render json: rows.map { |s|
       {

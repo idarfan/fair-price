@@ -195,6 +195,12 @@ def fetch_options_chain(symbol: str, config: dict) -> list[dict]:
                 if oi < min_oi:
                     continue
 
+                # Skip zero-market records (market closed / no active quotes from yfinance)
+                bid_val = _safe_float(row.get("bid")) or 0
+                ask_val = _safe_float(row.get("ask")) or 0
+                if bid_val == 0 and ask_val == 0:
+                    continue
+
                 snapshots.append({
                     "snapshot_date": today,
                     "snapped_at": datetime.now(timezone.utc),
