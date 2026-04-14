@@ -545,8 +545,8 @@ phase7_database() {
 
   info "建立測試資料庫（rspec 用）..."
   RAILS_ENV=test bundle exec rails db:create 2>/dev/null || info "測試資料庫已存在，略過建立"
-  RAILS_ENV=test bundle exec rails db:schema:load 2>/dev/null
-  ok "測試資料庫建立完成（fairprice_test）"
+  RAILS_ENV=test bundle exec rails db:schema:load 2>/dev/null || warn "測試資料庫 schema 載入失敗（不影響 app 運作，可稍後手動執行）"
+  ok "測試資料庫步驟完成"
 }
 
 _configure_pg_hba() {
