@@ -63,3 +63,5 @@ node_modules
 
 *storybook.log
 storybook-static
+# Added by code-review-graph
+.code-review-graph/

@@ -4,6 +4,13 @@
       "command": "/home/idarfan/.rbenv/versions/4.0.1/bin/rails-mcp-server",
       "args": [],
       "env": {}
+    },
+    "code-review-graph": {
+      "command": "code-review-graph",
+      "args": [
+        "serve"
+      ],
+      "type": "stdio"
     }
   }
 }
