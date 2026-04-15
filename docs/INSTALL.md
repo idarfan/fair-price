@@ -1,6 +1,20 @@
 # INSTALL.md — FairPrice 安裝指南
 
+> **版本：20260415**
+
 FairPrice 提供一鍵互動式安裝程式（`install.sh`），可在任何裝好 WSL2 的 Windows 電腦上自動完成所有環境設定。
+
+---
+
+## 版本記錄
+
+### 20260415
+- 修正首次安裝（無 `.env`）時 `cur_finnhub: unbound variable` 導致腳本提前退出
+- 改用 `npm install --legacy-peer-deps` 解決 `@vitejs/plugin-react` 與 `vite` 版本衝突
+- 修正 `pg_hba.conf` 設定：無密碼時改用 `trust`；直接改既有行而非插入新行
+- 測試資料庫 schema 載入失敗時改為警告而非中斷安裝
+- Vite dev server 加入 `--host 0.0.0.0`，Windows 瀏覽器可正常存取 `localhost:3036`
+- `pm2 startup` 提示指令加上引號，避免 WSL2 PATH 含空格時出現 `env: 'Files': No such file or directory`
 
 ---
 
