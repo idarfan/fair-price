@@ -35,9 +35,11 @@ module Charts
       result
     end
 
-    # Detects pivot-based support/resistance levels. Returns { support:, resistance: }.
+    # Detects pivot-based support/resistance levels.
+    # Returns 5 named levels (each may be nil if insufficient pivot data).
+    # Levels: strong_resistance, short_resistance, short_support, mid_support, strong_support
     def calc_support_resistance(closes)
-      return { support: [], resistance: [] } if closes.length < 5
+      return empty_sr_levels if closes.length < 5
 
       pivot_highs = []
       pivot_lows  = []
@@ -48,11 +50,24 @@ module Charts
         pivot_lows  << closes[i] if closes[i] == window.min
       end
 
-      last_close = closes.last
-      resistance = cluster_levels(pivot_highs).select { |l| l > last_close }
-      support    = cluster_levels(pivot_lows).select  { |l| l < last_close }
+      last_close  = closes.last
+      supports    = cluster_levels(pivot_lows,  max: 3).select { |l| l < last_close }
+      resistances = cluster_levels(pivot_highs, max: 3).select { |l| l > last_close }
 
-      { support: support.last(2), resistance: resistance.first(2) }
+      # supports sorted ASC: [-1] nearest price = short-term, [-2] = mid, [0] = furthest = strong
+      # resistances sorted ASC: [0] nearest price = short-term, [-1] = furthest = strong
+      {
+        short_support:     supports[-1],
+        mid_support:       supports.length >= 2 ? supports[-2] : nil,
+        strong_support:    supports.length >= 3 ? supports[0]  : nil,
+        short_resistance:  resistances[0],
+        strong_resistance: resistances.length >= 2 ? resistances[-1] : nil
+      }
+    end
+
+    def empty_sr_levels
+      { short_support: nil, mid_support: nil, strong_support: nil,
+        short_resistance: nil, strong_resistance: nil }
     end
 
     def rsi_label(v)
@@ -77,7 +92,7 @@ module Charts
     private
 
     # Clusters nearby price levels within 1.5% tolerance; returns medians of top clusters.
-    def cluster_levels(levels)
+    def cluster_levels(levels, max: 4)
       sorted = levels.sort
       groups = []
       sorted.each do |lvl|
@@ -89,7 +104,7 @@ module Charts
       end
       groups
         .sort_by { |g| -g.length }
-        .first(4)
+        .first(max)
         .map { |g| g.sort[g.length / 2].round(2) }
         .sort
     end

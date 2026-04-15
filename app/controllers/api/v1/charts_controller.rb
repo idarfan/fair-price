@@ -85,7 +85,7 @@ class Api::V1::ChartsController < Api::V1::BaseController
       vol_label:     vol_label(vol_ratio)
     }
 
-    sr = intraday ? { support: [], resistance: [] } : calc_support_resistance(closes)
+    sr = intraday ? empty_sr_levels : calc_support_resistance(closes)
 
     render json: { symbol: symbol, range: params[:range], data: data, stats: stats, support_resistance: sr }
   end
