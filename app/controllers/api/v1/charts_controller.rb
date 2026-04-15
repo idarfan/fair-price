@@ -85,7 +85,12 @@ class Api::V1::ChartsController < Api::V1::BaseController
       vol_label:     vol_label(vol_ratio)
     }
 
-    sr = intraday ? empty_sr_levels : calc_support_resistance(closes)
+    sr = if intraday
+           daily = YahooFinanceService.new.chart(symbol, range: "1mo", interval: "1d")
+           calc_support_resistance(daily[:closes])
+    else
+           calc_support_resistance(closes)
+    end
 
     render json: { symbol: symbol, range: params[:range], data: data, stats: stats, support_resistance: sr }
   end
