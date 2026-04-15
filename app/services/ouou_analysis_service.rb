@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class OuouAnalysisService
+  include Charts::TechnicalIndicators
+
   GROQ_API   = "https://api.groq.com/openai/v1/chat/completions"
   MODEL      = "llama-3.3-70b-versatile"
   MAX_TOKENS    = 4096
@@ -127,6 +129,9 @@ class OuouAnalysisService
       ## 動量數據（此表格已由系統產生，請在技術面分析的動量觀察小節原文輸出，不得更改任何符號或格式）
       #{build_momentum_table(closes, volumes)}
 
+      ## 技術分析計算的支撐阻力位（「層級」與「價位」欄已由系統確定，必須原字不差地輸出至報告，禁止更改數字，只在「說明」欄填入你的解讀）
+      #{build_sr_table(closes)}
+
       ## 近期新聞（過去7天）
       #{news_text.presence || '（無新聞資料）'}
 
@@ -143,6 +148,23 @@ class OuouAnalysisService
     ]
     lines = [ "| 指標 | 數值 |", "|---|---|" ]
     rows.each { |name, val| lines << "| #{name} | #{val} |" }
+    lines.join("\n")
+  end
+
+  def build_sr_table(closes)
+    sr = calc_support_resistance(closes)
+    rows = [
+      [ "強阻力",   sr[:strong_resistance] ],
+      [ "短線阻力", sr[:short_resistance]  ],
+      [ "短線支撐", sr[:short_support]     ],
+      [ "中線支撐", sr[:mid_support]       ],
+      [ "強支撐",   sr[:strong_support]    ]
+    ]
+    lines = [ "| 層級 | 價位 | 說明 |", "|---|---|---|" ]
+    rows.each do |name, val|
+      price_str = val ? "$#{val}" : "—"
+      lines << "| #{name} | #{price_str} | [說明] |"
+    end
     lines.join("\n")
   end
 
@@ -242,13 +264,15 @@ class OuouAnalysisService
 
       ### 支撐與阻力位估算：
 
+      （「層級」與「價位」欄已在 user message 中由系統計算確定，必須**原字不差**輸出，禁止更改或捏造任何數字；「說明」欄填入你的解讀；價位為「—」表示資料不足，說明欄寫「資料不足」）
+
       | 層級 | 價位 | 說明 |
       |---|---|---|
-      | [強阻力] | $[價格區間] | [說明] |
-      | [短線阻力] | $[價格區間] | [說明] |
-      | [短線支撐] | $[價格區間] | [說明] |
-      | [中線支撐] | $[價格區間] | [說明] |
-      | [強支撐] | $[價格區間] | [說明] |
+      | 強阻力 | [原樣輸出 user message 中的價位] | [說明] |
+      | 短線阻力 | [原樣輸出 user message 中的價位] | [說明] |
+      | 短線支撐 | [原樣輸出 user message 中的價位] | [說明] |
+      | 中線支撐 | [原樣輸出 user message 中的價位] | [說明] |
+      | 強支撐 | [原樣輸出 user message 中的價位] | [說明] |
 
       ## 3. 📰 催化因素
 
