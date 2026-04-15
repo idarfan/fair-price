@@ -544,6 +544,44 @@ export default function TechnicalsChart({ symbol }: { symbol: string }) {
             </span>
           ))}
         </div>
+        {/* S/R 文字摘要：永遠可見，不依賴圖表 axis（解決線在可視範圍外時看不到標籤的問題） */}
+        {SR_LINES.some((l) => sr[l.key] != null) && data.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              flexWrap: "wrap",
+              marginBottom: 6,
+              padding: "4px 8px",
+              background: "#0f172a",
+              borderRadius: 6,
+              fontSize: 11,
+            }}
+          >
+            {SR_LINES.filter((l) => sr[l.key] != null).map((l) => {
+              const price = sr[l.key]!;
+              const lastClose = data[data.length - 1]?.close;
+              const dist =
+                lastClose && lastClose > 0
+                  ? (((price - lastClose) / lastClose) * 100).toFixed(1)
+                  : null;
+              return (
+                <span
+                  key={l.key}
+                  style={{ color: l.color, whiteSpace: "nowrap" }}
+                >
+                  {l.label} <span style={{ fontWeight: 600 }}>${price}</span>
+                  {dist !== null && (
+                    <span style={{ color: "#64748b", marginLeft: 2 }}>
+                      ({Number(dist) > 0 ? "+" : ""}
+                      {dist}%)
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        )}
         <div ref={priceRef} style={{ width: "100%" }} />
 
         {/* Volume */}
