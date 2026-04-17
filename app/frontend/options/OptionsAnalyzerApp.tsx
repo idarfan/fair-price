@@ -517,7 +517,7 @@ export default function OptionsAnalyzerApp({
   }, []);
 
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden bg-gray-50">
+    <div className="flex flex-col flex-1 min-h-0 w-full overflow-hidden bg-gray-50">
       {/* Header：左半輸入 + 右半上傳 + 還原版面按鈕 */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-stretch gap-4 h-20">
         {/* 左半：標題 + 代號輸入 */}
@@ -571,9 +571,9 @@ export default function OptionsAnalyzerApp({
         {/* 左側：Outlook + Sentiment */}
         <Panel
           id={PANEL_IDS.lrSidebar}
-          defaultSize={DEFAULTS.leftRight[PANEL_IDS.lrSidebar]}
-          minSize={8}
-          maxSize={25}
+          defaultSize="13%"
+          minSize="8%"
+          maxSize="25%"
           className="overflow-y-auto overflow-x-hidden bg-white border-r border-gray-200"
         >
           <div className="p-2 flex flex-col gap-2 min-h-full">
@@ -587,7 +587,7 @@ export default function OptionsAnalyzerApp({
         {/* 右側主區域 */}
         <Panel
           id={PANEL_IDS.lrMain}
-          defaultSize={DEFAULTS.leftRight[PANEL_IDS.lrMain]}
+          defaultSize="87%"
           className="flex flex-col overflow-hidden min-w-0"
         >
           {/* 垂直分割：損益圖 ↔ 策略區 */}
@@ -601,9 +601,9 @@ export default function OptionsAnalyzerApp({
             {/* 上方：損益圖 */}
             <Panel
               id={PANEL_IDS.tbChart}
-              defaultSize={DEFAULTS.topBottom[PANEL_IDS.tbChart]}
-              minSize={15}
-              maxSize={60}
+              defaultSize="34%"
+              minSize="15%"
+              maxSize="60%"
               className="flex flex-col bg-white border-b border-gray-200 overflow-hidden"
             >
               <div className="p-4 h-full flex flex-col">
@@ -621,7 +621,7 @@ export default function OptionsAnalyzerApp({
             {/* 下方：AI 分析（不參與 resize）+ 策略列表/解說 */}
             <Panel
               id={PANEL_IDS.tbBottom}
-              defaultSize={DEFAULTS.topBottom[PANEL_IDS.tbBottom]}
+              defaultSize="66%"
               className="flex flex-col overflow-hidden min-h-0"
             >
               {/* AI 截圖分析（全寬，上傳後才顯示，不參與 resize） */}
@@ -671,9 +671,9 @@ export default function OptionsAnalyzerApp({
                 {/* 策略列表 */}
                 <Panel
                   id={PANEL_IDS.ssLeft}
-                  defaultSize={DEFAULTS.stratSplit[PANEL_IDS.ssLeft]}
-                  minSize={12}
-                  maxSize={40}
+                  defaultSize="22%"
+                  minSize="12%"
+                  maxSize="40%"
                   className="flex flex-col bg-white border-r border-gray-100 overflow-hidden"
                 >
                   <div className="flex border-b border-gray-100 flex-shrink-0">
@@ -721,7 +721,7 @@ export default function OptionsAnalyzerApp({
                 {/* 策略解說 */}
                 <Panel
                   id={PANEL_IDS.ssRight}
-                  defaultSize={DEFAULTS.stratSplit[PANEL_IDS.ssRight]}
+                  defaultSize="78%"
                   className="overflow-y-auto overflow-x-hidden bg-white"
                 >
                   <div className="p-3">
