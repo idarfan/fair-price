@@ -28,3 +28,12 @@
 /* NProgress */
 #nprogress .bar { background: #2563eb; height: 3px; }
 #nprogress .peg  { box-shadow: 0 0 10px #2563eb, 0 0 5px #2563eb; }
+
+/* Panel resize handles (react-resizable-panels) — 靜態宣告確保 Tailwind scanner 掃到 */
+.cursor-col-resize { cursor: col-resize; }
+.cursor-row-resize { cursor: row-resize; }
+.w-1\.5 { width: calc(var(--spacing, 0.25rem) * 1.5); }
+.h-1\.5 { height: calc(var(--spacing, 0.25rem) * 1.5); }
+@media (hover: hover) {
+  .hover\:bg-blue-400:hover { background-color: var(--color-blue-400, oklch(70.7% .165 254.624)); }
+}

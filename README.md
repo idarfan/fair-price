@@ -52,6 +52,17 @@ bundle exec rubocop -a   # 自動修正
 
 ## 變更記錄
 
+### 2026-04-17 — Options 頁面可調整框格 + Navbar 字體大小控制
+
+**動機：** 提升 Options 頁面彈性：三個固定框格改為可拖動調整並記憶位置；Navbar 加入 5 個字體大小按鍵。
+
+**異動內容：**
+- `app/frontend/options/OptionsAnalyzerApp.tsx`：改用 `react-resizable-panels` v2，三個 `Group`/`Panel`/`Separator` 結構；`useDefaultLayout` 自動 localStorage 持久化；header 加入「↺ 還原版面」按鈕
+- `app/components/fair_value/font_size_controls_component.rb`：新建，5 個遞增大小的 A 按鍵（14-18px），修改 `html` 根字體，localStorage 持久化
+- `app/components/fair_value/navbar_component.rb`：AppSwitcher 右側加入字體大小控制元件
+- `app/views/layouts/application.html.erb`：head 最頂加 early-paint script 防止字體閃爍 (FOUC)
+- `app/assets/tailwind/application.css`：加入 resize handle 所需 CSS（cursor-col/row-resize、w/h-1.5、hover:bg-blue-400）
+
 ### 2026-03-17 — 修復歐歐分析重複點擊導致串流衝突
 
 **動機：** 串流進行中再次點擊 🐱 按鈕會開第二條 EventSource 連線，兩條互相寫同一面板，導致分析停頓或需點第二次才出現結果。
