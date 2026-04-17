@@ -3,7 +3,7 @@
 ## 設計原則
 
 - **無資料庫依賴**（估值 / 動量功能）：所有股票數據即時從 Finnhub / Yahoo Finance 抓取，不落地存儲
-- **無前端框架**：UI 全由 Phlex 元件（伺服器端渲染）組成，互動邏輯用原生 JavaScript + 事件委派
+- **混合前端架構**：靜態頁面用 Phlex 元件（伺服器端渲染），互動圖表 / 複雜 UI 用 Vite + React（見下表）
 - **無 Hotwire**：明確禁用 Turbo / Stimulus，避免隱式行為
 - **單一 process**：所有工具共用一個 Rails 應用，監聽 port 3003
 
@@ -15,14 +15,26 @@
 |------|------|
 | 框架 | Ruby on Rails 8.1 |
 | 資源管線 | Propshaft |
-| UI 元件 | Phlex 2.x（phlex-rails） |
+| UI 元件 | Phlex 2.x（phlex-rails）— 靜態頁面 |
+| 前端打包 | Vite（vite-plugin-ruby）+ React 19 — 互動頁面 |
+| 互動圖表 | Recharts（持股結構）、Lightweight Charts（技術圖） |
+| 可調整佈局 | react-resizable-panels v4（Options 頁面）|
 | CSS | Tailwind CSS v4（tailwindcss-rails，本地編譯） |
 | Markdown | kramdown + kramdown-parser-gfm（伺服器端） |
 | HTTP 客戶端 | HTTParty |
 | AI 分析 | Groq API（llama-3.3-70b-versatile，SSE 串流） |
-| 元件預覽 | Lookbook |
-| Lint | RuboCop（rubocop-rails-omakase） |
-| 程序管理 | systemd user service |
+| 元件預覽 | Lookbook（Phlex）/ Storybook（React） |
+| Lint | RuboCop（rubocop-rails-omakase）、ESLint、TypeScript strict |
+| 程序管理 | pm2（禁止直接用 systemctl --user） |
+
+### 前端技術選擇原則
+
+| 頁面類型 | 建議技術 |
+|---------|---------|
+| 靜態資料展示、表單 | Phlex + Tailwind |
+| 互動圖表、可調整佈局、複雜 UI 狀態 | Vite + React + Recharts |
+| Phlex 元件開發預覽 | Lookbook |
+| React 元件開發預覽 | Storybook |
 
 ---
 
@@ -32,65 +44,79 @@
 fairprice/
 ├── app/
 │   ├── components/                # Phlex UI 元件
-│   │   ├── application_component.rb     # 基底類別（格式化 helpers）
-│   │   ├── fair_value/                  # FairPrice 估值工具元件
-│   │   │   ├── app_switcher_component.rb  # 左側 App 切換側欄
-│   │   │   ├── page_layout_component.rb
-│   │   │   ├── valuation_table_component.rb
-│   │   │   └── ...
-│   │   ├── daily_momentum/              # Daily Momentum 工具元件
-│   │   │   ├── analysis_panel_component.rb  # 歐歐 AI 分析面板
-│   │   │   ├── watchlist_table_component.rb
-│   │   │   └── ...
-│   │   ├── portfolio/                   # Portfolio 工具元件
-│   │   └── stock_alert/                 # Watchlist 警示元件
+│   │   ├── application_component.rb          # 基底類別（格式化 helpers）
+│   │   ├── fair_value/                       # 共用 Navbar / AppSwitcher 元件
+│   │   │   ├── app_switcher_component.rb     # 左側 App 切換側欄
+│   │   │   ├── font_size_controls_component.rb  # Navbar 字體大小按鍵（5 個）
+│   │   │   ├── navbar_component.rb           # 頂部導覽列
+│   │   │   └── search_bar_component.rb
+│   │   ├── daily_momentum/                   # Daily Momentum 工具元件
+│   │   │   ├── analysis_panel_component.rb   # 歐歐 AI 分析面板
+│   │   │   └── watchlist_table_component.rb
+│   │   ├── options/                          # Options Analyzer 掛載點
+│   │   │   └── page_component.rb             # React app 掛載容器（flex flex-col）
+│   │   ├── ownership/                        # Ownership React app 掛載點
+│   │   ├── portfolio/                        # Portfolio 工具元件
+│   │   └── stock_alert/                      # Watchlist 警示元件
 │   ├── controllers/
-│   │   ├── valuations_controller.rb     # FairPrice 估值
-│   │   ├── reports_controller.rb        # Daily Momentum 報告
-│   │   ├── stock_alerts_controller.rb   # 價格警示
-│   │   ├── portfolios_controller.rb     # 投資組合
-│   │   └── api/v1/valuations_controller.rb  # JSON API
+│   │   ├── valuations_controller.rb          # FairPrice 估值
+│   │   ├── reports_controller.rb             # Daily Momentum 報告
+│   │   ├── options_controller.rb             # Options Analyzer
+│   │   ├── ownership_controller.rb           # 持股結構
+│   │   ├── margin_controller.rb              # 保證金試算
+│   │   ├── stock_alerts_controller.rb        # 價格警示
+│   │   ├── portfolios_controller.rb          # 投資組合
+│   │   └── api/v1/                           # JSON API
+│   ├── frontend/                             # Vite + React 前端原始碼
+│   │   ├── options/                          # Options Analyzer App
+│   │   │   ├── OptionsAnalyzerApp.tsx        # 主元件（react-resizable-panels v4）
+│   │   │   ├── components/                   # PayoffChart, StrategyDetail 等
+│   │   │   ├── strategies.ts                 # 期權策略定義
+│   │   │   └── types.ts
+│   │   ├── ownership/                        # 持股結構 App
+│   │   └── entrypoints/                      # Vite 入口點
 │   ├── services/
-│   │   ├── stock_data_service.rb        # Finnhub 資料聚合
-│   │   ├── valuation_service.rb         # 估值計算（DCF/P-E/PEG/DDM/P-B/EV-EBITDA）
-│   │   ├── finnhub_service.rb           # Finnhub API 客戶端
-│   │   ├── yahoo_finance_service.rb     # Yahoo Finance API 客戶端
-│   │   ├── momentum_report_service.rb   # 動量報告聚合
-│   │   ├── ouou_analysis_service.rb     # AI 分析（Claude API + cache）
-│   │   ├── exchange_rate_service.rb     # 匯率
-│   │   ├── vix_service.rb               # VIX 指數
-│   │   ├── telegram_service.rb          # Telegram 推播
-│   │   ├── portfolio_ocr_service.rb     # OCR 持倉辨識
-│   │   └── stock_price_checker.rb       # 價格警示背景檢查
+│   │   ├── stock_data_service.rb
+│   │   ├── valuation_service.rb
+│   │   ├── finnhub_service.rb
+│   │   ├── yahoo_finance_service.rb
+│   │   ├── momentum_report_service.rb
+│   │   ├── ouou_analysis_service.rb          # AI 分析（Groq + cache）
+│   │   ├── vix_service.rb
+│   │   ├── telegram_service.rb
+│   │   └── stock_price_checker.rb
 │   └── views/
 │       └── layouts/
-│           ├── application.html.erb     # 主 layout（navbar + sidebar）
-│           └── component_preview.html.erb  # Lookbook 預覽 layout
+│           └── application.html.erb          # 主 layout（含早期字體大小腳本）
 ├── config/
 │   ├── routes.rb
-│   └── watchlist.yml                    # 動量報告自選股清單
-├── docs/                                # 專案文件（本目錄）
+│   └── watchlist.yml                         # 動量報告自選股清單
+├── docs/                                     # 專案文件（本目錄）
 │   ├── ARCHITECTURE.md
+│   ├── USER_MANUAL.md
 │   ├── INSTALL.md
-│   └── USER_MANUAL.md
-└── test/
-    └── components/previews/             # Lookbook 元件預覽
+│   └── DAILY_MOMENTUM.md
+└── tasks/
+    └── lessons.md                            # 踩坑教訓紀錄
 ```
 
 ---
 
 ## 工具路由表
 
-| 工具 | 路由 | Controller | 命名空間 |
-|------|------|------------|----------|
-| FairPrice 估值 | `GET /` `GET /valuations/:ticker` | `ValuationsController` | `FairValue::` |
-| Daily Momentum | `GET /momentum` | `ReportsController` | `DailyMomentum::` |
-| 歐歐 AI 分析（SSE） | `GET /momentum/analysis` | `ReportsController#analysis` | — |
-| Markdown 渲染 | `POST /momentum/render_markdown` | `ReportsController#render_markdown` | — |
-| 新聞 | `GET /momentum/news` | `ReportsController#company_news` | — |
-| Watchlist | `GET/POST /watchlist` 等 | `StockAlertsController` | — |
-| Portfolio | `GET/POST /portfolio` 等 | `PortfoliosController` | — |
-| JSON API | `GET /api/v1/valuations/:ticker` | `Api::V1::ValuationsController` | `Api::V1::` |
+| 工具 | 路由 | Controller | 前端 |
+|------|------|------------|------|
+| FairPrice 估值 | `GET /` `GET /valuations/:ticker` | `ValuationsController` | Phlex |
+| Daily Momentum | `GET /momentum` | `ReportsController` | Phlex |
+| 歐歐 AI 分析（SSE） | `GET /momentum/analysis` | `ReportsController#analysis` | Phlex |
+| 技術圖表 | `GET /reports/:ticker/technicals` | `ReportsController#technicals` | Vite + React |
+| 美股期權分析 | `GET /options` `GET /options/:symbol` | `OptionsController` | Vite + React |
+| 持股結構 | `GET /ownership` | `OwnershipController` | Vite + React |
+| 保證金試算 | `GET /margin` | `MarginController` | Vite + React |
+| 期權價格追蹤 | `GET /option_price_tracker` | `OptionPriceTrackerController` | Vite + React |
+| Watchlist | `GET/POST /watchlist` 等 | `StockAlertsController` | Phlex |
+| Portfolio | `GET/POST /portfolio` 等 | `PortfoliosController` | Phlex |
+| JSON API | `GET /api/v1/...` | `Api::V1::*` | — |
 | 元件預覽 | `GET /lookbook` | Lookbook Engine | — |
 
 ---
@@ -189,15 +215,63 @@ AI 輸出（raw markdown）
 
 左側側欄，`APP_LINKS` 常數維護所有工具入口。新增工具時需在此常數新增一筆。
 
+### FairValue::FontSizeControlsComponent
+
+Navbar 字體大小控制（5 個按鍵，14–18px）。點擊修改 `document.documentElement.style.fontSize`，Tailwind 所有 rem 值等比縮放。偏好存至 `localStorage['fairprice:font-size']`，`application.html.erb` head 含早期渲染腳本防止 FOUC。
+
+### Options::PageComponent
+
+React app 掛載容器。需設定 `flex flex-col` 確保 React 根元件的 `flex-1 min-h-0` 能正確繼承高度。
+
+---
+
+## Options Analyzer 架構（React）
+
+```
+OptionsController#index / #show
+  └── Options::PageComponent（Phlex 掛載容器，flex flex-col）
+        └── OptionsAnalyzerApp.tsx（React）
+              ├── react-resizable-panels v4（三組可調整邊界）
+              │     ├── Group horizontal：sidebar（13%）↔ 主區（87%）
+              │     ├── Group vertical：損益圖（34%）↔ 策略區（66%）
+              │     └── Group horizontal：策略列表（22%）↔ 策略解說（78%）
+              ├── useDefaultLayout({ id })  → localStorage 記憶面板大小
+              ├── PanelResetButton          → setLayout() 還原預設比例
+              ├── PayoffChart               → Recharts 損益圖
+              ├── StrategyRecommendList     → 推薦策略清單
+              ├── StrategyDetailPanel       → 策略詳細說明
+              └── HeaderUploadZone          → 截圖上傳 + AI 分析
+```
+
+**Panel 尺寸規則（v4 特殊注意）：**
+```tsx
+// ✅ 必須用字串百分比，純數字 = px（會被 maxSize 鎖死）
+<Panel defaultSize="13%" minSize="8%" maxSize="25%">
+// setLayout 的 layout 物件用 0–100 純數字（百分比格式不同）
+ref.current?.setLayout({ "lr-sidebar": 13, "lr-main": 87 })
+```
+
 ---
 
 ## 新增工具步驟
+
+### Phlex 頁面
 
 1. 在 `config/routes.rb` 新增路由
 2. 建立 Controller（與對應 namespace 目錄）
 3. 建立 Phlex 元件（`app/components/<namespace>/`）
 4. 在 `FairValue::AppSwitcherComponent` 的 `APP_LINKS` 新增入口
 5. 建立 Lookbook Preview 檔案（`test/components/previews/`）
+
+### React 頁面（Vite）
+
+1. 在 `config/routes.rb` 新增路由
+2. 建立 Controller，`render <Namespace>::PageComponent.new(...)`
+3. 建立 `app/components/<namespace>/page_component.rb`（掛載 div 需有 `flex flex-col`）
+4. 建立 `app/frontend/<namespace>/` 目錄與 React 元件
+5. 在 `app/frontend/entrypoints/` 建立入口點（`<name>.tsx`）
+6. 在 `app/views/layouts/application.html.erb` 加 `vite_javascript_tag '<name>.tsx'` 條件判斷
+7. 在 `FairValue::AppSwitcherComponent` 的 `APP_LINKS` 新增入口
 
 ---
 
