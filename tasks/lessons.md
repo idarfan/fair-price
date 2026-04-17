@@ -1,5 +1,64 @@
 # 專案教訓紀錄
 
+## 2026-04-17 — react-resizable-panels v4 + CSS 高度鏈三個教訓
+
+### 教訓 A：npm 套件裝完必須讀 `.d.ts`，不能從文件/記憶寫 code
+
+**過錯：** 計畫基於 v2 文件研究，但裝上的是 v4。v4 Panel 的 `defaultSize`/`minSize`/`maxSize` 傳入純數字會被解讀為 **px**（非 %）。`maxSize={25}` = 25px = ~1.96% 容器寬，sidebar 被硬鎖，`setLayout()` 也因此無效。
+
+**診斷關鍵：** `panel.style.flexGrow = "1.962"` 而非 "13"；`25px / 1273px = 1.963%`，精確吻合。
+
+**防治規則：**
+```
+引入新 npm 套件三步驟（必做，不可跳過）：
+1. 確認 package.json 裡實際安裝的 semver（npm install 後版本可能比預期高）
+2. head -80 node_modules/<pkg>/dist/*.d.ts   ← 讀實際型別
+3. 查 CHANGELOG 或 README 確認有無 breaking change
+禁止直接從文件/記憶/計畫寫 code，必須先確認實際型別。
+```
+
+**本例正確格式：**
+```tsx
+// ✅ v4 Panel 尺寸一律用字串百分比
+<Panel defaultSize="13%" minSize="8%" maxSize="25%">
+// setLayout 的 layout 物件用 0-100 數字（%），與 Panel prop 格式不對稱
+ref.current?.setLayout({ "lr-sidebar": 13, "lr-main": 87 })
+```
+
+---
+
+### 教訓 B：全高佈局改前必須追蹤 CSS 高度鏈
+
+**過錯：** `options-root` 缺少 `flex flex-col`，React `h-full` 失效，Group 只有 288px（應 517px）。改之前截圖已顯示所有面板壓扁在左上角，但誤判成 localStorage 問題沒有繼續追查。
+
+**防治規則：**
+```
+新增任何 h-full / flex-1 / overflow-hidden 容器前，
+先用 browser_evaluate 量從 body 到目標元素的每一層高度：
+  root → main → outer-div → react-div → group
+確認每層 getBoundingClientRect().height 與預期一致，
+再動手寫 code。
+```
+
+改用 `flex-1 min-h-0` 比 `h-full` 更可靠，因為不依賴父層有明確 height。
+
+---
+
+### 教訓 C：截圖異常就要量數字，不要跳過繼續
+
+**過錯：** 第一張截圖看到 sidebar 顯示垂直字（壓扁狀態），應立即 `browser_evaluate` 量 `panel.style.flexGrow`，就能在 5 分鐘內定位問題。但選擇先假設是 localStorage 壞掉，多繞了一大圈。
+
+**防治規則：**
+```
+截圖看到佈局異常（壓扁、消失、重疊）：
+  Step 1：browser_evaluate 量 flexGrow / getBoundingClientRect()
+  Step 2：確認數字與預期一致
+  Step 3：追因（高度/寬度/minSize/maxSize）
+  禁止只看截圖猜原因，數字是唯一的事實。
+```
+
+---
+
 ## 2026-03-26 — Options Analyzer UI 修改的五個教訓
 
 ### 教訓 1：移除預設值時必須全域搜尋
