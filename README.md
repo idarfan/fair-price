@@ -310,6 +310,33 @@ bundle exec rubocop -a   # 自動修正
 | `app/views/layouts/application.html.erb` | 新增 `html2canvas@1.4.1` CDN script |
 | `app/components/daily_momentum/analysis_panel_component.rb` | `renderMarkdown` 加入匯出按鈕；新增 `exportPng`、`exportPdf` 函式與 click 委派 |
 
+### 2026-04-17 — Options 頁面三框格可調整大小 + Navbar 字體大小控制
+
+**新增功能**
+
+- `react-resizable-panels` v4 接入 Options 頁面，支援三組可拖動邊界（左側 sidebar / 損益圖 / 策略列表）
+- 各面板位置自動記憶至 localStorage（`react-resizable-panels:options-*`）
+- Header 新增「↺ 還原版面」按鈕，一鍵恢復預設比例（13/87/34/66/22/78%）
+- Navbar AppSwitcher 右側加入五個字體大小按鍵（14–18px），含 `fairprice:font-size` localStorage 記憶與早期渲染腳本（防 FOUC）
+
+**修正 Bug**
+
+- `react-resizable-panels` v4 Panel 尺寸 prop 必須為字串百分比（如 `"13%"`），傳入純數字會被解讀為 px，導致面板被 maxSize 鎖死在 ~2%
+- `options-root` 缺少 `flex flex-col`，造成 React `h-full` 失效、Group 高度僅 288px（修正後 517px）
+- React 根容器改為 `flex-1 min-h-0`，確保在 flex 父容器中正確撐開高度
+
+**涉及檔案**
+
+| 檔案 | 說明 |
+|------|------|
+| `app/frontend/options/OptionsAnalyzerApp.tsx` | 主要改寫：Panel 尺寸改字串 %、根容器高度修正 |
+| `app/components/options/page_component.rb` | 加入 `flex flex-col` 解決高度鏈問題 |
+| `app/components/fair_value/font_size_controls_component.rb` | 新建：5 個字體大小按鍵元件 |
+| `app/components/fair_value/navbar_component.rb` | 加入 FontSizeControls |
+| `app/views/layouts/application.html.erb` | 加入早期渲染字體大小腳本 |
+| `app/assets/tailwind/application.css` | 新增 resize handle 靜態 class 定義 |
+| `package.json` | 新增 react-resizable-panels ^4.10.0 |
+
 ### 2026-04-03 — routes.rb 重構：抽常數、改用 resources
 
 整理 `config/routes.rb`，消除重複定義與手動展開的 REST 路由。
