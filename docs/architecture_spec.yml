@@ -1,0 +1,106 @@
+project: fairprice
+title: FairPrice 系統架構圖
+
+canvas:
+  width: 2200
+  # height is auto-computed from layers
+
+layers:
+  - id: browser
+    type: box
+    text: "Browser / User"
+    fill: "#fef08a"
+    stroke: "#854d0e"
+
+  - id: pages
+    type: band
+    label: "Pages  (port 3003 · Phlex SSR + Vite/React SPA)"
+    fill: "#e0e7ff"
+    stroke: "#4338ca"
+    item_fill: "#a5b4fc"
+    item_stroke: "#4338ca"
+    items:
+      - ["FairPrice 估值",   "(Phlex)"]
+      - ["Daily Momentum",   "(Phlex)"]
+      - ["歐歐 AI 分析",     "(SSE)"]
+      - ["技術圖表",         "(React)"]
+      - ["Options Analyzer", "(React)"]
+      - ["持股結構",         "(React)"]
+      - ["保證金試算",       "(React)"]
+      - ["期權價格追蹤",     "(React)"]
+      - ["Watchlist",        "(Phlex)"]
+      - ["Portfolio",        "(Phlex)"]
+
+  - id: controllers
+    type: band
+    label: "Controllers"
+    fill: "#dcfce7"
+    stroke: "#15803d"
+    item_fill: "#86efac"
+    item_stroke: "#15803d"
+    items:
+      - ["ValuationsController",    "/valuations/:ticker"]
+      - ["ReportsController",       "/momentum"]
+      - ["OptionsController",       "/options"]
+      - ["OwnershipController",     "/ownership"]
+      - ["MarginController",        "/margin"]
+      - ["StockAlertsController",   "/watchlist"]
+      - ["PortfoliosController",    "/portfolio"]
+      - ["Api::V1::*",              "/api/v1/..."]
+
+  - id: services
+    type: band
+    label: "Services"
+    fill: "#fef9c3"
+    stroke: "#a16207"
+    item_fill: "#fde047"
+    item_stroke: "#a16207"
+    items:
+      - ["StockDataService",       "+ ValuationService"]
+      - ["MomentumReportService",  "(Thread 平行化)"]
+      - ["OuouAnalysisService",    "(Groq + cache)"]
+      - ["FinnhubService",         "(quote/metrics/news)"]
+      - ["YahooFinanceService",    "(chart/holders)"]
+      - ["VixService",             "(^VIX)"]
+      - ["TelegramService",        "(Bot 通知)"]
+
+  - id: database
+    type: band
+    label: "PostgreSQL — 持久化資料"
+    fill: "#fce7f3"
+    stroke: "#9d174d"
+    item_fill: "#f9a8d4"
+    item_stroke: "#9d174d"
+    items:
+      - ["OwnershipSnapshot", "(ticker+quarter)"]
+      - ["OwnershipHolder",   "(快照明細)"]
+      - ["StockAlert",        "(價格警示)"]
+      - ["Portfolio",         "(投資組合)"]
+
+  - id: external
+    type: external
+    label: "External APIs"
+    items:
+      - text: "Finnhub API"
+        sub:  "(quote / metrics / news)"
+        fill:   "#fed7aa"
+        stroke: "#c2410c"
+      - text: "Yahoo Finance API"
+        sub:  "(chart / historical / holders)"
+        fill:   "#fed7aa"
+        stroke: "#c2410c"
+      - text: "Groq API"
+        sub:  "(llama-3.3-70b · SSE 串流)"
+        fill:   "#e9d5ff"
+        stroke: "#7c3aed"
+      - text: "Telegram Bot API"
+        sub:  "(盤前報告推播)"
+        fill:   "#bfdbfe"
+        stroke: "#1d4ed8"
+
+arrows:
+  - [browser,     pages]
+  - [pages,       controllers]
+  - [controllers, services]
+  - [services,    database]
+  - [services,    external]

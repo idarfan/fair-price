@@ -1,177 +1,124 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2400 1100" style="background:#f8fafc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2200 870" style="background:#f8fafc">
 <defs>
   <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
     <path d="M0,0 L0,6 L8,3 z" fill="#9ca3af"/>
   </marker>
 </defs>
-<text x="1200" y="40" text-anchor="middle" font-size="26" fill="#111827" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">FairPrice 系統架構圖</text>
-<rect x="1090" y="58" width="220" height="52" rx="6" fill="#fef08a" stroke="#854d0e" stroke-width="1.5" opacity="1" />
-<text x="1200.0" y="85.4" text-anchor="middle" font-size="14" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Browser / User</text>
-<rect x="80" y="130" width="2240" height="192" rx="10" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.5" opacity="0.38" stroke-dasharray="8,4"/>
-<text x="94" y="148" text-anchor="start" font-size="11" fill="#1d4ed8" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Frontend Layer</text>
-<rect x="100" y="156" width="2200" height="44" rx="6" fill="#bfdbfe" stroke="#1d4ed8" stroke-width="1.5" opacity="1" />
-<text x="1200.0" y="179.2" text-anchor="middle" font-size="12" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">application.html.erb  —  Shared Layout + Tailwind CSS</text>
-<rect x="90" y="214" width="1100" height="82" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5" opacity="0.38" stroke-dasharray="8,4"/>
-<text x="104" y="232" text-anchor="start" font-size="11" fill="#3b82f6" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Server-side Render</text>
-<rect x="100" y="236" width="264" height="58" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1" />
-<text x="232.0" y="258.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Phlex Views</text>
-<text x="232.0" y="273.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(HTML Components)</text>
-<rect x="372" y="236" width="264" height="58" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1" />
-<text x="504.0" y="258.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Daily Momentum</text>
-<text x="504.0" y="273.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(ReportsCtrl)</text>
-<rect x="644" y="236" width="264" height="58" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1" />
-<text x="776.0" y="258.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Watchlist / Alerts</text>
-<text x="776.0" y="273.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Forms)</text>
-<rect x="916" y="236" width="264" height="58" rx="6" fill="#bfdbfe" stroke="#1d4ed8" stroke-width="1.5" opacity="1" />
-<text x="1048.0" y="258.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Lookbook</text>
-<text x="1048.0" y="273.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Preview)</text>
-<rect x="1210" y="214" width="1100" height="82" rx="10" fill="#faf5ff" stroke="#7c3aed" stroke-width="1.5" opacity="0.38" stroke-dasharray="8,4"/>
-<text x="1224" y="232" text-anchor="start" font-size="11" fill="#7c3aed" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Client-side SPA</text>
-<rect x="1220" y="236" width="264" height="58" rx="6" fill="#c4b5fd" stroke="#7c3aed" stroke-width="1.5" opacity="1" />
-<text x="1352.0" y="258.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">TechnicalsChart</text>
-<text x="1352.0" y="273.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Recharts)</text>
-<rect x="1492" y="236" width="264" height="58" rx="6" fill="#c4b5fd" stroke="#7c3aed" stroke-width="1.5" opacity="1" />
-<text x="1624.0" y="258.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Ownership App</text>
-<text x="1624.0" y="273.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(React SPA)</text>
-<rect x="1764" y="236" width="264" height="58" rx="6" fill="#ddd6fe" stroke="#7c3aed" stroke-width="1.5" opacity="1" />
-<text x="1896.0" y="258.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Vite + React</text>
-<text x="1896.0" y="273.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Build Pipeline)</text>
-<rect x="2036" y="236" width="264" height="58" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5" opacity="1" />
-<text x="2168.0" y="258.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Storybook</text>
-<text x="2168.0" y="273.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Component Preview)</text>
-<line x1="900" y1="200" x2="900" y2="214" stroke="#3b82f6" stroke-width="1.5" opacity="0.7" stroke-dasharray="6,3" marker-end="url(#arr)"/>
-<line x1="1500" y1="200" x2="1500" y2="214" stroke="#7c3aed" stroke-width="1.5" opacity="0.7" stroke-dasharray="6,3" marker-end="url(#arr)"/>
-<rect x="80" y="344" width="2240" height="114" rx="10" fill="#dcfce7" stroke="#15803d" stroke-width="1.5" opacity="0.38" stroke-dasharray="8,4"/>
-<text x="94" y="362" text-anchor="start" font-size="11" fill="#15803d" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Rails Controllers  (port 3003)</text>
-<rect x="90" y="372" width="269" height="76" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1" />
-<text x="224.5" y="403.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">  ValuationsController</text>
-<text x="224.5" y="418.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/valuations/:ticker</text>
-<rect x="367" y="372" width="269" height="76" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1" />
-<text x="501.5" y="403.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">  PortfoliosController</text>
-<text x="501.5" y="418.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/portfolios</text>
-<rect x="644" y="372" width="269" height="76" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1" />
-<text x="778.5" y="403.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">  OwnershipController</text>
-<text x="778.5" y="418.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/ownership</text>
-<rect x="921" y="372" width="269" height="76" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1" />
-<text x="1055.5" y="403.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">  ReportsController</text>
-<text x="1055.5" y="418.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/momentum</text>
-<rect x="1198" y="372" width="269" height="76" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1" />
-<text x="1332.5" y="403.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">  StockAlertsController</text>
-<text x="1332.5" y="418.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/stock_alerts</text>
-<rect x="1475" y="372" width="269" height="76" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1" />
-<text x="1609.5" y="403.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">  WatchlistItemsController</text>
-<text x="1609.5" y="418.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/watchlist</text>
-<rect x="1752" y="372" width="269" height="76" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1" />
-<text x="1886.5" y="403.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">  MarginController</text>
-<text x="1886.5" y="418.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/margin</text>
-<rect x="2029" y="372" width="269" height="76" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1" />
-<text x="2163.5" y="403.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">  OptionsController</text>
-<text x="2163.5" y="418.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/options</text>
-<rect x="80" y="480" width="2240" height="114" rx="10" fill="#fef9c3" stroke="#a16207" stroke-width="1.5" opacity="0.38" stroke-dasharray="8,4"/>
-<text x="94" y="498" text-anchor="start" font-size="11" fill="#a16207" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Core Services</text>
-<rect x="90" y="508" width="269" height="76" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1" />
-<text x="224.5" y="539.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">StockDataService</text>
-<text x="224.5" y="554.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(API Aggregation)</text>
-<rect x="367" y="508" width="269" height="76" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1" />
-<text x="501.5" y="539.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">ValuationService</text>
-<text x="501.5" y="554.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(DCF / P-E / PEG)</text>
-<rect x="644" y="508" width="269" height="76" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1" />
-<text x="778.5" y="539.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">MomentumReportService</text>
-<text x="778.5" y="554.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(VIX / Futures)</text>
-<rect x="921" y="508" width="269" height="76" rx="6" fill="#fbbf24" stroke="#a16207" stroke-width="1.5" opacity="1" />
-<text x="1055.5" y="539.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OuouAnalysisService</text>
-<text x="1055.5" y="554.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(AI SSE Stream)</text>
-<rect x="1198" y="508" width="269" height="76" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1" />
-<text x="1332.5" y="539.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">IvRankService</text>
-<text x="1332.5" y="554.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(IV Rank / Peers)</text>
-<rect x="1475" y="508" width="269" height="76" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1" />
-<text x="1609.5" y="539.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OwnershipSnapshotService</text>
-<text x="1609.5" y="554.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Quarterly Save)</text>
-<rect x="1752" y="508" width="269" height="76" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1" />
-<text x="1886.5" y="539.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">MarginInterestService</text>
-<text x="1886.5" y="554.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Interest Calc)</text>
-<rect x="2029" y="508" width="269" height="76" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1" />
-<text x="2163.5" y="539.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OptionsOcrService</text>
-<text x="2163.5" y="554.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Vision / OCR)</text>
-<rect x="80" y="616" width="2240" height="114" rx="10" fill="#fee2e2" stroke="#b91c1c" stroke-width="1.5" opacity="0.38" stroke-dasharray="8,4"/>
-<text x="94" y="634" text-anchor="start" font-size="11" fill="#b91c1c" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Data / Integration Services</text>
-<rect x="90" y="644" width="269" height="76" rx="6" fill="#fca5a5" stroke="#b91c1c" stroke-width="1.5" opacity="1" />
-<text x="224.5" y="675.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">FinnhubService</text>
-<text x="224.5" y="690.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Quote/News/Metrics)</text>
-<rect x="367" y="644" width="269" height="76" rx="6" fill="#fca5a5" stroke="#b91c1c" stroke-width="1.5" opacity="1" />
-<text x="501.5" y="675.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">YahooFinanceService</text>
-<text x="501.5" y="690.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Chart / Holders)</text>
-<rect x="644" y="644" width="269" height="76" rx="6" fill="#fca5a5" stroke="#b91c1c" stroke-width="1.5" opacity="1" />
-<text x="778.5" y="675.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">VixService</text>
-<text x="778.5" y="690.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(VIX Fetch)</text>
-<rect x="921" y="644" width="269" height="76" rx="6" fill="#fca5a5" stroke="#b91c1c" stroke-width="1.5" opacity="1" />
-<text x="1055.5" y="675.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">TelegramBotHandlerService</text>
-<text x="1055.5" y="690.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Bot Handler)</text>
-<rect x="1198" y="644" width="269" height="76" rx="6" fill="#fca5a5" stroke="#b91c1c" stroke-width="1.5" opacity="1" />
-<text x="1332.5" y="675.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OuouPreMarketService</text>
-<text x="1332.5" y="690.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Pre-market Report)</text>
-<rect x="1475" y="644" width="269" height="76" rx="6" fill="#fca5a5" stroke="#b91c1c" stroke-width="1.5" opacity="1" />
-<text x="1609.5" y="675.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">StockPriceChecker</text>
-<text x="1609.5" y="690.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Alert Monitor)</text>
-<rect x="1752" y="644" width="269" height="76" rx="6" fill="#fca5a5" stroke="#b91c1c" stroke-width="1.5" opacity="1" />
-<text x="1886.5" y="675.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">SecEdgarService</text>
-<text x="1886.5" y="690.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Holdings Fallback)</text>
-<rect x="2029" y="644" width="269" height="76" rx="6" fill="#fecaca" stroke="#b91c1c" stroke-width="1.5" opacity="1" />
-<text x="2163.5" y="675.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">TranslationService</text>
-<text x="2163.5" y="690.5" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(i18n)</text>
-<rect x="80" y="752" width="2240" height="114" rx="10" fill="#f3e8ff" stroke="#7e22ce" stroke-width="1.5" opacity="0.38" stroke-dasharray="8,4"/>
-<text x="94" y="770" text-anchor="start" font-size="11" fill="#7e22ce" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Database &amp; Background Jobs</text>
-<rect x="90" y="780" width="436" height="76" rx="6" fill="#d8b4fe" stroke="#7e22ce" stroke-width="1.5" opacity="1" />
-<text x="308.0" y="810.85" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">ActiveRecord Models</text>
-<text x="308.0" y="827.35" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(ORM Layer)</text>
-<rect x="534" y="780" width="436" height="76" rx="6" fill="#c084fc" stroke="#7e22ce" stroke-width="1.5" opacity="1" />
-<text x="752.0" y="810.85" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">PostgreSQL</text>
-<text x="752.0" y="827.35" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Primary DB)</text>
-<rect x="978" y="780" width="436" height="76" rx="6" fill="#d8b4fe" stroke="#7e22ce" stroke-width="1.5" opacity="1" />
-<text x="1196.0" y="810.85" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">StockPriceCheckJob</text>
-<text x="1196.0" y="827.35" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Background Job)</text>
-<rect x="1422" y="780" width="436" height="76" rx="6" fill="#e9d5ff" stroke="#7e22ce" stroke-width="1.5" opacity="1" />
-<text x="1640.0" y="810.85" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OwnershipSnapshot</text>
-<text x="1640.0" y="827.35" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Quarterly Data)</text>
-<rect x="1866" y="780" width="436" height="76" rx="6" fill="#e9d5ff" stroke="#7e22ce" stroke-width="1.5" opacity="1" />
-<text x="2084.0" y="810.85" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">WatchlistItem + PriceAlert</text>
-<text x="2084.0" y="827.35" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(AR Models)</text>
-<rect x="80" y="888" width="2240" height="114" rx="10" fill="#fce8e8" stroke="#991b1b" stroke-width="1.5" opacity="0.38" stroke-dasharray="8,4"/>
-<text x="94" y="906" text-anchor="start" font-size="11" fill="#991b1b" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">External APIs</text>
-<rect x="90" y="916" width="362" height="76" rx="6" fill="#f87171" stroke="#991b1b" stroke-width="1.5" opacity="1" />
-<text x="271.0" y="946.85" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Finnhub API</text>
-<text x="271.0" y="963.35" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Quotes/News/Earnings)</text>
-<rect x="460" y="916" width="362" height="76" rx="6" fill="#f87171" stroke="#991b1b" stroke-width="1.5" opacity="1" />
-<text x="641.0" y="946.85" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Yahoo Finance API</text>
-<text x="641.0" y="963.35" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Charts/Shareholders)</text>
-<rect x="830" y="916" width="362" height="76" rx="6" fill="#f87171" stroke="#991b1b" stroke-width="1.5" opacity="1" />
-<text x="1011.0" y="946.85" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OpenAI / Claude API</text>
-<text x="1011.0" y="963.35" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(SSE Streaming)</text>
-<rect x="1200" y="916" width="362" height="76" rx="6" fill="#f87171" stroke="#991b1b" stroke-width="1.5" opacity="1" />
-<text x="1381.0" y="946.85" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Telegram Bot API</text>
-<text x="1381.0" y="963.35" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Notifications)</text>
-<rect x="1570" y="916" width="362" height="76" rx="6" fill="#f87171" stroke="#991b1b" stroke-width="1.5" opacity="1" />
-<text x="1751.0" y="946.85" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Groq Vision API</text>
-<text x="1751.0" y="963.35" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(OCR / Screenshot)</text>
-<rect x="1940" y="916" width="362" height="76" rx="6" fill="#f87171" stroke="#991b1b" stroke-width="1.5" opacity="1" />
-<text x="2121.0" y="946.85" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">SEC EDGAR API</text>
-<text x="2121.0" y="963.35" text-anchor="middle" font-size="11" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Holdings Data)</text>
-<line x1="1200" y1="110" x2="1200" y2="156" stroke="#854d0e" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="1200" y1="322" x2="1200" y2="344" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="501" y1="458" x2="501" y2="480" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="778" y1="458" x2="778" y2="480" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="1055" y1="458" x2="1055" y2="480" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="1332" y1="458" x2="1332" y2="480" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="224" y1="594" x2="224" y2="616" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="501" y1="594" x2="501" y2="616" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="778" y1="594" x2="778" y2="616" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="1055" y1="594" x2="1055" y2="616" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="224" y1="730" x2="271" y2="888" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="501" y1="730" x2="641" y2="888" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="778" y1="730" x2="1011" y2="888" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="1055" y1="730" x2="1381" y2="888" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="1332" y1="730" x2="1751" y2="888" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="1609" y1="730" x2="2121" y2="888" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="1609" y1="730" x2="752" y2="752" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
-<line x1="1609" y1="594" x2="1640" y2="752" stroke="#9ca3af" stroke-width="1.5" opacity="0.7"  marker-end="url(#arr)"/>
+<text x="1100" y="34" text-anchor="middle" font-size="22" fill="#111827" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">FairPrice 系統架構圖</text>
+<rect x="970" y="48" width="260" height="42" rx="6" fill="#fef08a" stroke="#854d0e" stroke-width="1.5" opacity="1"/>
+<text x="1100" y="75" text-anchor="middle" font-size="13" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Browser / User</text>
+<rect x="60" y="110" width="2080" height="128" rx="10" fill="#e0e7ff" stroke="#4338ca" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
+<text x="74" y="126" text-anchor="start" font-size="11" fill="#4338ca" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Pages  (port 3003 · Phlex SSR + Vite/React SPA)</text>
+<rect x="70" y="160" width="197" height="64" rx="6" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" opacity="1"/>
+<text x="168" y="187" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">FairPrice 估值</text>
+<text x="168" y="203" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Phlex)</text>
+<rect x="277" y="160" width="197" height="64" rx="6" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" opacity="1"/>
+<text x="375" y="187" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Daily Momentum</text>
+<text x="375" y="203" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Phlex)</text>
+<rect x="484" y="160" width="197" height="64" rx="6" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" opacity="1"/>
+<text x="582" y="187" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">歐歐 AI 分析</text>
+<text x="582" y="203" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(SSE)</text>
+<rect x="691" y="160" width="197" height="64" rx="6" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" opacity="1"/>
+<text x="789" y="187" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">技術圖表</text>
+<text x="789" y="203" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(React)</text>
+<rect x="898" y="160" width="197" height="64" rx="6" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" opacity="1"/>
+<text x="996" y="187" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Options Analyzer</text>
+<text x="996" y="203" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(React)</text>
+<rect x="1105" y="160" width="197" height="64" rx="6" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" opacity="1"/>
+<text x="1203" y="187" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">持股結構</text>
+<text x="1203" y="203" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(React)</text>
+<rect x="1312" y="160" width="197" height="64" rx="6" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" opacity="1"/>
+<text x="1410" y="187" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">保證金試算</text>
+<text x="1410" y="203" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(React)</text>
+<rect x="1519" y="160" width="197" height="64" rx="6" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" opacity="1"/>
+<text x="1617" y="187" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">期權價格追蹤</text>
+<text x="1617" y="203" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(React)</text>
+<rect x="1726" y="160" width="197" height="64" rx="6" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" opacity="1"/>
+<text x="1824" y="187" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Watchlist</text>
+<text x="1824" y="203" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Phlex)</text>
+<rect x="1933" y="160" width="197" height="64" rx="6" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" opacity="1"/>
+<text x="2031" y="187" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Portfolio</text>
+<text x="2031" y="203" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Phlex)</text>
+<rect x="60" y="258" width="2080" height="128" rx="10" fill="#dcfce7" stroke="#15803d" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
+<text x="74" y="274" text-anchor="start" font-size="11" fill="#15803d" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Controllers</text>
+<rect x="70" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="194" y="335" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">ValuationsController</text>
+<text x="194" y="351" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/valuations/:ticker</text>
+<rect x="328" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="452" y="335" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">ReportsController</text>
+<text x="452" y="351" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/momentum</text>
+<rect x="586" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="710" y="335" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OptionsController</text>
+<text x="710" y="351" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/options</text>
+<rect x="844" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="968" y="335" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OwnershipController</text>
+<text x="968" y="351" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/ownership</text>
+<rect x="1102" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="1226" y="335" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">MarginController</text>
+<text x="1226" y="351" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/margin</text>
+<rect x="1360" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="1484" y="335" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">StockAlertsController</text>
+<text x="1484" y="351" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/watchlist</text>
+<rect x="1618" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="1742" y="335" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">PortfoliosController</text>
+<text x="1742" y="351" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/portfolio</text>
+<rect x="1876" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="2000" y="335" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Api::V1::*</text>
+<text x="2000" y="351" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">/api/v1/...</text>
+<rect x="60" y="406" width="2080" height="128" rx="10" fill="#fef9c3" stroke="#a16207" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
+<text x="74" y="422" text-anchor="start" font-size="11" fill="#a16207" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Services</text>
+<rect x="70" y="456" width="285" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="212" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">StockDataService</text>
+<text x="212" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">+ ValuationService</text>
+<rect x="365" y="456" width="285" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="507" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">MomentumReportService</text>
+<text x="507" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Thread 平行化)</text>
+<rect x="660" y="456" width="285" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="802" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OuouAnalysisService</text>
+<text x="802" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Groq + cache)</text>
+<rect x="955" y="456" width="285" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="1097" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">FinnhubService</text>
+<text x="1097" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(quote/metrics/news)</text>
+<rect x="1250" y="456" width="285" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="1392" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">YahooFinanceService</text>
+<text x="1392" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(chart/holders)</text>
+<rect x="1545" y="456" width="285" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="1687" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">VixService</text>
+<text x="1687" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(^VIX)</text>
+<rect x="1840" y="456" width="285" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="1982" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">TelegramService</text>
+<text x="1982" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(Bot 通知)</text>
+<rect x="60" y="554" width="2080" height="128" rx="10" fill="#fce7f3" stroke="#9d174d" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
+<text x="74" y="570" text-anchor="start" font-size="11" fill="#9d174d" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">PostgreSQL — 持久化資料</text>
+<rect x="70" y="604" width="507" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
+<text x="323" y="631" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OwnershipSnapshot</text>
+<text x="323" y="647" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(ticker+quarter)</text>
+<rect x="587" y="604" width="507" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
+<text x="840" y="631" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OwnershipHolder</text>
+<text x="840" y="647" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(快照明細)</text>
+<rect x="1104" y="604" width="507" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
+<text x="1357" y="631" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">StockAlert</text>
+<text x="1357" y="647" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(價格警示)</text>
+<rect x="1621" y="604" width="507" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
+<text x="1874" y="631" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Portfolio</text>
+<text x="1874" y="647" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(投資組合)</text>
+<rect x="60" y="702" width="2080" height="128" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5" opacity="0.6" stroke-dasharray="6,3"/>
+<text x="74" y="718" text-anchor="start" font-size="11" fill="#6b7280" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">External APIs</text>
+<rect x="70" y="752" width="507" height="64" rx="6" fill="#fed7aa" stroke="#c2410c" stroke-width="1.5" opacity="1"/>
+<text x="323" y="779" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Finnhub API</text>
+<text x="323" y="795" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(quote / metrics / news)</text>
+<rect x="587" y="752" width="507" height="64" rx="6" fill="#fed7aa" stroke="#c2410c" stroke-width="1.5" opacity="1"/>
+<text x="840" y="779" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Yahoo Finance API</text>
+<text x="840" y="795" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(chart / historical / holders)</text>
+<rect x="1104" y="752" width="507" height="64" rx="6" fill="#e9d5ff" stroke="#7c3aed" stroke-width="1.5" opacity="1"/>
+<text x="1357" y="779" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Groq API</text>
+<text x="1357" y="795" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(llama-3.3-70b · SSE 串流)</text>
+<rect x="1621" y="752" width="507" height="64" rx="6" fill="#bfdbfe" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
+<text x="1874" y="779" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Telegram Bot API</text>
+<text x="1874" y="795" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">(盤前報告推播)</text>
+<line x1="1100" y1="90" x2="1100" y2="110" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
+<line x1="1100" y1="238" x2="1100" y2="258" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
+<line x1="1100" y1="386" x2="1100" y2="406" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
+<line x1="1100" y1="534" x2="1100" y2="554" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
+<line x1="1100" y1="534" x2="1100" y2="702" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
 </svg>
