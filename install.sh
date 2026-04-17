@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # ── 版本常數 ────────────────────────────────────────────────
-readonly SCRIPT_VERSION="20260415"
+readonly SCRIPT_VERSION="20260417"
 readonly RUBY_VERSION="4.0.1"
 readonly BUNDLER_VERSION="4.0.7"
 readonly MIN_NODE_MAJOR=20
