@@ -22,6 +22,8 @@ class FairValue::NavbarComponent < ApplicationComponent
           end
           div(class: "w-px h-5 bg-gray-200 mx-1")
           render FairValue::AppSwitcherComponent.new(navbar: true)
+          div(class: "w-px h-5 bg-gray-200 mx-1")
+          render FairValue::FontSizeControlsComponent.new
         end
         if @show_search
           div(class: "flex-1 max-w-md") do

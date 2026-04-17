@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
   <head>
+    <script>
+      (function() {
+        var s = localStorage.getItem('fairprice:font-size');
+        if (s && ['14','15','16','17','18'].indexOf(s) !== -1) {
+          document.documentElement.style.fontSize = s + 'px';
+        }
+      })();
+    </script>
     <title><%= content_for(:title).presence || "FairPrice" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
