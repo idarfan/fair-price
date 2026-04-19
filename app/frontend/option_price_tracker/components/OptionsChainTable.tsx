@@ -91,7 +91,12 @@ export default function OptionsChainTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ strike, call, put }) => {
+          {(() => {
+            const dividerIdx =
+              underlyingPrice > 0
+                ? rows.findIndex((r) => r.strike > underlyingPrice)
+                : -1;
+            return rows.flatMap(({ strike, call, put }, idx) => {
             const callItm = call?.in_the_money ?? strike < underlyingPrice;
             const putItm = put?.in_the_money ?? strike > underlyingPrice;
             const isAtm =
@@ -117,7 +122,7 @@ export default function OptionsChainTable({
               : "bg-gray-50";
             const strikePutBg = putSelected ? "opt-put-selected" : "bg-gray-50";
 
-            return (
+            const strikeRow = (
               <tr
                 key={strike}
                 className={`${rowBase} ${isAtm ? "ring-1 ring-inset ring-amber-400/60" : ""}`}
@@ -220,7 +225,22 @@ export default function OptionsChainTable({
                 </td>
               </tr>
             );
-          })}
+            if (dividerIdx === idx) {
+              return [
+                <tr key="price-divider" className="bg-amber-50 border-y-2 border-amber-300">
+                  <td
+                    colSpan={13}
+                    className="text-center py-1.5 text-xs font-semibold text-amber-700 tracking-wide"
+                  >
+                    {`── 現價 $${underlyingPrice.toFixed(2)} ──`}
+                  </td>
+                </tr>,
+                strikeRow,
+              ];
+            }
+            return [strikeRow];
+          });
+        })()}
         </tbody>
       </table>
     </div>

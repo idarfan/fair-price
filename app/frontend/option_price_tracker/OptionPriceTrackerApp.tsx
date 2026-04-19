@@ -29,11 +29,20 @@ function calcDte(expiration: string): number {
 function buildChainRows(
   snapshots: OptionSnapshotRow[],
   expiration: string,
+  underlyingPrice = 0,
+  nearCount = 6,
 ): StrikeRow[] {
   const filtered = snapshots.filter((s) => s.expiration === expiration);
-  const strikes = [...new Set(filtered.map((s) => s.strike))].sort(
+  let strikes = [...new Set(filtered.map((s) => s.strike))].sort(
     (a, b) => a - b,
   );
+
+  if (underlyingPrice > 0) {
+    const below = strikes.filter((s) => s <= underlyingPrice).slice(-nearCount);
+    const above = strikes.filter((s) => s > underlyingPrice).slice(0, nearCount);
+    strikes = [...below, ...above];
+  }
+
   return strikes.map((strike) => ({
     strike,
     call:
@@ -217,7 +226,7 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
     if (selected) loadSnapshots(selected);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const chainRows = selectedExp ? buildChainRows(snapshots, selectedExp) : [];
+  const chainRows = selectedExp ? buildChainRows(snapshots, selectedExp, underlyingPrice) : [];
   const dte = selectedExp ? calcDte(selectedExp) : null;
 
   return (
