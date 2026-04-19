@@ -1,3 +1,16 @@
 {
-  "hooks": {}
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Grep|Glob|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/idarfan/.claude/hooks/pre-graph-first-reminder.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
 }
