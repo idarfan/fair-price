@@ -60,16 +60,6 @@ export default function OptionsChainTable({
             {/* Strike */}
             <th className="px-3 py-1.5 text-center text-gray-500 text-xs font-semibold bg-gray-50">
               行權價格
-              {underlyingPrice > 0 && (
-                <div className="mt-1">
-                  <span className="inline-flex items-center gap-1 bg-amber-50 border border-amber-300 rounded px-2 py-0.5">
-                    <span className="text-[10px] text-gray-500">現價</span>
-                    <span className="text-xs font-mono font-bold text-amber-700">
-                      ${underlyingPrice.toFixed(2)}
-                    </span>
-                  </span>
-                </div>
-              )}
             </th>
             {/* Puts header */}
             <th
@@ -88,7 +78,16 @@ export default function OptionsChainTable({
             <th className={thBase}>出價</th>
             <th className={`${thBase} border-r border-gray-200`}>價格</th>
             {/* Strike */}
-            <th className="px-3 py-1.5 text-center text-xs font-medium text-gray-500 bg-gray-50"></th>
+            <th className="px-3 py-1.5 text-center text-xs font-medium text-gray-500 bg-gray-50">
+              {underlyingPrice > 0 && (
+                <span className="inline-flex items-center gap-1 bg-amber-50 border border-amber-300 rounded px-2 py-0.5">
+                  <span className="text-[10px] text-gray-400">現價</span>
+                  <span className="text-xs font-mono font-bold text-amber-700">
+                    ${underlyingPrice.toFixed(2)}
+                  </span>
+                </span>
+              )}
+            </th>
             {/* Put columns */}
             <th className={`${thBase} border-l border-gray-200 text-left`}>
               價格
