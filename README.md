@@ -52,6 +52,13 @@ bundle exec rubocop -a   # 自動修正
 
 ## 變更記錄
 
+### 2026-04-19 — 期權鏈 Tippy+KaTeX tooltip 升級、水平溢出修正、中文欄位標籤
+
+**動機：** 單選 Calls/Puts 模式新增 TradingView 風格欄位後表格水平溢出；tooltip 說明過於簡陋，缺乏數學公式；Bid/Ask 欄位應維持中文。
+
+**異動內容：**
+- `app/frontend/option_price_tracker/components/OptionsChainTable.tsx`：安裝 `@tippyjs/react` + `katex`，以 Tippy 取代 CSS hover tooltip（支援跨 overflow 容器定位、居中顯示）；各欄位 tooltip 含 KaTeX 數學公式、中文說明、黃底範例；改用 `table-layout: fixed` + 百分比欄寬消除水平捲動；單選模式欄位標籤改回出價/要價；修正 both-mode thead 多餘欄造成的錯位
+
 ### 2026-04-17 — Options 頁面可調整框格 + Navbar 字體大小控制
 
 **動機：** 提升 Options 頁面彈性：三個固定框格改為可拖動調整並記憶位置；Navbar 加入 5 個字體大小按鍵。
