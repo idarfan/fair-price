@@ -281,7 +281,7 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
                 </span>
               )}
               {underlyingPrice > 0 && (
-                <span className="ml-auto flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-0.5">
+                <span className="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-0.5">
                   <span className="text-xs text-gray-500">現價</span>
                   <span className="text-sm font-mono font-bold text-amber-700">
                     ${underlyingPrice.toFixed(2)}
