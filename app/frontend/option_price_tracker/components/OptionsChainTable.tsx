@@ -60,6 +60,16 @@ export default function OptionsChainTable({
             {/* Strike */}
             <th className="px-3 py-1.5 text-center text-gray-500 text-xs font-semibold bg-gray-50">
               行權價格
+              {underlyingPrice > 0 && (
+                <div className="mt-1">
+                  <span className="inline-flex items-center gap-1 bg-amber-50 border border-amber-300 rounded px-2 py-0.5">
+                    <span className="text-[10px] text-gray-500">現價</span>
+                    <span className="text-xs font-mono font-bold text-amber-700">
+                      ${underlyingPrice.toFixed(2)}
+                    </span>
+                  </span>
+                </div>
+              )}
             </th>
             {/* Puts header */}
             <th
