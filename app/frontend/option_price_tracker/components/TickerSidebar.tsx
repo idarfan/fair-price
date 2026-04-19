@@ -19,6 +19,7 @@ export default function TickerSidebar({
   const [input, setInput] = useState("");
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   async function handleAdd(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -36,12 +37,43 @@ export default function TickerSidebar({
     }
   }
 
+  if (collapsed) {
+    return (
+      <aside className="w-8 shrink-0 border-r border-gray-200 bg-teal-700 flex flex-col items-center pt-2 gap-2">
+        <button
+          onClick={() => setCollapsed(false)}
+          title="展開清單"
+          className="text-teal-100 hover:text-white transition-colors text-sm"
+        >
+          ▶
+        </button>
+        {selected && (
+          <span
+            className="text-[10px] font-mono font-bold text-teal-200 writing-mode-vertical"
+            style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
+          >
+            {selected.symbol}
+          </span>
+        )}
+      </aside>
+    );
+  }
+
   return (
     <aside className="w-52 shrink-0 border-r border-gray-200 bg-white flex flex-col">
       <div className="px-3 py-3 border-b border-gray-200 bg-teal-700">
-        <p className="text-xs text-teal-100 font-semibold uppercase tracking-wider mb-2">
-          追蹤清單
-        </p>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs text-teal-100 font-semibold uppercase tracking-wider">
+            追蹤清單
+          </p>
+          <button
+            onClick={() => setCollapsed(true)}
+            title="收摺清單"
+            className="text-teal-300 hover:text-white transition-colors text-xs leading-none"
+          >
+            ◀
+          </button>
+        </div>
         <form onSubmit={handleAdd} className="flex gap-1">
           <input
             type="text"
