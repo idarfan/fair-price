@@ -272,9 +272,9 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
                   onClick={() => setCallPutFilter((f) => (f === "call" ? "both" : "call"))}
                   className={`px-2.5 py-0.5 rounded text-xs font-semibold transition-colors ${
                     callPutFilter === "call"
-                      ? "bg-blue-600 text-white"
+                      ? "btn-calls-active"
                       : callPutFilter === "put"
-                        ? "bg-gray-100 text-gray-400"
+                        ? "btn-filter-muted"
                         : "bg-blue-50 text-blue-600 hover:bg-blue-100"
                   }`}
                 >
@@ -284,9 +284,9 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
                   onClick={() => setCallPutFilter((f) => (f === "put" ? "both" : "put"))}
                   className={`px-2.5 py-0.5 rounded text-xs font-semibold transition-colors ${
                     callPutFilter === "put"
-                      ? "bg-rose-600 text-white"
+                      ? "btn-puts-active"
                       : callPutFilter === "call"
-                        ? "bg-gray-100 text-gray-400"
+                        ? "btn-filter-muted"
                         : "bg-rose-50 text-rose-600 hover:bg-rose-100"
                   }`}
                 >
