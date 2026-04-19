@@ -70,6 +70,7 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [underlyingPrice, setUnderlyingPrice] = useState(0);
+  const [callPutFilter, setCallPutFilter] = useState<"both" | "call" | "put">("both");
 
   const [selectedContract, setSelectedContract] = useState<string | null>(null);
   const [trendData, setTrendData] = useState<PremiumTrendPoint[]>([]);
@@ -266,9 +267,28 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
 
             {/* Header */}
             <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-200 bg-white shrink-0">
-              <span className="text-xs text-gray-500 font-medium">
-                Calls / Puts
-              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCallPutFilter((f) => (f === "call" ? "both" : "call"))}
+                  className={`px-2.5 py-0.5 rounded text-xs font-semibold transition-colors ${
+                    callPutFilter === "call"
+                      ? "bg-blue-600 text-white"
+                      : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                  }`}
+                >
+                  Calls
+                </button>
+                <button
+                  onClick={() => setCallPutFilter((f) => (f === "put" ? "both" : "put"))}
+                  className={`px-2.5 py-0.5 rounded text-xs font-semibold transition-colors ${
+                    callPutFilter === "put"
+                      ? "bg-red-500 text-white"
+                      : "bg-red-50 text-red-500 hover:bg-red-100"
+                  }`}
+                >
+                  Puts
+                </button>
+              </div>
               <span className="font-mono font-bold text-sm text-gray-800">
                 {selected.symbol}
               </span>
@@ -293,6 +313,7 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
                 <OptionsChainTable
                   rows={chainRows}
                   underlyingPrice={underlyingPrice}
+                  filter={callPutFilter}
                   selectedContract={selectedContract}
                   onSelect={loadTrend}
                 />
