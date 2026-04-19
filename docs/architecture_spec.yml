@@ -16,50 +16,40 @@ layers:
   item_fill: '#93c5fd'
   item_stroke: '#1d4ed8'
   items:
-  - - StockLogo
-    - ''
+  - - OptionsChainTable
+    - Tippy+KaTeX tooltip
+  - - OwnershipApp
+    - 持股結構圖
+  - - OptionPriceTrackerApp
+    - 期權鏈追蹤
   - - AddPositionForm
-    - ''
-  - - CalculatorTab
-    - ''
-  - - Controlled
-    - ''
-  - - DaysSelector
-    - ''
-  - - Story
-    - ''
-  - - InterestScheduleTable
     - ''
   - - PositionListTab
     - ''
-  - - Story
-    - ''
-  - - PositionRow
+  - - CalculatorTab
+    - 融資試算器
+  - - InterestScheduleTable
     - ''
 - id: rails_api
   type: band
-  label: Rails API  (port 3000)
+  label: Rails API  (port 3003)
   fill: '#dcfce7'
   stroke: '#15803d'
   item_fill: '#86efac'
   item_stroke: '#15803d'
   items:
-  - - BaseController
-    - ''
-  - - MarginPositionsController
-    - ''
-  - - OptionsController
-    - ''
-  - - OwnershipSnapshotsController
-    - ''
   - - ValuationsController
-    - ''
-  - - MarginController
-    - ''
+    - FairPrice
+  - - ReportsController
+    - Daily Momentum
+  - - OwnershipController
+    - 持股結構
   - - OptionPriceTrackerController
-    - ''
-  - - OptionsController
-    - ''
+    - 期權鏈
+  - - MarginPositionsController
+    - 融資部位
+  - - Api::V1::*
+    - JSON API
 - id: services
   type: band
   label: Services
@@ -68,22 +58,24 @@ layers:
   item_fill: '#fde047'
   item_stroke: '#a16207'
   items:
-  - - ExchangeRateService
-    - ''
   - - FinnhubService
-    - ''
-  - - IvRankService
-    - ''
-  - - MarginInterestReminderService
-    - ''
-  - - MarginInterestService
-    - ''
+    - 報價/指標
+  - - YahooFinanceService
+    - 持股/歷史/VIX
+  - - VixService
+    - VIX 指數
   - - MomentumReportService
-    - ''
-  - - OptionsOcrService
-    - ''
-  - - Ouou
-    - ''
+    - 動能報告
+  - - StockDataService
+    - 估值資料
+  - - ValuationService
+    - DCF/PE/PEG
+  - - SecEdgarService
+    - 機構持股備援
+  - - IvRankService
+    - IV Rank
+  - - OuouAnalysisService
+    - AI 分析
 - id: models
   type: band
   label: Models / Database  (PostgreSQL)
@@ -92,22 +84,16 @@ layers:
   item_fill: '#f9a8d4'
   item_stroke: '#9d174d'
   items:
-  - - Charts
-    - ''
-  - - TechnicalIndicators
-    - ''
-  - - DailyMomentum
-    - ''
-  - - MarketStancePresenter
-    - ''
-  - - DailyMomentum
-    - ''
-  - - WatchlistRowPresenter
-    - ''
-  - - ConsensusPresenter
-    - ''
-  - - FairValue
-    - ''
+  - - OptionSnapshot
+    - 期權快照
+  - - TrackedTicker
+    - 追蹤代號
+  - - OwnershipSnapshot
+    - 持股快照
+  - - OwnershipHolder
+    - 持股人
+  - - MarginPosition
+    - 融資部位
 - id: scripts
   type: band
   label: 自動化腳本  (Python + Playwright CDP)
@@ -116,12 +102,32 @@ layers:
   item_fill: '#fde047'
   item_stroke: '#a16207'
   items:
-  - - fairprice.py
-    - ''
   - - options_collector.py
-    - ''
+    - CBOE→yfinance
+  - - fairprice.py
+    - Playwright 截圖
   - - options_ocr.py
-    - ''
+    - OCR 解析
+- id: external_apis
+  type: external
+  label: 外部 API / 資料來源
+  items:
+  - text: CBOE Delayed Quotes
+    sub: 期權鏈（主要）
+    fill: '#fde68a'
+    stroke: '#d97706'
+  - text: Yahoo Finance
+    sub: 報價/歷史/VIX/持股
+    fill: '#bfdbfe'
+    stroke: '#2563eb'
+  - text: Finnhub
+    sub: 報價/指標/財報
+    fill: '#bbf7d0'
+    stroke: '#16a34a'
+  - text: SEC EDGAR
+    sub: 機構持股（備援）
+    fill: '#e9d5ff'
+    stroke: '#7c3aed'
 arrows:
 - - browser
   - frontend
@@ -133,3 +139,7 @@ arrows:
   - models
 - - models
   - scripts
+- - scripts
+  - external_apis
+- - services
+  - external_apis
