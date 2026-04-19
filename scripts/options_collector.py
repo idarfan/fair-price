@@ -2,7 +2,7 @@
 """
 Options Price Tracker — Daily EOD Snapshot Collector
 ====================================================
-Fetches current options chain data from Yahoo Finance via yfinance,
+Fetches current options chain data from CBOE (primary) with yfinance fallback,
 filters by DTE/strike range/OI, and upserts into PostgreSQL.
 
 Designed to share the same PostgreSQL database as a Rails app.
@@ -23,9 +23,11 @@ Schedule (crontab, Taiwan time):
 import os
 import sys
 import json
+import re
 import time
 import logging
 import argparse
+import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -145,11 +147,111 @@ def get_tracked_tickers(conn, symbols: list[str] | None = None) -> list[dict]:
     return tickers
 
 
+CBOE_API = "https://cdn.cboe.com/api/global/delayed_quotes/options/{symbol}.json"
+
+
+def _parse_cboe_symbol(sym: str) -> tuple | None:
+    """Parse SQQQ260515P00050000 → (exp_date, 'put', 50.0)"""
+    m = re.match(r'^[A-Z]+(\d{2})(\d{2})(\d{2})([CP])(\d{8})$', sym)
+    if not m:
+        return None
+    yy, mm, dd, cp, strike_str = m.groups()
+    exp = date(2000 + int(yy), int(mm), int(dd))
+    opt_type = "call" if cp == "C" else "put"
+    strike = int(strike_str) / 1000.0
+    return exp, opt_type, strike
+
+
+def fetch_options_chain_cboe(symbol: str, config: dict) -> list[dict] | None:
+    """
+    Fetch from CBOE delayed quotes API.
+    Returns list of snapshot dicts, or None on failure.
+    """
+    min_dte = config.get("min_dte", DEFAULT_MIN_DTE)
+    max_dte = config.get("max_dte", DEFAULT_MAX_DTE)
+    strike_range = config.get("strike_range", DEFAULT_STRIKE_RANGE)
+    min_oi = config.get("min_oi", DEFAULT_MIN_OI)
+
+    url = CBOE_API.format(symbol=symbol)
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read())
+    except Exception as e:
+        log.warning(f"{symbol}: CBOE fetch failed: {e}")
+        return None
+
+    body = data.get("data", {})
+    underlying_price = float(body.get("current_price") or body.get("close") or 0)
+    if not underlying_price:
+        log.warning(f"{symbol}: CBOE — cannot determine underlying price")
+        return None
+
+    options = body.get("options", [])
+    if not options:
+        log.warning(f"{symbol}: CBOE — no options data")
+        return None
+
+    today = date.today()
+    snapshots = []
+
+    for opt in options:
+        sym = opt.get("option", "")
+        parsed = _parse_cboe_symbol(sym)
+        if not parsed:
+            continue
+        exp_date, opt_type, strike = parsed
+
+        dte = (exp_date - today).days
+        if dte < min_dte or dte > max_dte:
+            continue
+        if strike < underlying_price * (1 - strike_range):
+            continue
+        if strike > underlying_price * (1 + strike_range):
+            continue
+
+        bid_val = _safe_float(opt.get("bid")) or 0
+        ask_val = _safe_float(opt.get("ask")) or 0
+        oi = _safe_int(opt.get("open_interest"))
+        if oi < min_oi:
+            continue
+        if bid_val == 0 and ask_val == 0 and oi == 0:
+            continue
+
+        itm = (opt_type == "call" and strike < underlying_price) or               (opt_type == "put"  and strike > underlying_price)
+
+        snapshots.append({
+            "snapshot_date": today,
+            "snapped_at": datetime.now(timezone.utc),
+            "contract_symbol": sym,
+            "option_type": opt_type,
+            "expiration": exp_date,
+            "strike": strike,
+            "last_price": _safe_float(opt.get("last_trade_price")),
+            "bid": bid_val,
+            "ask": ask_val,
+            "volume": _safe_int(opt.get("volume")),
+            "open_interest": oi,
+            "implied_volatility": _safe_float(opt.get("iv")),
+            "in_the_money": itm,
+            "underlying_price": underlying_price,
+        })
+
+    log.info(f"{symbol}: CBOE collected {len(snapshots)} contracts")
+    return snapshots
+
+
 def fetch_options_chain(symbol: str, config: dict) -> list[dict]:
     """
-    Fetch options chain from Yahoo Finance for a single ticker.
+    Fetch options chain — CBOE first, yfinance fallback.
     Returns a list of snapshot dicts ready for DB insertion.
     """
+    # Try CBOE first (more complete strike coverage)
+    cboe_result = fetch_options_chain_cboe(symbol, config)
+    if cboe_result is not None:
+        return cboe_result
+    log.info(f"{symbol}: falling back to yfinance")
+
     min_dte = config.get("min_dte", DEFAULT_MIN_DTE)
     max_dte = config.get("max_dte", DEFAULT_MAX_DTE)
     strike_range = config.get("strike_range", DEFAULT_STRIKE_RANGE)
