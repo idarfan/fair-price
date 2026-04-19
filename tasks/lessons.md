@@ -349,3 +349,85 @@ async viteFinal(config) {
 - 在 `.storybook/vite.config.ts` 設 `base: '/'` → 會被 sbConfig 的 `base: './'` 覆蓋
 - 在 `viteFinal` 只設 `config.base = '/'` → RubyPlugin 的 config hook 之後再次覆蓋
 - 清除 Storybook cache → 無效，問題不在 cache
+
+---
+
+## 2026-04-19 — Tippy+KaTeX tooltip、CBOE 整合：五個錯誤
+
+### 錯誤 1：嘗試直接寫入 ~/.claude/settings.json（被系統阻斷）
+
+**過錯：** 兩次用 Write/Edit 工具修改 `~/.claude/settings.json`，均被 Claude Code 自改保護阻斷，浪費 2 輪。
+
+**根本原因：** Claude Code 有內建保護，禁止自己修改 `~/.claude/` 下的 JSON 設定檔。
+
+**防治：**
+- 凡需修改 `~/.claude/settings.json`（或其他 `~/.claude/` 下的 JSON），**直接告知用戶需手動執行**，給出具體指令或 Python 腳本。
+- 不要嘗試用 Write / Edit / Bash 工具寫入，節省輪次。
+
+---
+
+### 錯誤 2：Obsidian 去重用 commit message，被 grep 過濾邏輯拆穿
+
+**過錯：** `post-push-obsidian.sh` 用 `git log -1 --format="%s"` 取 commit message 存為去重憑證，但輸出時用 grep 過濾掉 "chore: 自動提交"，導致 state file 儲存的 subject 永遠不等於 log 輸出，每次都重複寫入。
+
+**根本原因：** 去重憑證（業務過濾前的原始值）與去重比對點（業務過濾後的輸出）是同一欄位，一旦過濾邏輯介入就短路。
+
+**防治：**
+- 去重憑證必須用 **不受業務邏輯影響的欄位**：commit hash (`git log -1 --format="%H"`) 存入 state file。
+- 邏輯順序：先 hash 比對 → 決定要不要執行 → 執行時再做過濾。
+
+---
+
+### 錯誤 3：用 `python3 -c "..."` 寫多行 Python，被 bash 展開破壞
+
+**過錯：** 用 `python3 -c "content = '...'"` 寫多行 Python 腳本到檔案，bash 展開了 `${}`, backtick、雙引號，導致 SyntaxError 或邏輯錯誤。
+
+**根本原因：** bash 雙引號 heredoc 會展開特殊字元；`-c` 字串也同理。
+
+**防治：**
+```bash
+# ✅ 永遠用單引號 heredoc 寫 Python
+python3 << 'PYEOF'
+content = r"""
+import re
+pattern = r'^\d+'
+"""
+print(content)
+PYEOF
+
+# ❌ 禁止
+python3 -c "pattern = '\d+'"
+```
+
+---
+
+### 錯誤 4：修改 `<table>` 結構時沒數欄數，造成 thead/colgroup 不一致
+
+**過錯：** 在 both-mode 的 thead row-1 多插了 `{!single && strikeBadgeTh}`，造成 row-1 有 14 個 `<th>` 而 row-2 只有 13 個，表格渲染錯位。
+
+**根本原因：** 複製貼上既有行時沒有逐格計數。
+
+**防治：**
+- 修改 table 欄結構時，在改完後立即在 browser console 跑 assertion：
+  ```js
+  const colCount = document.querySelectorAll('colgroup col').length;
+  const row2Count = document.querySelectorAll('thead tr:nth-child(2) th').length;
+  console.assert(colCount === row2Count, `欄數不符: col=${colCount} th=${row2Count}`);
+  ```
+- 或在程式碼同一處加行 comment：`// row-1 = N cols, row-2 = N cols, colgroup = N cols`。
+
+---
+
+### 錯誤 5：KaTeX 字體載入中截圖 timeout，沒有偵錯提示
+
+**過錯：** Tippy + KaTeX 字體非同步載入，`browser_take_screenshot` timeout 後靜默失敗，誤以為頁面正常。
+
+**根本原因：** 截圖工具在字體請求未完成時 timeout，不報告具體原因。
+
+**防治：**
+- 有第三方 CSS 字體（KaTeX、Google Fonts 等）的頁面，截圖前先用：
+  ```js
+  browser_evaluate: document.fonts.ready.then(() => 'fonts-loaded')
+  ```
+  或確認關鍵 DOM 元素已存在再截圖。
+- 若截圖持續 timeout，改用 `browser_evaluate` 驗證 DOM 狀態作為替代驗證手段。
