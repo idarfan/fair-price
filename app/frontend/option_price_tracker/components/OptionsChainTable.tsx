@@ -55,6 +55,12 @@ export default function OptionsChainTable({
       <table className="w-full border-collapse text-xs">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
+            {/* Single-mode: strike left */}
+            {filter !== "both" && (
+              <th className="px-3 py-1.5 text-center text-gray-500 text-xs font-semibold bg-gray-50">
+                行權價格
+              </th>
+            )}
             {showCalls && (
               <th
                 colSpan={6}
@@ -63,19 +69,35 @@ export default function OptionsChainTable({
                 CALLS
               </th>
             )}
-            <th className="px-3 py-1.5 text-center text-gray-500 text-xs font-semibold bg-gray-50">
-              行權價格
-            </th>
+            {/* Both-mode: strike in centre */}
+            {filter === "both" && (
+              <th className="px-3 py-1.5 text-center text-gray-500 text-xs font-semibold bg-gray-50">
+                行權價格
+              </th>
+            )}
             {showPuts && (
               <th
                 colSpan={6}
-                className="py-1.5 text-center text-red-500 text-xs font-semibold border-l border-gray-200"
+                className="py-1.5 text-center text-rose-600 text-xs font-semibold border-l border-gray-200"
               >
                 PUTS
               </th>
             )}
           </tr>
           <tr className="bg-white border-b border-gray-200">
+            {/* Strike badge cell — left in single-mode */}
+            {filter !== "both" && (
+              <th className="px-3 py-1.5 text-center text-xs font-medium text-gray-500 bg-gray-50">
+                {underlyingPrice > 0 && (
+                  <span className="inline-flex items-center gap-1 bg-amber-50 border border-amber-300 rounded px-2 py-0.5">
+                    <span className="text-[10px] text-gray-400">現價</span>
+                    <span className="text-xs font-mono font-bold text-amber-700">
+                      ${underlyingPrice.toFixed(2)}
+                    </span>
+                  </span>
+                )}
+              </th>
+            )}
             {showCalls && (
               <>
                 <th className={thBase}>持倉量</th>
@@ -86,16 +108,18 @@ export default function OptionsChainTable({
                 <th className={`${thBase} border-r border-gray-200`}>價格</th>
               </>
             )}
-            <th className="px-3 py-1.5 text-center text-xs font-medium text-gray-500 bg-gray-50">
-              {underlyingPrice > 0 && (
-                <span className="inline-flex items-center gap-1 bg-amber-50 border border-amber-300 rounded px-2 py-0.5">
-                  <span className="text-[10px] text-gray-400">現價</span>
-                  <span className="text-xs font-mono font-bold text-amber-700">
-                    ${underlyingPrice.toFixed(2)}
+            {filter === "both" && (
+              <th className="px-3 py-1.5 text-center text-xs font-medium text-gray-500 bg-gray-50">
+                {underlyingPrice > 0 && (
+                  <span className="inline-flex items-center gap-1 bg-amber-50 border border-amber-300 rounded px-2 py-0.5">
+                    <span className="text-[10px] text-gray-400">現價</span>
+                    <span className="text-xs font-mono font-bold text-amber-700">
+                      ${underlyingPrice.toFixed(2)}
+                    </span>
                   </span>
-                </span>
-              )}
-            </th>
+                )}
+              </th>
+            )}
             {showPuts && (
               <>
                 <th className={`${thBase} border-l border-gray-200 text-left`}>
@@ -147,11 +171,50 @@ export default function OptionsChainTable({
               const isLastBelow =
                 firstAboveIdx > 0 && idx === firstAboveIdx - 1;
 
+              const strikeTd = (
+                <td key="strike" className="py-1.5 text-sm bg-gray-50">
+                  {filter === "both" ? (
+                    <div className="flex items-center">
+                      <div
+                        className={`flex-1 py-1.5 text-right pr-1 font-mono font-semibold text-gray-700 tabular-nums select-none ${strikeCallBg}
+                          ${call ? "cursor-pointer hover:text-blue-600 transition-colors" : "opacity-40"}`}
+                        onClick={() => call && onSelect(call.contract_symbol)}
+                      >
+                        {strike.toFixed(2)}
+                      </div>
+                      <div className="w-px h-4 bg-gray-300 shrink-0" />
+                      <div
+                        className={`flex-1 py-1.5 text-left pl-1 font-mono font-semibold text-gray-700 tabular-nums select-none ${strikePutBg}
+                          ${put ? "cursor-pointer hover:text-red-600 transition-colors" : "opacity-40"}`}
+                        onClick={() => put && onSelect(put.contract_symbol)}
+                      >
+                        {strike.toFixed(2)}
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className={`px-3 text-center font-mono font-semibold text-gray-700 tabular-nums select-none
+                        ${showCalls && call ? "cursor-pointer hover:text-blue-600" : ""}
+                        ${showPuts && put ? "cursor-pointer hover:text-red-600" : ""}`}
+                      onClick={() => {
+                        if (showCalls && call) onSelect(call.contract_symbol);
+                        else if (showPuts && put) onSelect(put.contract_symbol);
+                      }}
+                    >
+                      {strike.toFixed(2)}
+                    </div>
+                  )}
+                </td>
+              );
+
               return (
                 <tr
                   key={strike}
                   className={`${rowBase} ${isAtm ? "ring-1 ring-inset ring-amber-400/60" : ""} ${isLastBelow ? "border-b-[3px] border-b-amber-400" : ""}`}
                 >
+                  {/* Strike left (Calls-only mode) */}
+                  {filter === "call" && strikeTd}
+
                   {showCalls && (
                     <>
                       <td
@@ -193,40 +256,8 @@ export default function OptionsChainTable({
                     </>
                   )}
 
-                  {/* Strike */}
-                  <td className="py-1.5 text-sm bg-gray-50">
-                    {filter === "both" ? (
-                      <div className="flex items-center">
-                        <div
-                          className={`flex-1 py-1.5 text-right pr-1 font-mono font-semibold text-gray-700 tabular-nums select-none ${strikeCallBg}
-                            ${call ? "cursor-pointer hover:text-blue-600 transition-colors" : "opacity-40"}`}
-                          onClick={() => call && onSelect(call.contract_symbol)}
-                        >
-                          {strike.toFixed(2)}
-                        </div>
-                        <div className="w-px h-4 bg-gray-300 shrink-0" />
-                        <div
-                          className={`flex-1 py-1.5 text-left pl-1 font-mono font-semibold text-gray-700 tabular-nums select-none ${strikePutBg}
-                            ${put ? "cursor-pointer hover:text-red-600 transition-colors" : "opacity-40"}`}
-                          onClick={() => put && onSelect(put.contract_symbol)}
-                        >
-                          {strike.toFixed(2)}
-                        </div>
-                      </div>
-                    ) : (
-                      <div
-                        className={`px-3 text-center font-mono font-semibold text-gray-700 tabular-nums select-none
-                          ${showCalls && call ? "cursor-pointer hover:text-blue-600" : ""}
-                          ${showPuts && put ? "cursor-pointer hover:text-red-600" : ""}`}
-                        onClick={() => {
-                          if (showCalls && call) onSelect(call.contract_symbol);
-                          else if (showPuts && put) onSelect(put.contract_symbol);
-                        }}
-                      >
-                        {strike.toFixed(2)}
-                      </div>
-                    )}
-                  </td>
+                  {/* Strike centre (both) or puts-only right */}
+                  {filter !== "call" && strikeTd}
 
                   {showPuts && (
                     <>
