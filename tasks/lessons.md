@@ -431,3 +431,22 @@ python3 -c "pattern = '\d+'"
   ```
   或確認關鍵 DOM 元素已存在再截圖。
 - 若截圖持續 timeout，改用 `browser_evaluate` 驗證 DOM 狀態作為替代驗證手段。
+
+---
+
+### 錯誤 6：高輸出指令與大檔讀取未使用 RTK 前綴
+
+**過錯：** 今日 session 中以下指令未加 `rtk` 前綴，直接消耗大量 context：
+- `git log --oneline` / `git show <sha> --stat`（輸出超過 5000 行 diff）
+- `cat architecture_spec.yml`、`cat 工作日誌.md`
+- Read tool 讀取 `package.sh`（89 行，應用 `rtk read`）
+
+**根本原因：** 沒有養成「每次 Bash 前先問自己：這個指令輸出量大嗎？」的反射動作。
+
+**防治（強制清單）：**
+- `git log`、`git show`、`git diff` → 一律 `rtk git ...`
+- `cat <file>` → 一律 `rtk cat <file>`
+- 任何 100 行以上的檔案 → 禁用 Read tool，改 `rtk read <path>`
+- 記住：`rtk` 的用途是截斷輸出，保護 context window，不用是浪費 token
+
+**代價：** 一次 `git show` 輸出 5000+ 行 = 數千個 token 白白消耗。
