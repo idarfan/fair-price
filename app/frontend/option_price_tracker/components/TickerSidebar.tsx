@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { TrackedTicker } from "../types";
 
 interface Props {
@@ -20,6 +20,38 @@ export default function TickerSidebar({
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [autoStatus, setAutoStatus] = useState<"idle" | "detecting" | "collecting">("idle");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const sym = input.trim().toUpperCase();
+    if (!sym || !/^[A-Z0-9.]{1,10}$/.test(sym) || adding) {
+      setAutoStatus("idle");
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      return;
+    }
+    if (tickers.some((t) => t.symbol === sym)) {
+      setAutoStatus("idle");
+      return;
+    }
+    setAutoStatus("detecting");
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setAutoStatus("collecting");
+      setError(null);
+      try {
+        await onAdd(sym);
+        setInput("");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "新增失敗");
+      } finally {
+        setAutoStatus("idle");
+      }
+    }, 1200);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [input, adding, tickers, onAdd]);
 
   async function handleAdd(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -92,6 +124,12 @@ export default function TickerSidebar({
           </button>
         </form>
         {error && <p className="text-xs text-red-300 mt-1">{error}</p>}
+        {autoStatus === "detecting" && (
+          <p className="text-xs text-teal-200 mt-1">偵測中…</p>
+        )}
+        {autoStatus === "collecting" && (
+          <p className="text-xs text-yellow-300 mt-1">向 CBOE 採集資料中…</p>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto py-1">

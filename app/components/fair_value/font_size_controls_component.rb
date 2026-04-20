@@ -11,7 +11,8 @@ class FairValue::FontSizeControlsComponent < ApplicationComponent
   STORAGE_KEY = "fairprice:font-size"
 
   def view_template
-    div(class: "flex items-center gap-0.5", id: "font-size-controls") do
+    div(class: "flex items-center gap-1", id: "font-size-controls") do
+      span(class: "text-xs text-gray-400 mr-0.5 select-none") { plain("字體調整") }
       SIZES.each do |s|
         button(
           type: "button",
