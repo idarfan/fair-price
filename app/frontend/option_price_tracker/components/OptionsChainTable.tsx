@@ -59,7 +59,7 @@ function TipContent({ title, formula, desc, example }: TipDef) {
 
 function ColTh({ label, tip, className = "" }: { label: string; tip: TipDef; className?: string }) {
   return (
-    <th className={`px-1.5 py-1 text-[10px] font-medium text-gray-500 uppercase tracking-wide text-right whitespace-nowrap ${className}`}>
+    <th className={`px-1.5 py-1 text-[13px] font-semibold text-gray-600 uppercase tracking-wide text-right whitespace-nowrap ${className}`}>
       <Tippy
         content={<TipContent {...tip} />}
         placement="bottom"
@@ -254,7 +254,7 @@ export default function OptionsChainTable({
   const showPuts  = filter !== "call";
   const single    = filter !== "both";
 
-  const thBase = "px-2 py-1.5 text-xs font-medium text-gray-500 uppercase tracking-wider text-right";
+  const thBase = "px-2 py-1.5 text-[13px] font-semibold text-gray-600 uppercase tracking-wider text-right";
   const thL    = `${thBase} border-r border-gray-200`;
   const thR    = `${thBase} border-l border-gray-200 text-left`;
 
