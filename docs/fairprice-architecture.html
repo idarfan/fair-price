@@ -15,17 +15,117 @@
 <body>
 <div id="wrap">
   <div id="svg-container">
-    <img id="arch-img" src="fairprice-architecture.svg" style="width:1600px;height:1200px;display:block;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2200 870" style="background:#f8fafc">
+<defs>
+  <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#9ca3af"/>
+  </marker>
+</defs>
+<text x="1100" y="34" text-anchor="middle" font-size="22" fill="#111827" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Fairprice 系統架構圖</text>
+<rect x="970" y="48" width="260" height="42" rx="6" fill="#fef08a" stroke="#854d0e" stroke-width="1.5" opacity="1"/>
+<text x="1100" y="75" text-anchor="middle" font-size="13" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Browser / User</text>
+<rect x="60" y="110" width="2080" height="128" rx="10" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
+<text x="74" y="126" text-anchor="start" font-size="11" fill="#1d4ed8" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Frontend  (React + TypeScript, port 5173)</text>
+<rect x="70" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
+<text x="168" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">StockLogo</text>
+<rect x="277" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
+<text x="375" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">AddPositionForm</text>
+<rect x="484" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
+<text x="582" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">CalculatorTab</text>
+<rect x="691" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
+<text x="789" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Controlled</text>
+<rect x="898" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
+<text x="996" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">DaysSelector</text>
+<rect x="1105" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
+<text x="1203" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Story</text>
+<rect x="1312" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
+<text x="1410" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">InterestScheduleTable</text>
+<rect x="1519" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
+<text x="1617" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">PositionListTab</text>
+<rect x="1726" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
+<text x="1824" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Story</text>
+<rect x="1933" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
+<text x="2031" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">PositionRow</text>
+<rect x="60" y="258" width="2080" height="128" rx="10" fill="#dcfce7" stroke="#15803d" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
+<text x="74" y="274" text-anchor="start" font-size="11" fill="#15803d" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Rails API  (port 3000)</text>
+<rect x="70" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="194" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">BaseController</text>
+<rect x="328" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="452" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">MarginPositionsController</text>
+<rect x="586" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="710" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OptionsController</text>
+<rect x="844" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="968" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OwnershipSnapshotsController</text>
+<rect x="1102" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="1226" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">ValuationsController</text>
+<rect x="1360" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="1484" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">MarginController</text>
+<rect x="1618" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="1742" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OptionPriceTrackerController</text>
+<rect x="1876" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
+<text x="2000" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OptionsController</text>
+<rect x="60" y="406" width="2080" height="128" rx="10" fill="#fef9c3" stroke="#a16207" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
+<text x="74" y="422" text-anchor="start" font-size="11" fill="#a16207" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Services</text>
+<rect x="70" y="456" width="248" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="194" y="493" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">ExchangeRateService</text>
+<rect x="328" y="456" width="248" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="452" y="493" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">FinnhubService</text>
+<rect x="586" y="456" width="248" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="710" y="493" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">IvRankService</text>
+<rect x="844" y="456" width="248" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="968" y="493" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">MarginInterestReminderService</text>
+<rect x="1102" y="456" width="248" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="1226" y="493" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">MarginInterestService</text>
+<rect x="1360" y="456" width="248" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="1484" y="493" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">MomentumReportService</text>
+<rect x="1618" y="456" width="248" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="1742" y="493" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OptionsOcrService</text>
+<rect x="1876" y="456" width="248" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="2000" y="493" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Ouou</text>
+<rect x="60" y="554" width="2080" height="128" rx="10" fill="#fce7f3" stroke="#9d174d" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
+<text x="74" y="570" text-anchor="start" font-size="11" fill="#9d174d" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Models / Database  (PostgreSQL)</text>
+<rect x="70" y="604" width="248" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
+<text x="194" y="641" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Charts</text>
+<rect x="328" y="604" width="248" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
+<text x="452" y="641" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">TechnicalIndicators</text>
+<rect x="586" y="604" width="248" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
+<text x="710" y="641" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">DailyMomentum</text>
+<rect x="844" y="604" width="248" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
+<text x="968" y="641" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">MarketStancePresenter</text>
+<rect x="1102" y="604" width="248" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
+<text x="1226" y="641" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">DailyMomentum</text>
+<rect x="1360" y="604" width="248" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
+<text x="1484" y="641" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">WatchlistRowPresenter</text>
+<rect x="1618" y="604" width="248" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
+<text x="1742" y="641" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">ConsensusPresenter</text>
+<rect x="1876" y="604" width="248" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
+<text x="2000" y="641" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">FairValue</text>
+<rect x="60" y="702" width="2080" height="128" rx="10" fill="#fef9c3" stroke="#a16207" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
+<text x="74" y="718" text-anchor="start" font-size="11" fill="#a16207" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">自動化腳本  (Python + Playwright CDP)</text>
+<rect x="70" y="752" width="680" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="410" y="789" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">fairprice.py</text>
+<rect x="760" y="752" width="680" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="1100" y="789" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">options_collector.py</text>
+<rect x="1450" y="752" width="680" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
+<text x="1790" y="789" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">options_ocr.py</text>
+<line x1="1100" y1="90" x2="1100" y2="110" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
+<line x1="1100" y1="238" x2="1100" y2="258" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
+<line x1="1100" y1="386" x2="1100" y2="406" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
+<line x1="1100" y1="534" x2="1100" y2="554" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
+<line x1="1100" y1="682" x2="1100" y2="702" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
+</svg>
   </div>
 </div>
 <div id="hint">scroll: zoom · drag: pan · dblclick: fit</div>
 <script>
-const W = 1600, H = 1200;
 const wrap = document.getElementById('wrap');
 const container = document.getElementById('svg-container');
-let scale = Math.min(window.innerWidth/W, window.innerHeight/H) * 0.95;
-let tx = (window.innerWidth - W*scale)/2;
-let ty = (window.innerHeight - H*scale)/2;
+const svgEl = container.querySelector('svg');
+svgEl.style.width = '2200px';
+svgEl.style.height = '870px';
+let scale = Math.min(window.innerWidth/2200, window.innerHeight/870) * 0.95;
+let tx = (window.innerWidth - 2200*scale)/2;
+let ty = (window.innerHeight - 870*scale)/2;
 function apply() {
   container.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
 }
@@ -45,8 +145,8 @@ wrap.addEventListener('mousedown', e => { drag = {sx:e.clientX-tx, sy:e.clientY-
 wrap.addEventListener('mousemove', e => { if(drag){ tx=e.clientX-drag.sx; ty=e.clientY-drag.sy; apply(); } });
 wrap.addEventListener('mouseup', () => drag=null);
 wrap.addEventListener('dblclick', () => {
-  scale = Math.min(window.innerWidth/W, window.innerHeight/H)*0.95;
-  tx = (window.innerWidth-W*scale)/2; ty = (window.innerHeight-H*scale)/2;
+  scale = Math.min(window.innerWidth/2200, window.innerHeight/870)*0.95;
+  tx = (window.innerWidth-2200*scale)/2; ty = (window.innerHeight-870*scale)/2;
   apply();
 });
 </script>
