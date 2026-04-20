@@ -2,11 +2,11 @@
 
 class FairValue::FontSizeControlsComponent < ApplicationComponent
   SIZES = [
-    { px: 14, idx: 0 },
-    { px: 15, idx: 1 },
-    { px: 16, idx: 2 },
-    { px: 17, idx: 3 },
-    { px: 18, idx: 4 }
+    { px: 18, idx: 0 },
+    { px: 19, idx: 1 },
+    { px: 20, idx: 2 },
+    { px: 21, idx: 3 },
+    { px: 22, idx: 4 }
   ].freeze
   STORAGE_KEY = "fairprice:font-size"
 
@@ -33,7 +33,7 @@ class FairValue::FontSizeControlsComponent < ApplicationComponent
       raw <<~JS.html_safe
         (function() {
           var KEY = '#{STORAGE_KEY}';
-          var ALLOWED = ['14','15','16','17','18'];
+          var ALLOWED = ['18','19','20','21','22'];
           var container = document.getElementById('font-size-controls');
           if (!container) return;
           var btns = container.querySelectorAll('.font-size-btn');
@@ -54,7 +54,7 @@ class FairValue::FontSizeControlsComponent < ApplicationComponent
           }
 
           var stored = localStorage.getItem(KEY);
-          updateActive(ALLOWED.indexOf(stored) !== -1 ? stored : '16');
+          updateActive(ALLOWED.indexOf(stored) !== -1 ? stored : '20');
 
           btns.forEach(function(b) {
             b.addEventListener('click', function() {
