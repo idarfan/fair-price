@@ -14,7 +14,7 @@ gem "pg",               "~> 1.5"
 gem "kramdown",            "~> 2.4"
 gem "kramdown-parser-gfm", "~> 1.1"
 gem "tailwindcss-rails", "~> 4.0"
-gem "vite_rails",        "~> 3.0"
+gem "vite_rails",        "~> 3.10"
 
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 # gem "bcrypt", "~> 3.1.7"
