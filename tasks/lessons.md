@@ -467,3 +467,65 @@ python3 -c "pattern = '\d+'"
 ```
 
 **設計原則：** hook 必須讓違規行為「有感」，否則是隱形修正，永遠學不會。
+
+---
+
+### 錯誤 8：sed 插入字面 `\n` 而非真實換行
+
+**過錯：** 用 `sed -i 's/old/new\n  content/'` 想插入新行，結果寫入了 `\n` 兩個字元，需要額外跑 Python 修正，多花 2 輪往返。
+
+**根本原因：** BSD/GNU sed 的 `s///` 對 `\n` 行為不一致，且沒有事後驗證。
+
+**防治：**
+```bash
+# ❌ 禁止用 sed 做多行替換
+sed -i 's/old/new\n  content/' file.rb
+
+# ✅ 一律用 Python
+python3 << 'PYEOF'
+content = open(path).read()
+content = content.replace(old, new)
+open(path, 'w').write(content)
+PYEOF
+# 完成後驗證
+grep -n "關鍵字" file.rb
+```
+
+---
+
+### 錯誤 9：不可逆操作（DB write）確認選項後立即執行，未等使用者二次確認
+
+**過錯：** 使用者說「A」後立刻執行 `rails runner` 更新資料庫，使用者必須手動中斷才能改選 B。
+
+**根本原因：** DB write / 破壞性操作屬「需確認才執行」類別，但跳過了顯示計畫的步驟。
+
+**防治：** 凡 DB write、檔案刪除、採集觸發等不可逆操作，執行前必須顯示：
+```
+即將執行：<具體指令或 SQL>
+確認執行？
+```
+等使用者明確回覆才動。選項 A/B/C 的回答只是「選方向」，不是「立刻執行」的授權。
+
+---
+
+### 錯誤 10：Read / Edit tool 未先用 `rtk read` 導致被 hook 封鎖
+
+**過錯：** 兩次嘗試用內建 Read tool 讀 > 100 行檔案被封鎖；一次用 Edit tool 修改未被 Read 追蹤的檔案也被拒絕。每次都需要補救。
+
+**防治（強制清單）：**
+- 任何 `.rb` / `.tsx` / `.py` 檔 → 預設 `rtk read <path>`，不試 Read tool
+- 要編輯的檔案 → 讀取後用 Python/Bash 直接修改，不用 Edit tool（除非確定 < 100 行）
+- Edit tool 使用前提：必須先用 Read tool（不是 Bash）讀過
+
+---
+
+### 錯誤 11：違反 Graph-first rule，直接 Grep 搜尋程式碼
+
+**過錯：** 找 options 相關程式碼全程直接 Grep，hook 警告出現 5 次以上。
+
+**根本原因：** 沒有養成「先問 graph，graph 沒答案才用 Grep」的反射動作。
+
+**防治：**
+1. `semantic_search_nodes("關鍵字")` 先試
+2. 結果為空 → 用 Grep，並記錄「此功能 graph 未覆蓋」
+3. 避免同一 session 對同一功能重複嘗試 graph
