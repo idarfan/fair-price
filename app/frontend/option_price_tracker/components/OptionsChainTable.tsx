@@ -1,5 +1,7 @@
 import Tippy from "@tippyjs/react";
 import "tippy.js/dist/tippy.css";
+import "tippy.js/themes/light.css";
+import "./tippy-override.css";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import type { OptionSnapshotRow } from "../types";
@@ -62,6 +64,7 @@ function ColTh({ label, tip, className = "" }: { label: string; tip: TipDef; cla
     <th className={`px-1.5 py-1 text-[13px] font-semibold text-gray-600 uppercase tracking-wide text-right whitespace-nowrap ${className}`}>
       <Tippy
         content={<TipContent {...tip} />}
+        theme="light"
         placement="bottom"
         arrow={false}
         interactive={false}
@@ -228,9 +231,9 @@ function buildTips(s: number): Record<string, TipDef> {
       example: `Ask $${typAsk}, 現價 $${sStr} → ${askPctVal}%`,
     },
     annBid: {
-      title: "年化 Bid% (Ann bid%)",
+      title: "年化 Bid% — 賣出期權的年化權利金報酬率",
       formula: "\\text{Bid\\%} \\times \\dfrac{365}{\\text{DTE}}",
-      desc: "將 Bid% 換算為年化收益率。Covered Call / Wheel 策略中最常用的效率指標，反映每年潛在收益率。",
+      desc: "Covered Call / Cash-Secured Put（Wheel）策略的效率指標：假設每期到期後以相同條件重新開倉，推算全年累積的理論收益率。⚠️ 為線性外推，不含複利；不保證每輪成交條件相同，僅供不同行權價的橫向比較。",
       example: `Bid% ${bidPctVal}%, DTE 30 → 年化 ≈ ${annBidVal}%`,
     },
     ltp: {
