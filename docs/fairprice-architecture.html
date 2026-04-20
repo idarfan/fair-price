@@ -15,146 +15,17 @@
 <body>
 <div id="wrap">
   <div id="svg-container">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2200 1018" style="background:#f8fafc">
-<defs>
-  <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-    <path d="M0,0 L0,6 L8,3 z" fill="#9ca3af"/>
-  </marker>
-</defs>
-<text x="1100" y="34" text-anchor="middle" font-size="22" fill="#111827" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Fairprice 系統架構圖</text>
-<rect x="970" y="48" width="260" height="42" rx="6" fill="#fef08a" stroke="#854d0e" stroke-width="1.5" opacity="1"/>
-<text x="1100" y="75" text-anchor="middle" font-size="13" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Browser / User</text>
-<rect x="60" y="110" width="2080" height="128" rx="10" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
-<text x="74" y="126" text-anchor="start" font-size="11" fill="#1d4ed8" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Frontend  (React + TypeScript, port 5173)</text>
-<rect x="70" y="160" width="285" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
-<text x="212" y="187" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OptionsChainTable</text>
-<text x="212" y="203" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Tippy+KaTeX tooltip</text>
-<rect x="365" y="160" width="285" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
-<text x="507" y="187" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OwnershipApp</text>
-<text x="507" y="203" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">持股結構圖</text>
-<rect x="660" y="160" width="285" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
-<text x="802" y="187" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OptionPriceTrackerApp</text>
-<text x="802" y="203" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">期權鏈追蹤</text>
-<rect x="955" y="160" width="285" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
-<text x="1097" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">AddPositionForm</text>
-<rect x="1250" y="160" width="285" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
-<text x="1392" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">PositionListTab</text>
-<rect x="1545" y="160" width="285" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
-<text x="1687" y="187" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">CalculatorTab</text>
-<text x="1687" y="203" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">融資試算器</text>
-<rect x="1840" y="160" width="285" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
-<text x="1982" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">InterestScheduleTable</text>
-<rect x="60" y="258" width="2080" height="128" rx="10" fill="#dcfce7" stroke="#15803d" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
-<text x="74" y="274" text-anchor="start" font-size="11" fill="#15803d" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Rails API  (port 3003)</text>
-<rect x="70" y="308" width="335" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
-<text x="237" y="335" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">ValuationsController</text>
-<text x="237" y="351" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">FairPrice</text>
-<rect x="415" y="308" width="335" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
-<text x="582" y="335" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">ReportsController</text>
-<text x="582" y="351" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Daily Momentum</text>
-<rect x="760" y="308" width="335" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
-<text x="927" y="335" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OwnershipController</text>
-<text x="927" y="351" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">持股結構</text>
-<rect x="1105" y="308" width="335" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
-<text x="1272" y="335" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OptionPriceTrackerController</text>
-<text x="1272" y="351" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">期權鏈</text>
-<rect x="1450" y="308" width="335" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
-<text x="1617" y="335" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">MarginPositionsController</text>
-<text x="1617" y="351" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">融資部位</text>
-<rect x="1795" y="308" width="335" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
-<text x="1962" y="335" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Api::V1::*</text>
-<text x="1962" y="351" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">JSON API</text>
-<rect x="60" y="406" width="2080" height="128" rx="10" fill="#fef9c3" stroke="#a16207" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
-<text x="74" y="422" text-anchor="start" font-size="11" fill="#a16207" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Services</text>
-<rect x="70" y="456" width="220" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
-<text x="180" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">FinnhubService</text>
-<text x="180" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">報價/指標</text>
-<rect x="300" y="456" width="220" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
-<text x="410" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">YahooFinanceService</text>
-<text x="410" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">持股/歷史/VIX</text>
-<rect x="530" y="456" width="220" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
-<text x="640" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">VixService</text>
-<text x="640" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">VIX 指數</text>
-<rect x="760" y="456" width="220" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
-<text x="870" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">MomentumReportService</text>
-<text x="870" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">動能報告</text>
-<rect x="990" y="456" width="220" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
-<text x="1100" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">StockDataService</text>
-<text x="1100" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">估值資料</text>
-<rect x="1220" y="456" width="220" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
-<text x="1330" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">ValuationService</text>
-<text x="1330" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">DCF/PE/PEG</text>
-<rect x="1450" y="456" width="220" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
-<text x="1560" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">SecEdgarService</text>
-<text x="1560" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">機構持股備援</text>
-<rect x="1680" y="456" width="220" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
-<text x="1790" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">IvRankService</text>
-<text x="1790" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">IV Rank</text>
-<rect x="1910" y="456" width="220" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
-<text x="2020" y="483" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OuouAnalysisService</text>
-<text x="2020" y="499" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">AI 分析</text>
-<rect x="60" y="554" width="2080" height="128" rx="10" fill="#fce7f3" stroke="#9d174d" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
-<text x="74" y="570" text-anchor="start" font-size="11" fill="#9d174d" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Models / Database  (PostgreSQL)</text>
-<rect x="70" y="604" width="404" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
-<text x="272" y="631" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OptionSnapshot</text>
-<text x="272" y="647" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">期權快照</text>
-<rect x="484" y="604" width="404" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
-<text x="686" y="631" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">TrackedTicker</text>
-<text x="686" y="647" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">追蹤代號</text>
-<rect x="898" y="604" width="404" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
-<text x="1100" y="631" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OwnershipSnapshot</text>
-<text x="1100" y="647" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">持股快照</text>
-<rect x="1312" y="604" width="404" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
-<text x="1514" y="631" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OwnershipHolder</text>
-<text x="1514" y="647" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">持股人</text>
-<rect x="1726" y="604" width="404" height="64" rx="6" fill="#f9a8d4" stroke="#9d174d" stroke-width="1.5" opacity="1"/>
-<text x="1928" y="631" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">MarginPosition</text>
-<text x="1928" y="647" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">融資部位</text>
-<rect x="60" y="702" width="2080" height="128" rx="10" fill="#fef9c3" stroke="#a16207" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
-<text x="74" y="718" text-anchor="start" font-size="11" fill="#a16207" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">自動化腳本  (Python + Playwright CDP)</text>
-<rect x="70" y="752" width="680" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
-<text x="410" y="779" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">options_collector.py</text>
-<text x="410" y="795" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">CBOE→yfinance</text>
-<rect x="760" y="752" width="680" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
-<text x="1100" y="779" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">fairprice.py</text>
-<text x="1100" y="795" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Playwright 截圖</text>
-<rect x="1450" y="752" width="680" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
-<text x="1790" y="779" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">options_ocr.py</text>
-<text x="1790" y="795" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OCR 解析</text>
-<rect x="60" y="850" width="2080" height="128" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5" opacity="0.6" stroke-dasharray="6,3"/>
-<text x="74" y="866" text-anchor="start" font-size="11" fill="#6b7280" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">外部 API / 資料來源</text>
-<rect x="70" y="900" width="507" height="64" rx="6" fill="#fde68a" stroke="#d97706" stroke-width="1.5" opacity="1"/>
-<text x="323" y="927" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">CBOE Delayed Quotes</text>
-<text x="323" y="943" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">期權鏈（主要）</text>
-<rect x="587" y="900" width="507" height="64" rx="6" fill="#bfdbfe" stroke="#2563eb" stroke-width="1.5" opacity="1"/>
-<text x="840" y="927" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Yahoo Finance</text>
-<text x="840" y="943" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">報價/歷史/VIX/持股</text>
-<rect x="1104" y="900" width="507" height="64" rx="6" fill="#bbf7d0" stroke="#16a34a" stroke-width="1.5" opacity="1"/>
-<text x="1357" y="927" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Finnhub</text>
-<text x="1357" y="943" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">報價/指標/財報</text>
-<rect x="1621" y="900" width="507" height="64" rx="6" fill="#e9d5ff" stroke="#7c3aed" stroke-width="1.5" opacity="1"/>
-<text x="1874" y="927" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">SEC EDGAR</text>
-<text x="1874" y="943" text-anchor="middle" font-size="9" fill="#374151" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">機構持股（備援）</text>
-<line x1="1100" y1="90" x2="1100" y2="110" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
-<line x1="1100" y1="238" x2="1100" y2="258" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
-<line x1="1100" y1="386" x2="1100" y2="406" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
-<line x1="1100" y1="534" x2="1100" y2="554" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
-<line x1="1100" y1="682" x2="1100" y2="702" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
-<line x1="1100" y1="830" x2="1100" y2="850" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
-<line x1="1100" y1="534" x2="1100" y2="850" stroke="#9ca3af" stroke-width="1.5" opacity="0.7" marker-end="url(#arr)"/>
-</svg>
+    <img id="arch-img" src="fairprice-architecture.svg" style="width:1600px;height:1200px;display:block;">
   </div>
 </div>
 <div id="hint">scroll: zoom · drag: pan · dblclick: fit</div>
 <script>
+const W = 1600, H = 1200;
 const wrap = document.getElementById('wrap');
 const container = document.getElementById('svg-container');
-const svgEl = container.querySelector('svg');
-svgEl.style.width = '2200px';
-svgEl.style.height = '1018px';
-let scale = Math.min(window.innerWidth/2200, window.innerHeight/1018) * 0.95;
-let tx = (window.innerWidth - 2200*scale)/2;
-let ty = (window.innerHeight - 1018*scale)/2;
+let scale = Math.min(window.innerWidth/W, window.innerHeight/H) * 0.95;
+let tx = (window.innerWidth - W*scale)/2;
+let ty = (window.innerHeight - H*scale)/2;
 function apply() {
   container.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
 }
@@ -174,8 +45,8 @@ wrap.addEventListener('mousedown', e => { drag = {sx:e.clientX-tx, sy:e.clientY-
 wrap.addEventListener('mousemove', e => { if(drag){ tx=e.clientX-drag.sx; ty=e.clientY-drag.sy; apply(); } });
 wrap.addEventListener('mouseup', () => drag=null);
 wrap.addEventListener('dblclick', () => {
-  scale = Math.min(window.innerWidth/2200, window.innerHeight/1018)*0.95;
-  tx = (window.innerWidth-2200*scale)/2; ty = (window.innerHeight-1018*scale)/2;
+  scale = Math.min(window.innerWidth/W, window.innerHeight/H)*0.95;
+  tx = (window.innerWidth-W*scale)/2; ty = (window.innerHeight-H*scale)/2;
   apply();
 });
 </script>
