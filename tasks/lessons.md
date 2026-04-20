@@ -529,3 +529,34 @@ grep -n "關鍵字" file.rb
 1. `semantic_search_nodes("關鍵字")` 先試
 2. 結果為空 → 用 Grep，並記錄「此功能 graph 未覆蓋」
 3. 避免同一 session 對同一功能重複嘗試 graph
+
+---
+
+### 錯誤 12：Shell 變數不跨 Bash tool call 存活
+
+**過錯（2026-04-20）：** 在第一個 Bash call 設定 `FILE=/home/.../OptionsChainTable.tsx`，第二個 Bash call 直接用 `$FILE`，得到 `sed: $FILE: No such file or directory`，連犯兩次。
+
+**根本原因：** 每個 Bash tool call 是獨立的 shell process，上一個 call 的環境變數完全消失。
+
+**防治：**
+```bash
+# ❌ 禁止跨 call 使用變數
+# Call 1:
+FILE=/home/idarfan/fairprice/app/frontend/.../Foo.tsx
+# Call 2:
+sed -i 's/old/new/' $FILE   # → $FILE 是空字串
+
+# ✅ 方案 A：同一個 call 內用完整路徑
+sed -i 's/old/new/' /home/idarfan/fairprice/app/frontend/.../Foo.tsx
+
+# ✅ 方案 B：同一個 call 內宣告並使用
+FILE=/home/idarfan/fairprice/app/frontend/.../Foo.tsx && sed -i 's/old/new/' "$FILE"
+
+# ✅ 方案 C：改用 Python（最穩，不受 shell 狀態影響）
+python3 << 'PYEOF'
+path = "/home/idarfan/fairprice/app/frontend/.../Foo.tsx"
+...
+PYEOF
+```
+
+**規則：** 需要跨多步驟操作同一個檔案，一律用 Python heredoc 或在同一個 Bash call 內完成。
