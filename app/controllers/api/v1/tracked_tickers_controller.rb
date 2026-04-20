@@ -43,7 +43,7 @@ class Api::V1::TrackedTickersController < Api::V1::BaseController
     python = Rails.root.join("scripts/venv/bin/python3").to_s
     script = Rails.root.join("scripts/options_collector.py").to_s
 
-    _output, status = Open3.capture2e(python, script, "--symbols", ticker.symbol)
+    _output, status = Open3.capture2e(python, script, "--symbols", ticker.symbol, "--force")
 
     if status.success?
       ticker.reload
