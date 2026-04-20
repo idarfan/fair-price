@@ -65,7 +65,7 @@ log = logging.getLogger("options_collector")
 # ── Config defaults ──────────────────────────────────────────────────
 DEFAULT_MIN_DTE = 7
 DEFAULT_MAX_DTE = 90
-DEFAULT_STRIKE_RANGE = 0.30  # ±30% of underlying price
+DEFAULT_STRIKE_RANGE = 0.45  # ±45% of underlying price
 DEFAULT_MIN_OI = 0
 INTER_TICKER_DELAY = 2  # seconds between tickers to avoid rate limiting
 
