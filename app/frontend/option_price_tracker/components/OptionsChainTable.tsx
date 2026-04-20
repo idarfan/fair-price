@@ -36,7 +36,7 @@ interface TipDef {
 
 function TipContent({ title, formula, desc, example }: TipDef) {
   return (
-    <div style={{ minWidth: 210, maxWidth: 290, padding: "10px 12px", fontSize: 12, lineHeight: 1.55, background: "#fff", color: "#111827" }}>
+    <div style={{ minWidth: 210, maxWidth: 290, padding: "10px 12px", fontSize: 13, lineHeight: 1.55, background: "#fff", color: "#111827", border: "2px solid #86efac", borderRadius: 6 }}>
       <div style={{ fontWeight: 700, fontSize: 13, paddingBottom: 5, marginBottom: 5, borderBottom: "1px solid #e5e7eb" }}>
         {title}
       </div>
@@ -45,9 +45,9 @@ function TipContent({ title, formula, desc, example }: TipDef) {
           <KaTeXSpan formula={formula} />
         </div>
       )}
-      <div style={{ color: "#374151", fontSize: 11, lineHeight: 1.65 }}>{desc}</div>
+      <div style={{ color: "#374151", fontSize: 13, lineHeight: 1.65 }}>{desc}</div>
       {example && (
-        <div style={{ color: "#92400e", fontSize: 11, marginTop: 5, background: "#fef3c7", padding: "3px 6px", borderRadius: 3 }}>
+        <div style={{ color: "#92400e", fontSize: 13, marginTop: 5, background: "#fef3c7", padding: "3px 6px", borderRadius: 3 }}>
           <span style={{ fontWeight: 600 }}>範例：</span>{example}
         </div>
       )}
@@ -284,7 +284,7 @@ export default function OptionsChainTable({
       <ColTh label="Ask%"   tip={TIPS.askPct} />
       <ColTh label="年化%"  tip={TIPS.annBid} />
       <ColTh label="LTP"    tip={TIPS.ltp} />
-      <ColTh label="量"     tip={TIPS.volume} />
+      <ColTh label="交易量"     tip={TIPS.volume} />
       <ColTh label="倉"     tip={TIPS.oi} />
     </>
   );
