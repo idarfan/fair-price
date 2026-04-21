@@ -26,6 +26,88 @@ function calcDte(expiration: string): number {
   return Math.round((exp.getTime() - today.getTime()) / 86_400_000);
 }
 
+function usMarketHolidays(year: number): Set<string> {
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const nearestWeekday = (d: Date): Date => {
+    const day = d.getDay();
+    if (day === 0) return new Date(d.getTime() + 86_400_000);
+    if (day === 6) return new Date(d.getTime() - 86_400_000);
+    return d;
+  };
+  const nthWeekday = (
+    y: number,
+    month: number,
+    weekday: number,
+    n: number,
+  ): Date => {
+    const d = new Date(y, month, 1);
+    let count = 0;
+    while (true) {
+      if (d.getDay() === weekday && ++count === n) return new Date(d);
+      d.setDate(d.getDate() + 1);
+    }
+  };
+  const lastWeekday = (y: number, month: number, weekday: number): Date => {
+    const d = new Date(y, month + 1, 0);
+    while (d.getDay() !== weekday) d.setDate(d.getDate() - 1);
+    return new Date(d);
+  };
+  // Easter (Anonymous Gregorian algorithm)
+  const easterDate = (() => {
+    const a = year % 19,
+      b = Math.floor(year / 100),
+      c = year % 100;
+    const d = Math.floor(b / 4),
+      e = b % 4,
+      f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4),
+      k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31) - 1;
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month, day);
+  })();
+  const goodFriday = new Date(easterDate.getTime() - 2 * 86_400_000);
+
+  return new Set([
+    fmt(nearestWeekday(new Date(year, 0, 1))), // New Year's Day
+    fmt(nthWeekday(year, 0, 1, 3)), // MLK Day (3rd Mon Jan)
+    fmt(nthWeekday(year, 1, 1, 3)), // Presidents' Day (3rd Mon Feb)
+    fmt(goodFriday), // Good Friday
+    fmt(lastWeekday(year, 4, 1)), // Memorial Day (last Mon May)
+    fmt(nearestWeekday(new Date(year, 5, 19))), // Juneteenth
+    fmt(nearestWeekday(new Date(year, 6, 4))), // Independence Day
+    fmt(nthWeekday(year, 8, 1, 1)), // Labor Day (1st Mon Sep)
+    fmt(nthWeekday(year, 10, 4, 4)), // Thanksgiving (4th Thu Nov)
+    fmt(nearestWeekday(new Date(year, 11, 25))), // Christmas
+  ]);
+}
+
+function calcTradingDays(expiration: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const exp = new Date(expiration);
+  exp.setHours(0, 0, 0, 0);
+  if (exp <= today) return 0;
+  const holidays = new Set<string>();
+  for (let y = today.getFullYear(); y <= exp.getFullYear(); y++) {
+    usMarketHolidays(y).forEach((h) => holidays.add(h));
+  }
+  let count = 0;
+  const cur = new Date(today);
+  cur.setDate(cur.getDate() + 1);
+  while (cur <= exp) {
+    const day = cur.getDay();
+    if (day !== 0 && day !== 6 && !holidays.has(cur.toISOString().slice(0, 10)))
+      count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
+
 function buildChainRows(
   snapshots: OptionSnapshotRow[],
   expiration: string,
@@ -39,7 +121,9 @@ function buildChainRows(
 
   if (underlyingPrice > 0) {
     const below = strikes.filter((s) => s <= underlyingPrice).slice(-nearCount);
-    const above = strikes.filter((s) => s > underlyingPrice).slice(0, nearCount);
+    const above = strikes
+      .filter((s) => s > underlyingPrice)
+      .slice(0, nearCount);
     strikes = [...below, ...above];
   }
 
@@ -70,7 +154,9 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [underlyingPrice, setUnderlyingPrice] = useState(0);
-  const [callPutFilter, setCallPutFilter] = useState<"both" | "call" | "put">("both");
+  const [callPutFilter, setCallPutFilter] = useState<"both" | "call" | "put">(
+    "both",
+  );
 
   const [selectedContract, setSelectedContract] = useState<string | null>(null);
   const [trendData, setTrendData] = useState<PremiumTrendPoint[]>([]);
@@ -227,8 +313,11 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
     if (selected) loadSnapshots(selected);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const chainRows = selectedExp ? buildChainRows(snapshots, selectedExp, underlyingPrice) : [];
+  const chainRows = selectedExp
+    ? buildChainRows(snapshots, selectedExp, underlyingPrice)
+    : [];
   const dte = selectedExp ? calcDte(selectedExp) : null;
+  const tradingDays = selectedExp ? calcTradingDays(selectedExp) : null;
 
   return (
     <div className="flex h-full min-h-screen bg-gray-50 text-gray-800 overflow-hidden">
@@ -269,7 +358,9 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
             <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-200 bg-white shrink-0">
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setCallPutFilter((f) => (f === "call" ? "both" : "call"))}
+                  onClick={() =>
+                    setCallPutFilter((f) => (f === "call" ? "both" : "call"))
+                  }
                   className={`px-2.5 py-0.5 rounded text-xs font-semibold transition-colors ${
                     callPutFilter === "call"
                       ? "btn-calls-active"
@@ -281,7 +372,9 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
                   Calls
                 </button>
                 <button
-                  onClick={() => setCallPutFilter((f) => (f === "put" ? "both" : "put"))}
+                  onClick={() =>
+                    setCallPutFilter((f) => (f === "put" ? "both" : "put"))
+                  }
                   className={`px-2.5 py-0.5 rounded text-xs font-semibold transition-colors ${
                     callPutFilter === "put"
                       ? "btn-puts-active"
@@ -302,6 +395,11 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
               {dte != null && (
                 <span className="text-xs text-amber-600 font-medium">
                   距離到期日還有 {dte} 天
+                  {tradingDays != null && (
+                    <span className="text-gray-400 font-normal ml-1">
+                      （{tradingDays} 交易日）
+                    </span>
+                  )}
                 </span>
               )}
 
