@@ -153,21 +153,42 @@ export function OptionProfitCalcApp() {
 
         {/* Section 2: Option inputs */}
         <div className="space-y-4">
-          <div>
-            <label className={labelClass}>期權購入價格（每股，美元）</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
-                $
-              </span>
-              <input
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={purchasePrice}
-                onChange={(e) => setPurchasePrice(e.target.value)}
-                placeholder="0.00"
-                className={`${inputClass} pl-7`}
-              />
+          {/* Row: purchase price + sell price side by side */}
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className={labelClass}>期權購入價格（每股，美元）</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                  $
+                </span>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={purchasePrice}
+                  onChange={(e) => setPurchasePrice(e.target.value)}
+                  placeholder="0.00"
+                  className={`${inputClass} pl-7`}
+                />
+              </div>
+            </div>
+
+            <div className="flex-1">
+              <p className={labelClass}>建議賣出價格</p>
+              {result ? (
+                <div className="bg-gray-800 border border-yellow-600/40 rounded-lg px-3 py-2 flex items-center justify-between">
+                  <span className="text-lg font-bold text-yellow-400">
+                    ${fmt(result.sellPrice)}
+                  </span>
+                  <span className="text-xs text-green-400">
+                    +{fmt(result.returnPct, 1)}%
+                  </span>
+                </div>
+              ) : (
+                <div className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 flex items-center">
+                  <span className="text-gray-600 text-sm">—</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -182,11 +203,6 @@ export function OptionProfitCalcApp() {
               placeholder="1"
               className={inputClass}
             />
-            {ctrs > 0 && purchase > 0 && (
-              <p className="text-xs text-gray-500 mt-1">
-                持倉成本：${fmt(purchase * ctrs * 100)}（{ctrs * 100} 股）
-              </p>
-            )}
           </div>
 
           <div>
@@ -206,48 +222,26 @@ export function OptionProfitCalcApp() {
               />
             </div>
           </div>
-        </div>
 
-        {/* Section 3: Result */}
-        {result && (
-          <>
-            <div className="border-t border-gray-700" />
-            <div className="rounded-xl bg-gray-800 border border-gray-700 overflow-hidden">
-              <div className="px-4 py-2 bg-gray-750 border-b border-gray-700">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  建議賣出價格
-                </p>
-              </div>
-              <div className="px-4 py-4 text-center">
-                <p className="text-4xl font-bold text-yellow-400">
-                  ${fmt(result.sellPrice)}
-                </p>
-                <p className="text-sm text-gray-400 mt-1">
-                  +${fmt(result.priceDiff)}
-                  <span className="mx-1 text-gray-600">·</span>
-                  <span className="text-green-400">
-                    +{fmt(result.returnPct, 1)}%
-                  </span>
-                </p>
-              </div>
-              <div className="border-t border-gray-700 px-4 py-3 space-y-1">
-                {[
-                  ["持倉成本", `$${fmt(result.totalCost)}`],
-                  ["預期獲利", `$${fmt(profit)}`],
-                  [
-                    "需漲幅度",
-                    `${fmt(((result.sellPrice - purchase) / purchase) * 100, 1)}%`,
-                  ],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex justify-between text-xs">
-                    <span className="text-gray-500">{k}</span>
-                    <span className="text-gray-300 font-medium">{v}</span>
-                  </div>
-                ))}
-              </div>
+          {/* Detail summary */}
+          {result && (
+            <div className="bg-gray-800 rounded-lg px-3 py-3 space-y-1.5">
+              {[
+                [
+                  "漲幅",
+                  `+$${fmt(result.priceDiff)} · +${fmt(((result.sellPrice - purchase) / purchase) * 100, 1)}%`,
+                ],
+                ["持倉成本", `$${fmt(result.totalCost)}`],
+                ["預期獲利", `$${fmt(profit)}`],
+              ].map(([k, v]) => (
+                <div key={k} className="flex justify-between text-xs">
+                  <span className="text-gray-500">{k}</span>
+                  <span className="text-gray-300 font-medium">{v}</span>
+                </div>
+              ))}
             </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
