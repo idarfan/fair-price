@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface StockInfo {
   symbol: string;
@@ -38,36 +38,52 @@ export function OptionProfitCalcApp() {
   const [stockInfo, setStockInfo] = useState<StockInfo | null>(null);
   const [fetchError, setFetchError] = useState("");
   const [loading, setLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const [purchasePrice, setPurchasePrice] = useState("");
   const [contracts, setContracts] = useState("");
   const [targetProfit, setTargetProfit] = useState("");
 
-  const lookupPrice = useCallback(async () => {
+  useEffect(() => {
     const sym = ticker.trim().toUpperCase();
-    if (!sym) return;
-    setLoading(true);
-    setFetchError("");
-    setStockInfo(null);
-    try {
-      const res = await fetch(
-        `/api/v1/margin_positions/price_lookup?symbol=${encodeURIComponent(sym)}`,
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        setFetchError(data.error ?? "查詢失敗");
-        return;
-      }
-      setStockInfo({
-        symbol: data.symbol,
-        company_name: data.company_name,
-        price: data.price,
-      });
-    } catch {
-      setFetchError("網路錯誤，請稍後再試");
-    } finally {
-      setLoading(false);
+    if (!sym) {
+      setStockInfo(null);
+      setFetchError("");
+      return;
     }
+
+    const timer = setTimeout(async () => {
+      abortRef.current?.abort();
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+
+      setLoading(true);
+      setFetchError("");
+      setStockInfo(null);
+      try {
+        const res = await fetch(
+          `/api/v1/margin_positions/price_lookup?symbol=${encodeURIComponent(sym)}`,
+          { signal: ctrl.signal },
+        );
+        const data = await res.json();
+        if (!res.ok) {
+          setFetchError(data.error ?? "查詢失敗");
+          return;
+        }
+        setStockInfo({
+          symbol: data.symbol,
+          company_name: data.company_name,
+          price: data.price,
+        });
+      } catch (err) {
+        if ((err as Error).name !== "AbortError")
+          setFetchError("網路錯誤，請稍後再試");
+      } finally {
+        setLoading(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
   }, [ticker]);
 
   const purchase = parseFloat(purchasePrice);
@@ -95,23 +111,20 @@ export function OptionProfitCalcApp() {
         {/* Section 1: Stock lookup */}
         <div className="space-y-2">
           <p className={labelClass}>股票代號</p>
-          <div className="flex gap-2">
+          <div className="relative">
             <input
               type="text"
               value={ticker}
               onChange={(e) => setTicker(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === "Enter" && lookupPrice()}
               placeholder="e.g. AAPL"
               maxLength={10}
-              className={`flex-1 ${inputClass}`}
+              className={inputClass}
             />
-            <button
-              onClick={lookupPrice}
-              disabled={loading || !ticker.trim()}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg text-sm font-medium transition-colors"
-            >
-              {loading ? "…" : "查詢"}
-            </button>
+            {loading && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs animate-pulse">
+                查詢中…
+              </span>
+            )}
           </div>
 
           {fetchError && <p className="text-xs text-red-400">{fetchError}</p>}
