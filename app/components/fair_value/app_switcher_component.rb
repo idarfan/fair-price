@@ -9,7 +9,8 @@ class FairValue::AppSwitcherComponent < ApplicationComponent
     { icon: "📉", label: "Options",        href: "/options",    desc: "美股期權分析｜策略推薦｜IV Rank" },
     { icon: "🏦", label: "持股結構",       href: "/ownership",  desc: "Watchlist 持股結構變化圖表" },
     { icon: "💹", label: "融資試算",       href: "/margin",               desc: "美股融資交易獲利試算與持股管理" },
-    { icon: "📍", label: "期權歷史價格",   href: "/option_price_tracker", desc: "期權 Premium 歷史價格追蹤與分析" }
+    { icon: "📍", label: "期權歷史價格",   href: "/option_price_tracker", desc: "期權 Premium 歷史價格追蹤與分析" },
+    { icon: "🎯", label: "期權收益計算",   href: "/option_profit_calc",     desc: "期權賣出目標價試算｜達成預期獲利" }
   ].freeze
 
   def initialize(navbar: false)

@@ -91,6 +91,9 @@ Rails.application.routes.draw do
   # Option Price History Tracker
   get "option_price_tracker", to: "option_price_tracker#index", as: :option_price_tracker
 
+  # Option Profit Calculator
+  get "option_profit_calc", to: "option_profit_calc#index", as: :option_profit_calc
+
   # Ownership Structure
   get  "ownership",         to: "ownership#index",   as: :ownership
   get  "ownership/history", to: "ownership#history", as: :ownership_history
