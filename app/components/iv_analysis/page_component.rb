@@ -2,7 +2,7 @@
 
 class IvAnalysis::PageComponent < ApplicationComponent
   def view_template
-    div(class: "max-w-4xl mx-auto") do
+    div do
       div(class: "flex items-center justify-between mb-6") do
         div do
           h1(class: "text-xl font-bold text-gray-900") { plain "期權 IV 分析" }

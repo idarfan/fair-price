@@ -37,22 +37,29 @@ class IvAnalysis::EducationComponent < ApplicationComponent
 
       # Dark formula card
       div(class: "rounded-xl p-6 mb-6 text-center", style: FORMULA_STYLE) do
-        p(style: "font-size:1.5rem; letter-spacing:0.04em; color:#d4e157; font-style:italic;") do
+        # Plain-language prefix line
+        p(class: "mb-3", style: "font-size:13px; color:#7d8590; letter-spacing:0.03em;") do
+          span(style: "color:#e8f5a3; font-weight:600") { plain "C（買權價格）" }
+          plain " 約等於"
+        end
+
+        # Formula line — 22px
+        p(style: "font-size:22px; letter-spacing:0.04em; color:#d4e157; font-style:italic; line-height:1.4;") do
           span(style: "color:#e8f5a3; font-weight:700") { plain "C" }
-          span(style: "color:#7ecaf5; font-weight:300; margin:0 6px") { plain " ≈ " }
+          span(style: "color:#7ecaf5; font-weight:300; margin:0 8px") { plain "≈" }
           span(style: "color:#81c784; font-weight:700") { plain "Δ" }
           span(style: "color:#b0bec5") { plain "(" }
           span(style: "color:#e8f5a3; font-weight:700") { plain "S" }
-          span(style: "color:#b0bec5; margin:0 4px") { plain "−" }
+          span(style: "color:#b0bec5; margin:0 5px") { plain "−" }
           span(style: "color:#e8f5a3; font-weight:700") { plain "K" }
           span(style: "color:#b0bec5") { plain ")" }
-          span(style: "color:#7ecaf5; margin:0 8px") { plain " + " }
+          span(style: "color:#7ecaf5; margin:0 10px") { plain "+" }
           span(style: "color:#b0bec5; font-weight:400; font-style:normal") { plain "0.4" }
-          span(style: "color:#7ecaf5; margin:0 4px") { plain " · " }
+          span(style: "color:#7ecaf5; margin:0 5px") { plain "·" }
           span(style: "color:#e8f5a3; font-weight:700") { plain "S" }
-          span(style: "color:#7ecaf5; margin:0 4px") { plain " · " }
+          span(style: "color:#7ecaf5; margin:0 5px") { plain "·" }
           span(style: "color:#ffb74d; font-weight:700") { plain "σ" }
-          span(style: "color:#7ecaf5; margin:0 4px") { plain " · " }
+          span(style: "color:#7ecaf5; margin:0 5px") { plain "·" }
           span(style: "color:#b0bec5; font-weight:400; font-style:normal") { plain "√" }
           span(style: "color:#e8f5a3; font-weight:700") { plain "T" }
         end
