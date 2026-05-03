@@ -84,14 +84,27 @@ class IvAnalysis::QueryFormComponent < ApplicationComponent
 
   private
 
+  # Fridays NYSE is closed (holiday observed) — shift expiry to prior Thursday
+  CLOSED_FRIDAYS = [
+    Date.new(2026, 6, 19),  # Juneteenth
+    Date.new(2026, 7, 3),   # Independence Day observed (Jul 4 = Sat)
+    Date.new(2027, 1, 1)   # New Year's Day
+  ].freeze
+
   def expiry_groups
     today    = Date.today
     next_fri = today + 1
     next_fri += 1 until next_fri.friday?
     all_fridays = (0..51).map { |i| next_fri + (i * 7) }
 
-    weekly  = all_fridays.first(6)
-    monthly = all_fridays.drop(6).select { |d| d.day.between?(15, 21) }
+    # Skip closed Fridays for weeklies
+    weekly        = all_fridays.reject { |d| CLOSED_FRIDAYS.include?(d) }.first(6)
+    weekly_cutoff = weekly.last
+
+    # Monthly: 3rd Friday zone (day 15–21), shift closed Fridays to prior Thursday
+    monthly = all_fridays
+      .select { |d| d > weekly_cutoff && d.day.between?(15, 21) }
+      .map    { |d| CLOSED_FRIDAYS.include?(d) ? d - 1 : d }
 
     { "近期（週選）" => weekly, "月選 / LEAPS" => monthly }
   end
