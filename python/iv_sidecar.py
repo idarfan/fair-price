@@ -1,13 +1,23 @@
 #!/usr/bin/env python3
 """IV sidecar — Flask HTTP server on port 5050.
-Provides yfinance-based option data to Rails backend.
+Uses FlashAlpha public /v1/surface endpoint (no rate limit, no auth needed).
+Greeks computed locally via Black-Scholes.
+
+# API Verification (2026-05-03):
+# - Service: FlashAlpha Lab API
+# - Surface endpoint: https://lab.flashalpha.com/v1/surface/{symbol}
+# - Auth: Public (no API key needed for /v1/surface)
+# - Rate limit: None for surface endpoint
+# - Status: Active
 """
 import math
 import logging
+import os
 from datetime import date
 
-import yfinance as yf
 import numpy as np
+import requests
+from scipy.interpolate import RegularGridInterpolator
 from scipy.stats import norm
 from flask import Flask, request, jsonify
 
@@ -15,65 +25,97 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
+SURFACE_BASE = "https://lab.flashalpha.com"
 
-# ── Black-Scholes delta ─────────────────────────────────────────────────────
+_session = requests.Session()
+_session.headers.update({"Accept": "application/json"})
+_api_key = os.environ.get("FLASHALPHA_API_KEY")
+if _api_key:
+    _session.headers.update({"X-Api-Key": _api_key})
+
+
+# -- Black-Scholes -----------------------------------------------------------
 
 def bs_delta(S: float, K: float, T: float, r: float, sigma: float, option_type: str) -> float:
-    """Black-Scholes delta. T in years."""
     if T <= 0 or sigma <= 0:
         return 0.5 if option_type == "call" else -0.5
     d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
-    if option_type == "call":
-        return float(norm.cdf(d1))
-    return float(norm.cdf(d1) - 1)
+    return float(norm.cdf(d1)) if option_type == "call" else float(norm.cdf(d1) - 1)
 
 
 def years_to_expiry(expiry_str: str) -> float:
-    """Days between today and expiry_str (YYYY-MM-DD), divided by 252."""
     exp = date.fromisoformat(expiry_str)
     days = (exp - date.today()).days
-    return max(days, 0) / 252.0
+    return max(days, 0) / 365.0
 
 
-# ── Helpers ─────────────────────────────────────────────────────────────────
+# -- FlashAlpha surface -------------------------------------------------------
 
-def _get_chain(tk: yf.Ticker, expiry: str, option_type: str):
-    """Return calls or puts DataFrame for given expiry."""
-    chain = tk.option_chain(expiry)
-    return chain.calls if option_type == "call" else chain.puts
-
-
-def _nearest_strike(df, target: float):
-    """Return row whose strike is closest to target."""
-    idx = (df["strike"] - target).abs().idxmin()
-    return df.loc[idx]
+def _fetch_surface(ticker: str) -> dict:
+    """Public endpoint — no auth, no rate limit."""
+    url = f"{SURFACE_BASE}/v1/surface/{ticker.upper()}"
+    resp = _session.get(url, timeout=15)
+    resp.raise_for_status()
+    return resp.json()
 
 
-# ── Endpoints ───────────────────────────────────────────────────────────────
+def _surface_iv(data: dict, strike: float, dte_years: float) -> float:
+    """Interpolate IV for any strike/tenor via log-moneyness grid."""
+    spot      = data["spot"]
+    tenors    = np.array(data["tenors"])
+    moneyness = np.array(data["moneyness"])  # log(K/S) values
+    iv_grid   = np.array(data["iv"])
+
+    log_m = math.log(strike / spot)
+
+    interp = RegularGridInterpolator(
+        (tenors, moneyness), iv_grid,
+        method="linear", bounds_error=False, fill_value=None
+    )
+
+    t_clamped = float(np.clip(dte_years, tenors.min(), tenors.max()))
+    m_clamped = float(np.clip(log_m, moneyness.min(), moneyness.max()))
+
+    iv_val = float(interp([[t_clamped, m_clamped]])[0])
+    return max(iv_val, 0.001)
+
+
+def _atm_iv(data: dict, dte_years: float | None = None) -> float:
+    """ATM IV from surface at moneyness=0 for the nearest tenor."""
+    tenors    = np.array(data["tenors"])
+    moneyness = np.array(data["moneyness"])
+    iv_grid   = np.array(data["iv"])
+
+    atm_m_idx = int(np.argmin(np.abs(moneyness)))
+
+    if dte_years is None:
+        # Shortest tenor >= 7 calendar days to avoid near-expiry noise
+        valid    = tenors[tenors >= 0.019]
+        target_t = float(valid[0]) if len(valid) else float(tenors[0])
+    else:
+        target_t = float(np.clip(dte_years, tenors.min(), tenors.max()))
+
+    t_idx = int(np.argmin(np.abs(tenors - target_t)))
+    return max(float(iv_grid[t_idx][atm_m_idx]), 0.001)
+
+
+# -- Endpoints ----------------------------------------------------------------
 
 @app.post("/fetch_atm_iv")
 def fetch_atm_iv():
-    body = request.get_json(silent=True) or {}
+    body   = request.get_json(silent=True) or {}
     ticker = (body.get("ticker") or "").upper().strip()
     if not ticker:
         return jsonify(error="ticker is required"), 422
 
     try:
-        tk = yf.Ticker(ticker)
-        current_price = float(tk.fast_info.last_price)
-
-        expiry = tk.options[0]
-        calls = _get_chain(tk, expiry, "call")
-
-        row = _nearest_strike(calls, current_price)
-        atm_iv = float(row["impliedVolatility"])
-        atm_strike = float(row["strike"])
-
+        data   = _fetch_surface(ticker)
+        spot   = round(float(data["spot"]), 2)
+        atm_iv = round(_atm_iv(data), 6)
         return jsonify(
             ticker=ticker,
-            current_price=round(current_price, 2),
-            atm_strike=round(atm_strike, 2),
-            atm_iv=round(atm_iv, 6),
+            current_price=spot,
+            atm_iv=atm_iv,
             snapshot_date=date.today().isoformat(),
         )
     except Exception as exc:
@@ -83,9 +125,9 @@ def fetch_atm_iv():
 
 @app.post("/fetch_option_detail")
 def fetch_option_detail():
-    body = request.get_json(silent=True) or {}
-    ticker = (body.get("ticker") or "").upper().strip()
-    strike = body.get("strike")
+    body        = request.get_json(silent=True) or {}
+    ticker      = (body.get("ticker") or "").upper().strip()
+    strike      = body.get("strike")
     expiry_date = body.get("expiry_date")
     option_type = (body.get("option_type") or "call").lower()
 
@@ -97,30 +139,20 @@ def fetch_option_detail():
 
     try:
         strike = float(strike)
-        tk = yf.Ticker(ticker)
-        current_price = float(tk.fast_info.last_price)
-
-        available = tk.options
-        if expiry_date not in available:
-            return jsonify(error=f"expiry {expiry_date} not available; options: {available[:5]}"), 422
-
-        df = _get_chain(tk, expiry_date, option_type)
-        row = _nearest_strike(df, strike)
-        matched_strike = float(row["strike"])
-
-        iv = float(row["impliedVolatility"])
-
-        T = years_to_expiry(expiry_date)
-        delta = bs_delta(current_price, matched_strike, T, r=0.045, sigma=iv, option_type=option_type)
+        data   = _fetch_surface(ticker)
+        spot   = float(data["spot"])
+        T      = years_to_expiry(expiry_date)
+        iv     = _surface_iv(data, strike, T)
+        delta  = bs_delta(spot, strike, T, r=0.045, sigma=iv, option_type=option_type)
 
         return jsonify(
             ticker=ticker,
             requested_strike=round(strike, 2),
-            strike=round(matched_strike, 2),
-            strike_snapped=(abs(matched_strike - strike) > 0.001),
+            strike=round(strike, 2),
+            strike_snapped=False,
             expiry_date=expiry_date,
             option_type=option_type,
-            current_price=round(current_price, 2),
+            current_price=round(spot, 2),
             iv=round(iv, 6),
             delta=round(delta, 4),
         )
