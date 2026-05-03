@@ -2,15 +2,15 @@
 
 class FairValue::AppSwitcherComponent < ApplicationComponent
   APP_LINKS = [
-    { icon: "📊", label: "FairPrice",      href: "/",         desc: "美股公允價值分析" },
-    { icon: "📈", label: "Daily Momentum", href: "/momentum", desc: "每日動量報告" },
-    { icon: "📁", label: "Portfolio",      href: "/portfolio", desc: "個人持股追蹤" },
-    { icon: "🔔", label: "Watchlist",      href: "/watchlist",  desc: "自選股到價通知" },
-    { icon: "📉", label: "Options",        href: "/options",    desc: "美股期權分析｜策略推薦｜IV Rank" },
-    { icon: "🏦", label: "持股結構",       href: "/ownership",  desc: "Watchlist 持股結構變化圖表" },
+    { icon: "📊", label: "FairPrice",      href: "/",              desc: "美股公允價值分析" },
+    { icon: "📈", label: "Daily Momentum", href: "/momentum",      desc: "每日動量報告" },
+    { icon: "📡", label: "IV 分析",        href: "/iv_analysis",   desc: "IV Rank · IV Percentile · ATM IV 歷史追蹤" },
+    { icon: "🔔", label: "Watchlist",      href: "/watchlist",     desc: "自選股到價通知" },
+    { icon: "📉", label: "Options",        href: "/options",       desc: "美股期權分析｜策略推薦｜IV Rank" },
+    { icon: "🏦", label: "持股結構",       href: "/ownership",     desc: "Watchlist 持股結構變化圖表" },
     { icon: "💹", label: "融資試算",       href: "/margin",               desc: "美股融資交易獲利試算與持股管理" },
     { icon: "📍", label: "期權歷史價格",   href: "/option_price_tracker", desc: "期權 Premium 歷史價格追蹤與分析" },
-    { icon: "🎯", label: "期權收益計算",   href: "/option_profit_calc",     desc: "期權賣出目標價試算｜達成預期獲利" }
+    { icon: "🎯", label: "期權收益計算",   href: "/option_profit_calc",   desc: "期權賣出目標價試算｜達成預期獲利" }
   ].freeze
 
   def initialize(navbar: false)
