@@ -174,6 +174,21 @@ class Api::IvAnalysisController < ApplicationController
     render json: { success: true }
   end
 
+  # GET /api/iv_analysis/expirations?ticker=AAPL
+  def expirations
+    ticker = params[:ticker].to_s.upcase.strip
+    return render json: { error: "ticker required" }, status: :unprocessable_entity if ticker.blank?
+
+    begin
+      result = IvSidecarService.fetch_expirations(ticker)
+      render json: result
+    rescue IvSidecarService::UnavailableError => e
+      render json: { error: e.message }, status: :service_unavailable
+    rescue IvSidecarService::RequestError => e
+      render json: { error: e.message }, status: :unprocessable_entity
+    end
+  end
+
   private
 
   def build_signal(stats)

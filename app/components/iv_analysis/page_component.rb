@@ -46,6 +46,50 @@ class IvAnalysis::PageComponent < ApplicationComponent
             typeInput.value   = 'put';
           });
 
+          // ── Expiry dropdown dynamic load ──────────────────────────
+          var tickerInput  = document.getElementById('iv-ticker');
+          var expirySelect = document.getElementById('iv-expiry');
+
+          function buildExpiryOptions(expirations, weeklyCount) {
+            expirySelect.innerHTML = '';
+            var near = expirations.slice(0, weeklyCount);
+            var far  = expirations.slice(weeklyCount);
+
+            function addGroup(label, dates) {
+              if (!dates.length) return;
+              var grp = document.createElement('optgroup');
+              grp.label = label;
+              dates.forEach(function(d, i) {
+                var opt = document.createElement('option');
+                opt.value = d;
+                opt.textContent = d.replace(/-/g, '/');
+                if (i === 0 && label.indexOf('近期') >= 0) opt.selected = true;
+                grp.appendChild(opt);
+              });
+              expirySelect.appendChild(grp);
+            }
+
+            addGroup('近期（週選）', near);
+            addGroup('月選 / LEAPS', far);
+          }
+
+          function loadExpirations(ticker) {
+            if (!ticker) return;
+            fetch('/api/iv_analysis/expirations?ticker=' + encodeURIComponent(ticker))
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                if (data.expirations && data.expirations.length) {
+                  buildExpiryOptions(data.expirations, data.weekly_count || 6);
+                }
+              })
+              .catch(function() {});
+          }
+
+          tickerInput.addEventListener('blur', function() {
+            var t = tickerInput.value.toUpperCase().trim();
+            if (t.length >= 1) loadExpirations(t);
+          });
+
           // ── Form submit ───────────────────────────────────────────────
           var form      = document.getElementById('iv-analysis-form');
           var submitBtn = document.getElementById('iv-submit-btn');

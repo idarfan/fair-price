@@ -23,6 +23,29 @@ class IvSidecarService
     })
   end
 
+  def self.fetch_expirations(ticker)
+    new.get("/expirations/#{ticker.to_s.upcase.strip}")
+  end
+
+  def get(path)
+    uri  = URI("#{SIDECAR_URL}#{path}")
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.open_timeout = TIMEOUT_SECS
+    http.read_timeout = TIMEOUT_SECS
+
+    req = Net::HTTP::Get.new(uri, "Accept" => "application/json")
+
+    begin
+      res = http.request(req)
+    rescue Errno::ECONNREFUSED, Net::OpenTimeout => e
+      raise UnavailableError, "IV sidecar unavailable: #{e.message}"
+    end
+
+    body = JSON.parse(res.body, symbolize_names: true)
+    raise RequestError, body[:error] || "sidecar error (#{res.code})" unless res.is_a?(Net::HTTPSuccess)
+    body
+  end
+
   def post(path, payload)
     uri  = URI("#{SIDECAR_URL}#{path}")
     http = Net::HTTP.new(uri.host, uri.port)

@@ -43,6 +43,7 @@ Rails.application.routes.draw do
     end
 
     # IV Analysis API
+    get    "iv_analysis/expirations",          to: "iv_analysis#expirations"
     post   "iv_analysis",                    to: "iv_analysis#create"
     get    "iv_analysis/watchlist",          to: "iv_analysis#watchlist"
     delete "iv_analysis/watchlist/:ticker",  to: "iv_analysis#watchlist_destroy",

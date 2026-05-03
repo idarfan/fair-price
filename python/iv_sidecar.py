@@ -13,7 +13,7 @@ Greeks computed locally via Black-Scholes.
 import math
 import logging
 import os
-from datetime import date
+from datetime import date, timedelta
 
 import numpy as np
 import requests
@@ -99,6 +99,77 @@ def _atm_iv(data: dict, dte_years: float | None = None) -> float:
     return max(float(iv_grid[t_idx][atm_m_idx]), 0.001)
 
 
+# -- Expiration inference -----------------------------------------------------
+
+# Fridays NYSE is closed — option expiry shifts to prior Thursday
+_CLOSED_FRIDAYS = frozenset([
+    date(2026, 6, 19),  # Juneteenth
+    date(2026, 7, 3),   # Independence Day observed (Jul 4 = Sat)
+    date(2027, 1, 1),   # New Year's Day
+])
+
+_QUARTERLY_MONTHS = frozenset([3, 6, 9, 12])
+
+
+def _infer_expirations(data: dict) -> tuple[list, int]:
+    """Infer available option expiry dates from surface metadata.
+
+    Uses slices_used as a proxy for option chain depth:
+      ≤15 slices → quarterly cycle (3/6/9/12) + Jan LEAPS  (e.g. SQQQ)
+      >15 slices → all monthly 3rd Fridays                  (e.g. AAPL)
+
+    Returns (sorted list of dates, weekly_count).
+    """
+    tenors      = data["tenors"]
+    slices_used = int(data.get("slices_used", 10))
+    today       = date.today()
+
+    # Surface coverage range
+    max_date = today + timedelta(days=int(max(tenors) * 365) + 14)
+
+    # Collect all Fridays from tomorrow up to max_date
+    d = today + timedelta(days=1)
+    while d.weekday() != 4:   # 4 = Friday
+        d += timedelta(days=1)
+    all_fridays: list[date] = []
+    while d <= max_date:
+        all_fridays.append(d)
+        d += timedelta(days=7)
+
+    # Weekly: first 6 open (non-holiday) Fridays
+    open_fridays = [f for f in all_fridays if f not in _CLOSED_FRIDAYS]
+    weekly       = open_fridays[:6]
+    cutoff       = weekly[-1] if weekly else today
+
+    # Monthly candidates: 3rd Friday zone (day 15–21), after weekly period
+    candidates = [f for f in all_fridays if f > cutoff and 15 <= f.day <= 21]
+
+    if slices_used <= 15:
+        # Quarterly months within surface range + Jan LEAPS for next 2 years
+        quarterly = [f for f in candidates if f.month in _QUARTERLY_MONTHS]
+        jan_leaps = []
+        for offset in range(1, 3):
+            yr  = today.year + offset
+            jan = date(yr, 1, 1)
+            fri = jan
+            while fri.weekday() != 4:
+                fri += timedelta(days=1)
+            third_fri = fri + timedelta(days=14)
+            if third_fri > cutoff:
+                jan_leaps.append(third_fri)
+        # Merge & deduplicate, then apply holiday shift
+        combined = sorted(set(quarterly) | set(jan_leaps))
+    else:
+        combined = candidates
+
+    monthly = [
+        (f - timedelta(days=1) if f in _CLOSED_FRIDAYS else f)
+        for f in combined
+    ]
+
+    return weekly + monthly, len(weekly)
+
+
 # -- Endpoints ----------------------------------------------------------------
 
 @app.post("/fetch_atm_iv")
@@ -158,6 +229,23 @@ def fetch_option_detail():
         )
     except Exception as exc:
         logger.error("fetch_option_detail error for %s: %s", ticker, exc)
+        return jsonify(error=str(exc)), 422
+
+
+@app.get("/expirations/<ticker>")
+def expirations(ticker):
+    ticker = ticker.upper().strip()
+    if not ticker:
+        return jsonify(error="ticker required"), 422
+    try:
+        data          = _fetch_surface(ticker)
+        dates, wcount = _infer_expirations(data)
+        return jsonify(
+            expirations=[d.isoformat() for d in dates],
+            weekly_count=wcount,
+        )
+    except Exception as exc:
+        logger.error("expirations error for %s: %s", ticker, exc)
         return jsonify(error=str(exc)), 422
 
 
