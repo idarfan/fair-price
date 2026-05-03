@@ -115,7 +115,9 @@ def fetch_option_detail():
 
         return jsonify(
             ticker=ticker,
+            requested_strike=round(strike, 2),
             strike=round(matched_strike, 2),
+            strike_snapped=(abs(matched_strike - strike) > 0.001),
             expiry_date=expiry_date,
             option_type=option_type,
             current_price=round(current_price, 2),

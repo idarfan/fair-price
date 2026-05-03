@@ -97,6 +97,15 @@ class IvAnalysis::PageComponent < ApplicationComponent
             document.getElementById('iv-result-section').classList.remove('hidden');
             document.getElementById('iv-result-ticker').textContent =
               d.ticker + ' ' + d.option_type.toUpperCase() + ' ' + d.strike + ' ' + d.expiry_date;
+
+            var snapWarn = document.getElementById('iv-snap-warning');
+            if (d.snap_notice) {
+              snapWarn.textContent = d.snap_notice;
+              snapWarn.classList.remove('hidden');
+            } else {
+              snapWarn.classList.add('hidden');
+              snapWarn.textContent = '';
+            }
             document.getElementById('iv-result-time').textContent =
               new Date(d.queried_at).toLocaleString('zh-TW');
 

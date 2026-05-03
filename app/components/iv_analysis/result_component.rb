@@ -12,6 +12,9 @@ class IvAnalysis::ResultComponent < ApplicationComponent
           span(id: "iv-result-time", class: "text-xs text-gray-400")
         end
 
+        # strike snap warning
+        div(id: "iv-snap-warning", class: "hidden mb-3 px-4 py-2.5 rounded-lg text-sm bg-amber-50 border border-amber-200 text-amber-800")
+
         # data quality banner
         div(id: "iv-quality-banner", class: "hidden mb-4 px-4 py-2.5 rounded-lg text-sm")
 

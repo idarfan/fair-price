@@ -37,6 +37,10 @@ class Api::IvAnalysisController < ApplicationController
 
     low_iv_signal, notice = build_signal(stats)
 
+    snap_notice = if detail[:strike_snapped]
+      "⚠️ Strike #{detail[:requested_strike]} 不存在於選擇權鏈，已自動使用最近可用行權價 #{detail[:strike]}"
+    end
+
     query = IvQuery.create!(
       ticker:         ticker,
       strike:         detail[:strike],
@@ -71,6 +75,7 @@ class Api::IvAnalysisController < ApplicationController
       data_quality:   query.data_quality,
       low_iv_signal:  query.low_iv_signal,
       notice:         notice,
+      snap_notice:    snap_notice,
       queried_at:     query.queried_at
     }
   end
