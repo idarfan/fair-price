@@ -10,9 +10,40 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_14_042936) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_03_035830) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "iv_daily_snapshots", force: :cascade do |t|
+    t.decimal "atm_iv", precision: 8, scale: 4
+    t.decimal "atm_strike", precision: 10, scale: 2
+    t.datetime "created_at", null: false
+    t.decimal "current_price", precision: 10, scale: 2
+    t.date "snapshot_date", null: false
+    t.string "ticker", null: false
+    t.datetime "updated_at", null: false
+    t.index ["ticker", "snapshot_date"], name: "index_iv_daily_snapshots_on_ticker_and_snapshot_date", unique: true
+  end
+
+  create_table "iv_queries", force: :cascade do |t|
+    t.integer "available_days"
+    t.datetime "created_at", null: false
+    t.decimal "current_price", precision: 10, scale: 2
+    t.string "data_quality"
+    t.decimal "delta", precision: 6, scale: 4
+    t.date "expiry_date"
+    t.decimal "iv", precision: 8, scale: 4
+    t.decimal "ivp_1y", precision: 6, scale: 2
+    t.decimal "ivp_2y", precision: 6, scale: 2
+    t.decimal "ivr_1y", precision: 6, scale: 2
+    t.decimal "ivr_2y", precision: 6, scale: 2
+    t.boolean "low_iv_signal"
+    t.string "option_type"
+    t.datetime "queried_at"
+    t.decimal "strike", precision: 10, scale: 2
+    t.string "ticker"
+    t.datetime "updated_at", null: false
+  end
 
   create_table "margin_positions", force: :cascade do |t|
     t.decimal "buy_price", precision: 15, scale: 4, null: false
@@ -132,6 +163,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_14_042936) do
     t.datetime "updated_at", null: false
     t.index ["active"], name: "index_tracked_tickers_on_active"
     t.index ["symbol"], name: "index_tracked_tickers_on_symbol", unique: true
+  end
+
+  create_table "watched_tickers", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.datetime "added_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "last_fetched_at"
+    t.string "ticker", null: false
+    t.datetime "updated_at", null: false
+    t.index ["ticker"], name: "index_watched_tickers_on_ticker", unique: true
   end
 
   create_table "watchlist_items", force: :cascade do |t|
