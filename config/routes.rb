@@ -41,6 +41,12 @@ Rails.application.routes.draw do
         member      { post :close }
       end
     end
+
+    # IV Analysis API
+    post   "iv_analysis",                    to: "iv_analysis#create"
+    get    "iv_analysis/watchlist",          to: "iv_analysis#watchlist"
+    delete "iv_analysis/watchlist/:ticker",  to: "iv_analysis#watchlist_destroy",
+           constraints: { ticker: TICKER_CONSTRAINT }
   end
 
   # Health check
@@ -98,6 +104,9 @@ Rails.application.routes.draw do
   get  "ownership",         to: "ownership#index",   as: :ownership
   get  "ownership/history", to: "ownership#history", as: :ownership_history
   post "ownership/fetch",   to: "ownership#fetch",   as: :ownership_fetch
+
+  # IV Analysis
+  get "iv_analysis", to: "iv_analysis#index", as: :iv_analysis
 
   # Lookbook component previews (development only)
   mount Lookbook::Engine, at: "/lookbook" if defined?(Lookbook)

@@ -21,6 +21,10 @@ class IvStatsService
     new(ticker, current_iv.to_f).calculate
   end
 
+  def self.quality_for(available_days)
+    QUALITY_THRESHOLDS.find { |_, range| range.cover?(available_days) }&.first || :insufficient
+  end
+
   def initialize(ticker, current_iv)
     @ticker     = ticker.to_s.upcase.strip
     @current_iv = current_iv
@@ -56,7 +60,7 @@ class IvStatsService
 
   def period_stats(all_snapshots, period)
     window = all_snapshots.last(period)
-    return [nil, nil] if window.size < 30
+    return [ nil, nil ] if window.size < 30
 
     min   = window.min
     max   = window.max
@@ -65,6 +69,6 @@ class IvStatsService
     ivr = max == min ? 0.0 : ((@current_iv - min) / (max - min) * 100).round(2)
     ivp = (window.count { |v| v < @current_iv }.to_f / total * 100).round(2)
 
-    [ivr, ivp]
+    [ ivr, ivp ]
   end
 end
