@@ -8,8 +8,11 @@ class IvAnalysis::WatchlistComponent < ApplicationComponent
         button(
           id:    "iv-watchlist-refresh",
           type:  "button",
-          class: "text-xs text-blue-500 hover:text-blue-700 transition-colors"
-        ) { plain "重新整理" }
+          class: "inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg shadow-sm transition-colors"
+        ) do
+          span(style: "font-size:1rem; line-height:1") { plain "↻" }
+          plain "即時重新整理"
+        end
       end
       div(class: "overflow-x-auto") do
         table(class: "w-full text-sm") do
