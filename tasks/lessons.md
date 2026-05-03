@@ -560,3 +560,54 @@ PYEOF
 ```
 
 **規則：** 需要跨多步驟操作同一個檔案，一律用 Python heredoc 或在同一個 Bash call 內完成。
+
+---
+
+## 2026-05-03 — IV Sidecar 遷移、假日日期、API 探索：三個錯誤
+
+### 錯誤 13：修改 Python sidecar 後沒有告知需要重啟 pm2
+
+**過錯：** 上次對話把 `python/iv_sidecar.py` 從 yfinance 改成 FlashAlpha surface 並 commit（`d64ec43`，16 分鐘前），但 pm2 的 `iv-sidecar` 程序是 28 分鐘前啟動的舊版本。新程式碼在磁碟上，舊程式碼在記憶體裡跑，snap 警告繼續出現。使用者回報 bug 才發現。
+
+**根本原因：** Python 不熱重載（不像 Phlex/Rails）。修改 `.py` 後 pm2 不會自動套用，必須手動重啟。
+
+**防治：**
+```
+修改任何 python/ 目錄下的 .py 檔後，完成 commit 前必須執行：
+  pm2 restart iv-sidecar
+  pm2 logs iv-sidecar --lines 5 --nostream   # 確認 Flask 已重新啟動
+測試通過後才算完成。
+```
+
+**規則：** Python sidecar 的「完成定義」= 程式碼改完 + commit + `pm2 restart` + log 確認。少任何一步都是未完成。
+
+---
+
+### 錯誤 14：對使用者的日期主張直接反駁，而非先查美股假日日曆
+
+**過錯：** 使用者說「6月12再下去一個檔期是6/18」，我根據日曆計算「6月第3個週五是6/19，6/18是週四，你錯了」並附上日曆輸出堅持己見。但使用者是對的：6/19 = Juneteenth（美國聯邦假日），NYSE 休市，月選到期日自動前移到 6/18（週四）。使用者必須截 Barchart 截圖才能讓我認錯。
+
+**根本原因：** 只驗證「第幾個週五」，完全沒考慮美國聯邦假日會讓選擇權到期日提前。
+
+**防治：**
+1. 凡涉及美股選擇權到期日，日曆計算後還要對照美股假日清單：
+   - Juneteenth（6/19）、Independence Day（7/4）、Christmas（12/25）、New Year（1/1）落在週五時，到期日**前移一天至週四**
+2. 使用者有實際平台（Barchart、IB、TD）截圖支撐的主張，**不要直接反駁**，先查：
+   ```bash
+   python3 -c "import datetime; d=datetime.date(YYYY,M,D); print(d.strftime('%A'))"
+   # 再查 US Federal holidays
+   ```
+3. 不確定假日時，承認「讓我查一下是否有假日調整」，而非篤定地給出錯誤答案。
+
+---
+
+### 錯誤 15：測試新 API key 時盲目猜測端點，浪費多輪
+
+**過錯：** 使用者要測試 `FLASHALPHA_API_KEY`，我依序嘗試了 `api.flashalpha.ai`、`api.flashalpha.io`、`flashalpha.io`、`flashalpha.com`、`api.flashalpha.com` 等多個域名，全部失敗。最後是使用者直接提供正確指令 `curl -H "X-Api-Key: ..." https://lab.flashalpha.com/v1/...` 才解決。
+
+**根本原因：** 沒有文件就自行猜測 API 端點，屬於無依據的試誤。
+
+**防治：**
+1. 收到新的 API key 時，**第一步**是要求使用者提供對應的 API 文件或範例指令，而不是自行猜域名。
+2. 若無文件，依序嘗試：root domain → `/api/` → `/v1/` → `/health`，最多 3 次，找不到就停下來問。
+3. 記住 FlashAlpha 正確端點：`lab.flashalpha.com/v1/`，Header 用 `X-Api-Key`。
