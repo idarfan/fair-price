@@ -36,7 +36,7 @@ class IvAnalysis::EducationComponent < ApplicationComponent
       end
 
       # Dark formula card
-      div(class: "rounded-xl p-6 mb-5 text-center", style: FORMULA_STYLE) do
+      div(class: "rounded-xl p-6 mb-6 text-center", style: FORMULA_STYLE) do
         p(style: "font-size:1.5rem; letter-spacing:0.04em; color:#d4e157; font-style:italic;") do
           span(style: "color:#e8f5a3; font-weight:700") { plain "C" }
           span(style: "color:#7ecaf5; font-weight:300; margin:0 6px") { plain " ≈ " }
@@ -56,25 +56,63 @@ class IvAnalysis::EducationComponent < ApplicationComponent
           span(style: "color:#b0bec5; font-weight:400; font-style:normal") { plain "√" }
           span(style: "color:#e8f5a3; font-weight:700") { plain "T" }
         end
-        div(class: "mt-4 flex flex-wrap justify-center gap-x-5 gap-y-1",
-            style: "font-size:0.72rem; color:#78909c;") do
-          [["C","買權價格","#e8f5a3"], ["Δ","Delta","#81c784"],
-           ["S","股價","#e8f5a3"], ["K","行權價","#e8f5a3"],
-           ["σ","隱含波動率","#ffb74d"], ["T","到期時間（年）","#e8f5a3"]].each do |sym, desc, c|
-            span do
-              span(style: "font-style:italic; color:#{c}; font-weight:600") { plain sym }
-              plain " = #{desc}"
+
+        # Two-term breakdown cards inside formula card
+        div(class: "mt-5 flex flex-wrap justify-center gap-4 text-left") do
+          div(class: "rounded-lg px-4 py-3 flex-1",
+              style: "background:#112240; border:1px solid #1e3a5f; min-width:200px; max-width:260px") do
+            p(style: "color:#58a6ff; font-size:0.68rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px") do
+              plain "① 內涵價值"
+            end
+            p(style: "color:#c9d1d9; font-size:0.9rem; font-style:italic; margin-bottom:6px") { plain "Δ · (S − K)" }
+            p(style: "color:#8b949e; font-size:0.72rem; line-height:1.6") do
+              plain "S（股價）− K（行權價）= 「立刻行權能拿到多少錢」。若 S < K（OTM 價外），視同零。乘以 Δ 是因為期權並非直接持股，Delta 代表對股價變動的實際放大比例。"
+            end
+          end
+          div(class: "rounded-lg px-4 py-3 flex-1",
+              style: "background:#1a1200; border:1px solid #3d2e00; min-width:200px; max-width:260px") do
+            p(style: "color:#d29922; font-size:0.68rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px") do
+              plain "② 時間價值"
+            end
+            p(style: "color:#c9d1d9; font-size:0.9rem; font-style:italic; margin-bottom:6px") { plain "0.4 · S · σ · √T" }
+            p(style: "color:#8b949e; font-size:0.72rem; line-height:1.6") do
+              plain "S · σ · √T 是「股票在剩餘期間的預期波動幅度（1個標準差）」，例如 S=100、σ=30%、T=1年 → 預期震幅 ±$30。0.4 是 ATM 近似係數（B-S 推導：N′(0) = 1/√2π ≈ 0.3989 ≈ 0.4），把預期震幅轉換為期權溢價。"
             end
           end
         end
       end
 
+      # Symbol cards grid
+      h4(class: "text-sm font-semibold text-gray-700 mb-3") { plain "符號完整說明" }
+      div(class: "grid sm:grid-cols-2 xl:grid-cols-3 gap-3 mb-6") do
+        symbol_card("C", "#e8f5a3", "買權價格", "Call Premium", "每股，美元",
+          "你為「以 K 買入股票的權利」支付的市場價格。由兩部分疊加：內涵價值（已在價內的真實獲利）＋時間價值（市場對未來波動的定價）。1 份合約通常對應 100 股。")
+
+        symbol_card("Δ", "#81c784", "Delta", "Delta", "0 ~ 1（Call）",
+          "股價每漲 $1，期權理論上的價格變化。ATM（價平）≈ 0.5；深度 ITM（價內）→ 趨近 1.0，近似直接持股；深度 OTM（價外）→ 趨近 0.0，幾乎不隨股票移動。亦可近似解讀為「到期時處於價內」的機率。")
+
+        symbol_card("S", "#e8f5a3", "股價", "Stock Price", "美元 / 每股",
+          "標的資產的當前市場價格。S 越高，Call 的內涵價值（S − K）越大；Delta 正是衡量期權對 S 每變動 $1 的瞬間敏感度。")
+
+        symbol_card("K", "#e8f5a3", "行權價", "Strike Price", "美元 / 每股",
+          "你有權以此價格買入股票的約定價格。S > K → ITM（價內），存在內涵價值；S = K → ATM（價平），Δ ≈ 0.5；S < K → OTM（價外），內涵價值為零，期權總價純為時間價值。")
+
+        symbol_card("σ", "#ffb74d", "隱含波動率", "Implied Volatility", "年化 %（代入如 0.30）",
+          "從市場期權成交價「反推」出市場對未來波動的預期，並非歷史波動率。σ 越高，時間價值越貴，期權總價越高。本工具計算的 IVR / IVP 正是衡量當前 σ 在歷史分布中的相對高低。")
+
+        symbol_card("T", "#e8f5a3", "到期時間", "Time to Expiration", "年（1 月 ≈ 0.083）",
+          "公式採 √T 源自隨機漫步理論：資產價格分布的標準差與時間的平方根成正比，而非線性。T 趨近 0 時時間價值加速歸零——即每日 Theta 耗損在到期週前急劇放大的原因。")
+
+        symbol_card("0.4", "#b0bec5", "ATM 近似係數", "≈ 1/√(2π) ≈ 0.3989", "僅 ATM 附近有效",
+          "源自 B-S 推導：時間價值項係數為 N′(d₁)，N′ 是標準常態分配的機率密度函數（PDF）。當期權恰好 ATM 時 d₁ ≈ 0，N′(0) = 1/√(2π) ≈ 0.3989 ≈ 0.4。深度 OTM（價外）或 ITM（價內）時此近似誤差較大，需用完整 B-S 公式。")
+      end
+
       div(class: "grid sm:grid-cols-2 gap-4") do
         value_box("內涵價值（Intrinsic Value）", "Δ · (S − K)",
-          "期權「已在價內」的真實獲利部分。若 S < K（價外），此項趨近於零。",
+          "期權「已在價內」的真實獲利部分。若 S < K（OTM 價外），此項趨近於零，期權總價幾乎全是時間價值。",
           "border-blue-200 bg-blue-50", "text-blue-700")
         value_box("時間價值（Time Value）", "0.4 · S · σ · √T",
-          "市場對未來波動的定價。IV（σ）直接乘在這裡——IV 越高，時間價值越貴。",
+          "S·σ·√T 是股票的預期震幅（1個標準差）；0.4 把它轉換成期權溢價。IV（σ）越高震幅越大，時間價值越貴；T 越小震幅越小，溢價越快消失（Theta 耗損）。",
           "border-orange-200 bg-orange-50", "text-orange-700")
       end
       p(class: "mt-4 text-sm text-gray-600 leading-relaxed") do
@@ -82,6 +120,21 @@ class IvAnalysis::EducationComponent < ApplicationComponent
         span(class: "font-semibold text-gray-800") { plain "Δ 本身也和 σ 高度相關" }
         plain "，接下來的圖表正是要展示這個關鍵事實。"
       end
+    end
+  end
+
+  def symbol_card(sym, color, name_zh, name_en, unit, desc)
+    div(class: "rounded-lg border border-gray-200 bg-gray-50 p-3.5") do
+      div(class: "flex items-start gap-2.5 mb-2") do
+        span(style: "font-size:1.4rem; font-weight:700; font-style:italic; color:#{color}; line-height:1.1; flex-shrink:0") { plain sym }
+        div(class: "flex-1 min-w-0") do
+          p(class: "text-xs font-bold text-gray-800 leading-tight") { plain name_zh }
+          p(class: "text-xs text-gray-400 leading-tight mt-0.5") { plain name_en }
+        end
+        span(class: "text-xs rounded-full px-2 py-0.5 bg-white border border-gray-200 text-gray-500 whitespace-nowrap flex-shrink-0",
+             style: "font-size:0.65rem") { plain unit }
+      end
+      p(class: "text-xs text-gray-600 leading-relaxed") { plain desc }
     end
   end
 
