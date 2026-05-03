@@ -28,16 +28,15 @@ class IvAnalysis::EducationComponent < ApplicationComponent
 
   def formula_section
     div(class: "bg-white rounded-xl border border-gray-200 shadow-sm p-6") do
-      h3(class: "text-base font-semibold text-gray-800 mb-3") { plain "📐 買權定價公式（ATM 近似）" }
+      h3(class: "text-base font-semibold text-gray-800 mb-3") { plain "📐 買權定價公式（ATM 價平 近似）" }
       p(class: "text-sm text-gray-600 leading-relaxed mb-5") do
         plain "以下基於 Black–Scholes 模型，在"
         span(class: "font-semibold text-gray-800") { plain "價平（ATM）附近" }
         plain "適用的買權近似定價公式。本文不推導數學，但這個式子的「關係」是正確的："
       end
 
-      # Dark formula card — no overline, no Georgia web-font requests
+      # Dark formula card
       div(class: "rounded-xl p-6 mb-5 text-center", style: FORMULA_STYLE) do
-        # Formula row
         p(style: "font-size:1.5rem; letter-spacing:0.04em; color:#d4e157; font-style:italic;") do
           span(style: "color:#e8f5a3; font-weight:700") { plain "C" }
           span(style: "color:#7ecaf5; font-weight:300; margin:0 6px") { plain " ≈ " }
@@ -57,7 +56,6 @@ class IvAnalysis::EducationComponent < ApplicationComponent
           span(style: "color:#b0bec5; font-weight:400; font-style:normal") { plain "√" }
           span(style: "color:#e8f5a3; font-weight:700") { plain "T" }
         end
-        # Legend
         div(class: "mt-4 flex flex-wrap justify-center gap-x-5 gap-y-1",
             style: "font-size:0.72rem; color:#78909c;") do
           [["C","買權價格","#e8f5a3"], ["Δ","Delta","#81c784"],
@@ -128,9 +126,9 @@ class IvAnalysis::EducationComponent < ApplicationComponent
       div(class: "mx-4 mb-4 rounded-lg p-4", style: "background:#1f2937; border:1px solid #374151;") do
         p(class: "font-semibold text-sm mb-2", style: "color:#fbbf24") { plain "📌 從圖表看出的關鍵事實" }
         ul(class: "space-y-1") do
-          ["IV = 10% 時，履約價 115 的 OTM Call Delta 幾乎趨近於 0 ——買了幾乎不動",
+          ["IV = 10% 時，履約價 115 的 OTM（價外）Call Delta 幾乎趨近於 0 ——買了幾乎不動",
            "IV = 80% 時，同樣履約價 115 的 Delta 可達 0.4 以上 ——對股價極度敏感",
-           "IV 上升 8 倍（10% → 80%），OTM Call 的 Δ 可能翻倍甚至高達五倍",
+           "IV 上升 8 倍（10% → 80%），OTM（價外）Call 的 Δ 可能翻倍甚至高達五倍",
            "無論是內涵價值（Δ 變大）還是時間價值（σ 直接乘進去），都以倍數放大"].each do |txt|
             li(class: "text-xs leading-relaxed", style: "color:#9ca3af") do
               span(style: "color:#6b7280; margin-right:6px") { plain "•" }
@@ -152,21 +150,21 @@ class IvAnalysis::EducationComponent < ApplicationComponent
           "買入期權就是持有正 Vega。IV 每上升 1%，期權價值增加；IV 下降 1%，期權價值減少。",
           "border-purple-200 bg-purple-50", "text-purple-800")
         greek_box("Vanna", "IV 變化 → Delta 變化（同時也是股價變化 → Vega 變化）",
-          "IV 崩潰時，Vanna 把你的 OTM Delta 從 0.4 打回 0.05——此後即便股票漲了，你也賺不到錢。",
+          "IV 崩潰時，Vanna 把你的 OTM（價外）Delta 從 0.4 打回 0.05——此後即便股票漲了，你也賺不到錢。",
           "border-red-200 bg-red-50", "text-red-800")
       end
       div(class: "rounded-lg border border-gray-200 overflow-hidden") do
         div(class: "px-4 py-2.5 bg-gray-50 border-b border-gray-200") do
           p(class: "text-xs font-semibold text-gray-600 uppercase tracking-wide") do
-            plain "財報後情境：你買了 OTM Call，股票確實漲了，但你卻虧損了"
+            plain "財報後情境：你買了 OTM（價外）Call，股票確實漲了，但你卻虧損了"
           end
         end
         div(class: "divide-y divide-gray-100") do
-          scenario_row("財報前（IV = 80%）",  "OTM Call Δ = 0.45，期權價格 = $8.50", "text-gray-700", "")
-          scenario_row("財報後股票漲 3%",     "IV 從 80% 崩潰至 25%",               "text-red-700",  "⚠️")
-          scenario_row("Vanna 效應",          "Δ 從 0.45 暴跌至 0.12",              "text-red-700",  "⚠️")
-          scenario_row("Vega 損失",           "IV 崩 55%，時間價值大幅蒸發",         "text-red-700",  "⚠️")
-          scenario_row("最終結果",            "期權從 $8.50 → $3.20，虧損 62%",     "text-red-800 font-semibold", "❌")
+          scenario_row("財報前（IV = 80%）",  "OTM（價外）Call Δ = 0.45，期權價格 = $8.50", "text-gray-700", "")
+          scenario_row("財報後股票漲 3%",     "IV 從 80% 崩潰至 25%",                       "text-red-700",  "⚠️")
+          scenario_row("Vanna 效應",          "Δ 從 0.45 暴跌至 0.12",                      "text-red-700",  "⚠️")
+          scenario_row("Vega 損失",           "IV 崩 55%，時間價值大幅蒸發",                 "text-red-700",  "⚠️")
+          scenario_row("最終結果",            "期權從 $8.50 → $3.20，虧損 62%",             "text-red-800 font-semibold", "❌")
         end
       end
     end
@@ -193,13 +191,13 @@ class IvAnalysis::EducationComponent < ApplicationComponent
       h3(class: "text-base font-semibold text-gray-800 mb-4") { plain "🎯 實戰要點" }
       div(class: "space-y-3") do
         takeaway("低 IV 買期權（IVR < 20%）",
-          "IV 低時，時間價值便宜；Vanna 效應讓 OTM Delta 還有上升空間。若 IV 後續回升，Vega 和 Vanna 雙重受益。這正是 IVR 低點買入期權的核心邏輯。",
+          "IV 低時，時間價值便宜；Vanna 效應讓 OTM（價外）Delta 還有上升空間。若 IV 後續回升，Vega 和 Vanna 雙重受益。這正是 IVR 低點買入期權的核心邏輯。",
           "border-green-200 bg-green-50", "text-green-700")
-        takeaway("高 IV 避免買 OTM 期權（IVR > 80%）",
+        takeaway("高 IV 避免買 OTM（價外）期權（IVR > 80%）",
           "高 IV 代表市場已充分定價未來波動。財報等事件過後，IV 一旦崩潰，Vega 損失加上 Vanna 讓 Delta 歸零，方向做對了也可能虧錢。",
           "border-red-200 bg-red-50", "text-red-700")
-        takeaway("高 IV 環境的替代策略：深度價內或現股",
-          "若 IV 很高但你仍看好方向，可選深度 ITM 短期期權甚至直接買現股。深度 ITM 讓 (S−K) 佔主導，時間價值極小，IV 崩潰的衝擊也就微乎其微。",
+        takeaway("高 IV 環境的替代策略：深度 ITM（價內）或現股",
+          "若 IV 很高但你仍看好方向，可選深度 ITM（價內）短期期權甚至直接買現股。深度 ITM（價內）讓 (S−K) 佔主導，時間價值極小，IV 崩潰的衝擊也就微乎其微。",
           "border-blue-200 bg-blue-50", "text-blue-700")
         takeaway("高 IV 環境的賣方策略",
           "賣出期權（如 Covered Call、Cash-Secured Put、Vertical Spread）可收取高額 IV 溢價。當 IV 回落，正 Theta 和負 Vega 雙重獲益。需注意賣方面臨 Gamma 風險。",
@@ -260,13 +258,10 @@ class IvAnalysis::EducationComponent < ApplicationComponent
           function toX(K)     { return pad.left + (K - Kmin) / (Kmax - Kmin) * cW; }
           function toY(delta) { return pad.top  + (1 - delta) * cH; }
 
-          // Background
           ctx.fillStyle = '#161b22';
           ctx.fillRect(0, 0, W, H);
 
-          // Grid
-          ctx.strokeStyle = '#21262d';
-          ctx.lineWidth = 1;
+          ctx.strokeStyle = '#21262d'; ctx.lineWidth = 1;
           [0, 0.25, 0.5, 0.75, 1.0].forEach(function(y) {
             var cy = toY(y);
             ctx.beginPath(); ctx.moveTo(pad.left, cy); ctx.lineTo(pad.left + cW, cy); ctx.stroke();
@@ -276,16 +271,15 @@ class IvAnalysis::EducationComponent < ApplicationComponent
             ctx.beginPath(); ctx.moveTo(cx, pad.top); ctx.lineTo(cx, pad.top + cH); ctx.stroke();
           });
 
-          // ATM dashed line
+          // ATM（價平）dashed line
           ctx.strokeStyle = '#444c56'; ctx.setLineDash([5,4]); ctx.lineWidth = 1.5;
           var ax = toX(100);
           ctx.beginPath(); ctx.moveTo(ax, pad.top); ctx.lineTo(ax, pad.top + cH); ctx.stroke();
           ctx.setLineDash([]);
 
-          // Labels
           ctx.fillStyle = '#7d8590'; ctx.font = '11px sans-serif';
           ctx.textAlign = 'left';
-          ctx.fillText('價平 (ATM: 100)', ax + 5, pad.top + 14);
+          ctx.fillText('價平 ATM: 100', ax + 5, pad.top + 14);
           ctx.textAlign = 'right';
           [0, 0.25, 0.5, 0.75, 1.0].forEach(function(y) {
             ctx.fillText(y.toFixed(2), pad.left - 6, toY(y) + 4);
@@ -295,11 +289,10 @@ class IvAnalysis::EducationComponent < ApplicationComponent
             ctx.fillText(k, toX(k), pad.top + cH + 16);
           });
           ctx.fillStyle = '#9ca3af'; ctx.font = 'bold 11px sans-serif';
-          ctx.fillText('履約價 (Strike)', pad.left + cW / 2, H - 6);
+          ctx.fillText('履約價 Strike', pad.left + cW / 2, H - 6);
           ctx.save(); ctx.translate(13, pad.top + cH / 2); ctx.rotate(-Math.PI/2);
           ctx.fillText('買權 Delta', 0, 0); ctx.restore();
 
-          // Curves
           ivs.forEach(function(iv) {
             ctx.beginPath(); ctx.strokeStyle = iv.c; ctx.lineWidth = 2.5;
             ctx.shadowColor = iv.c; ctx.shadowBlur = 4;
@@ -311,7 +304,6 @@ class IvAnalysis::EducationComponent < ApplicationComponent
             ctx.stroke(); ctx.shadowBlur = 0;
           });
 
-          // Frame
           ctx.strokeStyle = '#30363d'; ctx.lineWidth = 1.5;
           ctx.beginPath();
           ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top + cH);
