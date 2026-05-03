@@ -133,6 +133,9 @@ class Api::IvAnalysisController < ApplicationController
         query_label     = "#{latest_query.option_type.upcase} #{latest_query.strike} #{latest_query.expiry_date}"
       end
 
+      live_price = live ? live[:current_price].to_f : latest_query&.current_price.to_f
+      live_iv    = live ? live[:atm_iv].to_f        : latest_query&.iv.to_f
+
       {
         ticker:          wt.ticker,
         added_at:        wt.added_at,
@@ -147,7 +150,12 @@ class Api::IvAnalysisController < ApplicationController
         intrinsic_value: intrinsic_value,
         time_value:      time_value,
         query_label:     query_label,
-        is_live:         live != nil
+        is_live:         live != nil,
+        strike:          latest_query&.strike,
+        expiry_date:     latest_query&.expiry_date,
+        option_type:     latest_query&.option_type,
+        live_price:      live_price,
+        live_iv:         live_iv
       }
     end
 

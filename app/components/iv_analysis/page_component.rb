@@ -216,6 +216,27 @@ class IvAnalysis::PageComponent < ApplicationComponent
               .catch(function () {});
           }
 
+          function recalcRow(ticker) {
+            var row = document.getElementById('wl-row-' + ticker);
+            if (!row) return;
+            var S     = parseFloat(row.dataset.price  || '0');
+            var sigma = parseFloat(row.dataset.iv     || '0');
+            var type  = row.dataset.otype || 'call';
+            var K     = parseFloat(row.querySelector('.wl-strike-input').value  || '0');
+            var expiry= row.querySelector('.wl-expiry-input').value;
+            var days  = expiry ? Math.max(0, (new Date(expiry) - new Date()) / 86400000) : 0;
+            var T     = days / 365;
+            var intrinsic = type === 'call' ? Math.max(0, S - K) : Math.max(0, K - S);
+            var timeVal   = T > 0 ? 0.4 * S * sigma * Math.sqrt(T) : 0;
+            var iEl = row.querySelector('.wl-intrinsic-val');
+            var tEl = row.querySelector('.wl-time-val');
+            if (iEl) {
+              iEl.textContent = '$' + intrinsic.toFixed(2);
+              iEl.className   = 'wl-intrinsic-val font-mono text-sm ' + (intrinsic > 0 ? 'text-blue-600' : 'text-gray-400');
+            }
+            if (tEl) tEl.textContent = '$' + timeVal.toFixed(2);
+          }
+
           function ivrCell(val) {
             if (val === null || val === undefined) return '<td class="px-4 py-3 text-right text-gray-300">—</td>';
             var v = parseFloat(val);
@@ -230,7 +251,7 @@ class IvAnalysis::PageComponent < ApplicationComponent
           function renderWatchlist(list) {
             var tbody = document.getElementById('iv-watchlist-body');
             if (!list || list.length === 0) {
-              tbody.innerHTML = '<tr><td colspan="12" class="px-4 py-8 text-center text-sm text-gray-400">尚無追蹤中的股票</td></tr>';
+              tbody.innerHTML = '<tr><td colspan="14" class="px-4 py-8 text-center text-sm text-gray-400">尚無追蹤中的股票</td></tr>';
               return;
             }
             tbody.innerHTML = list.map(function (item) {
@@ -250,23 +271,35 @@ class IvAnalysis::PageComponent < ApplicationComponent
                   ? '<br><span style="font-size:0.65rem;color:#9ca3af">' + item.query_label + liveTag + '</span>'
                   : '';
                 intrinsicCell = '<td class="px-4 py-3 text-right">' +
-                  '<span class="font-mono text-sm ' + (item.intrinsic_value > 0 ? 'text-blue-600' : 'text-gray-400') + '">' +
+                  '<span class="wl-intrinsic-val font-mono text-sm ' + (item.intrinsic_value > 0 ? 'text-blue-600' : 'text-gray-400') + '">' +
                   '$' + parseFloat(item.intrinsic_value).toFixed(2) + '</span>' + sub + '</td>';
                 timeCell = '<td class="px-4 py-3 text-right">' +
-                  '<span class="font-mono text-sm text-orange-500">$' +
+                  '<span class="wl-time-val font-mono text-sm text-orange-500">$' +
                   parseFloat(item.time_value).toFixed(2) + '</span>' + sub + '</td>';
               } else {
                 intrinsicCell = '<td class="px-4 py-3 text-right text-gray-300 text-xs">尚無查詢</td>';
                 timeCell      = '<td class="px-4 py-3 text-right text-gray-300 text-xs">—</td>';
               }
 
-              return '<tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors" id="wl-row-' + item.ticker + '">' +
+              var typeTag = item.option_type
+                ? '<span class="inline-block px-1.5 py-0.5 rounded text-xs font-bold mr-1.5 ' + (item.option_type === 'call' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700') + '">' + item.option_type.toUpperCase() + '</span>'
+                : '';
+              var strikeCell = item.strike != null
+                ? '<td class="px-3 py-2 text-right">' + typeTag + '<input type="number" class="wl-strike-input font-mono text-sm text-gray-700 w-20 text-right border border-gray-200 rounded px-1.5 py-0.5 hover:border-blue-400 focus:border-blue-500 focus:outline-none" value="' + parseFloat(item.strike).toFixed(1) + '" step="0.5" data-ticker="' + item.ticker + '"></td>'
+                : '<td class="px-3 py-2 text-right text-gray-300">—</td>';
+              var expiryCell = item.expiry_date != null
+                ? '<td class="px-3 py-2 text-right"><input type="date" class="wl-expiry-input text-sm text-gray-700 border border-gray-200 rounded px-1.5 py-0.5 hover:border-blue-400 focus:border-blue-500 focus:outline-none" value="' + item.expiry_date + '" data-ticker="' + item.ticker + '"></td>'
+                : '<td class="px-3 py-2 text-right text-gray-300">—</td>';
+
+              return '<tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors" id="wl-row-' + item.ticker + '" data-price="' + (item.live_price || '') + '" data-iv="' + (item.live_iv || '') + '" data-otype="' + (item.option_type || 'call') + '">' +
                 '<td class="px-4 py-3 font-semibold text-gray-800">' + item.ticker + '</td>' +
                 '<td class="px-4 py-3 text-right font-mono text-gray-700">' + iv + '</td>' +
                 ivrCell(item.ivr_1y) +
                 ivpCell(item.ivp_1y) +
                 ivrCell(item.ivr_2y) +
                 ivpCell(item.ivp_2y) +
+                strikeCell +
+                expiryCell +
                 intrinsicCell +
                 timeCell +
                 '<td class="px-4 py-3 text-right text-gray-600">' + item.available_days + ' 天</td>' +
@@ -280,6 +313,13 @@ class IvAnalysis::PageComponent < ApplicationComponent
 
           document.getElementById('iv-watchlist-refresh')
             .addEventListener('click', loadWatchlist);
+
+          document.addEventListener('input', function (e) {
+            var el = e.target;
+            if (el.classList.contains('wl-strike-input') || el.classList.contains('wl-expiry-input')) {
+              recalcRow(el.dataset.ticker);
+            }
+          });
 
           document.addEventListener('click', function (e) {
             var btn = e.target.closest('.wl-remove-btn');
