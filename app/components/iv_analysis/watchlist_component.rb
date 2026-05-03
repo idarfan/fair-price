@@ -17,6 +17,10 @@ class IvAnalysis::WatchlistComponent < ApplicationComponent
             tr(class: "bg-gray-50 border-b border-gray-100") do
               th(class: "text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide") { plain "Ticker" }
               th(class: "text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide") { plain "ATM IV" }
+              th(class: "text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide") { plain "IVR 1Y" }
+              th(class: "text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide") { plain "IVP 1Y" }
+              th(class: "text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide") { plain "IVR 2Y" }
+              th(class: "text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide") { plain "IVP 2Y" }
               th(class: "text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide") { plain "內涵價值" }
               th(class: "text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide") { plain "時間價值" }
               th(class: "text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide") { plain "累積天數" }
@@ -27,7 +31,7 @@ class IvAnalysis::WatchlistComponent < ApplicationComponent
           end
           tbody(id: "iv-watchlist-body") do
             tr do
-              td(colspan: "8", class: "px-4 py-8 text-center text-sm text-gray-400") { plain "載入中…" }
+              td(colspan: "12", class: "px-4 py-8 text-center text-sm text-gray-400") { plain "載入中…" }
             end
           end
         end

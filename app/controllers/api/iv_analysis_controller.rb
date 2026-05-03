@@ -102,6 +102,22 @@ class Api::IvAnalysisController < ApplicationController
       time_value      = nil
       query_label     = nil
 
+      # IVR / IVP — use live IV if available, else fall back to last stored query
+      if live
+        stats  = IvStatsService.calculate(wt.ticker, live[:atm_iv])
+        ivr_1y = stats.ivr_1y
+        ivp_1y = stats.ivp_1y
+        ivr_2y = stats.ivr_2y
+        ivp_2y = stats.ivp_2y
+      elsif latest_query
+        ivr_1y = latest_query.ivr_1y
+        ivp_1y = latest_query.ivp_1y
+        ivr_2y = latest_query.ivr_2y
+        ivp_2y = latest_query.ivp_2y
+      else
+        ivr_1y = ivp_1y = ivr_2y = ivp_2y = nil
+      end
+
       if latest_query
         s     = live ? live[:current_price].to_f : latest_query.current_price.to_f
         sigma = live ? live[:atm_iv].to_f        : latest_query.iv.to_f
@@ -124,6 +140,10 @@ class Api::IvAnalysisController < ApplicationController
         available_days:  available_days,
         latest_atm_iv:   live ? live[:atm_iv] : snaps.last&.atm_iv,
         data_quality:    data_quality.to_s,
+        ivr_1y:          ivr_1y,
+        ivp_1y:          ivp_1y,
+        ivr_2y:          ivr_2y,
+        ivp_2y:          ivp_2y,
         intrinsic_value: intrinsic_value,
         time_value:      time_value,
         query_label:     query_label,

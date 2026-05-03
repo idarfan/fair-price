@@ -216,10 +216,21 @@ class IvAnalysis::PageComponent < ApplicationComponent
               .catch(function () {});
           }
 
+          function ivrCell(val) {
+            if (val === null || val === undefined) return '<td class="px-4 py-3 text-right text-gray-300">—</td>';
+            var v = parseFloat(val);
+            var cls = v < 20 ? 'font-semibold text-green-600' : v > 80 ? 'font-semibold text-red-600' : 'text-gray-700';
+            return '<td class="px-4 py-3 text-right"><span class="font-mono text-sm ' + cls + '">' + v.toFixed(1) + '%</span></td>';
+          }
+          function ivpCell(val) {
+            if (val === null || val === undefined) return '<td class="px-4 py-3 text-right text-gray-300">—</td>';
+            return '<td class="px-4 py-3 text-right"><span class="font-mono text-sm text-gray-600">' + parseFloat(val).toFixed(1) + '%</span></td>';
+          }
+
           function renderWatchlist(list) {
             var tbody = document.getElementById('iv-watchlist-body');
             if (!list || list.length === 0) {
-              tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-sm text-gray-400">尚無追蹤中的股票</td></tr>';
+              tbody.innerHTML = '<tr><td colspan="12" class="px-4 py-8 text-center text-sm text-gray-400">尚無追蹤中的股票</td></tr>';
               return;
             }
             tbody.innerHTML = list.map(function (item) {
@@ -252,6 +263,10 @@ class IvAnalysis::PageComponent < ApplicationComponent
               return '<tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors" id="wl-row-' + item.ticker + '">' +
                 '<td class="px-4 py-3 font-semibold text-gray-800">' + item.ticker + '</td>' +
                 '<td class="px-4 py-3 text-right font-mono text-gray-700">' + iv + '</td>' +
+                ivrCell(item.ivr_1y) +
+                ivpCell(item.ivp_1y) +
+                ivrCell(item.ivr_2y) +
+                ivpCell(item.ivp_2y) +
                 intrinsicCell +
                 timeCell +
                 '<td class="px-4 py-3 text-right text-gray-600">' + item.available_days + ' 天</td>' +
