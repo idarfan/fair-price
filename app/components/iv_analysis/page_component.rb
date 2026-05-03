@@ -219,7 +219,7 @@ class IvAnalysis::PageComponent < ApplicationComponent
           function renderWatchlist(list) {
             var tbody = document.getElementById('iv-watchlist-body');
             if (!list || list.length === 0) {
-              tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-sm text-gray-400">尚無追蹤中的股票</td></tr>';
+              tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-sm text-gray-400">尚無追蹤中的股票</td></tr>';
               return;
             }
             tbody.innerHTML = list.map(function (item) {
@@ -229,9 +229,31 @@ class IvAnalysis::PageComponent < ApplicationComponent
               var label = QUALITY_LABEL[item.data_quality] || item.data_quality;
               var ts    = item.last_fetched_at
                 ? new Date(item.last_fetched_at).toLocaleDateString('zh-TW') : '—';
+
+              var intrinsicCell, timeCell;
+              if (item.intrinsic_value !== null && item.intrinsic_value !== undefined) {
+                var liveTag = item.is_live
+                  ? '<span title="即時報價" style="font-size:0.6rem;vertical-align:middle;margin-left:3px">🟢</span>'
+                  : '<span title="使用快取值，點重新整理取得即時數據" style="font-size:0.6rem;vertical-align:middle;margin-left:3px">⚪</span>';
+                var sub = item.query_label
+                  ? '<br><span style="font-size:0.65rem;color:#9ca3af">' + item.query_label + liveTag + '</span>'
+                  : '';
+                intrinsicCell = '<td class="px-4 py-3 text-right">' +
+                  '<span class="font-mono text-sm ' + (item.intrinsic_value > 0 ? 'text-blue-600' : 'text-gray-400') + '">' +
+                  '$' + parseFloat(item.intrinsic_value).toFixed(2) + '</span>' + sub + '</td>';
+                timeCell = '<td class="px-4 py-3 text-right">' +
+                  '<span class="font-mono text-sm text-orange-500">$' +
+                  parseFloat(item.time_value).toFixed(2) + '</span>' + sub + '</td>';
+              } else {
+                intrinsicCell = '<td class="px-4 py-3 text-right text-gray-300 text-xs">尚無查詢</td>';
+                timeCell      = '<td class="px-4 py-3 text-right text-gray-300 text-xs">—</td>';
+              }
+
               return '<tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors" id="wl-row-' + item.ticker + '">' +
                 '<td class="px-4 py-3 font-semibold text-gray-800">' + item.ticker + '</td>' +
                 '<td class="px-4 py-3 text-right font-mono text-gray-700">' + iv + '</td>' +
+                intrinsicCell +
+                timeCell +
                 '<td class="px-4 py-3 text-right text-gray-600">' + item.available_days + ' 天</td>' +
                 '<td class="px-4 py-3 text-center"><span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium ' + badge + '">' + label + '</span></td>' +
                 '<td class="px-4 py-3 text-right text-gray-400 text-xs">' + ts + '</td>' +

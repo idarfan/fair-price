@@ -77,19 +77,57 @@ class Api::IvAnalysisController < ApplicationController
 
   # GET /api/iv_analysis/watchlist
   def watchlist
-    tickers = WatchedTicker.active.order(added_at: :desc).map do |wt|
+    watched = WatchedTicker.active.order(added_at: :desc).to_a
+
+    # Parallel live price + IV fetch (HTTP only — no AR inside threads)
+    live_prices = {}
+    watched.map { |wt|
+      Thread.new {
+        begin
+          [wt.ticker, IvSidecarService.fetch_atm_iv(wt.ticker)]
+        rescue StandardError
+          [wt.ticker, nil]
+        end
+      }
+    }.each { |t| r = t.value; live_prices[r[0]] = r[1] }
+
+    tickers = watched.map do |wt|
       snaps          = IvDailySnapshot.for_ticker(wt.ticker).ordered
       available_days = snaps.count
-      latest         = snaps.last
       data_quality   = IvStatsService.quality_for(available_days)
+
+      live            = live_prices[wt.ticker]
+      latest_query    = IvQuery.where(ticker: wt.ticker).order(queried_at: :desc).first
+      intrinsic_value = nil
+      time_value      = nil
+      query_label     = nil
+
+      if latest_query
+        s     = live ? live[:current_price].to_f : latest_query.current_price.to_f
+        sigma = live ? live[:atm_iv].to_f        : latest_query.iv.to_f
+        k     = latest_query.strike.to_f
+        days  = (latest_query.expiry_date.to_date - Date.today).to_i
+        t     = [days.to_f / 365, 0].max
+
+        iv_val = latest_query.option_type == "call" ? [s - k, 0].max : [k - s, 0].max
+        tv_val = t > 0 ? (0.4 * s * sigma * Math.sqrt(t)).round(2) : 0.0
+
+        intrinsic_value = iv_val.round(2)
+        time_value      = tv_val
+        query_label     = "#{latest_query.option_type.upcase} #{latest_query.strike} #{latest_query.expiry_date}"
+      end
 
       {
         ticker:          wt.ticker,
         added_at:        wt.added_at,
         last_fetched_at: wt.last_fetched_at,
         available_days:  available_days,
-        latest_atm_iv:   latest&.atm_iv,
-        data_quality:    data_quality.to_s
+        latest_atm_iv:   live ? live[:atm_iv] : snaps.last&.atm_iv,
+        data_quality:    data_quality.to_s,
+        intrinsic_value: intrinsic_value,
+        time_value:      time_value,
+        query_label:     query_label,
+        is_live:         live != nil
       }
     end
 
