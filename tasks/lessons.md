@@ -611,3 +611,19 @@ PYEOF
 1. 收到新的 API key 時，**第一步**是要求使用者提供對應的 API 文件或範例指令，而不是自行猜域名。
 2. 若無文件，依序嘗試：root domain → `/api/` → `/v1/` → `/health`，最多 3 次，找不到就停下來問。
 3. 記住 FlashAlpha 正確端點：`lab.flashalpha.com/v1/`，Header 用 `X-Api-Key`。
+
+---
+
+### 錯誤 13 補充：Ruby/Rails 程式碼改完同樣需要重啟 pm2
+
+**補充：** 今日同樣犯了 Python sidecar 那個錯誤的 Rails 版本 — 修改了 controller、routes、Phlex component，但沒有重啟 `fairprice-rails`，使用者看到的還是舊行為。
+
+**強制 SOP（修改程式碼後的重啟清單）：**
+
+| 改了什麼 | 需要重啟 |
+|---------|---------|
+| `python/*.py` | `pm2 restart iv-sidecar` |
+| `app/controllers/`, `app/services/`, `config/routes.rb`, `app/components/` | `pm2 restart fairprice-rails` |
+| `app/frontend/**/*.tsx` | 不需要（Vite HMR 自動熱重載）|
+
+**規則：** 每次 commit 涉及 Ruby/Python 檔案，commit 訊息後立即執行對應重啟指令，再驗證。
