@@ -30,12 +30,27 @@ class IvAnalysis::QueryFormComponent < ApplicationComponent
         end
         div do
           label(for: "iv-expiry", class: "block text-xs font-medium text-gray-600 mb-1") { plain "到期日" }
-          input(
+          select(
             id:    "iv-expiry",
             name:  "expiry_date",
-            type:  "date",
-            class: "w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          )
+            class: "w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+          ) do
+            groups     = expiry_groups
+            first_date = groups.values.first&.first
+            groups.each do |group_label, dates|
+              optgroup(label: group_label) do
+                dates.each do |d|
+                  val  = d.strftime("%Y-%m-%d")
+                  lbl  = d.strftime("%Y/%m/%d")
+                  if d == first_date
+                    option(value: val, selected: true) { plain lbl }
+                  else
+                    option(value: val) { plain lbl }
+                  end
+                end
+              end
+            end
+          end
         end
         div do
           label(class: "block text-xs font-medium text-gray-600 mb-1") { plain "類型" }
@@ -65,5 +80,19 @@ class IvAnalysis::QueryFormComponent < ApplicationComponent
         end
       end
     end
+  end
+
+  private
+
+  def expiry_groups
+    today    = Date.today
+    next_fri = today + 1
+    next_fri += 1 until next_fri.friday?
+    all_fridays = (0..51).map { |i| next_fri + (i * 7) }
+
+    weekly  = all_fridays.first(6)
+    monthly = all_fridays.drop(6).select { |d| d.day.between?(15, 21) }
+
+    { "近期（週選）" => weekly, "月選 / LEAPS" => monthly }
   end
 end
