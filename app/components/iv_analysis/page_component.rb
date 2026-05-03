@@ -13,6 +13,7 @@ class IvAnalysis::PageComponent < ApplicationComponent
       render IvAnalysis::QueryFormComponent.new
       render IvAnalysis::ResultComponent.new
       render IvAnalysis::WatchlistComponent.new
+      render IvAnalysis::EducationComponent.new
     end
 
     render_script
@@ -161,7 +162,6 @@ class IvAnalysis::PageComponent < ApplicationComponent
           function renderQualityBanner(quality, days, notice) {
             var el  = document.getElementById('iv-quality-banner');
             var txt = (BANNER_TEXT[quality] || function (n) { return n + ' 天'; })(days);
-            // only append notice when it adds new info (not for insufficient which banner already covers)
             if (notice && quality !== 'insufficient') txt += '　' + notice;
             el.textContent = txt;
             el.className   = 'mb-4 px-4 py-2.5 rounded-lg text-sm ' + (BANNER_STYLES[quality] || '');
