@@ -262,6 +262,8 @@ class IvAnalysis::EducationComponent < ApplicationComponent
         takeaway("高 IV 環境的賣方策略",
           "賣出期權（如 Covered Call、Cash-Secured Put、Vertical Spread）可收取高額 IV 溢價。當 IV 回落，正 Theta 和負 Vega 雙重獲益。需注意賣方面臨 Gamma 風險。",
           "border-purple-200 bg-purple-50", "text-purple-700")
+        hv_iv_box
+        ivr_wheel_table
       end
       p(class: "mt-5 text-xs text-gray-400 italic") do
         plain "本文僅為教育說明，不構成投資建議。期權交易涉及複雜風險，請自行評估。"
@@ -273,6 +275,85 @@ class IvAnalysis::EducationComponent < ApplicationComponent
     div(class: "rounded-lg border p-4 #{border_class}") do
       p(class: "font-semibold text-sm #{title_color} mb-1") { plain title }
       p(class: "text-sm text-gray-700 leading-relaxed") { plain desc }
+    end
+  end
+
+  def hv_iv_box
+    div(class: "rounded-lg border border-gray-200 p-4 bg-gray-50") do
+      p(class: "font-semibold text-sm text-gray-800 mb-3") { plain "📊 HV（歷史波動率）vs IV（隱含波動率）" }
+
+      div(class: "grid sm:grid-cols-2 gap-3 mb-4") do
+        div(class: "rounded-lg border border-gray-200 bg-white p-3") do
+          p(class: "text-xs font-bold text-gray-700 mb-1") { plain "HV — Historic Volatility" }
+          p(class: "text-xs text-gray-600 leading-relaxed") do
+            plain "過去實際發生的波動率，用過去 30 天的每日漲跌幅計算年化標準差。代表「股票過去真實波動了多劇烈」。"
+          end
+        end
+        div(class: "rounded-lg border border-gray-200 bg-white p-3") do
+          p(class: "text-xs font-bold text-gray-700 mb-1") { plain "IV — Implied Volatility" }
+          p(class: "text-xs text-gray-600 leading-relaxed") do
+            plain "市場對未來波動率的預期，從期權價格反推回來。代表「市場認為接下來會波動多劇烈」。"
+          end
+        end
+      end
+
+      div(class: "space-y-2") do
+        div(class: "flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5") do
+          span(class: "text-xs font-bold text-green-700 whitespace-nowrap mt-0.5") { plain "HV > IV" }
+          p(class: "text-xs text-gray-700 leading-relaxed") do
+            plain "過去波動比市場預期大，期權相對便宜（以歷史標準衡量）。"
+            span(class: "font-semibold text-green-700") { plain "買方略為有利" }
+            plain "，CSP 等賣方策略權利金偏薄。"
+          end
+        end
+        div(class: "flex items-start gap-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5") do
+          span(class: "text-xs font-bold text-orange-700 whitespace-nowrap mt-0.5") { plain "IV > HV" }
+          p(class: "text-xs text-gray-700 leading-relaxed") do
+            plain "期權被高估（相對於實際波動）。"
+            span(class: "font-semibold text-orange-700") { plain "賣方策略（Wheel）更有利" }
+            plain "，可收取超額 IV 溢價。"
+          end
+        end
+      end
+    end
+  end
+
+  def ivr_wheel_table
+    rows = [
+      ["0 ~ 20%",   "IV 處於一年低點",  "適合買期權，CSP 權利金偏薄",   "bg-green-100 text-green-800",  "text-green-700"],
+      ["20 ~ 40%",  "偏低",             "CSP 尚可，收益普通",            "bg-green-50 text-green-700",   "text-green-600"],
+      ["40 ~ 60%",  "中性",             "Wheel 正常運作",                "bg-gray-50 text-gray-700",     "text-gray-600"],
+      ["60 ~ 80%",  "偏高",             "Wheel 收益豐厚",                "bg-orange-50 text-orange-700", "text-orange-600"],
+      ["80 ~ 100%", "IV 處於一年高點",  "賣方天堂，但注意方向風險",       "bg-red-100 text-red-800",      "text-red-700"],
+    ]
+
+    div(class: "rounded-lg border border-gray-200 overflow-hidden") do
+      div(class: "px-4 py-2.5 bg-gray-50 border-b border-gray-200") do
+        p(class: "text-xs font-semibold text-gray-700") { plain "📈 IV Rank（IVR）對 Wheel 策略的意義" }
+        p(class: "text-xs text-gray-500 mt-0.5") do
+          plain "IVR = （當前 IV − 一年最低 IV）÷（一年最高 IV − 一年最低 IV）× 100"
+        end
+      end
+      table(class: "w-full text-xs") do
+        thead do
+          tr(class: "border-b border-gray-200 bg-gray-50") do
+            th(class: "px-4 py-2 text-left font-semibold text-gray-500") { plain "IVR 範圍" }
+            th(class: "px-4 py-2 text-left font-semibold text-gray-500") { plain "意義" }
+            th(class: "px-4 py-2 text-left font-semibold text-gray-500") { plain "對你的 Wheel 策略" }
+          end
+        end
+        tbody do
+          rows.each do |range, meaning, strategy, badge_class, strategy_class|
+            tr(class: "border-b border-gray-100 last:border-0") do
+              td(class: "px-4 py-2.5") do
+                span(class: "inline-block px-2 py-0.5 rounded-full text-xs font-bold #{badge_class}") { plain range }
+              end
+              td(class: "px-4 py-2.5 text-gray-600") { plain meaning }
+              td(class: "px-4 py-2.5 font-medium #{strategy_class}") { plain strategy }
+            end
+          end
+        end
+      end
     end
   end
 
