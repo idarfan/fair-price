@@ -175,17 +175,20 @@ class IvAnalysis::PageComponent < ApplicationComponent
               atmEl.textContent = '—%';
             }
 
-            var hv21El = document.getElementById('iv-card-hv21');
-            if (d.hv21 !== null && d.hv21 !== undefined) {
-              var hv21 = parseFloat(d.hv21) * 100;
-              var atm  = d.atm_iv !== null ? parseFloat(d.atm_iv) * 100 : null;
-              hv21El.textContent = hv21.toFixed(2) + '%';
-              hv21El.className = 'text-lg font-bold ' +
-                (atm !== null && hv21 > atm + 5 ? 'text-green-600' :
-                 atm !== null && hv21 < atm - 5 ? 'text-orange-500' : 'text-gray-800');
+            var hvEl  = document.getElementById('iv-card-hv');
+            var hvWin = document.getElementById('iv-card-hv-window');
+            if (d.hv_dte !== null && d.hv_dte !== undefined) {
+              var hvPct = parseFloat(d.hv_dte) * 100;
+              var atm   = d.atm_iv !== null ? parseFloat(d.atm_iv) * 100 : null;
+              hvEl.textContent = hvPct.toFixed(2) + '%';
+              hvEl.className = 'text-lg font-bold ' +
+                (atm !== null && hvPct > atm + 5 ? 'text-green-600' :
+                 atm !== null && hvPct < atm - 5 ? 'text-orange-500' : 'text-gray-800');
+              if (hvWin && d.hv_window) hvWin.textContent = d.hv_window;
             } else {
-              hv21El.textContent = '—%';
-              hv21El.className = 'text-lg font-bold text-gray-800';
+              hvEl.textContent = '—%';
+              hvEl.className = 'text-lg font-bold text-gray-800';
+              if (hvWin) hvWin.textContent = '—';
             }
 
             renderIvrCell('iv-ivr-1y', d.ivr_1y);

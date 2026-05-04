@@ -29,7 +29,7 @@ class IvAnalysis::ResultComponent < ApplicationComponent
         div(class: "grid grid-cols-3 gap-4 mb-5") do
           metric_card("iv-card-dte",    "DTE",        "— 天")
           metric_card("iv-card-atm",    "ATM IV",     "—%")
-          metric_card("iv-card-hv21",   "HV (21d)",   "—%")
+          metric_card_hv
         end
 
         # IVR/IVP table
@@ -56,6 +56,17 @@ class IvAnalysis::ResultComponent < ApplicationComponent
   end
 
   private
+
+  def metric_card_hv
+    div(class: "bg-gray-50 rounded-lg p-3 text-center") do
+      p(class: "text-xs text-gray-500 mb-1") do
+        plain "HV ("
+        span(id: "iv-card-hv-window") { plain "—" }
+        plain "d)"
+      end
+      p(id: "iv-card-hv", class: "text-lg font-bold text-gray-800") { plain "—%" }
+    end
+  end
 
   def metric_card(id, label, default)
     div(class: "bg-gray-50 rounded-lg p-3 text-center") do

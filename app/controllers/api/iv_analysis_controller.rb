@@ -79,8 +79,8 @@ class Api::IvAnalysisController < ApplicationController
       queried_at:     query.queried_at,
       atm_iv:         detail[:atm_iv],
       dte:            detail[:dte],
-      hv21:           detail[:hv21],
-      hv63:           detail[:hv63]
+      hv_dte:         detail[:hv_dte],
+      hv_window:      detail[:hv_window]
     }
   end
 

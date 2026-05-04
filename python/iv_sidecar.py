@@ -55,7 +55,7 @@ def years_to_expiry(expiry_str: str) -> float:
 def _hist_vol(ticker: str, window: int = 21) -> float | None:
     """Annualised HV = std(log-returns over `window` trading days) x sqrt(252)."""
     try:
-        hist = yf.download(ticker, period="3mo", interval="1d",
+        hist = yf.download(ticker, period="1y", interval="1d",
                            progress=False, auto_adjust=True)
         if hist.empty:
             return None
@@ -241,8 +241,9 @@ def fetch_option_detail():
         delta  = bs_delta(spot, strike, T, r=0.045, sigma=iv, option_type=option_type)
         atm    = round(_atm_iv(data, T), 6)
         dte    = max((date.fromisoformat(expiry_date) - date.today()).days, 0)
-        hv21   = _hist_vol(ticker, 21)
-        hv63   = _hist_vol(ticker, 63)
+        # HV window matches DTE (calendar -> trading days, capped 21-252)
+        hv_window = max(min(round(dte * 252 / 365), 252), 21)
+        hv_dte    = _hist_vol(ticker, hv_window)
 
         return jsonify(
             ticker=ticker,
@@ -256,8 +257,8 @@ def fetch_option_detail():
             delta=round(delta, 4),
             atm_iv=atm,
             dte=dte,
-            hv21=hv21,
-            hv63=hv63,
+            hv_dte=hv_dte,
+            hv_window=hv_window,
         )
     except Exception as exc:
         logger.error("fetch_option_detail error for %s: %s", ticker, exc)
