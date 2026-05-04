@@ -262,6 +262,7 @@ class IvAnalysis::EducationComponent < ApplicationComponent
         takeaway("高 IV 環境的賣方策略",
           "賣出期權（如 Covered Call、Cash-Secured Put、Vertical Spread）可收取高額 IV 溢價。當 IV 回落，正 Theta 和負 Vega 雙重獲益。需注意賣方面臨 Gamma 風險。",
           "border-purple-200 bg-purple-50", "text-purple-700")
+        real_example_box
         hv_iv_box
         ivr_wheel_table
       end
@@ -275,6 +276,69 @@ class IvAnalysis::EducationComponent < ApplicationComponent
     div(class: "rounded-lg border p-4 #{border_class}") do
       p(class: "font-semibold text-sm #{title_color} mb-1") { plain title }
       p(class: "text-sm text-gray-700 leading-relaxed") { plain desc }
+    end
+  end
+
+  def real_example_box
+    div(class: "rounded-lg border border-gray-200 overflow-hidden") do
+      div(class: "px-4 py-3 bg-gray-50 border-b border-gray-200") do
+        p(class: "text-xs font-semibold text-gray-700") { plain "🖼 真實案例：Barchart 選擇權鏈（SQQQ, 2026-05-15 到期）" }
+        p(class: "text-xs text-gray-500 mt-0.5") do
+          plain "以下截圖中，最上方資訊欄的四個數字，正是本工具計算的核心指標。"
+        end
+      end
+
+      # Screenshot
+      div(class: "p-4") do
+        img(
+          src:   "/images/options_chain_example.png",
+          alt:   "Barchart 選擇權鏈截圖",
+          class: "w-full rounded-lg border border-gray-200 shadow-sm"
+        )
+      end
+
+      # Annotation grid
+      div(class: "grid sm:grid-cols-2 xl:grid-cols-4 gap-3 px-4 pb-4") do
+        annotation_card(
+          "Expiration", "2026-05-15 (13 DTE)",
+          "到期日與剩餘天數（Days to Expiration）。",
+          "border-gray-300 bg-gray-50", "text-gray-700"
+        )
+        annotation_card(
+          "Implied Volatility (ATM)", "59.71%",
+          "平值（ATM）隱含波動率，從市場期權價格反推的「市場預期未來波動率」。本工具的 ATM IV 欄位即為此值。",
+          "border-blue-200 bg-blue-50", "text-blue-700"
+        )
+        annotation_card(
+          "Historic Volatility", "62.72%",
+          "過去 30 個交易日收盤價漲跌幅的年化標準差，代表「股票過去真實波動了多劇烈」。本工具的 HV (21d) 欄位與此對應（窗口略有差異）。",
+          "border-green-200 bg-green-50", "text-green-700"
+        )
+        annotation_card(
+          "IV Rank", "37.04%",
+          "當前 IV 在過去一年高低區間的相對位置。37% 代表偏低但非極低，CSP 收益普通。本工具的 IVR 1Y 欄位即為此值。",
+          "border-orange-200 bg-orange-50", "text-orange-700"
+        )
+      end
+
+      # HV > IV interpretation for this specific example
+      div(class: "mx-4 mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3") do
+        p(class: "text-xs font-semibold text-amber-800 mb-1") { plain "📌 解讀這組數字（HV 62.72% > IV 59.71%）" }
+        div(class: "text-xs text-amber-900 leading-relaxed space-y-1") do
+          p { plain "• HV 比 IV 略高，代表過去實際波動比市場預期的還要大，期權以歷史標準衡量算相對便宜。" }
+          p { plain "• 不過差距僅 3%，優勢並不顯著，不算強烈的買方訊號。" }
+          p { plain "• IV Rank 37%，介於 20~40% 偏低區間，賣出 CSP 收益普通，市場未給出高溢價。" }
+          p { plain "• 結論：目前 IV 環境對買賣雙方均無明顯優勢，觀察等待 IVR 回到 60% 以上再賣 Wheel 更為有利。" }
+        end
+      end
+    end
+  end
+
+  def annotation_card(title, value, desc, border_class, value_class)
+    div(class: "rounded-lg border p-3 #{border_class}") do
+      p(class: "text-xs font-bold #{value_class} mb-0.5") { plain value }
+      p(class: "text-xs font-semibold text-gray-600 mb-1") { plain title }
+      p(class: "text-xs text-gray-600 leading-relaxed") { plain desc }
     end
   end
 
