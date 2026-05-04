@@ -17,6 +17,7 @@ from datetime import date, timedelta
 
 import numpy as np
 import requests
+import yfinance as yf
 from scipy.interpolate import RegularGridInterpolator
 from scipy.stats import norm
 from flask import Flask, request, jsonify
@@ -47,6 +48,29 @@ def years_to_expiry(expiry_str: str) -> float:
     exp = date.fromisoformat(expiry_str)
     days = (exp - date.today()).days
     return max(days, 0) / 365.0
+
+
+# -- Historic Volatility ------------------------------------------------------
+
+def _hist_vol(ticker: str, window: int = 21) -> float | None:
+    """Annualised HV = std(log-returns over `window` trading days) x sqrt(252)."""
+    try:
+        hist = yf.download(ticker, period="3mo", interval="1d",
+                           progress=False, auto_adjust=True)
+        if hist.empty:
+            return None
+        closes = hist["Close"]
+        if hasattr(closes, "squeeze"):
+            closes = closes.squeeze()
+        closes = closes.dropna()
+        if len(closes) < window + 1:
+            return None
+        log_ret = np.log(closes / closes.shift(1)).dropna()
+        hv = float(log_ret.tail(window).std() * math.sqrt(252))
+        return round(hv, 6)
+    except Exception as exc:
+        logger.warning("HV calc failed for %s: %s", ticker, exc)
+        return None
 
 
 # -- FlashAlpha surface -------------------------------------------------------
@@ -101,7 +125,7 @@ def _atm_iv(data: dict, dte_years: float | None = None) -> float:
 
 # -- Expiration inference -----------------------------------------------------
 
-# Fridays NYSE is closed — option expiry shifts to prior Thursday
+# Fridays NYSE is closed -- option expiry shifts to prior Thursday
 _CLOSED_FRIDAYS = frozenset([
     date(2026, 6, 19),  # Juneteenth
     date(2026, 7, 3),   # Independence Day observed (Jul 4 = Sat)
@@ -115,8 +139,8 @@ def _infer_expirations(data: dict) -> tuple[list, int]:
     """Infer available option expiry dates from surface metadata.
 
     Uses slices_used as a proxy for option chain depth:
-      ≤15 slices → quarterly cycle (3/6/9/12) + Jan LEAPS  (e.g. SQQQ)
-      >15 slices → all monthly 3rd Fridays                  (e.g. AAPL)
+      <=15 slices -> quarterly cycle (3/6/9/12) + Jan LEAPS  (e.g. SQQQ)
+      >15 slices  -> all monthly 3rd Fridays                  (e.g. AAPL)
 
     Returns (sorted list of dates, weekly_count).
     """
@@ -141,7 +165,7 @@ def _infer_expirations(data: dict) -> tuple[list, int]:
     weekly       = open_fridays[:6]
     cutoff       = weekly[-1] if weekly else today
 
-    # Monthly candidates: 3rd Friday zone (day 15–21), after weekly period
+    # Monthly candidates: 3rd Friday zone (day 15--21), after weekly period
     candidates = [f for f in all_fridays if f > cutoff and 15 <= f.day <= 21]
 
     if slices_used <= 15:
@@ -215,6 +239,10 @@ def fetch_option_detail():
         T      = years_to_expiry(expiry_date)
         iv     = _surface_iv(data, strike, T)
         delta  = bs_delta(spot, strike, T, r=0.045, sigma=iv, option_type=option_type)
+        atm    = round(_atm_iv(data, T), 6)
+        dte    = max((date.fromisoformat(expiry_date) - date.today()).days, 0)
+        hv21   = _hist_vol(ticker, 21)
+        hv63   = _hist_vol(ticker, 63)
 
         return jsonify(
             ticker=ticker,
@@ -226,6 +254,10 @@ def fetch_option_detail():
             current_price=round(spot, 2),
             iv=round(iv, 6),
             delta=round(delta, 4),
+            atm_iv=atm,
+            dte=dte,
+            hv21=hv21,
+            hv63=hv63,
         )
     except Exception as exc:
         logger.error("fetch_option_detail error for %s: %s", ticker, exc)

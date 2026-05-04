@@ -76,7 +76,11 @@ class Api::IvAnalysisController < ApplicationController
       low_iv_signal:  query.low_iv_signal,
       notice:         notice,
       snap_notice:    snap_notice,
-      queried_at:     query.queried_at
+      queried_at:     query.queried_at,
+      atm_iv:         detail[:atm_iv],
+      dte:            detail[:dte],
+      hv21:           detail[:hv21],
+      hv63:           detail[:hv63]
     }
   end
 

@@ -165,6 +165,29 @@ class IvAnalysis::PageComponent < ApplicationComponent
             document.getElementById('iv-card-iv').textContent =
               (parseFloat(d.iv) * 100).toFixed(2) + '%';
 
+            document.getElementById('iv-card-dte').textContent =
+              (d.dte !== null && d.dte !== undefined) ? d.dte + ' 天' : '—';
+
+            var atmEl = document.getElementById('iv-card-atm');
+            if (d.atm_iv !== null && d.atm_iv !== undefined) {
+              atmEl.textContent = (parseFloat(d.atm_iv) * 100).toFixed(2) + '%';
+            } else {
+              atmEl.textContent = '—%';
+            }
+
+            var hv21El = document.getElementById('iv-card-hv21');
+            if (d.hv21 !== null && d.hv21 !== undefined) {
+              var hv21 = parseFloat(d.hv21) * 100;
+              var atm  = d.atm_iv !== null ? parseFloat(d.atm_iv) * 100 : null;
+              hv21El.textContent = hv21.toFixed(2) + '%';
+              hv21El.className = 'text-lg font-bold ' +
+                (atm !== null && hv21 > atm + 5 ? 'text-green-600' :
+                 atm !== null && hv21 < atm - 5 ? 'text-orange-500' : 'text-gray-800');
+            } else {
+              hv21El.textContent = '—%';
+              hv21El.className = 'text-lg font-bold text-gray-800';
+            }
+
             renderIvrCell('iv-ivr-1y', d.ivr_1y);
             renderIvrCell('iv-ivr-2y', d.ivr_2y);
             renderStatCell('iv-ivp-1y', d.ivp_1y);

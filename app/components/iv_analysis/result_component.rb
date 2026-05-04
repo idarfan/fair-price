@@ -18,11 +18,18 @@ class IvAnalysis::ResultComponent < ApplicationComponent
         # data quality banner
         div(id: "iv-quality-banner", class: "hidden mb-4 px-4 py-2.5 rounded-lg text-sm")
 
-        # metric cards
+        # metric cards — row 1: price / delta / strike IV
+        div(class: "grid grid-cols-3 gap-4 mb-3") do
+          metric_card("iv-card-price",  "當前股價",   "$—")
+          metric_card("iv-card-delta",  "Delta",      "—")
+          metric_card("iv-card-iv",     "Strike IV",  "—%")
+        end
+
+        # metric cards — row 2: DTE / ATM IV / HV (21d)
         div(class: "grid grid-cols-3 gap-4 mb-5") do
-          metric_card("iv-card-price",  "當前股價",  "$—")
-          metric_card("iv-card-delta",  "Delta",     "—")
-          metric_card("iv-card-iv",     "IV",        "—%")
+          metric_card("iv-card-dte",    "DTE",        "— 天")
+          metric_card("iv-card-atm",    "ATM IV",     "—%")
+          metric_card("iv-card-hv21",   "HV (21d)",   "—%")
         end
 
         # IVR/IVP table
