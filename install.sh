@@ -7,12 +7,13 @@
 set -euo pipefail
 
 # ── 版本常數 ────────────────────────────────────────────────
-readonly SCRIPT_VERSION="20260417"
+readonly SCRIPT_VERSION="20260507"
 readonly RUBY_VERSION="4.0.1"
 readonly BUNDLER_VERSION="4.0.7"
 readonly MIN_NODE_MAJOR=20
 readonly RAILS_PORT=3003
 readonly VITE_PORT=3036
+readonly SIDECAR_PORT=5050
 
 # ── 顏色 ────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -270,6 +271,49 @@ _install_nodejs() {
   curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - &>/dev/null
   sudo apt-get install -y nodejs &>/dev/null
   ok "Node.js $(node --version) 安裝完成"
+}
+
+
+# ============================================================
+# PHASE 3b：Python venv + IV Sidecar 依賴
+# ============================================================
+phase3b_python_sidecar() {
+  step "Python venv + IV Sidecar 套件"
+
+  local py_pkgs=(python3-venv python3-pip)
+  local missing_py=()
+  for pkg in "${py_pkgs[@]}"; do
+    dpkg -l "$pkg" &>/dev/null || missing_py+=("$pkg")
+  done
+  if [[ ${#missing_py[@]} -gt 0 ]]; then
+    info "安裝 ${missing_py[*]}..."
+    sudo apt-get install -y "${missing_py[@]}" -q
+  else
+    skip "python3-venv / python3-pip 已安裝"
+  fi
+
+  local venv_dir="${APP_DIR}/python/venv"
+  if [[ ! -f "${venv_dir}/bin/python" ]]; then
+    info "建立 python/venv..."
+    python3 -m venv "$venv_dir"
+    ok "python/venv 建立完成"
+  else
+    skip "python/venv 已存在"
+  fi
+
+  info "安裝 IV Sidecar Python 套件（flask numpy scipy requests yfinance）..."
+  "${venv_dir}/bin/pip" install --quiet --upgrade pip
+  "${venv_dir}/bin/pip" install --quiet flask numpy scipy requests yfinance
+  ok "Python 套件安裝完成"
+
+  cat > bin/start-iv-sidecar.sh << 'SIDECAR_EOF'
+#!/bin/bash
+set -e
+cd "$(dirname "$0")/.."
+exec python/venv/bin/python python/iv_sidecar.py
+SIDECAR_EOF
+  chmod +x bin/start-iv-sidecar.sh
+  ok "bin/start-iv-sidecar.sh 建立完成"
 }
 
 # ============================================================
@@ -673,6 +717,19 @@ ${telegram_apps}
       watch: false,
     },
 
+    // ── IV Sidecar（Python Flask on :${SIDECAR_PORT}）
+    {
+      name: 'fairprice-iv-sidecar',
+      script: './bin/start-iv-sidecar.sh',
+      cwd: '${APP_DIR}',
+      interpreter: '/bin/bash',
+      autorestart: true,
+      watch: false,
+      max_restarts: 5,
+      min_uptime: '10s',
+      restart_delay: 3000,
+    },
+
     // ── 每日資料庫備份（台灣時間 22:00，保留 7 天）
     {
       name: 'fairprice-db-backup',
@@ -829,7 +886,7 @@ phase10_pm2() {
   step "pm2 服務啟動"
 
   # 停止舊的 fairprice 相關 process（若存在）
-  for proc in fairprice-rails fairprice-vite ouou-pre-market ouou-telegram-bot fairprice-db-backup; do
+  for proc in fairprice-rails fairprice-vite fairprice-iv-sidecar ouou-pre-market ouou-telegram-bot fairprice-db-backup; do
     pm2 delete "$proc" &>/dev/null || true
   done
 
@@ -920,6 +977,7 @@ phase12_summary() {
   echo "  ║  pm2 list                  查看服務狀態          ║"
   echo "  ║  pm2 logs fairprice-rails  Rails log             ║"
   echo "  ║  pm2 logs fairprice-vite   Vite log              ║"
+  echo "  ║  pm2 logs fairprice-iv-sidecar  IV log           ║"
   echo "  ╠══════════════════════════════════════════════════╣"
   echo "  ║  資料庫備份：每天 22:00 自動執行                 ║"
   printf "  ║  備份位置：${CYAN}~/fairprice-backups/${GREEN}${BOLD}                  ║\n"
@@ -947,6 +1005,7 @@ main() {
   phase1_system_deps
   phase2_ruby
   phase3_nodejs
+  phase3b_python_sidecar
   phase4_env
   phase5_master_key
   phase6_deps
