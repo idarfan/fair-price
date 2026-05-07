@@ -293,17 +293,17 @@ phase3b_python_sidecar() {
   fi
 
   local venv_dir="${APP_DIR}/python/venv"
-  if [[ ! -f "${venv_dir}/bin/python" ]]; then
-    info "建立 python/venv..."
-    python3 -m venv "$venv_dir"
+  if [[ ! -f "${venv_dir}/bin/python" ]] || [[ ! -f "${venv_dir}/bin/pip" ]]; then
+    info "建立 python/venv（--clear 確保完整）..."
+    python3 -m venv --clear "$venv_dir"
     ok "python/venv 建立完成"
   else
     skip "python/venv 已存在"
   fi
 
   info "安裝 IV Sidecar Python 套件（flask numpy scipy requests yfinance）..."
-  "${venv_dir}/bin/pip" install --quiet --upgrade pip
-  "${venv_dir}/bin/pip" install --quiet flask numpy scipy requests yfinance
+  "${venv_dir}/bin/python" -m pip install --quiet --upgrade pip
+  "${venv_dir}/bin/python" -m pip install --quiet flask numpy scipy requests yfinance
   ok "Python 套件安裝完成"
 
   cat > bin/start-iv-sidecar.sh << 'SIDECAR_EOF'
