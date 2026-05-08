@@ -289,6 +289,71 @@ class IvAnalysis::PageComponent < ApplicationComponent
             excellent:    '充足'
           };
 
+          // ── Skew tooltip definitions ──────────────────────────────────
+          var SKEW_TIPS = {
+            put:  'Put IV (25δ)\n\n價外 Put 的隱含波動率。\n數值越高代表市場願意付更多錢買下跌保護，\n反映偏空情緒或避險需求強烈。',
+            call: 'Call IV (25δ)\n\n價外 Call 的隱含波動率。\n數值越高代表市場願意付更多溢價買上漲曝險，\n反映偏多情緒或投機需求旺盛。',
+            skew: 'Skew (pts)\n\nPut IV 減去 Call IV 的差值（單位：百分點）。\n正值(+) → Put 比 Call 貴，市場偏空/避險。\n負值(-) → Call 比 Put 貴，市場偏多/投機。',
+            rank: 'Skew Rank\n\n當前 Skew 在過去歷史中的相對位置。\n100 = 最偏空（Put 溢價最高）\n0 = 最偏多（Call 溢價最高）\n需累積≥5天資料才顯示指針。'
+          };
+
+          function initTooltip() {
+            var tip = document.createElement('div');
+            tip.id = 'iv-global-tip';
+            tip.style.cssText = [
+              'position:fixed', 'z-index:9999', 'display:none',
+              'max-width:240px', 'background:#1e293b', 'color:#e2e8f0',
+              'font-size:12px', 'line-height:1.55', 'white-space:pre-line',
+              'padding:8px 10px', 'border-radius:8px',
+              'box-shadow:0 4px 16px rgba(0,0,0,.35)',
+              'pointer-events:none', 'transition:opacity .15s'
+            ].join(';');
+            document.body.appendChild(tip);
+
+            var lastTipEl = null;
+
+            function showTip(el, e) {
+              var key = el.dataset.tipKey;
+              if (!key || !SKEW_TIPS[key]) return;
+              tip.textContent = SKEW_TIPS[key];
+              tip.style.display = 'block';
+              moveTip(e);
+            }
+            function moveTip(e) {
+              var px = e.clientX + 14, py = e.clientY - 10;
+              if (px + 250 > window.innerWidth) px = e.clientX - 254;
+              if (py + tip.offsetHeight > window.innerHeight) py = e.clientY - tip.offsetHeight - 6;
+              tip.style.left = px + 'px';
+              tip.style.top  = py + 'px';
+            }
+            function hideTip() {
+              tip.style.display = 'none';
+              lastTipEl = null;
+            }
+
+            document.addEventListener('mouseover', function (e) {
+              var el = e.target.closest('[data-tip-key]');
+              if (!el) return;
+              lastTipEl = el;
+              showTip(el, e);
+            });
+            document.addEventListener('mousemove', function (e) {
+              if (tip.style.display === 'none') return;
+              moveTip(e);
+            });
+            document.addEventListener('mouseout', function (e) {
+              var el = e.target.closest('[data-tip-key]');
+              if (el) hideTip();
+            });
+            document.addEventListener('click', function (e) {
+              var el = e.target.closest('[data-tip-key]');
+              if (!el) { hideTip(); return; }
+              if (lastTipEl === el && tip.style.display !== 'none') { hideTip(); return; }
+              lastTipEl = el;
+              showTip(el, e);
+            });
+          }
+
           // ── Dashboard ─────────────────────────────────────────────────
           var _dashMode = 'ivr'; // 'ivr' | 'skew'
           var _watchlistData = [];
@@ -387,6 +452,11 @@ class IvAnalysis::PageComponent < ApplicationComponent
             svg += '<text x="' + cx + '" y="' + (cy + 16) + '"' +
               ' text-anchor="middle" font-size="15" font-weight="700" fill="' + needleColor + '">' +
               (rank !== null ? rank.toFixed(1) : '—') + '</text>';
+            var rankTipHtml = !isIvr
+              ? '<div style="text-align:center;margin-top:-12px;margin-bottom:2px">' +
+                '<span data-tip-key="rank" style="cursor:pointer;color:#94a3b8;font-size:9px;user-select:none">❓ Skew Rank</span>' +
+                '</div>'
+              : '';
 
             var lp = degToXY(cx, cy, r, 180);
             var rp = degToXY(cx, cy, r, 360);
@@ -409,11 +479,18 @@ class IvAnalysis::PageComponent < ApplicationComponent
                 ? (parseFloat(item.call_iv_025) * 100).toFixed(1) + '%' : '—';
               var skewStr = item.skew_pts    !== null && item.skew_pts    !== undefined
                 ? (parseFloat(item.skew_pts) >= 0 ? '+' : '') + parseFloat(item.skew_pts).toFixed(1) + ' pts' : '—';
+              var tipStyle = 'cursor:pointer;color:#94a3b8;font-size:9px;vertical-align:middle;margin-left:2px;user-select:none';
               detailLine =
                 '<div style="text-align:center;font-size:10px;color:#9ca3af;margin-top:-2px">' +
-                  'Put: ' + putStr + ' | Call: ' + callStr +
+                  'Put: ' + putStr +
+                  '<span data-tip-key="put" style="' + tipStyle + '">❓</span>' +
+                  ' | Call: ' + callStr +
+                  '<span data-tip-key="call" style="' + tipStyle + '">❓</span>' +
                 '</div>' +
-                '<div style="text-align:center;font-size:10px;color:#9ca3af">Skew: ' + skewStr + '</div>';
+                '<div style="text-align:center;font-size:10px;color:#9ca3af">' +
+                  'Skew: ' + skewStr +
+                  '<span data-tip-key="skew" style="' + tipStyle + '">❓</span>' +
+                '</div>';
             }
 
             // Strategy label
@@ -430,6 +507,7 @@ class IvAnalysis::PageComponent < ApplicationComponent
               '<div style="font-size:0.75rem;font-weight:700;color:#374151;text-align:center;margin-bottom:1px">' +
               item.ticker + '</div>' +
               '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + svg + '</svg>' +
+              rankTipHtml +
               detailLine +
               stratDiv +
               '</div>';
@@ -651,6 +729,7 @@ class IvAnalysis::PageComponent < ApplicationComponent
               .catch(function () {});
           });
 
+          initTooltip();
           loadWatchlist();
         })();
       JS
