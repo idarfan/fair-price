@@ -223,8 +223,8 @@ def _real_expirations(ticker: str, surface_data: dict) -> tuple[list, int]:
         return weekly + monthly, len(weekly)
 
     except Exception as exc:
-        logger.warning("yfinance expirations failed for %s: %s — using inferred", ticker, exc)
-        return _infer_expirations(surface_data)
+        logger.warning("yfinance expirations failed for %s: %s", ticker, exc)
+        raise RuntimeError("無法取得 Yahoo Finance 資料，請稍候再試") from exc
 
 
 # -- Endpoints ----------------------------------------------------------------
