@@ -10,6 +10,7 @@ class IvAnalysis::PageComponent < ApplicationComponent
         end
       end
 
+      render IvAnalysis::DashboardComponent.new
       render IvAnalysis::QueryFormComponent.new
       render IvAnalysis::ResultComponent.new
       render IvAnalysis::WatchlistComponent.new
@@ -288,10 +289,148 @@ class IvAnalysis::PageComponent < ApplicationComponent
             excellent:    '充足'
           };
 
+
+          // ── Dashboard ─────────────────────────────────────────────────
+
+          function degToXY(cx, cy, r, deg) {
+            var rad = deg * Math.PI / 180;
+            return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+          }
+
+          function buildArcPath(cx, cy, r, startDeg, endDeg) {
+            var s    = degToXY(cx, cy, r, startDeg);
+            var e    = degToXY(cx, cy, r, endDeg);
+            var large = (endDeg - startDeg) > 180 ? 1 : 0;
+            return 'M' + s[0].toFixed(1) + ',' + s[1].toFixed(1) +
+              ' A' + r + ',' + r + ' 0 ' + large + ' 1 ' +
+              e[0].toFixed(1) + ',' + e[1].toFixed(1);
+          }
+
+          function buildGaugeCard(item) {
+            var W = 128, H = 86, cx = 64, cy = 68, r = 50, sw = 10;
+            var rank = (item.ivr_1y !== null && item.ivr_1y !== undefined)
+              ? parseFloat(item.ivr_1y) : null;
+
+            var needleColor = rank === null ? '#9ca3af'
+              : rank >= 60 ? '#e05252'
+              : rank >= 30 ? '#e6952a' : '#2ecc8e';
+            var borderColor = rank === null ? '#e5e7eb'
+              : rank >= 60 ? '#fecaca'
+              : rank >= 30 ? '#fed7aa' : '#bbf7d0';
+
+            var svg = '';
+            // Background arc
+            svg += '<path d="' + buildArcPath(cx, cy, r, 180, 360) +
+              '" fill="none" stroke="#f3f4f6" stroke-width="' + sw + '" stroke-linecap="butt"/>';
+
+            if (rank !== null) {
+              // Coloured segments: green 0-30 → 180-234°, orange 30-60 → 234-288°, red 60-100 → 288-360°
+              svg += '<path d="' + buildArcPath(cx, cy, r, 180, 234) +
+                '" fill="none" stroke="#2ecc8e" stroke-width="' + sw + '" stroke-linecap="butt"/>';
+              svg += '<path d="' + buildArcPath(cx, cy, r, 234, 288) +
+                '" fill="none" stroke="#e6952a" stroke-width="' + sw + '" stroke-linecap="butt"/>';
+              svg += '<path d="' + buildArcPath(cx, cy, r, 288, 360) +
+                '" fill="none" stroke="#e05252" stroke-width="' + sw + '" stroke-linecap="butt"/>';
+
+              // Needle
+              var ndeg = (180 + rank / 100 * 180) * Math.PI / 180;
+              var nl   = r * 0.76;
+              svg += '<line x1="' + cx + '" y1="' + cy + '"' +
+                ' x2="' + (cx + nl * Math.cos(ndeg)).toFixed(1) + '"' +
+                ' y2="' + (cy + nl * Math.sin(ndeg)).toFixed(1) + '"' +
+                ' stroke="' + needleColor + '" stroke-width="2.5" stroke-linecap="round"/>';
+              svg += '<circle cx="' + cx + '" cy="' + cy + '" r="3.5" fill="' + needleColor + '"/>';
+            }
+
+            // Rank number
+            svg += '<text x="' + cx + '" y="' + (cy + 16) + '"' +
+              ' text-anchor="middle" font-size="15" font-weight="700" fill="' + needleColor + '">' +
+              (rank !== null ? rank.toFixed(1) : '—') + '</text>';
+
+            // 0 / 100 axis labels
+            var lp = degToXY(cx, cy, r, 180);
+            var rp = degToXY(cx, cy, r, 360);
+            svg += '<text x="' + (lp[0] + 6).toFixed(0) + '" y="' + (lp[1] + 4).toFixed(0) +
+              '" text-anchor="middle" font-size="7" fill="#9ca3af">0</text>';
+            svg += '<text x="' + (rp[0] - 6).toFixed(0) + '" y="' + (rp[1] + 4).toFixed(0) +
+              '" text-anchor="middle" font-size="7" fill="#9ca3af">100</text>';
+
+            // ATM IV sub-label
+            var atmStr = item.latest_atm_iv !== null && item.latest_atm_iv !== undefined
+              ? 'ATM ' + (parseFloat(item.latest_atm_iv) * 100).toFixed(1) + '%'
+              : (rank === null ? '尚無資料' : '');
+
+            // IVR 2Y secondary
+            var ivr2 = (item.ivr_2y !== null && item.ivr_2y !== undefined)
+              ? '<div style="text-align:center;font-size:0.65rem;color:#9ca3af;margin-top:1px">2Y: ' +
+                parseFloat(item.ivr_2y).toFixed(1) + '%</div>'
+              : '';
+
+            return '<div class="iv-dash-card" data-ticker="' + item.ticker + '" style="' +
+              'border:2px solid ' + borderColor + ';border-radius:12px;padding:6px 4px;' +
+              'background:#fff;width:128px;cursor:pointer;transition:box-shadow .15s,transform .15s;' +
+              'box-sizing:border-box">' +
+              '<div style="font-size:0.75rem;font-weight:700;color:#374151;text-align:center;margin-bottom:1px">' +
+              item.ticker + '</div>' +
+              '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + svg + '</svg>' +
+              '<div style="text-align:center;font-size:0.68rem;color:#9ca3af;margin-top:-4px">' + atmStr + '</div>' +
+              ivr2 +
+              '</div>';
+          }
+
+          function renderDashboard(list) {
+            var summaryEl = document.getElementById('iv-dashboard-summary');
+            var cardsEl   = document.getElementById('iv-dashboard-cards');
+
+            if (!list || !list.length) {
+              cardsEl.innerHTML = '<span style="font-size:.875rem;color:#9ca3af;padding:1rem 0">查詢後自動加入 Watchlist</span>';
+              summaryEl.classList.add('hidden');
+              return;
+            }
+
+            // Summary counts (only tickers with IVR data)
+            var withRank = list.filter(function(d) { return d.ivr_1y !== null && d.ivr_1y !== undefined; });
+            var high = withRank.filter(function(d) { return parseFloat(d.ivr_1y) >= 60; }).length;
+            var mid  = withRank.filter(function(d) { var v = parseFloat(d.ivr_1y); return v >= 30 && v < 60; }).length;
+            var low  = withRank.filter(function(d) { return parseFloat(d.ivr_1y) < 30; }).length;
+
+            document.getElementById('iv-summary-high-count').textContent = high;
+            document.getElementById('iv-summary-mid-count').textContent  = mid;
+            document.getElementById('iv-summary-low-count').textContent  = low;
+            summaryEl.classList.remove('hidden');
+
+            // Sort: high IVR first, no-rank last
+            var sorted = list.slice().sort(function(a, b) {
+              var ra = a.ivr_1y !== null && a.ivr_1y !== undefined ? parseFloat(a.ivr_1y) : -1;
+              var rb = b.ivr_1y !== null && b.ivr_1y !== undefined ? parseFloat(b.ivr_1y) : -1;
+              return rb - ra;
+            });
+
+            cardsEl.innerHTML = sorted.map(buildGaugeCard).join('');
+
+            // Click: fill ticker + load expirations + smooth scroll
+            cardsEl.querySelectorAll('.iv-dash-card').forEach(function(card) {
+              card.addEventListener('click', function() {
+                var ticker = card.dataset.ticker;
+                document.getElementById('iv-ticker').value = ticker;
+                loadExpirations(ticker);
+                document.getElementById('iv-analysis-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+              });
+              card.addEventListener('mouseover', function() {
+                card.style.boxShadow = '0 4px 12px rgba(0,0,0,.12)';
+                card.style.transform = 'translateY(-2px)';
+              });
+              card.addEventListener('mouseout', function() {
+                card.style.boxShadow = '';
+                card.style.transform = '';
+              });
+            });
+          }
+
           function loadWatchlist() {
             fetch('/api/iv_analysis/watchlist')
               .then(function (r) { return r.json(); })
-              .then(function (data) { renderWatchlist(data.watchlist); })
+              .then(function (data) { renderWatchlist(data.watchlist); renderDashboard(data.watchlist); })
               .catch(function () {});
           }
 
