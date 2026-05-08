@@ -328,7 +328,7 @@ class IvAnalysis::PageComponent < ApplicationComponent
             var skHigh = skewRank !== null && skewRank >= 60;
             var skLow  = skewRank !== null && skewRank < 30;
             if (ivr === null) return { text: '觀望', color: '#9ca3af' };
-            if (ivHigh && skHigh) return { text: '適合 CSP・偏空',     color: '#dc2626' };
+            if (ivHigh && skHigh) return { text: '適合賣 Call・偏空',  color: '#dc2626' };
             if (ivHigh && skLow)  return { text: '適合 CSP・偏多',     color: '#ea580c' };
             if (ivHigh)           return { text: '適合賣方・方向中性', color: '#ea580c' };
             if (ivLow  && skLow)  return { text: '適合買 Call',        color: '#16a34a' };
