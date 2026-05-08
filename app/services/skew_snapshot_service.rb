@@ -33,7 +33,7 @@ class SkewSnapshotService
   private
 
   def compute_rank(current, history)
-    return nil if history.size < 5
+    return nil if history.empty?
 
     count_below = history.count { |v| v < current }
     (count_below.to_f / history.size * 100).round(2)
