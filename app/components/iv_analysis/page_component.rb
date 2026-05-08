@@ -289,8 +289,23 @@ class IvAnalysis::PageComponent < ApplicationComponent
             excellent:    '充足'
           };
 
-
           // ── Dashboard ─────────────────────────────────────────────────
+          var _dashMode = 'ivr'; // 'ivr' | 'skew'
+          var _watchlistData = [];
+
+          window.switchDashMode = function(mode) {
+            _dashMode = mode;
+            var ivrBtn  = document.getElementById('dash-mode-ivr');
+            var skewBtn = document.getElementById('dash-mode-skew');
+            if (mode === 'ivr') {
+              ivrBtn.className  = 'px-3 py-1.5 bg-orange-500 text-white transition-colors';
+              skewBtn.className = 'px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 transition-colors';
+            } else {
+              ivrBtn.className  = 'px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 transition-colors';
+              skewBtn.className = 'px-3 py-1.5 bg-cyan-500 text-white transition-colors';
+            }
+            renderDashboard(_watchlistData, mode);
+          };
 
           function degToXY(cx, cy, r, deg) {
             var rad = deg * Math.PI / 180;
@@ -306,33 +321,60 @@ class IvAnalysis::PageComponent < ApplicationComponent
               e[0].toFixed(1) + ',' + e[1].toFixed(1);
           }
 
-          function buildGaugeCard(item) {
-            var W = 128, H = 86, cx = 64, cy = 68, r = 50, sw = 10;
-            var rank = (item.ivr_1y !== null && item.ivr_1y !== undefined)
-              ? parseFloat(item.ivr_1y) : null;
+          // Strategy label combining ivr + skew_rank
+          function strategyInfo(ivr, skewRank) {
+            var ivHigh = ivr !== null && ivr >= 60;
+            var ivLow  = ivr !== null && ivr < 30;
+            var skHigh = skewRank !== null && skewRank >= 60;
+            var skLow  = skewRank !== null && skewRank < 30;
+            if (ivr === null) return { text: '觀望', color: '#9ca3af' };
+            if (ivHigh && skHigh) return { text: '適合 CSP・偏空',     color: '#dc2626' };
+            if (ivHigh && skLow)  return { text: '適合 CSP・偏多',     color: '#ea580c' };
+            if (ivHigh)           return { text: '適合賣方・方向中性', color: '#ea580c' };
+            if (ivLow  && skLow)  return { text: '適合買 Call',        color: '#16a34a' };
+            if (ivLow  && skHigh) return { text: '適合買 Put',         color: '#dc2626' };
+            return { text: '觀望', color: '#9ca3af' };
+          }
 
-            var needleColor = rank === null ? '#9ca3af'
-              : rank >= 60 ? '#e05252'
-              : rank >= 30 ? '#e6952a' : '#2ecc8e';
-            var borderColor = rank === null ? '#e5e7eb'
-              : rank >= 60 ? '#fecaca'
-              : rank >= 30 ? '#fed7aa' : '#bbf7d0';
+          function buildGaugeCard(item, mode) {
+            var W = 128, H = 86, cx = 64, cy = 68, r = 50, sw = 10;
+            var isIvr = mode !== 'skew';
+
+            // Rank value for this mode
+            var rank = isIvr
+              ? (item.ivr_1y  !== null && item.ivr_1y  !== undefined ? parseFloat(item.ivr_1y)  : null)
+              : (item.skew_rank !== null && item.skew_rank !== undefined ? parseFloat(item.skew_rank) : null);
+
+            // IV Rank: warm palette (orange/red border)
+            // Skew Rank: cool palette (blue/cyan border)
+            var needleColor, borderColor, segLow, segMid, segHigh;
+            if (isIvr) {
+              segLow  = '#2ecc8e'; segMid = '#e6952a'; segHigh = '#e05252';
+              needleColor = rank === null ? '#9ca3af'
+                : rank >= 60 ? '#e05252' : rank >= 30 ? '#e6952a' : '#2ecc8e';
+              borderColor = rank === null ? '#e5e7eb'
+                : rank >= 60 ? '#fecaca' : rank >= 30 ? '#fed7aa' : '#bbf7d0';
+            } else {
+              // Skew: >= 60 red, 30-60 gray, < 30 green
+              segLow  = '#22d3ee'; segMid = '#94a3b8'; segHigh = '#f87171';
+              needleColor = rank === null ? '#9ca3af'
+                : rank >= 60 ? '#f87171' : rank >= 30 ? '#94a3b8' : '#22d3ee';
+              borderColor = rank === null ? '#e5e7eb'
+                : rank >= 60 ? '#fecaca' : rank >= 30 ? '#e2e8f0' : '#a5f3fc';
+            }
 
             var svg = '';
-            // Background arc
             svg += '<path d="' + buildArcPath(cx, cy, r, 180, 360) +
               '" fill="none" stroke="#f3f4f6" stroke-width="' + sw + '" stroke-linecap="butt"/>';
 
             if (rank !== null) {
-              // Coloured segments: green 0-30 → 180-234°, orange 30-60 → 234-288°, red 60-100 → 288-360°
               svg += '<path d="' + buildArcPath(cx, cy, r, 180, 234) +
-                '" fill="none" stroke="#2ecc8e" stroke-width="' + sw + '" stroke-linecap="butt"/>';
+                '" fill="none" stroke="' + segLow + '" stroke-width="' + sw + '" stroke-linecap="butt"/>';
               svg += '<path d="' + buildArcPath(cx, cy, r, 234, 288) +
-                '" fill="none" stroke="#e6952a" stroke-width="' + sw + '" stroke-linecap="butt"/>';
+                '" fill="none" stroke="' + segMid + '" stroke-width="' + sw + '" stroke-linecap="butt"/>';
               svg += '<path d="' + buildArcPath(cx, cy, r, 288, 360) +
-                '" fill="none" stroke="#e05252" stroke-width="' + sw + '" stroke-linecap="butt"/>';
+                '" fill="none" stroke="' + segHigh + '" stroke-width="' + sw + '" stroke-linecap="butt"/>';
 
-              // Needle
               var ndeg = (180 + rank / 100 * 180) * Math.PI / 180;
               var nl   = r * 0.76;
               svg += '<line x1="' + cx + '" y1="' + cy + '"' +
@@ -342,12 +384,10 @@ class IvAnalysis::PageComponent < ApplicationComponent
               svg += '<circle cx="' + cx + '" cy="' + cy + '" r="3.5" fill="' + needleColor + '"/>';
             }
 
-            // Rank number
             svg += '<text x="' + cx + '" y="' + (cy + 16) + '"' +
               ' text-anchor="middle" font-size="15" font-weight="700" fill="' + needleColor + '">' +
               (rank !== null ? rank.toFixed(1) : '—') + '</text>';
 
-            // 0 / 100 axis labels
             var lp = degToXY(cx, cy, r, 180);
             var rp = degToXY(cx, cy, r, 360);
             svg += '<text x="' + (lp[0] + 6).toFixed(0) + '" y="' + (lp[1] + 4).toFixed(0) +
@@ -355,32 +395,79 @@ class IvAnalysis::PageComponent < ApplicationComponent
             svg += '<text x="' + (rp[0] - 6).toFixed(0) + '" y="' + (rp[1] + 4).toFixed(0) +
               '" text-anchor="middle" font-size="7" fill="#9ca3af">100</text>';
 
-            // ATM IV sub-label
-            var atmStr = item.latest_atm_iv !== null && item.latest_atm_iv !== undefined
-              ? 'ATM ' + (parseFloat(item.latest_atm_iv) * 100).toFixed(1) + '%'
-              : (rank === null ? '尚無資料' : '');
+            // Bottom details (10px gray)
+            var detailLine;
+            if (isIvr) {
+              var atmStr = item.latest_atm_iv !== null && item.latest_atm_iv !== undefined
+                ? 'ATM IV: ' + (parseFloat(item.latest_atm_iv) * 100).toFixed(1) + '%'
+                : (rank === null ? '尚無資料' : '');
+              detailLine = '<div style="text-align:center;font-size:10px;color:#9ca3af;margin-top:-2px">' + atmStr + '</div>';
+            } else {
+              var putStr  = item.put_iv_025  !== null && item.put_iv_025  !== undefined
+                ? (parseFloat(item.put_iv_025)  * 100).toFixed(1) + '%' : '—';
+              var callStr = item.call_iv_025 !== null && item.call_iv_025 !== undefined
+                ? (parseFloat(item.call_iv_025) * 100).toFixed(1) + '%' : '—';
+              var skewStr = item.skew_pts    !== null && item.skew_pts    !== undefined
+                ? (parseFloat(item.skew_pts) >= 0 ? '+' : '') + parseFloat(item.skew_pts).toFixed(1) + ' pts' : '—';
+              detailLine =
+                '<div style="text-align:center;font-size:10px;color:#9ca3af;margin-top:-2px">' +
+                  'Put: ' + putStr + ' | Call: ' + callStr +
+                '</div>' +
+                '<div style="text-align:center;font-size:10px;color:#9ca3af">Skew: ' + skewStr + '</div>';
+            }
 
-            // IVR 2Y secondary
-            var ivr2 = (item.ivr_2y !== null && item.ivr_2y !== undefined)
-              ? '<div style="text-align:center;font-size:0.65rem;color:#9ca3af;margin-top:1px">2Y: ' +
-                parseFloat(item.ivr_2y).toFixed(1) + '%</div>'
-              : '';
+            // Strategy label
+            var ivr   = item.ivr_1y    !== null && item.ivr_1y    !== undefined ? parseFloat(item.ivr_1y)    : null;
+            var srank = item.skew_rank !== null && item.skew_rank !== undefined ? parseFloat(item.skew_rank) : null;
+            var strat = strategyInfo(ivr, srank);
+            var stratDiv = '<div style="text-align:center;font-size:11px;font-weight:700;color:' +
+              strat.color + ';margin-top:3px;padding-bottom:2px">' + strat.text + '</div>';
 
             return '<div class="iv-dash-card" data-ticker="' + item.ticker + '" style="' +
-              'border:2px solid ' + borderColor + ';border-radius:12px;padding:6px 4px;' +
+              'border:2px solid ' + borderColor + ';border-radius:12px;padding:6px 4px 4px;' +
               'background:#fff;width:128px;cursor:pointer;transition:box-shadow .15s,transform .15s;' +
               'box-sizing:border-box">' +
               '<div style="font-size:0.75rem;font-weight:700;color:#374151;text-align:center;margin-bottom:1px">' +
               item.ticker + '</div>' +
               '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + svg + '</svg>' +
-              '<div style="text-align:center;font-size:0.68rem;color:#9ca3af;margin-top:-4px">' + atmStr + '</div>' +
-              ivr2 +
+              detailLine +
+              stratDiv +
               '</div>';
           }
 
-          function renderDashboard(list) {
+          function renderDashboard(list, mode) {
             var summaryEl = document.getElementById('iv-dashboard-summary');
             var cardsEl   = document.getElementById('iv-dashboard-cards');
+            var isIvr     = mode !== 'skew';
+
+            // Update summary bar labels
+            if (isIvr) {
+              document.getElementById('dash-sum-high-label').textContent = 'High Vol · IVR ≥ 60';
+              document.getElementById('dash-sum-mid-label').textContent  = 'Neutral · 30–60';
+              document.getElementById('dash-sum-low-label').textContent  = 'Low Vol · IVR < 30';
+              document.getElementById('dash-sum-high-box').className = 'rounded-lg p-3 text-center bg-red-50';
+              document.getElementById('dash-sum-mid-box').className  = 'rounded-lg p-3 text-center bg-gray-50';
+              document.getElementById('dash-sum-low-box').className  = 'rounded-lg p-3 text-center bg-green-50';
+              document.getElementById('dash-sum-high-label').className = 'text-xs font-medium text-red-700';
+              document.getElementById('dash-sum-mid-label').className  = 'text-xs font-medium text-gray-600';
+              document.getElementById('dash-sum-low-label').className  = 'text-xs font-medium text-green-700';
+              document.getElementById('iv-summary-high-count').className = 'text-2xl font-bold text-red-600 mt-1';
+              document.getElementById('iv-summary-mid-count').className  = 'text-2xl font-bold text-gray-500 mt-1';
+              document.getElementById('iv-summary-low-count').className  = 'text-2xl font-bold text-green-600 mt-1';
+            } else {
+              document.getElementById('dash-sum-high-label').textContent = 'High Put Skew ≥ 60';
+              document.getElementById('dash-sum-mid-label').textContent  = 'Balanced Skew 30–60';
+              document.getElementById('dash-sum-low-label').textContent  = 'Low Put Skew < 30';
+              document.getElementById('dash-sum-high-box').className = 'rounded-lg p-3 text-center bg-red-50';
+              document.getElementById('dash-sum-mid-box').className  = 'rounded-lg p-3 text-center bg-slate-50';
+              document.getElementById('dash-sum-low-box').className  = 'rounded-lg p-3 text-center bg-cyan-50';
+              document.getElementById('dash-sum-high-label').className = 'text-xs font-medium text-red-700';
+              document.getElementById('dash-sum-mid-label').className  = 'text-xs font-medium text-slate-500';
+              document.getElementById('dash-sum-low-label').className  = 'text-xs font-medium text-cyan-700';
+              document.getElementById('iv-summary-high-count').className = 'text-2xl font-bold text-red-600 mt-1';
+              document.getElementById('iv-summary-mid-count').className  = 'text-2xl font-bold text-slate-500 mt-1';
+              document.getElementById('iv-summary-low-count').className  = 'text-2xl font-bold text-cyan-600 mt-1';
+            }
 
             if (!list || !list.length) {
               cardsEl.innerHTML = '<span style="font-size:.875rem;color:#9ca3af;padding:1rem 0">查詢後自動加入 Watchlist</span>';
@@ -388,27 +475,26 @@ class IvAnalysis::PageComponent < ApplicationComponent
               return;
             }
 
-            // Summary counts (only tickers with IVR data)
-            var withRank = list.filter(function(d) { return d.ivr_1y !== null && d.ivr_1y !== undefined; });
-            var high = withRank.filter(function(d) { return parseFloat(d.ivr_1y) >= 60; }).length;
-            var mid  = withRank.filter(function(d) { var v = parseFloat(d.ivr_1y); return v >= 30 && v < 60; }).length;
-            var low  = withRank.filter(function(d) { return parseFloat(d.ivr_1y) < 30; }).length;
+            // Summary counts
+            var rankKey = isIvr ? 'ivr_1y' : 'skew_rank';
+            var withRank = list.filter(function(d) { return d[rankKey] !== null && d[rankKey] !== undefined; });
+            var high = withRank.filter(function(d) { return parseFloat(d[rankKey]) >= 60; }).length;
+            var mid  = withRank.filter(function(d) { var v = parseFloat(d[rankKey]); return v >= 30 && v < 60; }).length;
+            var low  = withRank.filter(function(d) { return parseFloat(d[rankKey]) < 30; }).length;
 
             document.getElementById('iv-summary-high-count').textContent = high;
             document.getElementById('iv-summary-mid-count').textContent  = mid;
             document.getElementById('iv-summary-low-count').textContent  = low;
             summaryEl.classList.remove('hidden');
 
-            // Sort: high IVR first, no-rank last
             var sorted = list.slice().sort(function(a, b) {
-              var ra = a.ivr_1y !== null && a.ivr_1y !== undefined ? parseFloat(a.ivr_1y) : -1;
-              var rb = b.ivr_1y !== null && b.ivr_1y !== undefined ? parseFloat(b.ivr_1y) : -1;
+              var ra = a[rankKey] !== null && a[rankKey] !== undefined ? parseFloat(a[rankKey]) : -1;
+              var rb = b[rankKey] !== null && b[rankKey] !== undefined ? parseFloat(b[rankKey]) : -1;
               return rb - ra;
             });
 
-            cardsEl.innerHTML = sorted.map(buildGaugeCard).join('');
+            cardsEl.innerHTML = sorted.map(function(item) { return buildGaugeCard(item, mode); }).join('');
 
-            // Click: fill ticker + load expirations + smooth scroll
             cardsEl.querySelectorAll('.iv-dash-card').forEach(function(card) {
               card.addEventListener('click', function() {
                 var ticker = card.dataset.ticker;
@@ -427,10 +513,18 @@ class IvAnalysis::PageComponent < ApplicationComponent
             });
           }
 
+          // Mode toggle buttons
+          document.getElementById('dash-mode-ivr').addEventListener('click', function() { switchDashMode('ivr'); });
+          document.getElementById('dash-mode-skew').addEventListener('click', function() { switchDashMode('skew'); });
+
           function loadWatchlist() {
             fetch('/api/iv_analysis/watchlist')
               .then(function (r) { return r.json(); })
-              .then(function (data) { renderWatchlist(data.watchlist); renderDashboard(data.watchlist); })
+              .then(function (data) {
+                _watchlistData = data.watchlist || [];
+                renderWatchlist(_watchlistData);
+                renderDashboard(_watchlistData, _dashMode);
+              })
               .catch(function () {});
           }
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_03_035830) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_08_081846) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -152,6 +152,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_03_035830) do
     t.index ["active"], name: "index_price_alerts_on_active"
     t.index ["position"], name: "index_price_alerts_on_position"
     t.index ["symbol"], name: "index_price_alerts_on_symbol"
+  end
+
+  create_table "skew_rank_daily", force: :cascade do |t|
+    t.decimal "call_iv_025", precision: 8, scale: 6
+    t.datetime "created_at", null: false
+    t.decimal "put_iv_025", precision: 8, scale: 6
+    t.decimal "skew_pts", precision: 6, scale: 2
+    t.decimal "skew_rank", precision: 5, scale: 2
+    t.date "snapshot_date", null: false
+    t.string "ticker", null: false
+    t.datetime "updated_at", null: false
+    t.index ["ticker", "snapshot_date"], name: "index_skew_rank_daily_on_ticker_and_snapshot_date", unique: true
   end
 
   create_table "tracked_tickers", force: :cascade do |t|

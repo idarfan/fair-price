@@ -27,6 +27,10 @@ class IvSidecarService
     new.get("/expirations/#{ticker.to_s.upcase.strip}")
   end
 
+  def self.fetch_skew(ticker)
+    new.get("/skew/#{ticker.to_s.upcase.strip}")
+  end
+
   def get(path)
     uri  = URI("#{SIDECAR_URL}#{path}")
     http = Net::HTTP.new(uri.host, uri.port)

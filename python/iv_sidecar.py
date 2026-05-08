@@ -315,6 +315,54 @@ def expirations(ticker):
         return jsonify(error=str(exc)), 422
 
 
+
+
+@app.get("/skew/<ticker>")
+def skew(ticker):
+    """25-delta skew for watchlist dashboard."""
+    ticker = ticker.upper().strip()
+    try:
+        data    = _fetch_surface(ticker)
+        tenors  = np.array(data["tenors"])
+        mny     = np.array(data["moneyness"])
+        iv_grid = np.array(data["iv"])
+        spot    = float(data["spot"])
+
+        T_TARGET = 30.0 / 365.0
+        t_idx    = int(np.argmin(np.abs(tenors - T_TARGET)))
+        T        = max(float(tenors[t_idx]), 0.019)
+
+        atm_m_idx = int(np.argmin(np.abs(mny)))
+        sigma     = max(float(iv_grid[t_idx][atm_m_idx]), 0.001)
+
+        r     = 0.05
+        d1_25 = float(norm.ppf(0.75))
+
+        put_logm  = -d1_25 * sigma * math.sqrt(T) + (r + 0.5 * sigma ** 2) * T
+        call_logm =  d1_25 * sigma * math.sqrt(T) + (r + 0.5 * sigma ** 2) * T
+
+        put_logm_c  = float(np.clip(put_logm,  mny.min(), mny.max()))
+        call_logm_c = float(np.clip(call_logm, mny.min(), mny.max()))
+
+        interp = RegularGridInterpolator(
+            (tenors, mny), iv_grid,
+            method="linear", bounds_error=False, fill_value=None
+        )
+        put_iv  = max(float(interp([[T, put_logm_c]])[0]),  0.001)
+        call_iv = max(float(interp([[T, call_logm_c]])[0]), 0.001)
+
+        return jsonify(
+            ticker=ticker,
+            put_iv_025=round(put_iv,  6),
+            call_iv_025=round(call_iv, 6),
+            skew_pts=round((put_iv - call_iv) * 100, 2),
+            tenor_used=round(T, 4),
+            spot=round(spot, 2),
+        )
+    except Exception as exc:
+        logger.error("skew error for %s: %s", ticker, exc)
+        return jsonify(error=str(exc)), 422
+
 @app.get("/health")
 def health():
     return jsonify(status="ok")
@@ -322,3 +370,5 @@ def health():
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5050, debug=False)
+
+

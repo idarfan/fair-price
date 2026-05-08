@@ -9,6 +9,24 @@ namespace :iv do
     exit 1 if result[:failures] > 0 && result[:success] == 0
   end
 
+  desc "抓取所有 watchlist ticker 的當日 25-delta Skew 快照"
+  task skew_snapshot: :environment do
+    puts "[iv:skew_snapshot] 開始執行，#{Time.current.in_time_zone("Eastern Time (US & Canada)").strftime("%Y-%m-%d %H:%M ET")}"
+    tickers = WatchedTicker.active.pluck(:ticker)
+    success = 0
+    failures = 0
+    tickers.each do |ticker|
+      result = SkewSnapshotService.fetch_and_store(ticker)
+      puts "[iv:skew_snapshot] ✅ #{ticker} skew_pts=#{result[:skew_pts]} rank=#{result[:skew_rank]}"
+      success += 1
+    rescue => e
+      warn "[iv:skew_snapshot] ❌ #{ticker} 失敗 — #{e.message}"
+      failures += 1
+    end
+    puts "[iv:skew_snapshot] 完成 — 成功: #{success} / 失敗: #{failures} / 總計: #{tickers.size}"
+    exit 1 if failures > 0 && success == 0
+  end
+
   desc "補抓單一 ticker 當日 IV（用法：rake iv:backfill[AAPL]）"
   task :backfill, [:ticker] => :environment do |_t, args|
     ticker = args[:ticker].to_s.upcase.strip
