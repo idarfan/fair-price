@@ -291,10 +291,10 @@ class IvAnalysis::PageComponent < ApplicationComponent
 
           // ── Skew tooltip definitions ──────────────────────────────────
           var SKEW_TIPS = {
-            put:  'Put IV (25δ)\n\n價外 Put 的隱含波動率。\n數值越高代表市場願意付更多錢買下跌保護，\n反映偏空情緒或避險需求強烈。',
-            call: 'Call IV (25δ)\n\n價外 Call 的隱含波動率。\n數值越高代表市場願意付更多溢價買上漲曝險，\n反映偏多情緒或投機需求旺盛。',
-            skew: 'Skew (pts)\n\nPut IV 減去 Call IV 的差值（單位：百分點）。\n正值(+) → Put 比 Call 貴，市場偏空/避險。\n負值(-) → Call 比 Put 貴，市場偏多/投機。',
-            rank: 'Skew Rank\n\n當前 Skew 在過去歷史中的相對位置。\n100 = 最偏空（Put 溢價最高）\n0 = 最偏多（Call 溢價最高）\n需累積≥5天資料才顯示指針。'
+            put:  'Put IV (25δ)\\n\\n價外 Put 的隱含波動率。\\n數值越高代表市場願意付更多錢買下跌保護，\\n反映偏空情緒或避險需求強烈。',
+            call: 'Call IV (25δ)\\n\\n價外 Call 的隱含波動率。\\n數值越高代表市場願意付更多溢價買上漲曝險，\\n反映偏多情緒或投機需求旺盛。',
+            skew: 'Skew (pts)\\n\\nPut IV 減去 Call IV 的差值（單位：百分點）。\\n正值(+) → Put 比 Call 貴，市場偏空/避險。\\n負值(-) → Call 比 Put 貴，市場偏多/投機。',
+            rank: 'Skew Rank\\n\\n當前 Skew 在過去歷史中的相對位置。\\n100 = 最偏空（Put 溢價最高）\\n0 = 最偏多（Call 溢價最高）\\n需累積≥5天資料才顯示指針。'
           };
 
           function initTooltip() {
