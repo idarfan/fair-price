@@ -194,6 +194,39 @@ def _infer_expirations(data: dict) -> tuple[list, int]:
     return weekly + monthly, len(weekly)
 
 
+def _real_expirations(ticker: str, surface_data: dict) -> tuple[list, int]:
+    """Fetch real option expiration dates from yfinance.
+
+    Falls back to _infer_expirations when yfinance fails or returns nothing.
+    """
+    tenors = surface_data["tenors"]
+    today = date.today()
+    max_date = today + timedelta(days=int(max(tenors) * 365) + 14)
+
+    try:
+        raw = yf.Ticker(ticker).options  # tuple of "YYYY-MM-DD" strings
+        if not raw:
+            raise ValueError("no options returned from yfinance")
+
+        dates = sorted(
+            date.fromisoformat(s)
+            for s in raw
+            if today < date.fromisoformat(s) <= max_date
+        )
+        if not dates:
+            raise ValueError("no future dates within surface range")
+
+        # Dates within 8 weeks (cap 6) → near-term "週選" group
+        cutoff = today + timedelta(weeks=8)
+        weekly = [d for d in dates if d <= cutoff][:6]
+        monthly = [d for d in dates if d not in set(weekly)]
+        return weekly + monthly, len(weekly)
+
+    except Exception as exc:
+        logger.warning("yfinance expirations failed for %s: %s — using inferred", ticker, exc)
+        return _infer_expirations(surface_data)
+
+
 # -- Endpoints ----------------------------------------------------------------
 
 @app.post("/fetch_atm_iv")
@@ -272,7 +305,7 @@ def expirations(ticker):
         return jsonify(error="ticker required"), 422
     try:
         data          = _fetch_surface(ticker)
-        dates, wcount = _infer_expirations(data)
+        dates, wcount = _real_expirations(ticker, data)
         return jsonify(
             expirations=[d.isoformat() for d in dates],
             weekly_count=wcount,
