@@ -290,13 +290,44 @@ class IvAnalysis::EducationComponent < ApplicationComponent
         end
       end
 
-      # Screenshot
+      # Screenshot with interactive column tooltips
       div(class: "p-4") do
-        img(
-          src:   "/images/options_chain_example.png",
-          alt:   "Barchart 選擇權鏈截圖",
-          class: "w-full rounded-lg border border-gray-200 shadow-sm"
-        )
+        p(class: "text-xs text-gray-400 mb-2") { plain "— 滑鼠移到任一欄位可查看說明" }
+        div(id: "barchart-img-container",
+            class: "relative rounded-lg border border-gray-200 shadow-sm overflow-hidden") do
+          img(
+            src:   "/images/options_chain_example.png",
+            alt:   "Barchart 選擇權鏈截圖",
+            class: "w-full block select-none",
+            style: "display:block"
+          )
+          div(id: "barchart-col-hl", class: "absolute inset-y-0 pointer-events-none",
+              style: "opacity:0;background:rgba(59,130,246,0.18);transition:left 0.06s,width 0.06s;")
+        end
+      end
+
+      # Barchart tooltip overlay (fixed, JS-managed)
+      div(id: "barchart-col-tooltip",
+          class: "hidden fixed z-50 rounded-xl shadow-2xl overflow-hidden select-none",
+          style: "max-width:320px;pointer-events:none;border:1px solid #e5e7eb;") do
+        div(id: "barchart-tt-hdr", class: "px-4 py-3 flex items-center gap-2") do
+          span(id: "barchart-tt-num",
+               class: "w-6 h-6 rounded-full flex items-center justify-center text-white flex-shrink-0 font-bold",
+               style: "font-size:0.82rem;background:rgba(0,0,0,0.25)")
+          div(class: "flex-1 min-w-0") do
+            p(id: "barchart-tt-en", class: "font-bold font-mono text-white leading-tight", style: "font-size:0.95rem")
+            p(id: "barchart-tt-zh", class: "mt-0.5", style: "font-size:0.82rem;color:rgba(255,255,255,0.85)")
+          end
+          span(id: "barchart-tt-ex",
+               class: "ml-auto font-mono rounded px-2 py-0.5 whitespace-nowrap flex-shrink-0",
+               style: "font-size:0.82rem;background:rgba(0,0,0,0.2);color:rgba(255,255,255,0.9)")
+        end
+        div(class: "bg-white px-4 py-3") do
+          p(id: "barchart-tt-sum",
+            class: "text-gray-800 font-medium leading-relaxed mb-2",
+            style: "font-size:0.85rem")
+          div(id: "barchart-tt-bul", class: "space-y-1")
+        end
       end
 
       # Annotation grid
@@ -473,7 +504,7 @@ class IvAnalysis::EducationComponent < ApplicationComponent
                style: "background:rgba(0,0,0,0.2);color:rgba(255,255,255,0.9)")
         end
         div(class: "bg-white px-4 py-3") do
-          p(id: "chain-tt-sum", class: "text-xs text-gray-800 font-medium leading-relaxed mb-2")
+          p(id: "chain-tt-sum", class: "text-gray-800 font-medium leading-relaxed mb-2", style: "font-size:0.85rem")
           div(id: "chain-tt-bul", class: "space-y-1")
         end
       end
@@ -728,7 +759,7 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
             ex.textContent  = col.example;
             sm.textContent  = col.summary;
             bl.innerHTML = col.bullets.map(function(b) {
-              return '<p style="display:flex;gap:4px;font-size:0.72rem;color:#6b7280;line-height:1.5">' +
+              return '<p style="display:flex;gap:4px;font-size:0.85rem;color:#6b7280;line-height:1.5">' +
                 '<span style="color:' + col.color + ';flex-shrink:0">›</span>' + b + '</p>';
             }).join('');
           }
@@ -757,6 +788,145 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
             if (col !== lastCol) { fillTip(COLS[col]); lastCol = col; }
             tip.classList.remove('hidden');
             posTip(e);
+          });
+
+          wrapper.addEventListener('mouseleave', function() {
+            tip.classList.add('hidden');
+            hl.style.opacity = '0';
+            lastCol = -1;
+          });
+        })();
+
+        // ── Barchart (Calls+Puts) image tooltip ──
+        (function () {
+          var wrapper = document.getElementById('barchart-img-container');
+          var tip     = document.getElementById('barchart-col-tooltip');
+          var hl      = document.getElementById('barchart-col-hl');
+          if (!wrapper || !tip || !hl) return;
+
+          var hdr = document.getElementById('barchart-tt-hdr');
+          var num = document.getElementById('barchart-tt-num');
+          var en  = document.getElementById('barchart-tt-en');
+          var zh  = document.getElementById('barchart-tt-zh');
+          var ex  = document.getElementById('barchart-tt-ex');
+          var sm  = document.getElementById('barchart-tt-sum');
+          var bl  = document.getElementById('barchart-tt-bul');
+
+          // Column boundaries (%) — derived from 1631px image pixel analysis
+          // 20 columns: Links | Type | Latest | Bid | Ask | Change | Volume | Open Int | IV | Last Trade
+          //              | Strike |
+          //             Type | Latest | Bid | Ask | Change | Volume | Open Int | IV | Last Trade (Puts)
+          var BOUNDS = [0, 3.7, 9.2, 17.1, 21.5, 26.4, 32.0, 39.5, 45.5, 49.6, 53.8, 58.7, 62.1, 65.8, 69.7, 73.5, 77.0, 81.0, 88.7, 92.0, 100];
+
+          var COLS = [
+            { num:'①', en:'Links', zh:'圖表連結', color:'#64748b', example:'🔗',
+              summary:'每列左側的圖示連結，點擊可直接進入該合約的走勢圖或下單介面。',
+              bullets:['Click → 查看單一期權的歷史 IV 走勢圖', '方便快速進入 Calls 或 Puts 的交易頁面'] },
+            { num:'②', en:'Type', zh:'合約類型（Calls）', color:'#3b82f6', example:'C',
+              summary:'C = Call（買權），表示這是 Calls 那一側的合約。',
+              bullets:['Call 給你「以 Strike 買入股票」的權利', 'Barchart 左半部全為 Call 合約', '搭配 Strike 判斷是否在價內（ITM）'] },
+            { num:'③', en:'Latest', zh:'最新成交價（Call）', color:'#3b82f6', example:'$2.05',
+              summary:'這份 Call 期權最近一筆成交的市場價格。',
+              bullets:['1 合約 = 100 股，實際費用 = Latest × 100', '流動性差時 Latest 可能遠離中間報價', '搭配 Bid/Ask 確認成交是否合理'] },
+            { num:'④', en:'Bid', zh:'買入出價（Call）', color:'#3b82f6', example:'$1.90',
+              summary:'市場上最高的買入報價（做市商願意以此價格收購你的合約）。',
+              bullets:['賣出合約時通常以 Bid 成交', 'Bid 越接近 Ask 代表流動性越好', 'Bid/Ask 差大時實際進出成本高'] },
+            { num:'⑤', en:'Ask', zh:'賣出要價（Call）', color:'#3b82f6', example:'$2.10',
+              summary:'市場上最低的賣出報價（需支付此價格才能買入合約）。',
+              bullets:['買入合約時通常以 Ask 成交', '中間價 Mid = (Bid + Ask) / 2，可嘗試掛在此', 'Ask 遠高於 Bid → 流動性差，避免市價單'] },
+            { num:'⑥', en:'Change', zh:'價格變動（Call）', color:'#f59e0b', example:'+$0.15',
+              summary:'相對前一交易日收盤價的漲跌幅。',
+              bullets:['正值（綠色）= Call 漲價，隱含 IV 或股價走高', '負值（紅色）= Call 跌價，股價下跌或 IV 壓縮', '觀察 Change 可判斷市場方向情緒'] },
+            { num:'⑦', en:'Volume', zh:'當日成交量（Call）', color:'#0ea5e9', example:'230',
+              summary:'今日這份 Call 合約的成交總量（合約數）。',
+              bullets:['Volume 高 → 市場活躍，Bid/Ask 差窄', 'Volume 低 → 流動性差，避免大量進出', '突然大量 Volume → 可能有機構佈局或消息面'] },
+            { num:'⑧', en:'Open Int', zh:'未平倉量（Call）', color:'#0ea5e9', example:'1,820',
+              summary:'目前市場上這份 Call 合約尚未結算的總量。',
+              bullets:['Open Int 大 → 流動性好，容易找到對手盤', '搭配 Volume 一起看：Volume 遠大於 OI 代表今天進了大量新倉', '減少代表有人平倉或合約到期'] },
+            { num:'⑨', en:'IV', zh:'隱含波動率（Call）', color:'#f59e0b', example:'58.3%',
+              summary:'這份 Call 合約的隱含波動率，由市場價格反推而來。',
+              bullets:['IV 高 → 合約偏貴，賣 Covered Call 有利', 'ATM 附近 IV 最低；深 ITM / OTM 的 IV 會偏高（IV Skew）', '與 HV 比較：IV > HV → 賣方有優勢'] },
+            { num:'⑩', en:'Last Trade', zh:'最後成交時間（Call）', color:'#64748b', example:'05/13 10:32',
+              summary:'這份 Call 合約最近一次成交的日期與時間。',
+              bullets:['時間久遠代表流動性差、很久沒有成交', '配合 Volume 判斷：Low Volume + 舊 Last Trade = 避開', '活絡合約通常當天就有多筆成交'] },
+            { num:'⑪', en:'Strike', zh:'行權價（中央軸）', color:'#7c3aed', example:'$80.00',
+              summary:'這列期權的行權價，是 Calls 與 Puts 共用的核心基準價格。',
+              bullets:['股價 > Strike → Call ITM（有內在價值）', '股價 < Strike → Put ITM（有內在價值）', 'ATM Strike 是波動率最集中的區域，也是 Wheel 策略最常選擇的位置'] },
+            { num:'⑫', en:'Type', zh:'合約類型（Puts）', color:'#ef4444', example:'P',
+              summary:'P = Put（賣權），表示這是 Puts 那一側的合約。',
+              bullets:['Put 給你「以 Strike 賣出股票」的權利', 'Barchart 右半部全為 Put 合約', 'Wheel 的 CSP（現金擔保賣權）即是賣出 Put'] },
+            { num:'⑬', en:'Latest', zh:'最新成交價（Put）', color:'#ef4444', example:'$1.85',
+              summary:'這份 Put 期權最近一筆成交的市場價格。',
+              bullets:['Put Latest 通常隨股價下跌而上漲', '1 合約 = 100 股，Wheel 收到的權利金 = Latest × 100', '流動性差時避免市價單'] },
+            { num:'⑭', en:'Bid', zh:'買入出價（Put）', color:'#ef4444', example:'$1.75',
+              summary:'市場最高買入報價，賣出 Put 時通常以此成交。',
+              bullets:['賣 CSP 時以 Bid 成交，實際收到的權利金', 'Bid/Ask 差越小越好，進出成本低', '可嘗試掛 Mid 價，通常也能成交'] },
+            { num:'⑮', en:'Ask', zh:'賣出要價（Put）', color:'#ef4444', example:'$1.95',
+              summary:'市場最低賣出報價，買入 Put 時需支付此價格。',
+              bullets:['保護性買 Put（Protective Put）用 Ask 進場', 'Bid/Ask 差大的 Put → 流動性差，避免買入', 'Mid = (Bid+Ask)/2 是最佳掛單目標'] },
+            { num:'⑯', en:'Change', zh:'價格變動（Put）', color:'#f59e0b', example:'-$0.10',
+              summary:'Put 合約相對前一交易日的價格變化。',
+              bullets:['股價下跌時 Put 通常漲價（負 Change 代表股價漲）', '觀察 Put Change 可判斷市場對下行風險的憂慮程度', '財報前後 Put Change 常非常劇烈'] },
+            { num:'⑰', en:'Volume', zh:'當日成交量（Put）', color:'#0ea5e9', example:'520',
+              summary:'今日這份 Put 合約的成交總量。',
+              bullets:['Put Volume 暴增可能反映大戶買保護或押注下跌', '與 Call Volume 比較：Put/Call Ratio 是市場情緒指標', 'Wheel 賣 CSP 選擇 Volume > 100 的合約較安全'] },
+            { num:'⑱', en:'Open Int', zh:'未平倉量（Put）', color:'#0ea5e9', example:'3,240',
+              summary:'這份 Put 合約目前未平倉的總合約數。',
+              bullets:['Open Int 大 → 流動性好，容易以合理價成交', '選 CSP 執行價時常參考 Open Int 找支撐位', '大量 Open Int 聚集的 Strike 常形成支撐或阻力'] },
+            { num:'⑲', en:'IV', zh:'隱含波動率（Put）', color:'#f59e0b', example:'61.2%',
+              summary:'這份 Put 的隱含波動率，反映市場對下行風險的定價。',
+              bullets:['Put IV 通常略高於 Call IV（Skew 效應）', 'Put IV 越高 → CSP 權利金越豐厚', 'IV 高位（IVR > 60%）賣 Put 是 Wheel 黃金時機'] },
+            { num:'⑳', en:'Last Trade', zh:'最後成交時間（Put）', color:'#64748b', example:'05/13 09:45',
+              summary:'這份 Put 合約最近一次成交的時間。',
+              bullets:['時間久遠 = 流動性差，賣出時難找買家', 'Wheel 選 CSP 要選當天有成交紀錄的 Strike', '配合 Volume / Open Int 三項合一判斷流動性'] }
+          ];
+
+          var lastCol = -1;
+
+          function posTip2(e) {
+            var x = e.clientX + 20, y = e.clientY - 20;
+            var tw = tip.offsetWidth || 320, th = tip.offsetHeight || 180;
+            if (x + tw > window.innerWidth  - 12) x = e.clientX - tw - 20;
+            if (y + th > window.innerHeight - 12) y = window.innerHeight - th - 12;
+            if (y < 8) y = 8;
+            tip.style.left = x + 'px';
+            tip.style.top  = y + 'px';
+          }
+
+          function fillTip2(col) {
+            hdr.style.background = col.color;
+            num.textContent = col.num;
+            en.textContent  = col.en;
+            zh.textContent  = col.zh;
+            ex.textContent  = col.example;
+            sm.textContent  = col.summary;
+            bl.innerHTML = col.bullets.map(function(b) {
+              return '<p style="display:flex;gap:4px;font-size:0.85rem;color:#6b7280;line-height:1.5">' +
+                '<span style="color:' + col.color + ';flex-shrink:0">›</span>' + b + '</p>';
+            }).join('');
+          }
+
+          wrapper.style.cursor = 'crosshair';
+
+          wrapper.addEventListener('mousemove', function(e) {
+            var rect = wrapper.getBoundingClientRect();
+            var xPct = (e.clientX - rect.left) / rect.width * 100;
+            var col  = -1;
+            for (var i = 0; i < BOUNDS.length - 1; i++) {
+              if (xPct >= BOUNDS[i] && xPct < BOUNDS[i + 1]) { col = i; break; }
+            }
+            if (col < 0) {
+              tip.classList.add('hidden');
+              hl.style.opacity = '0';
+              lastCol = -1;
+              return;
+            }
+            hl.style.left    = BOUNDS[col] + '%';
+            hl.style.width   = (BOUNDS[col + 1] - BOUNDS[col]) + '%';
+            hl.style.opacity = '1';
+            if (col !== lastCol) { fillTip2(COLS[col]); lastCol = col; }
+            tip.classList.remove('hidden');
+            posTip2(e);
           });
 
           wrapper.addEventListener('mouseleave', function() {
