@@ -424,71 +424,168 @@ class IvAnalysis::EducationComponent < ApplicationComponent
 
 
   def chain_glossary_section
-    div(class: "mt-8 bg-white rounded-xl border border-gray-200 shadow-sm p-6") do
-      div(class: "border-b border-gray-200 pb-4 mb-6") do
+    div(class: "mt-8 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden") do
+      # Header
+      div(class: "px-6 pt-6 pb-4 border-b border-gray-100") do
         h2(class: "text-lg font-bold text-gray-900") { plain "📋 選擇權鏈欄位完整說明" }
         p(class: "mt-1 text-sm text-gray-500") do
-          plain "看懂每一欄位的意義，讓你查閱選擇權報價時不再霧裡看花。欄位名稱對應 Barchart 等主流選擇權鏈平台的標準顯示。"
+          plain "對照下方截圖，每個編號說明一個欄位的意義，讓你查表時不再霧裡看花。"
         end
       end
 
-      # ── 價格欄位 ──────────────────────────────────────────────
-      gloss_group_label("💰 價格欄位", "選擇權的成交價、理論價值與波動率")
-      div(class: "grid sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-2") do
-        gloss_card("Strike", "行權價", "#3b82f6", "eg. $80.00",
-          "你購買期權後，有權以此價格買入（Call）或賣出（Put）股票。"           "股價 > 行權價 → Call 在價內（ITM）；"           "股價 < 行權價 → Put 在價內（ITM）。"           "反之稱為價外（OTM）。")
-        gloss_card("Latest", "最新成交價", "#3b82f6", "eg. $2.05",
-          "這份期權合約在市場上最後一次成交的價格，即你今天買入需付出的每股費用。"           "注意：1 份合約 = 100 股，"           "實際付出金額 = Latest × 100 美元。")
-        gloss_card("Theor.", "理論價值", "#8b5cf6", "eg. $2.05",
-          "以 Black–Scholes 公式計算出來的「合理」價格。"           "Latest ≈ Theor. 最理想；"           "若差距很大，通常代表這個 Strike 的流動性不足，"           "Bid/Ask 價差大，進出場成本高。")
-        gloss_card("IV", "隱含波動率", "#f59e0b", "eg. 57.42%",
-          "把市場成交價（Latest）代入 Black–Scholes 公式「反推」出來的波動率。"           "IV 越高 → 期權越貴（市場預期震盪越大）；"           "IV 越低 → 期權越便宜。"           "本工具的 IVR、IVP 就是衡量這個數字在歷史中的位置。")
+      # Screenshot with column number badges overlaid via CSS
+      div(class: "relative px-6 pt-5 pb-3") do
+        p(class: "text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2") { plain "實際範例（Puts 選擇權鏈）" }
+        div(class: "relative overflow-x-auto rounded-lg border border-gray-200 shadow-sm") do
+          img(
+            src:   "/images/options_chain_puts_example.png",
+            alt:   "選擇權 Puts 報價表截圖",
+            class: "w-full block"
+          )
+        end
+        p(class: "mt-2 text-xs text-gray-400 text-right") { plain "欄位由左至右：Strike → Latest → Theor. → IV → Delta → Gamma → Theta → Vega → Rho → Volume → Open Int → Vol/OI → ITM Prob → Type" }
       end
 
-      # ── Greeks ───────────────────────────────────────────────
-      gloss_group_label("🔢 Greeks（風險敏感度指標）", "衡量期權價格對各種因素的瞬間變化，是管理期權風險的核心工具")
-      div(class: "grid sm:grid-cols-2 xl:grid-cols-3 gap-3 mb-2") do
-        gloss_card("Delta", "方向敏感度", "#10b981", "Put: −0.146",
-          "股價每漲 $1，期權價格的理論變化量。"           "Call Delta 為正（0～1），Put Delta 為負（−1～0）。"           "ATM（價平）Delta ≈ ±0.50。"           "也可粗略解讀為「到期時在價內的機率」，例如 Delta=0.2 ≈ 約 20% 機率在價內。")
-        gloss_card("Gamma", "Delta 的加速度", "#10b981", "eg. 0.0094",
-          "股價每漲 $1，Delta 本身的變化量。"           "越接近到期日、越接近 ATM 時 Gamma 越大。"           "Gamma 高意味著股票一動，Delta 就快速改變——買方可以趁勢放大獲利，"           "賣方則面臨方向突然逆轉的風險。")
-        gloss_card("Theta", "每日時間耗損", "#ef4444", "eg. −0.0408",
-          "每過一天，期權價值的理論耗損（通常為負數）。"           "時間是買方的敵人、賣方的朋友。"           "越接近到期，Theta 耗損越快——快到期的 OTM 期權往往一夜之間變成廢紙。")
-        gloss_card("Vega", "波動率敏感度", "#f59e0b", "eg. 0.0972",
-          "IV 每上升 1 個百分點，期權價值的理論變化。"           "正 Vega（買方）= IV 漲受益、IV 跌受損。"           "財報後 IV 崩潰（IV Crush）就是正 Vega 的陷阱："           "即使股票方向做對，IV 暴跌仍可能讓期權虧損。")
-        gloss_card("Rho", "利率敏感度", "#6b7280", "eg. −0.0273",
-          "無風險利率每上升 1%，期權價值的理論變化。"           "日常短期交易中 Rho 影響最小，通常可忽略。"           "持有超過 1 年的 LEAPS（長期期權）才需要關注利率的影響。")
-      end
+      # Tipdoc cards grid
+      div(class: "px-6 pb-6") do
+        div(class: "mb-4 mt-2") do
+          h3(class: "text-sm font-semibold text-gray-700") { plain "各欄位說明" }
+        end
 
-      # ── 流動性 & 機率 ──────────────────────────────────────────
-      gloss_group_label("📊 成交量、流動性與到期機率", "判斷市場活絡程度與合約的勝率預估")
-      div(class: "grid sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4") do
-        gloss_card("Volume", "當日成交量", "#0ea5e9", "eg. 60",
-          "今天共有多少份合約在市場上成交。"           "Volume 越高 → 今天越活躍，買賣容易成交。"           "Volume 很低時，Bid/Ask Spread 通常很大，"           "成交價可能遠差於你預期的。")
-        gloss_card("Open Int", "未平倉量", "#0ea5e9", "eg. 792",
-          "目前市場上仍在持有、尚未結算的合約總量。"           "Open Interest 大 → 流動性較好，有足夠對手盤。"           "隔天 Open Interest 增加，代表有新倉位建立；"           "減少代表有人平倉或到期結算。")
-        gloss_card("Vol/OI", "當日交投比", "#0ea5e9", "eg. 0.08",
-          "Volume ÷ Open Interest。"           "比值越高，代表今天相對於總持倉有更多人在動。"           "高 Vol/OI 有時暗示大戶或消息面開始佈局這個履約價，值得留意。")
-        gloss_card("ITM Prob", "到期價內機率", "#8b5cf6", "eg. 18.21%",
-          "這份期權在到期日時「處於價內」的估計機率，由 Delta 近似計算。"           "例如 ITM Prob = 18% → 股票有 18% 的機率在到期時超過（Call）或低於（Put）行權價。"           "賣 CSP 時常挑選 ITM Prob < 20% 的 Strike，代表你有約 80% 的機率讓期權到期歸零。")
-      end
+        # Row 1: 價格 & IV (4 cards)
+        div(class: "mb-3") do
+          p(class: "text-xs font-bold text-blue-600 uppercase tracking-wide mb-2") { plain "💰 價格與波動率" }
+          div(class: "grid sm:grid-cols-2 xl:grid-cols-4 gap-3") do
+            tipdoc("①", "Strike", "行權價", "#3b82f6",
+              "你有權以此價格買（Call）或賣（Put）股票。",
+              "股價 > Strike → Call 在價內（ITM）
+股價 < Strike → Put 在價內（ITM）",
+              "$80.00")
+            tipdoc("②", "Latest", "最新成交價", "#3b82f6",
+              "這份期權在市場上最後成交的價格。",
+              "1 份合約 = 100 股
+實際費用 = Latest × 100 美元",
+              "$2.05")
+            tipdoc("③", "Theor.", "理論價值", "#8b5cf6",
+              "用 Black–Scholes 公式算出的「合理」價格。",
+              "Latest ≈ Theor. → 流動性好
+差距太大 → Bid/Ask 價差寬，小心",
+              "$2.05")
+            tipdoc("④", "IV", "隱含波動率", "#f59e0b",
+              "把 Latest 代入 B-S 模型「反推」出來的波動率預期。",
+              "IV 高 → 期權貴，賣方策略有利
+IV 低 → 期權便宜，買方策略有利
+IVR / IVP 就是衡量它的歷史位置",
+              "57.42%")
+          end
+        end
 
-      # Type 說明列
-      div(class: "rounded-lg bg-gray-50 border border-gray-200 p-4 flex items-start gap-3") do
-        span(class: "text-xl flex-shrink-0 mt-0.5") { plain "🏷️" }
+        # Row 2: Greeks (5 cards)
+        div(class: "mb-3") do
+          p(class: "text-xs font-bold text-green-600 uppercase tracking-wide mb-2") { plain "🔢 Greeks（風險敏感度）" }
+          div(class: "grid sm:grid-cols-2 xl:grid-cols-3 gap-3") do
+            tipdoc("⑤", "Delta", "方向敏感度", "#10b981",
+              "股價每漲 $1，期權價格的理論變化。",
+              "Call: 0 ~ 1（正值）
+Put: −1 ~ 0（負值）
+ATM ≈ ±0.50，也近似「到期在價內的機率」",
+              "−0.146")
+            tipdoc("⑥", "Gamma", "Delta 的加速度", "#10b981",
+              "股價每漲 $1，Delta 本身的變化量。",
+              "越接近到期 & ATM → Gamma 越大
+買方：方向對了會加速獲利
+賣方：要注意方向逆轉的風險",
+              "0.0094")
+            tipdoc("⑦", "Theta", "每日時間耗損", "#ef4444",
+              "每過一天，期權價值的理論消耗（通常為負數）。",
+              "時間是買方的敵人、賣方的朋友
+越接近到期日 Theta 越大
+快到期的 OTM 期權可能一夜變廢紙",
+              "−0.0408")
+            tipdoc("⑧", "Vega", "波動率敏感度", "#f59e0b",
+              "IV 每上升 1%，期權價值的理論變化。",
+              "正 Vega（買方）= IV 漲受益
+財報後 IV 崩潰 → Vega 陷阱
+方向做對了，IV 暴跌仍可能虧損",
+              "0.0972")
+            tipdoc("⑨", "Rho", "利率敏感度", "#6b7280",
+              "無風險利率每上升 1%，期權價值的變化。",
+              "日常交易中影響最小，可忽略
+只有持有 LEAPS（2 年以上長期期權）時才需注意",
+              "−0.0273")
+          end
+        end
+
+        # Row 3: 流動性 & 機率 (5 cards)
         div do
-          p(class: "text-sm font-semibold text-gray-800 mb-1") { plain "Type — Call / Put 合約類型" }
-          p(class: "text-sm text-gray-600 leading-relaxed") do
-            plain "標示這份合約是 "
-            span(class: "inline-block px-1.5 py-0.5 rounded text-xs font-bold bg-green-100 text-green-700") { plain "Call" }
-            plain "（看漲，持有以 Strike 買入股票的權利）還是 "
-            span(class: "inline-block px-1.5 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700") { plain "Put" }
-            plain "（看跌，持有以 Strike 賣出股票的權利）。"               "Wheel 策略的 CSP（Cash-Secured Put）就是賣出 Put；Covered Call 就是賣出 Call。"
+          p(class: "text-xs font-bold text-sky-600 uppercase tracking-wide mb-2") { plain "📊 成交量、流動性與機率" }
+          div(class: "grid sm:grid-cols-2 xl:grid-cols-3 gap-3") do
+            tipdoc("⑩", "Volume", "當日成交量", "#0ea5e9",
+              "今天共有多少份合約在市場上成交。",
+              "Volume 高 → 活絡，容易買賣
+Volume 低 → Bid/Ask 價差大，成本高",
+              "60")
+            tipdoc("⑪", "Open Int", "未平倉量", "#0ea5e9",
+              "目前市場上尚未結算的合約總量。",
+              "Open Int 大 → 流動性好，有足夠對手盤
+增加 → 有新倉位建立
+減少 → 有人平倉或到期",
+              "792")
+            tipdoc("⑫", "Vol/OI", "當日交投比", "#0ea5e9",
+              "Volume ÷ Open Interest。",
+              "比值高 → 今天動靜大，可能有大戶佈局
+是觀察異常活動的快速指標",
+              "0.08")
+            tipdoc("⑬", "ITM Prob", "到期價內機率", "#8b5cf6",
+              "到期時「處於價內」的估計機率，由 Delta 近似。",
+              "賣 CSP 常選 ITM Prob < 20% 的 Strike
+= 約 80% 的機率讓期權到期歸零
+勝率的直觀表達",
+              "18.21%")
+            tipdoc("⑭", "Type", "Call / Put 類型", "#64748b",
+              "標示這是看漲（Call）還是看跌（Put）合約。",
+              "Call → 有權以 Strike 買入股票
+Put → 有權以 Strike 賣出股票
+Wheel: 賣 Put（CSP）或賣 Call（CC）",
+              "Put")
           end
         end
       end
     end
   end
+
+  def tipdoc(num, en_name, zh_name, accent, summary, bullets, example)
+    div(class: "rounded-lg bg-white",
+        style: "border: 1px solid #e5e7eb; border-left: 4px solid #{accent};") do
+      div(class: "p-3.5") do
+        # Header row
+        div(class: "flex items-start justify-between gap-2 mb-2") do
+          div(class: "flex items-center gap-1.5") do
+            span(class: "inline-flex items-center justify-center w-5 h-5 rounded-full text-white text-xs font-bold flex-shrink-0",
+                 style: "background:#{accent}; font-size:0.65rem") { plain num }
+            div do
+              p(class: "text-sm font-bold font-mono text-gray-900 leading-tight") { plain en_name }
+              p(class: "text-xs text-gray-500 mt-0.5") { plain zh_name }
+            end
+          end
+          span(class: "text-xs font-mono rounded px-1.5 py-0.5 bg-gray-100 text-gray-400 whitespace-nowrap flex-shrink-0",
+               style: "font-size:0.65rem") { plain example }
+        end
+        # Summary
+        p(class: "text-xs text-gray-700 leading-relaxed mb-1.5") { plain summary }
+        # Bullet lines
+        div(class: "space-y-0.5") do
+          bullets.split("\n").each do |line|
+            p(class: "text-xs text-gray-500 leading-relaxed") do
+              span(class: "mr-1", style: "color:#{accent}") { plain "›" }
+              plain line
+            end
+          end
+        end
+      end
+    end
+  end
+
 
   def gloss_group_label(title, subtitle)
     div(class: "mt-5 mb-3") do
