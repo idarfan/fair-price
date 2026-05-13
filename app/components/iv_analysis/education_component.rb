@@ -548,11 +548,18 @@ IVR / IVP 就是衡量它的歷史位置",
           p(class: "text-xs font-bold text-green-600 uppercase tracking-wide mb-2") { plain "🔢 Greeks（風險敏感度）" }
           div(class: "grid sm:grid-cols-2 xl:grid-cols-3 gap-3") do
             tipdoc("⑤", "Delta", "方向敏感度", "#10b981",
-              "股價每漲 $1，期權價格的理論變化。",
+              "股價每漲 $1，期權價格的理論變化（Put Delta 為負值）。",
               "Call: 0 ~ 1（正值）
 Put: −1 ~ 0（負值）
-ATM ≈ ±0.50，也近似「到期在價內的機率」",
-              "−0.146")
+ATM ≈ ±0.50，也近似「到期在價內的機率」
+─ 計算範例（Delta = −0.4482 的 Put）─
+股價跌 $1 → −0.4482 × (−1) = 期權漲 +$0.4482
+股價漲 $1 → −0.4482 × (+1) = 期權跌 −$0.4482
+⚠ 注意：這是理論值（瞬間線性估計）
+實際還要考慮 Gamma（Delta 本身隨股價改變）
+Theta（時間侵蝕）及 Bid/Ask 價差
+股價大幅波動時誤差會更大",
+              "−0.4482")
             tipdoc("⑥", "Gamma", "Delta 的加速度", "#10b981",
               "股價每漲 $1，Delta 本身的變化量。",
               "越接近到期 & ATM → Gamma 越大
@@ -707,9 +714,19 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
             { num:'④', en:'IV',       zh:'隱含波動率',   color:'#f59e0b', example:'57.42%',
               summary:'把市場成交價代入 B-S 公式反推出的波動率預期。',
               bullets:['IV 高期權貴，賣方策略（Wheel）有利','IV 低期權便宜，買方策略有利','IVR / IVP 正是衡量這個數字在歷史中的位置'] },
-            { num:'⑤', en:'Delta',    zh:'方向敏感度',   color:'#10b981', example:'-0.146',
-              summary:'股價每漲 $1，期權價格的理論變化量。',
-              bullets:['Call: 0~1（正值）；Put: -1~0（負值）','ATM 約 +/-0.50，也近似「到期在價內的機率」','深度 ITM Delta 趨近 +/-1.0，接近直接持有現股'] },
+            { num:'⑤', en:'Delta',    zh:'方向敏感度',   color:'#10b981', example:'-0.4482',
+              summary:'股價每漲 $1，期權價格的理論變化量（Put Delta 為負值）。',
+              bullets:[
+                'Call: 0~1（正值）；Put: \u22121~0（負值）',
+                'ATM \u2248 \u00b10.50，也近似「到期在價內的機率」',
+                '\u2500 計算範例（Delta = \u22120.4482 的 Put）\u2500',
+                '股價跌 $1 \u2192 \u22120.4482 \u00d7 (\u22121) = 期權漲 +$0.4482',
+                '股價漲 $1 \u2192 \u22120.4482 \u00d7 (+1) = 期權跌 \u2212$0.4482',
+                '\u26a0 理論值（瞬間線性估計）：實際還要考慮',
+                'Gamma（Delta 本身隨股價移動而改變）',
+                'Theta（時間流逝侵蝕價值）',
+                'Bid/Ask 價差 \u2014 股價大幅波動時誤差更大'
+              ] },
             { num:'⑥', en:'Gamma',    zh:'Delta 加速度', color:'#10b981', example:'0.0094',
               summary:'股價每漲 $1，Delta 本身的變化量。',
               bullets:['越接近到期且接近 ATM，Gamma 越大','買方：方向對了，獲利會加速放大','賣方：方向逆轉時 Delta 快速擴大，風險上升'] },
