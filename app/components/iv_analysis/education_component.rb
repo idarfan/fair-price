@@ -14,6 +14,7 @@ class IvAnalysis::EducationComponent < ApplicationComponent
       chain_glossary_section
     end
     render_chart_script
+    render_chain_tooltip_script
   end
 
   private
@@ -433,17 +434,70 @@ class IvAnalysis::EducationComponent < ApplicationComponent
         end
       end
 
-      # Screenshot with column number badges overlaid via CSS
-      div(class: "relative px-6 pt-5 pb-3") do
-        p(class: "text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2") { plain "實際範例（Puts 選擇權鏈）" }
-        div(class: "relative overflow-x-auto rounded-lg border border-gray-200 shadow-sm") do
+      # Screenshot with interactive hover tooltips per column
+      div(class: "px-6 pt-5 pb-3") do
+        p(class: "text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2") do
+          plain "實際範例（Puts 選擇權鏈）"
+          span(class: "ml-2 font-normal text-gray-400 normal-case") { plain "— 滑鼠移到任一欄可查看說明" }
+        end
+        div(id: "chain-img-container",
+            class: "relative rounded-lg border border-gray-200 shadow-sm overflow-hidden") do
           img(
             src:   "/images/options_chain_puts_example.png",
             alt:   "選擇權 Puts 報價表截圖",
-            class: "w-full block"
+            class: "w-full block select-none",
+            style: "display:block"
           )
+          # 14 absolutely-positioned transparent hotstrip overlays
+          # Positions derived from 1077px-wide image pixel analysis
+          [
+            [  0.0,  8.3],
+            [  8.3,  7.2],
+            [ 15.5,  7.0],
+            [ 22.5,  6.5],
+            [ 29.0,  6.3],
+            [ 35.3,  7.2],
+            [ 42.5,  6.5],
+            [ 49.0,  6.4],
+            [ 55.4,  6.8],
+            [ 62.2,  7.5],
+            [ 69.7,  8.0],
+            [ 77.7,  7.8],
+            [ 85.5,  7.5],
+            [ 93.0,  7.0],
+          ].each_with_index do |(left, width), idx|
+            div(
+              class: "chain-hotspot absolute inset-y-0 transition-opacity duration-150",
+              style: "left:#{left}%;width:#{width}%;cursor:crosshair;opacity:0;background:rgba(59,130,246,0.18);",
+              data:  { col: idx.to_s }
+            )
+          end
         end
-        p(class: "mt-2 text-xs text-gray-400 text-right") { plain "欄位由左至右：Strike → Latest → Theor. → IV → Delta → Gamma → Theta → Vega → Rho → Volume → Open Int → Vol/OI → ITM Prob → Type" }
+        p(class: "mt-2 text-xs text-gray-400") do
+          plain "① Strike　② Latest　③ Theor.　④ IV　⑤ Delta　⑥ Gamma　⑦ Theta　⑧ Vega　⑨ Rho　⑩ Volume　⑪ Open Int　⑫ Vol/OI　⑬ ITM Prob　⑭ Type"
+        end
+      end
+
+      # Fixed tooltip overlay — JS fills & positions on hover
+      div(id: "chain-col-tooltip",
+          class: "hidden fixed z-50 rounded-xl shadow-2xl overflow-hidden select-none",
+          style: "max-width:300px;pointer-events:none;border:1px solid #e5e7eb;") do
+        div(id: "chain-tt-hdr", class: "px-4 py-3 flex items-center gap-2") do
+          span(id: "chain-tt-num",
+               class: "w-6 h-6 rounded-full flex items-center justify-center text-white flex-shrink-0 font-bold",
+               style: "font-size:0.7rem;background:rgba(0,0,0,0.25)")
+          div(class: "flex-1 min-w-0") do
+            p(id: "chain-tt-en", class: "text-sm font-bold font-mono text-white leading-tight")
+            p(id: "chain-tt-zh", class: "text-xs mt-0.5", style: "color:rgba(255,255,255,0.8)")
+          end
+          span(id: "chain-tt-ex",
+               class: "ml-auto text-xs font-mono rounded px-2 py-0.5 whitespace-nowrap flex-shrink-0",
+               style: "background:rgba(0,0,0,0.2);color:rgba(255,255,255,0.9)")
+        end
+        div(class: "bg-white px-4 py-3") do
+          p(id: "chain-tt-sum", class: "text-xs text-gray-800 font-medium leading-relaxed mb-2")
+          div(id: "chain-tt-bul", class: "space-y-1")
+        end
       end
 
       # Tipdoc cards grid
@@ -608,6 +662,105 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
         end
         p(class: "text-xs text-gray-600 leading-relaxed") { plain desc }
       end
+    end
+  end
+
+  def render_chain_tooltip_script
+    script do
+      raw <<~JS.html_safe
+        (function () {
+          var COLS = [
+            { num:'①', en:'Strike',   zh:'行權價',      color:'#3b82f6', example:'$80.00',
+              summary:'你有權以此價格買（Call）或賣（Put）股票。',
+              bullets:['股價 > Strike → Call 在價內（ITM）','股價 < Strike → Put 在價內（ITM）','反之稱為價外（OTM）'] },
+            { num:'②', en:'Latest',   zh:'最新成交價',   color:'#3b82f6', example:'$2.05',
+              summary:'這份期權在市場上最後成交的價格，即買入需付的費用。',
+              bullets:['1 份合約 = 100 股，實際費用 = Latest x 100 美元','流動性差時 Latest 可能遠離合理價','搭配 Theor. 確認定價是否合理'] },
+            { num:'③', en:'Theor.',   zh:'理論價值',     color:'#8b5cf6', example:'$2.05',
+              summary:'用 Black-Scholes 公式計算出來的「合理」期權價格。',
+              bullets:['Latest = Theor. 流動性好，可放心交易','差距大 Bid/Ask 價差寬，進出成本高','常與 Latest 比較，判斷當前定價是否合理'] },
+            { num:'④', en:'IV',       zh:'隱含波動率',   color:'#f59e0b', example:'57.42%',
+              summary:'把市場成交價代入 B-S 公式反推出的波動率預期。',
+              bullets:['IV 高期權貴，賣方策略（Wheel）有利','IV 低期權便宜，買方策略有利','IVR / IVP 正是衡量這個數字在歷史中的位置'] },
+            { num:'⑤', en:'Delta',    zh:'方向敏感度',   color:'#10b981', example:'-0.146',
+              summary:'股價每漲 $1，期權價格的理論變化量。',
+              bullets:['Call: 0~1（正值）；Put: -1~0（負值）','ATM 約 ±0.50，也近似「到期在價內的機率」','深度 ITM Delta 趨近 ±1.0，接近直接持有現股'] },
+            { num:'⑥', en:'Gamma',    zh:'Delta 加速度', color:'#10b981', example:'0.0094',
+              summary:'股價每漲 $1，Delta 本身的變化量（Delta 的速度）。',
+              bullets:['越接近到期且接近 ATM，Gamma 越大','買方：方向對了，獲利會加速放大','賣方：方向逆轉時 Delta 快速擴大，風險上升'] },
+            { num:'⑦', en:'Theta',    zh:'每日時間耗損', color:'#ef4444', example:'-0.0408',
+              summary:'每過一天，期權價值的理論消耗（通常為負數）。',
+              bullets:['時間是買方的敵人、賣方的朋友','越接近到期 Theta 越大，耗損加速','快到期的 OTM 期權可能一夜之間變成廢紙'] },
+            { num:'⑧', en:'Vega',     zh:'波動率敏感度', color:'#f59e0b', example:'0.0972',
+              summary:'IV 每上升 1%，期權價值的理論變化。',
+              bullets:['買方持有正 Vega：IV 漲受益、IV 跌受損','財報後 IV 崩潰（IV Crush）是正 Vega 的大陷阱','方向做對了，IV 暴跌仍可能讓期權虧損'] },
+            { num:'⑨', en:'Rho',      zh:'利率敏感度',   color:'#6b7280', example:'-0.0273',
+              summary:'無風險利率每上升 1%，期權價值的變化。',
+              bullets:['日常交易中影響最小，通常可忽略','持有 LEAPS 長期期權時才需注意','升息環境：Call 略漲，Put 略跌'] },
+            { num:'⑩', en:'Volume',   zh:'當日成交量',   color:'#0ea5e9', example:'60',
+              summary:'今天共有多少份合約在市場上成交。',
+              bullets:['Volume 高，活絡，容易以合理價成交','Volume 低，Bid/Ask 差大，實際成交成本高','搭配 Open Int 一起判斷市場熱度'] },
+            { num:'⑪', en:'Open Int', zh:'未平倉量',     color:'#0ea5e9', example:'792',
+              summary:'目前市場上尚未結算的合約總量。',
+              bullets:['大代表流動性好，有足夠對手盤','增加代表有新倉位建立，資金進場','減少代表有人平倉或合約到期結算'] },
+            { num:'⑫', en:'Vol/OI',   zh:'當日交投比',   color:'#0ea5e9', example:'0.08',
+              summary:'Volume 除以 Open Interest，衡量今日活躍程度。',
+              bullets:['比值突然偏高，可能有大戶或消息面在動','是觀察異常佈局的快速指標','正常情況下多在 0.05~0.2 之間'] },
+            { num:'⑬', en:'ITM Prob', zh:'到期價內機率', color:'#8b5cf6', example:'18.21%',
+              summary:'到期時「處於價內」的估計機率，由 Delta 近似計算。',
+              bullets:['賣 CSP 常選 ITM Prob < 20% 的 Strike','約 80% 機率讓期權到期歸零，收全額權利金','直接以機率角度判斷勝率，最直觀'] },
+            { num:'⑭', en:'Type',     zh:'合約類型',     color:'#64748b', example:'Put',
+              summary:'標示這份合約是看漲（Call）還是看跌（Put）。',
+              bullets:['Call：有權以 Strike 買入股票','Put：有權以 Strike 賣出股票','Wheel：賣 Put（CSP）→ 被行使 → 賣 Covered Call'] }
+          ];
+
+          var wrapper = document.getElementById('chain-img-container');
+          var tip     = document.getElementById('chain-col-tooltip');
+          if (!wrapper || !tip) return;
+
+          var hdr = document.getElementById('chain-tt-hdr');
+          var num = document.getElementById('chain-tt-num');
+          var en  = document.getElementById('chain-tt-en');
+          var zh  = document.getElementById('chain-tt-zh');
+          var ex  = document.getElementById('chain-tt-ex');
+          var sm  = document.getElementById('chain-tt-sum');
+          var bl  = document.getElementById('chain-tt-bul');
+
+          function posTip(e) {
+            var x = e.clientX + 20, y = e.clientY - 20;
+            var tw = tip.offsetWidth || 300, th = tip.offsetHeight || 160;
+            if (x + tw > window.innerWidth  - 12) x = e.clientX - tw - 20;
+            if (y + th > window.innerHeight - 12) y = window.innerHeight - th - 12;
+            if (y < 8) y = 8;
+            tip.style.left = x + 'px';
+            tip.style.top  = y + 'px';
+          }
+
+          wrapper.querySelectorAll('.chain-hotspot').forEach(function(hs) {
+            var col = COLS[parseInt(hs.dataset.col, 10)];
+            hs.addEventListener('mouseenter', function(e) {
+              hdr.style.background = col.color;
+              num.textContent = col.num;
+              en.textContent  = col.en;
+              zh.textContent  = col.zh;
+              ex.textContent  = col.example;
+              sm.textContent  = col.summary;
+              bl.innerHTML = col.bullets.map(function(b) {
+                return '<p style="display:flex;gap:4px;font-size:0.72rem;color:#6b7280;line-height:1.5">' +
+                  '<span style="color:' + col.color + ';flex-shrink:0">›</span>' + b + '</p>';
+              }).join('');
+              hs.style.opacity = '1';
+              tip.classList.remove('hidden');
+              posTip(e);
+            });
+            hs.addEventListener('mousemove', posTip);
+            hs.addEventListener('mouseleave', function() {
+              hs.style.opacity = '0';
+              tip.classList.add('hidden');
+            });
+          });
+        })();
+      JS
     end
   end
 
