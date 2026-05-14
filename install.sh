@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # ── 版本常數 ────────────────────────────────────────────────
-readonly SCRIPT_VERSION="20260514"
+readonly SCRIPT_VERSION="20260515"
 readonly RUBY_VERSION="4.0.1"
 readonly BUNDLER_VERSION="4.0.7"
 readonly MIN_NODE_MAJOR=20
@@ -314,6 +314,166 @@ exec python/venv/bin/python python/iv_sidecar.py
 SIDECAR_EOF
   chmod +x bin/start-iv-sidecar.sh
   ok "bin/start-iv-sidecar.sh 建立完成"
+}
+
+
+# ============================================================
+# PHASE 3c：Kokoro TTS（本地語音引擎，port 5051）
+# ============================================================
+phase3c_kokoro_tts() {
+  step "Kokoro TTS 安裝"
+
+  local kokoro_dir="${HOME_DIR}/kokoro_tts"
+  mkdir -p "${kokoro_dir}/cache"
+
+  # ── Python 套件 ─────────────────────────────────────────
+  if python3 -c "import kokoro_onnx" &>/dev/null; then
+    skip "kokoro-onnx 已安裝"
+  else
+    info "安裝 kokoro-onnx soundfile..."
+    pip3 install --user --quiet kokoro-onnx soundfile
+    ok "kokoro-onnx 安裝完成"
+  fi
+
+  # ── 模型檔案下載 ─────────────────────────────────────────
+  local MODEL_URL="https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
+
+  if [[ ! -f "${kokoro_dir}/kokoro-v1.0.int8.onnx" ]]; then
+    info "下載 Kokoro 模型（88MB）..."
+    wget -q --show-progress -O "${kokoro_dir}/kokoro-v1.0.int8.onnx" \
+      "${MODEL_URL}/kokoro-v1.0.int8.onnx"
+    ok "kokoro-v1.0.int8.onnx 下載完成"
+  else
+    skip "kokoro-v1.0.int8.onnx 已存在"
+  fi
+
+  if [[ ! -f "${kokoro_dir}/voices-v1.0.bin" ]]; then
+    info "下載語音庫（27MB）..."
+    wget -q --show-progress -O "${kokoro_dir}/voices-v1.0.bin" \
+      "${MODEL_URL}/voices-v1.0.bin"
+    ok "voices-v1.0.bin 下載完成"
+  else
+    skip "voices-v1.0.bin 已存在"
+  fi
+
+  # ── server.py ────────────────────────────────────────────
+  cat > "${kokoro_dir}/server.py" << 'TTS_SERVER_EOF'
+#!/usr/bin/env python3
+"""
+Kokoro TTS HTTP server for FairPrice IV Analysis page.
+Port 5051 | GET /tts?text=<text>&voice=<voice_id> → audio/wav
+"""
+import io, os, re, threading, urllib.parse
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
+
+BASE        = os.path.expanduser("~/kokoro_tts")
+MODEL_FILE  = os.path.join(BASE, "kokoro-v1.0.int8.onnx")
+VOICES_FILE = os.path.join(BASE, "voices-v1.0.bin")
+CACHE_DIR   = os.path.join(BASE, "cache")
+HOST, PORT  = "127.0.0.1", 5051
+
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+WARMUP_TEXTS = [
+    "Call Premium", "Delta", "Stock Price", "Strike Price",
+    "Implied Volatility", "Time to Expiration",
+    "Expiration", "Implied Volatility (ATM)", "Historic Volatility", "IV Rank",
+    "Strike", "Latest", "Theor.", "IV",
+    "Gamma", "Theta", "Vega", "Rho",
+    "Volume", "Open Int", "Vol/OI", "ITM Prob", "Type",
+]
+WARMUP_VOICES = ["am_michael", "af_sarah"]
+
+print("Loading Kokoro model ...", flush=True)
+from kokoro_onnx import Kokoro
+import numpy as np
+import soundfile as sf
+kokoro = Kokoro(MODEL_FILE, VOICES_FILE)
+print("Kokoro ready.", flush=True)
+
+_infer_lock = threading.Lock()
+
+def lang_for(voice):
+    return "en-gb" if voice.startswith("b") else "en-us"
+
+def safe_name(text):
+    s = text.lower().strip()
+    s = re.sub(r"[^\w\s-]", "", s)
+    s = re.sub(r"[\s]+", "_", s)
+    return s[:60] or "unknown"
+
+def cache_path(text, voice):
+    return os.path.join(CACHE_DIR, f"{voice}__{safe_name(text)}.wav")
+
+def generate_wav(text, voice):
+    cp = cache_path(text, voice)
+    if os.path.exists(cp):
+        with open(cp, "rb") as f: return f.read()
+    with _infer_lock:
+        if os.path.exists(cp):
+            with open(cp, "rb") as f: return f.read()
+        samples, sample_rate = kokoro.create(text, voice=voice, speed=1.0, lang=lang_for(voice))
+    peak = np.max(np.abs(samples))
+    if peak > 0:
+        samples = (samples / peak * 0.95).astype(np.float32)
+    buf = io.BytesIO()
+    sf.write(buf, samples, sample_rate, format="WAV", subtype="PCM_16")
+    wav = buf.getvalue()
+    with open(cp, "wb") as f: f.write(wav)
+    return wav
+
+def warmup():
+    total = len(WARMUP_TEXTS) * len(WARMUP_VOICES)
+    done  = 0
+    for voice in WARMUP_VOICES:
+        for text in WARMUP_TEXTS:
+            if not os.path.exists(cache_path(text, voice)):
+                try: generate_wav(text, voice)
+                except Exception as e: print(f"[warmup] error {text!r} {voice}: {e}", flush=True)
+            done += 1
+            print(f"[warmup] {done}/{total} {voice} {text!r}", flush=True)
+    print("[warmup] done.", flush=True)
+
+class TTSHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        p = urllib.parse.urlparse(self.path)
+        if p.path != "/tts":
+            self.send_error(404); return
+        q     = urllib.parse.parse_qs(p.query)
+        text  = q.get("text",  [""])[0].strip()
+        voice = q.get("voice", ["af_sarah"])[0].strip()
+        if not text:
+            self.send_error(400, "Missing ?text= parameter"); return
+        try:
+            wav = generate_wav(text, voice)
+        except Exception as e:
+            self.send_error(500, f"Kokoro error: {e}"); return
+        self.send_response(200)
+        self.send_header("Content-Type", "audio/wav")
+        self.send_header("Content-Length", str(len(wav)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(wav)
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+    def log_message(self, *_): pass
+
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+if __name__ == "__main__":
+    threading.Thread(target=warmup, daemon=True).start()
+    srv = ThreadedHTTPServer((HOST, PORT), TTSHandler)
+    print(f"Kokoro TTS -> http://{HOST}:{PORT}/tts?text=hello&voice=am_michael", flush=True)
+    try: srv.serve_forever()
+    except KeyboardInterrupt: print("Server stopped.")
+TTS_SERVER_EOF
+  chmod +x "${kokoro_dir}/server.py"
+  ok "~/kokoro_tts/server.py 建立完成"
 }
 
 # ============================================================
@@ -776,6 +936,19 @@ ${telegram_apps}
       autorestart: false,
       watch: false,
     },
+
+    // ── Kokoro TTS（本地語音引擎 port 5051）
+    {
+      name: 'kokoro-tts',
+      script: '${HOME_DIR}/kokoro_tts/server.py',
+      cwd: '${HOME_DIR}/kokoro_tts',
+      interpreter: 'python3',
+      autorestart: true,
+      watch: false,
+      max_restarts: 5,
+      min_uptime: '30s',
+      restart_delay: 5000,
+    },
   ],
 }
 ECOSYSTEM
@@ -927,7 +1100,7 @@ phase10_pm2() {
   step "pm2 服務啟動"
 
   # 停止舊的 fairprice 相關 process（若存在）
-  for proc in fairprice-rails fairprice-vite fairprice-iv-sidecar ouou-pre-market ouou-telegram-bot fairprice-db-backup iv-daily-snapshot iv-skew-snapshot; do
+  for proc in fairprice-rails fairprice-vite fairprice-iv-sidecar ouou-pre-market ouou-telegram-bot fairprice-db-backup iv-daily-snapshot iv-skew-snapshot kokoro-tts; do
     pm2 delete "$proc" &>/dev/null || true
   done
 
@@ -1021,6 +1194,7 @@ phase12_summary() {
   echo "  ║  pm2 logs fairprice-iv-sidecar  IV log           ║"
   echo "  ║  pm2 logs iv-daily-snapshot     IV 快照 log      ║"
   echo "  ║  pm2 logs iv-skew-snapshot      Skew 快照 log    ║"
+  echo "  ║  pm2 logs kokoro-tts            TTS log          ║"
   echo "  ╠══════════════════════════════════════════════════╣"
   echo "  ║  資料庫備份：每天 22:00 自動執行                 ║"
   printf "  ║  備份位置：${CYAN}~/fairprice-backups/${GREEN}${BOLD}                  ║\n"
@@ -1049,6 +1223,7 @@ main() {
   phase2_ruby
   phase3_nodejs
   phase3b_python_sidecar
+  phase3c_kokoro_tts
   phase4_env
   phase5_master_key
   phase6_deps
