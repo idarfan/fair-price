@@ -15,15 +15,61 @@ class IvAnalysis::EducationComponent < ApplicationComponent
     end
     render_chart_script
     render_chain_tooltip_script
+    render_tts_script
   end
 
   private
 
   def section_header
     div(class: "border-b border-gray-200 pb-4") do
-      h2(class: "text-lg font-bold text-gray-900") { plain "隱含波動率（IV）完整說明" }
-      p(class: "mt-1 text-sm text-gray-500") do
-        plain "交易觀念為主，以 Black–Scholes 近似公式說明 IV 對期權價格與 Delta 的統治性影響。"
+      div(class: "flex items-start justify-between gap-3 flex-wrap") do
+        div do
+          h2(class: "text-lg font-bold text-gray-900") { plain "隱含波動率（IV）完整說明" }
+          p(class: "mt-1 text-sm text-gray-500") do
+            plain "交易觀念為主，以 Black–Scholes 近似公式說明 IV 對期權價格與 Delta 的統治性影響。"
+          end
+        end
+        div(class: "flex items-center gap-2 flex-shrink-0 mt-1") do
+          span(class: "text-gray-400 text-sm select-none", title: "音量") { plain "🔊" }
+          input(id: "tts-volume", type: "range", min: "0", max: "1", step: "0.05", value: "0.8",
+                class: "w-20 h-1 cursor-pointer", style: "accent-color:#3b82f6;", title: "音量調整")
+          button(id: "tts-settings-btn", type: "button",
+                 class: "flex items-center gap-1 px-2 py-1 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-gray-700 text-xs transition-colors",
+                 title: "語音設定") do
+            raw '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:inline-block;vertical-align:middle"><path fill-rule="evenodd" clip-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"/></svg>'.html_safe
+            plain " 語音設定"
+          end
+        end
+      end
+      div(id: "tts-settings-panel", class: "hidden mt-3 rounded-xl border border-blue-100 bg-blue-50 p-4") do
+        div(class: "flex items-center gap-2 mb-3") do
+          span(class: "text-sm") { plain "🎙️" }
+          h4(class: "text-xs font-bold text-gray-700") { plain "語音模型設定" }
+          p(class: "text-xs text-gray-400 ml-auto") { plain "設定儲存於瀏覽器，重新整理後保留" }
+        end
+        div(class: "grid sm:grid-cols-2 gap-3") do
+          div do
+            label(for: "tts-male-voice", class: "flex items-center gap-1 text-xs font-semibold text-blue-700 mb-1.5") do
+              plain "🔊 男聲模型（藍色按鈕）"
+            end
+            select(id: "tts-male-voice",
+                   class: "w-full text-xs border border-blue-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none") do
+              option(value: "") { plain "載入聲音中..." }
+            end
+          end
+          div do
+            label(for: "tts-female-voice", class: "flex items-center gap-1 text-xs font-semibold text-red-600 mb-1.5") do
+              plain "🔊 女聲模型（紅色按鈕）"
+            end
+            select(id: "tts-female-voice",
+                   class: "w-full text-xs border border-red-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none") do
+              option(value: "") { plain "載入聲音中..." }
+            end
+          end
+        end
+        p(class: "text-xs text-gray-400 mt-2") do
+          plain "* 可用聲音取決於您的瀏覽器與作業系統。Chrome 推薦：Google US English"
+        end
       end
     end
   end
@@ -132,13 +178,29 @@ class IvAnalysis::EducationComponent < ApplicationComponent
     end
   end
 
+  def tts_speaker_btn(text, gender)
+    color = gender == "male" ? "#3b82f6" : "#ef4444"
+    label = gender == "male" ? "男聲朗讀" : "女聲朗讀"
+    button(type: "button",
+           class: "tts-btn inline-flex items-center justify-center flex-shrink-0 opacity-40 hover:opacity-100 transition-opacity duration-150",
+           style: "color:#{color}; background:none; border:none; padding:1px 2px; cursor:pointer; line-height:1;",
+           data: { tts_text: text, tts_gender: gender },
+           title: label) do
+      raw '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="11" height="11" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg>'.html_safe
+    end
+  end
+
   def symbol_card(sym, color, name_zh, name_en, unit, desc)
     div(class: "rounded-lg border border-gray-200 bg-gray-50 p-3.5") do
       div(class: "flex items-start gap-2.5 mb-2") do
         span(style: "font-size:1.4rem; font-weight:700; font-style:italic; color:#{color}; line-height:1.1; flex-shrink:0") { plain sym }
         div(class: "flex-1 min-w-0") do
           p(class: "text-xs font-bold text-gray-800 leading-tight") { plain name_zh }
-          p(class: "text-xs text-gray-400 leading-tight mt-0.5") { plain name_en }
+          div(class: "flex items-center gap-0.5 mt-0.5") do
+            p(class: "text-xs text-gray-400 leading-tight") { plain name_en }
+            tts_speaker_btn(name_en, "male")
+            tts_speaker_btn(name_en, "female")
+          end
         end
         span(class: "text-xs rounded-full px-2 py-0.5 bg-white border border-gray-200 text-gray-500 whitespace-nowrap flex-shrink-0",
              style: "font-size:0.65rem") { plain unit }
@@ -370,7 +432,11 @@ class IvAnalysis::EducationComponent < ApplicationComponent
   def annotation_card(title, value, desc, border_class, value_class)
     div(class: "rounded-lg border p-3 #{border_class}") do
       p(class: "text-xs font-bold #{value_class} mb-0.5") { plain value }
-      p(class: "text-xs font-semibold text-gray-600 mb-1") { plain title }
+      div(class: "flex items-center gap-0.5 mb-1") do
+        p(class: "text-xs font-semibold text-gray-600") { plain title }
+        tts_speaker_btn(title, "male")
+        tts_speaker_btn(title, "female")
+      end
       p(class: "text-xs text-gray-600 leading-relaxed") { plain desc }
     end
   end
@@ -628,22 +694,23 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
     div(class: "rounded-lg bg-white",
         style: "border: 1px solid #e5e7eb; border-left: 4px solid #{accent};") do
       div(class: "p-3.5") do
-        # Header row
         div(class: "flex items-start justify-between gap-2 mb-2") do
           div(class: "flex items-center gap-1.5") do
             span(class: "inline-flex items-center justify-center w-5 h-5 rounded-full text-white text-xs font-bold flex-shrink-0",
                  style: "background:#{accent}; font-size:0.65rem") { plain num }
             div do
-              p(class: "text-sm font-bold font-mono text-gray-900 leading-tight") { plain en_name }
+              div(class: "flex items-center gap-0.5") do
+                p(class: "text-sm font-bold font-mono text-gray-900 leading-tight") { plain en_name }
+                tts_speaker_btn(en_name, "male")
+                tts_speaker_btn(en_name, "female")
+              end
               p(class: "text-xs text-gray-500 mt-0.5") { plain zh_name }
             end
           end
           span(class: "text-xs font-mono rounded px-1.5 py-0.5 bg-gray-100 text-gray-400 whitespace-nowrap flex-shrink-0",
                style: "font-size:0.65rem") { plain example }
         end
-        # Summary
         p(class: "text-xs text-gray-700 leading-relaxed mb-1.5") { plain summary }
-        # Bullet lines
         div(class: "space-y-0.5") do
           bullets.split("\n").each do |line|
             p(class: "text-xs text-gray-500 leading-relaxed") do
@@ -670,7 +737,11 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
       div(class: "p-3.5 flex flex-col gap-2") do
         div(class: "flex items-start justify-between gap-2") do
           div do
-            p(class: "text-base font-bold font-mono text-gray-900 leading-tight") { plain en_name }
+            div(class: "flex items-center gap-0.5") do
+              p(class: "text-base font-bold font-mono text-gray-900 leading-tight") { plain en_name }
+              tts_speaker_btn(en_name, "male")
+              tts_speaker_btn(en_name, "female")
+            end
             p(class: "text-xs text-gray-500 mt-0.5") { plain zh_name }
           end
           span(class: "text-xs rounded px-1.5 py-0.5 bg-gray-100 text-gray-400 font-mono whitespace-nowrap flex-shrink-0",
@@ -1053,4 +1124,112 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
       JS
     end
   end
+  def render_tts_script
+    script do
+      raw <<~JS.html_safe
+        (function () {
+          var synth = window.speechSynthesis;
+          if (!synth) return;
+
+          var allVoices      = [];
+          var maleVoiceName  = null;
+          var femaleVoiceName = null;
+
+          var volEl    = document.getElementById('tts-volume');
+          var settBtn  = document.getElementById('tts-settings-btn');
+          var settPane = document.getElementById('tts-settings-panel');
+          var maleEl   = document.getElementById('tts-male-voice');
+          var femaleEl = document.getElementById('tts-female-voice');
+
+          // ── Volume ────────────────────────────────────────────────────
+          var vol = parseFloat(localStorage.getItem('tts_volume') || '0.8');
+          if (volEl) {
+            volEl.value = vol;
+            volEl.addEventListener('input', function () {
+              vol = parseFloat(this.value);
+              localStorage.setItem('tts_volume', String(vol));
+            });
+          }
+
+          // ── Settings panel toggle ─────────────────────────────────────
+          if (settBtn && settPane) {
+            settBtn.addEventListener('click', function () {
+              settPane.classList.toggle('hidden');
+            });
+          }
+
+          // ── Voice population ──────────────────────────────────────────
+          function guessVoice(gender, voices) {
+            var kw  = gender === 'male' ? /male/i : /female/i;
+            var hit = voices.find(function (v) { return kw.test(v.name); });
+            if (hit) return hit.name;
+            if (gender === 'male')  return (voices[0] || {}).name || null;
+            return (voices[1] || voices[0] || {}).name || null;
+          }
+
+          function populateVoices() {
+            var raw = synth.getVoices();
+            if (!raw.length) return;
+
+            allVoices = raw.filter(function (v) { return v.lang.startsWith('en'); });
+            if (!allVoices.length) allVoices = raw;
+
+            var savedMale   = localStorage.getItem('tts_male_voice');
+            var savedFemale = localStorage.getItem('tts_female_voice');
+            maleVoiceName   = (savedMale   && raw.find(function(v){return v.name===savedMale;}))   ? savedMale   : guessVoice('male',   allVoices);
+            femaleVoiceName = (savedFemale && raw.find(function(v){return v.name===savedFemale;})) ? savedFemale : guessVoice('female', allVoices);
+
+            if (maleEl && femaleEl) {
+              maleEl.innerHTML   = '';
+              femaleEl.innerHTML = '';
+              raw.forEach(function (v) {
+                var label = v.name + ' (' + v.lang + ')';
+                maleEl.appendChild(  new Option(label, v.name, false, v.name === maleVoiceName));
+                femaleEl.appendChild(new Option(label, v.name, false, v.name === femaleVoiceName));
+              });
+            }
+          }
+
+          if (typeof synth.onvoiceschanged !== 'undefined') {
+            synth.onvoiceschanged = populateVoices;
+          }
+          populateVoices();
+
+          if (maleEl) {
+            maleEl.addEventListener('change', function () {
+              maleVoiceName = this.value;
+              localStorage.setItem('tts_male_voice', maleVoiceName);
+            });
+          }
+          if (femaleEl) {
+            femaleEl.addEventListener('change', function () {
+              femaleVoiceName = this.value;
+              localStorage.setItem('tts_female_voice', femaleVoiceName);
+            });
+          }
+
+          // ── Speak ─────────────────────────────────────────────────────
+          function speak(text, gender) {
+            if (synth.speaking) synth.cancel();
+            var utter = new SpeechSynthesisUtterance(text);
+            var raw   = synth.getVoices();
+            var vname = gender === 'male' ? maleVoiceName : femaleVoiceName;
+            var voice = raw.find(function (v) { return v.name === vname; });
+            if (voice) utter.voice = voice;
+            utter.volume = vol;
+            synth.speak(utter);
+          }
+
+          // ── Wire TTS buttons ──────────────────────────────────────────
+          document.querySelectorAll('.tts-btn').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+              e.stopPropagation();
+              speak(btn.dataset.ttsText, btn.dataset.ttsGender);
+            });
+          });
+        })();
+      JS
+    end
+  end
+
 end
