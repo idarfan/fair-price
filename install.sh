@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # ── 版本常數 ────────────────────────────────────────────────
-readonly SCRIPT_VERSION="20260507"
+readonly SCRIPT_VERSION="20260514"
 readonly RUBY_VERSION="4.0.1"
 readonly BUNDLER_VERSION="4.0.7"
 readonly MIN_NODE_MAJOR=20
@@ -744,6 +744,38 @@ ${telegram_apps}
       autorestart: false,
       watch: false,
     },
+
+    // ── IV 每日 ATM IV 快照（美股收盤後 04:30 台灣時間，週二〜六）
+    {
+      name: 'iv-daily-snapshot',
+      script: './bin/iv-daily-snapshot.sh',
+      cwd: '${APP_DIR}',
+      interpreter: '/bin/bash',
+      env: {
+        HOME: '${HOME_DIR}',
+        RBENV_ROOT: '${rbenv_root}',
+        PATH: '${full_path}',
+      },
+      cron_restart: '30 4 * * 2-6',
+      autorestart: false,
+      watch: false,
+    },
+
+    // ── IV 每日 25-delta Skew 快照（美股收盤後 04:45 台灣時間，週二〜六）
+    {
+      name: 'iv-skew-snapshot',
+      script: './bin/iv-skew-snapshot.sh',
+      cwd: '${APP_DIR}',
+      interpreter: '/bin/bash',
+      env: {
+        HOME: '${HOME_DIR}',
+        RBENV_ROOT: '${rbenv_root}',
+        PATH: '${full_path}',
+      },
+      cron_restart: '45 4 * * 2-6',
+      autorestart: false,
+      watch: false,
+    },
   ],
 }
 ECOSYSTEM
@@ -867,6 +899,15 @@ BACKUP_SCRIPT
   sed -i "s|DB_USER_PLACEHOLDER|${DB_USER}|g" scripts/backup_db.sh
   chmod +x scripts/backup_db.sh
   ok "scripts/backup_db.sh 建立完成"
+
+  # ── bin/iv-daily-snapshot.sh + bin/iv-skew-snapshot.sh ─
+  for snapshot_bin in bin/iv-daily-snapshot.sh bin/iv-skew-snapshot.sh; do
+    [[ -f "$snapshot_bin" ]] || continue
+    perl -pi -e "s|/home/idarfan/fairprice|${APP_DIR}|g" "$snapshot_bin"
+    perl -pi -e "s|/home/idarfan|${HOME_DIR}|g"          "$snapshot_bin"
+    chmod +x "$snapshot_bin"
+  done
+  ok "bin/iv-*-snapshot.sh 路徑更新完成"
 }
 
 # ============================================================
@@ -886,7 +927,7 @@ phase10_pm2() {
   step "pm2 服務啟動"
 
   # 停止舊的 fairprice 相關 process（若存在）
-  for proc in fairprice-rails fairprice-vite fairprice-iv-sidecar ouou-pre-market ouou-telegram-bot fairprice-db-backup; do
+  for proc in fairprice-rails fairprice-vite fairprice-iv-sidecar ouou-pre-market ouou-telegram-bot fairprice-db-backup iv-daily-snapshot iv-skew-snapshot; do
     pm2 delete "$proc" &>/dev/null || true
   done
 
@@ -978,6 +1019,8 @@ phase12_summary() {
   echo "  ║  pm2 logs fairprice-rails  Rails log             ║"
   echo "  ║  pm2 logs fairprice-vite   Vite log              ║"
   echo "  ║  pm2 logs fairprice-iv-sidecar  IV log           ║"
+  echo "  ║  pm2 logs iv-daily-snapshot     IV 快照 log      ║"
+  echo "  ║  pm2 logs iv-skew-snapshot      Skew 快照 log    ║"
   echo "  ╠══════════════════════════════════════════════════╣"
   echo "  ║  資料庫備份：每天 22:00 自動執行                 ║"
   printf "  ║  備份位置：${CYAN}~/fairprice-backups/${GREEN}${BOLD}                  ║\n"
