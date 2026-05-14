@@ -31,7 +31,7 @@ class IvAnalysis::EducationComponent < ApplicationComponent
         end
         div(class: "flex items-center gap-2 flex-shrink-0 mt-1") do
           span(class: "text-gray-400 text-sm select-none", title: "音量") { plain "🔊" }
-          input(id: "tts-volume", type: "range", min: "0", max: "1", step: "0.05", value: "0.8",
+          input(id: "tts-volume", type: "range", min: "0", max: "1", step: "0.05", value: "1.0",
                 class: "w-20 h-1 cursor-pointer", style: "accent-color:#3b82f6;", title: "音量調整")
           button(id: "tts-settings-btn", type: "button",
                  class: "flex items-center gap-1 px-2 py-1 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-gray-700 text-xs transition-colors",
@@ -1139,7 +1139,7 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
           var femaleEl = document.getElementById('tts-female-voice');
 
           // ── Volume ────────────────────────────────────────────────────
-          var vol = parseFloat(localStorage.getItem('tts_volume') || '0.8');
+          var vol = parseFloat(localStorage.getItem('tts_volume') || '1.0');
           if (volEl) {
             volEl.value = vol;
             volEl.addEventListener('input', function () {
