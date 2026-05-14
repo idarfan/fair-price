@@ -41,17 +41,29 @@ class FinnhubService
 
   private
 
-  def get(path, params = {})
-    response = HTTParty.get(
-      "#{BASE_URL}#{path}",
-      query: params.merge(token: @api_key),
-      timeout: 10
-    )
-    return nil unless response.success?
+  MAX_RETRIES = 2
 
-    response.parsed_response
-  rescue HTTParty::Error, Net::ReadTimeout, SocketError => e
-    Rails.logger.warn("[FinnhubService] #{path} failed: #{e.message}")
-    nil
+  def get(path, params = {})
+    retries = 0
+    begin
+      response = HTTParty.get(
+        "#{BASE_URL}#{path}",
+        query: params.merge(token: @api_key),
+        timeout: 10
+      )
+      return nil unless response.success?
+
+      response.parsed_response
+    rescue HTTParty::Error, Net::ReadTimeout, Errno::ECONNRESET,
+           OpenSSL::SSL::SSLError, SocketError => e
+      if retries < MAX_RETRIES
+        retries += 1
+        Rails.logger.warn("[FinnhubService] #{path} failed (attempt #{retries}/#{MAX_RETRIES}): #{e.message}, retrying in #{retries}s...")
+        sleep(retries)
+        retry
+      end
+      Rails.logger.warn("[FinnhubService] #{path} failed after #{MAX_RETRIES} retries: #{e.message}")
+      nil
+    end
   end
 end

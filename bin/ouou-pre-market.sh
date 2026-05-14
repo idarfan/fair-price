@@ -15,7 +15,7 @@ export PATH="$RBENV_ROOT/shims:$RBENV_ROOT/bin:/usr/bin:/bin"
 NY_HOUR=$(TZ=America/New_York date +%H)
 NY_MIN=$(TZ=America/New_York date +%M)
 
-if [[ "$NY_HOUR" != "09" || "$NY_MIN" -gt 4 ]]; then
+if [[ "$NY_HOUR" != "09" || $((10#$NY_MIN)) -gt 4 ]]; then
   echo "[ouou-pre-market] 跳過：紐約時間 ${NY_HOUR}:${NY_MIN}（非盤前窗口）"
   exit 0
 fi
