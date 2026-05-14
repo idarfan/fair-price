@@ -1128,12 +1128,8 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
     script do
       raw <<~JS.html_safe
         (function () {
-          var synth = window.speechSynthesis;
-          if (!synth) return;
-
-          var allVoices      = [];
-          var maleVoiceName  = null;
-          var femaleVoiceName = null;
+          var TTS_URL     = 'http://127.0.0.1:5051/tts';
+          var currentAudio = null;
 
           var volEl    = document.getElementById('tts-volume');
           var settBtn  = document.getElementById('tts-settings-btn');
@@ -1151,73 +1147,77 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
             });
           }
 
-          // ── Settings panel toggle ─────────────────────────────────────
+          // ── Settings panel ─────────────────────────────────────────────
           if (settBtn && settPane) {
             settBtn.addEventListener('click', function () {
               settPane.classList.toggle('hidden');
             });
           }
 
-          // ── Voice population ──────────────────────────────────────────
-          function guessVoice(gender, voices) {
-            var kw  = gender === 'male' ? /male/i : /female/i;
-            var hit = voices.find(function (v) { return kw.test(v.name); });
-            if (hit) return hit.name;
-            if (gender === 'male')  return (voices[0] || {}).name || null;
-            return (voices[1] || voices[0] || {}).name || null;
+          // ── Kokoro voice lists ────────────────────────────────────────
+          var MALE_VOICES = [
+            ['am_michael', 'Michael（美式男聲）'],
+            ['am_adam',    'Adam（美式男聲）'],
+            ['am_echo',    'Echo（美式男聲）'],
+            ['am_eric',    'Eric（美式男聲）'],
+            ['am_liam',    'Liam（美式男聲）'],
+            ['am_onyx',    'Onyx（美式男聲）'],
+            ['am_puck',    'Puck（美式男聲）'],
+            ['bm_george',  'George（英式男聲）'],
+            ['bm_daniel',  'Daniel（英式男聲）'],
+            ['bm_fable',   'Fable（英式男聲）'],
+          ];
+          var FEMALE_VOICES = [
+            ['af_sarah',   'Sarah（美式女聲）'],
+            ['af_heart',   'Heart（美式女聲）'],
+            ['af_bella',   'Bella（美式女聲）'],
+            ['af_nicole',  'Nicole（美式女聲）'],
+            ['af_nova',    'Nova（美式女聲）'],
+            ['af_sky',     'Sky（美式女聲）'],
+            ['af_jessica', 'Jessica（美式女聲）'],
+            ['bf_emma',    'Emma（英式女聲）'],
+            ['bf_alice',   'Alice（英式女聲）'],
+            ['bf_lily',    'Lily（英式女聲）'],
+          ];
+
+          var maleVoice  = localStorage.getItem('kokoro_male_voice')  || 'am_michael';
+          var femaleVoice = localStorage.getItem('kokoro_female_voice') || 'af_sarah';
+
+          function populate(sel, voices, current) {
+            if (!sel) return;
+            sel.innerHTML = '';
+            voices.forEach(function (v) {
+              sel.appendChild(new Option(v[1], v[0], false, v[0] === current));
+            });
           }
-
-          function populateVoices() {
-            var raw = synth.getVoices();
-            if (!raw.length) return;
-
-            allVoices = raw.filter(function (v) { return v.lang.startsWith('en'); });
-            if (!allVoices.length) allVoices = raw;
-
-            var savedMale   = localStorage.getItem('tts_male_voice');
-            var savedFemale = localStorage.getItem('tts_female_voice');
-            maleVoiceName   = (savedMale   && raw.find(function(v){return v.name===savedMale;}))   ? savedMale   : guessVoice('male',   allVoices);
-            femaleVoiceName = (savedFemale && raw.find(function(v){return v.name===savedFemale;})) ? savedFemale : guessVoice('female', allVoices);
-
-            if (maleEl && femaleEl) {
-              maleEl.innerHTML   = '';
-              femaleEl.innerHTML = '';
-              raw.forEach(function (v) {
-                var label = v.name + ' (' + v.lang + ')';
-                maleEl.appendChild(  new Option(label, v.name, false, v.name === maleVoiceName));
-                femaleEl.appendChild(new Option(label, v.name, false, v.name === femaleVoiceName));
-              });
-            }
-          }
-
-          if (typeof synth.onvoiceschanged !== 'undefined') {
-            synth.onvoiceschanged = populateVoices;
-          }
-          populateVoices();
+          populate(maleEl,   MALE_VOICES,   maleVoice);
+          populate(femaleEl, FEMALE_VOICES, femaleVoice);
 
           if (maleEl) {
             maleEl.addEventListener('change', function () {
-              maleVoiceName = this.value;
-              localStorage.setItem('tts_male_voice', maleVoiceName);
+              maleVoice = this.value;
+              localStorage.setItem('kokoro_male_voice', maleVoice);
             });
           }
           if (femaleEl) {
             femaleEl.addEventListener('change', function () {
-              femaleVoiceName = this.value;
-              localStorage.setItem('tts_female_voice', femaleVoiceName);
+              femaleVoice = this.value;
+              localStorage.setItem('kokoro_female_voice', femaleVoice);
             });
           }
 
-          // ── Speak ─────────────────────────────────────────────────────
+          // ── Speak via Kokoro local server ─────────────────────────────
           function speak(text, gender) {
-            if (synth.speaking) synth.cancel();
-            var utter = new SpeechSynthesisUtterance(text);
-            var raw   = synth.getVoices();
-            var vname = gender === 'male' ? maleVoiceName : femaleVoiceName;
-            var voice = raw.find(function (v) { return v.name === vname; });
-            if (voice) utter.voice = voice;
-            utter.volume = vol;
-            synth.speak(utter);
+            if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+            var voice = gender === 'male' ? maleVoice : femaleVoice;
+            var url   = TTS_URL + '?text=' + encodeURIComponent(text) + '&voice=' + encodeURIComponent(voice);
+            var audio = new Audio(url);
+            audio.volume = vol;
+            audio.play().catch(function (e) {
+              console.warn('Kokoro TTS unavailable:', e.message,
+                '— make sure pm2 kokoro-tts is running on port 5051');
+            });
+            currentAudio = audio;
           }
 
           // ── Wire TTS buttons ──────────────────────────────────────────
