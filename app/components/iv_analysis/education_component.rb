@@ -179,14 +179,15 @@ class IvAnalysis::EducationComponent < ApplicationComponent
   end
 
   def tts_speaker_btn(text, gender)
-    color = gender == "male" ? "#3b82f6" : "#ef4444"
-    label = gender == "male" ? "男聲朗讀" : "女聲朗讀"
+    color    = gender == "male" ? "#3b82f6" : "#ef4444"
+    label    = gender == "male" ? "男聲朗讀" : "女聲朗讀"
+    ml_style = gender == "female" ? "margin-left:60px;" : ""
     button(type: "button",
-           class: "tts-btn inline-flex items-center justify-center flex-shrink-0 opacity-40 hover:opacity-100 transition-opacity duration-150",
-           style: "color:#{color}; background:none; border:none; padding:1px 2px; cursor:pointer; line-height:1;",
+           class: "tts-btn inline-flex items-center justify-center flex-shrink-0 transition-transform duration-100 hover:scale-125 active:scale-95",
+           style: "color:#{color}; background:none; border:none; padding:4px 5px; cursor:pointer; line-height:1; #{ml_style}",
            data: { tts_text: text, tts_gender: gender },
            title: label) do
-      raw '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="11" height="11" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg>'.html_safe
+      raw '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="20" height="20" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg>'.html_safe
     end
   end
 
