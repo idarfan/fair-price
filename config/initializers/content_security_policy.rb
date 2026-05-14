@@ -29,6 +29,8 @@ Rails.application.configure do
     # Allow @vite/client to hot reload changes in development
     policy.connect_src *policy.connect_src, "ws://#{ViteRuby.config.host_with_port}" if Rails.env.development?
 
+    # Kokoro 本地 TTS 伺服器（port 5051）需要 media-src 明確允許
+    policy.media_src   :self, "http://127.0.0.1:5051"
     policy.object_src  :none
     policy.frame_ancestors :none
   end
