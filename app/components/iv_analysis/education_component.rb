@@ -181,7 +181,7 @@ class IvAnalysis::EducationComponent < ApplicationComponent
   def tts_speaker_btn(text, gender)
     color    = gender == "male" ? "#3b82f6" : "#ef4444"
     label    = gender == "male" ? "男聲朗讀" : "女聲朗讀"
-    ml_style = gender == "female" ? "margin-left:60px;" : ""
+    ml_style = gender == "female" ? "margin-left:20px;" : ""
     button(type: "button",
            class: "tts-btn inline-flex items-center justify-center flex-shrink-0 transition-transform duration-100 hover:scale-125 active:scale-95",
            style: "color:#{color}; background:none; border:none; padding:4px 5px; cursor:pointer; line-height:1; #{ml_style}",
