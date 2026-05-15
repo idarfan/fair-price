@@ -10,14 +10,14 @@ function normCDF(x: number): number {
   return 0.5 * (1 + sign * y)
 }
 
-function bsCall(S: number, K: number, T: number, sig: number): number {
+export function bsCall(S: number, K: number, T: number, sig: number): number {
   if (T <= 0) return Math.max(S - K, 0)
   const d1 = (Math.log(S / K) + (0.043 + sig * sig / 2) * T) / (sig * Math.sqrt(T))
   const d2 = d1 - sig * Math.sqrt(T)
   return S * normCDF(d1) - K * Math.exp(-0.043 * T) * normCDF(d2)
 }
 
-function bsPut(S: number, K: number, T: number, sig: number): number {
+export function bsPut(S: number, K: number, T: number, sig: number): number {
   if (T <= 0) return Math.max(K - S, 0)
   return bsCall(S, K, T, sig) - S + K * Math.exp(-0.043 * T)
 }

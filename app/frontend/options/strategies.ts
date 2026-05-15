@@ -1,4 +1,5 @@
 import type { MarketOutlook, IvEnv, StrategyTemplate } from './types'
+import { bsCall, bsPut } from './payoff'
 
 type StrategyMap = {
   [K in MarketOutlook]: Partial<Record<IvEnv | 'any', StrategyTemplate[]>>
@@ -451,11 +452,10 @@ export function buildLegsForPrice(
     const iv  = leg.iv  ?? 0.45
     const dte = leg.dte ?? 35
     const T   = dte / 365
-    const intrinsicApprox = leg.type.includes('call')
-      ? Math.max(price - strike, 0)
-      : Math.max(strike - price, 0)
-    const timeValue = iv * price * Math.sqrt(T) * 0.4
-    const premium   = Math.max(Math.round((intrinsicApprox + timeValue) * 20) / 20, 0.05)
+    const bsPrice = leg.type.includes('call')
+      ? bsCall(price, strike, T, iv)
+      : bsPut(price, strike, T, iv)
+    const premium = Math.max(Math.round(bsPrice * 20) / 20, 0.05)
 
     return { ...leg, strike, premium }
   })
