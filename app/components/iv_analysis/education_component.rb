@@ -175,6 +175,114 @@ class IvAnalysis::EducationComponent < ApplicationComponent
         span(class: "font-semibold text-gray-800") { plain "Δ 本身也和 σ 高度相關" }
         plain "，接下來的圖表正是要展示這個關鍵事實。"
       end
+
+      # ── 賣權定價公式 ─────────────────────────────────────────────────────────
+      div(class: "mt-8 pt-6 border-t border-gray-200") do
+        h3(class: "text-base font-semibold text-gray-800 mb-3") { plain "📐 賣權定價公式（ATM 價平 近似）" }
+        p(class: "text-sm text-gray-600 leading-relaxed mb-5") do
+          plain "賣權（Put）與買權共享相同的時間價值結構，差異在於"
+          span(class: "font-semibold text-gray-800") { plain "內涵價值方向相反" }
+          plain "：股票跌破行權價時才有內涵價值。兩者之間由"
+          span(class: "font-semibold text-gray-800") { plain "Put-Call Parity" }
+          plain "嚴格連結。"
+        end
+
+        # Dark formula card — Put
+        div(class: "rounded-xl p-6 mb-6 text-center",
+            style: "background:#0d1117; border:1.5px dashed #f48fb1;") do
+          p(class: "mb-3", style: "font-size:13px; color:#7d8590; letter-spacing:0.03em;") do
+            span(style: "color:#f8c8d4; font-weight:600") { plain "P（賣權價格）" }
+            plain " 約等於"
+          end
+          p(style: "font-size:22px; letter-spacing:0.04em; color:#f48fb1; font-style:italic; line-height:1.4;") do
+            span(style: "color:#f8c8d4; font-weight:700") { plain "P" }
+            span(style: "color:#7ecaf5; font-weight:300; margin:0 8px") { plain "≈" }
+            span(style: "color:#ef9a9a; font-weight:700") { plain "|Δ" }
+            span(style: "color:#ef9a9a; font-style:normal; font-size:0.7em; vertical-align:sub; font-weight:700") { plain "P" }
+            span(style: "color:#ef9a9a; font-weight:700") { plain "|" }
+            span(style: "color:#b0bec5") { plain "·(" }
+            span(style: "color:#f8c8d4; font-weight:700") { plain "K" }
+            span(style: "color:#b0bec5; margin:0 5px") { plain "−" }
+            span(style: "color:#f8c8d4; font-weight:700") { plain "S" }
+            span(style: "color:#b0bec5") { plain ")" }
+            span(style: "color:#7ecaf5; margin:0 10px") { plain "+" }
+            span(style: "color:#b0bec5; font-weight:400; font-style:normal") { plain "0.4" }
+            span(style: "color:#7ecaf5; margin:0 5px") { plain "·" }
+            span(style: "color:#f8c8d4; font-weight:700") { plain "S" }
+            span(style: "color:#7ecaf5; margin:0 5px") { plain "·" }
+            span(style: "color:#ffb74d; font-weight:700") { plain "σ" }
+            span(style: "color:#7ecaf5; margin:0 5px") { plain "·" }
+            span(style: "color:#b0bec5; font-weight:400; font-style:normal") { plain "√" }
+            span(style: "color:#f8c8d4; font-weight:700") { plain "T" }
+          end
+
+          div(class: "mt-5 flex flex-wrap justify-center gap-4 text-left") do
+            div(class: "rounded-lg px-4 py-3 flex-1",
+                style: "background:#1a0808; border:1px solid #5f1e1e; min-width:200px; max-width:260px") do
+              p(style: "color:#ef9a9a; font-size:0.68rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px") do
+                plain "① 內涵價值"
+              end
+              p(style: "color:#c9d1d9; font-size:0.9rem; font-style:italic; margin-bottom:6px") { plain "|Δ_P| · (K − S)" }
+              p(style: "color:#8b949e; font-size:0.72rem; line-height:1.6") do
+                plain "K − S = 立刻行權能拿到的錢（看跌方向）。S > K（OTM 價外）時視同零。Put Delta 本為負值（−1 ~ 0），取絕對值 |Δ_P|：ATM ≈ 0.5，深度 ITM → 1.0，深度 OTM → 0.0。"
+              end
+            end
+            div(class: "rounded-lg px-4 py-3 flex-1",
+                style: "background:#1a1200; border:1px solid #3d2e00; min-width:200px; max-width:260px") do
+              p(style: "color:#d29922; font-size:0.68rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px") do
+                plain "② 時間價值"
+              end
+              p(style: "color:#c9d1d9; font-size:0.9rem; font-style:italic; margin-bottom:6px") { plain "0.4 · S · σ · √T" }
+              p(style: "color:#8b949e; font-size:0.72rem; line-height:1.6") do
+                plain "時間價值公式與買權完全相同——Put-Call Parity 的數學體現：ATM 附近買賣權時間溢價對稱，差異僅來自內涵價值方向相反。"
+              end
+            end
+          end
+        end
+
+        # Put-Call Parity
+        div(class: "rounded-xl px-5 py-4 mb-5",
+            style: "background:#0d1117; border:1px solid #30363d;") do
+          p(class: "text-xs font-bold mb-2",
+            style: "color:#d29922; letter-spacing:0.06em; text-transform:uppercase;") do
+            plain "⚖️  Put-Call Parity"
+          end
+          p(class: "text-center mb-3",
+            style: "font-size:18px; color:#c9d1d9; font-style:italic; letter-spacing:0.04em;") do
+            span(style: "color:#e8f5a3") { plain "C" }
+            span(style: "color:#7ecaf5; margin:0 8px") { plain "−" }
+            span(style: "color:#f8c8d4") { plain "P" }
+            span(style: "color:#7ecaf5; margin:0 8px") { plain "=" }
+            span(style: "color:#e8f5a3") { plain "S" }
+            span(style: "color:#7ecaf5; margin:0 8px") { plain "−" }
+            span(style: "color:#b0bec5") { plain "K" }
+            span(style: "color:#b0bec5; font-size:0.7em; vertical-align:super") { plain " · e" }
+            span(style: "color:#b0bec5; font-size:0.58em; vertical-align:super") { plain "−rT" }
+          end
+          p(style: "color:#8b949e; font-size:0.75rem; line-height:1.7") do
+            plain "買賣權價差等於現股價減行權價現值，無套利條件下恆成立。"
+            plain "若兩者偏離，套利者立即介入修正。"
+            span(style: "color:#d4e157") { plain " ATM 時（S ≈ K）：C ≈ P" }
+            plain "，買賣權溢價幾乎相等。"
+          end
+        end
+
+        # Side-by-side comparison
+        div(class: "grid sm:grid-cols-2 gap-4") do
+          value_box(
+            "買權 Call（看漲）",
+            "C ≈ Δ · (S − K) + 0.4·S·σ·√T",
+            "股價上漲時 S > K 產生內涵價值。Δ（0~1）放大漲幅。賣方收 Premium，買方有上漲槓桿。",
+            "border-green-200 bg-green-50", "text-green-700"
+          )
+          value_box(
+            "賣權 Put（看跌）",
+            "P ≈ |Δ_P| · (K − S) + 0.4·S·σ·√T",
+            "股價下跌時 K > S 產生內涵價值。|Δ_P|（0~1）放大跌幅。賣方收 Premium，買方有下跌槓桿。",
+            "border-red-200 bg-red-50", "text-red-700"
+          )
+        end
+      end
     end
   end
 
