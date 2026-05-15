@@ -58,6 +58,20 @@ function Block({
   )
 }
 
+// ─── Tooltip ─────────────────────────────────────────────────────────────────
+
+function Tooltip({ content }: { content: string }) {
+  return (
+    <span className="group relative inline-block align-middle">
+      <span className="ml-1 cursor-help inline-flex items-center justify-center w-4 h-4 rounded-full border border-gray-300 text-gray-400 text-xs hover:border-gray-500 hover:text-gray-600 select-none">?</span>
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-xl bg-gray-900 text-white text-xs px-3 py-2.5 leading-relaxed shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-normal">
+        {content}
+        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+      </span>
+    </span>
+  )
+}
+
 // ─── 損益腿位摘要 ─────────────────────────────────────────────────────────────
 
 const LEG_LABELS: Record<string, string> = {
@@ -212,30 +226,69 @@ export default function StrategyDetailPanel({ template, legs, price, summary }: 
       {/* Block 5.5: Greeks 摘要 */}
       {(() => {
         const greeks = calcPositionGreeks(legs, price)
-        return (greeks.netDelta !== 0 || greeks.netTheta !== 0) ? (
+        if (greeks.netDelta === 0 && greeks.netTheta === 0) return null
+        const deltaPerPoint = Math.abs(greeks.netDelta * 100).toFixed(2)
+        const theta7d  = (greeks.netTheta * 7).toFixed(2)
+        const theta30d = (greeks.netTheta * 30).toFixed(2)
+        return (
           <Block icon="📊" title="Greeks 摘要" accent="#a78bfa">
-            <div className="flex gap-6 flex-wrap">
-              <div>
-                <span className="text-gray-500">淨 Delta</span>{' '}
-                <span className={`text-lg font-bold ${greeks.netDelta > 0 ? 'text-green-600' : greeks.netDelta < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+            <div className="flex gap-3 flex-wrap mb-3">
+
+              {/* Delta card */}
+              <div className="flex-1 min-w-36 bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+                <div className="flex items-center gap-0.5 mb-1">
+                  <span className="text-xs text-gray-500 font-medium">淨 Delta</span>
+                  <Tooltip content="股價每變動 $1，整組倉位的理論損益變化。正值 = 偏多頭（股票漲你賺）；負值 = 偏空頭（股票跌你賺）。絕對值越大方向風險越高；接近 0 為 Delta 中性。還需考慮 Gamma：Delta 本身也會隨股價移動而改變。" />
+                </div>
+                <div className={`text-xl font-bold leading-none mb-1.5 ${greeks.netDelta > 0 ? 'text-green-600' : greeks.netDelta < 0 ? 'text-red-600' : 'text-gray-600'}`}>
                   {greeks.netDelta > 0 ? '+' : ''}{greeks.netDelta.toFixed(2)}
-                </span>
+                </div>
+                <p className="text-xs text-gray-600">
+                  股票每 ±$1 → 組合 {greeks.netDelta >= 0 ? '+' : '−'}${deltaPerPoint}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {greeks.netDelta > 0.2 ? '↑ 明顯偏多頭，方向風險高' :
+                   greeks.netDelta > 0.05 ? '↑ 輕微偏多頭' :
+                   greeks.netDelta < -0.2 ? '↓ 明顯偏空頭，方向風險高' :
+                   greeks.netDelta < -0.05 ? '↓ 輕微偏空頭' :
+                   '≈ 接近 Delta 中性'}
+                </p>
               </div>
-              <div>
-                <span className="text-gray-500">每日 Theta</span>{' '}
-                <span className={`text-lg font-bold ${greeks.netTheta > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {greeks.netTheta > 0 ? '+' : ''}${greeks.netTheta.toFixed(1)}
-                </span>
+
+              {/* Theta card */}
+              <div className="flex-1 min-w-36 bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+                <div className="flex items-center gap-0.5 mb-1">
+                  <span className="text-xs text-gray-500 font-medium">每日 Theta</span>
+                  <Tooltip content="每過一天，整組倉位因時間價值耗損產生的損益（按 1 張 contract 計）。正值 = 時間是你的朋友（賣方收租）；負值 = 每天付出時間成本（買方）。越接近到期日耗損加速，OTM 期權在最後一週可能一夜變廢紙。" />
+                </div>
+                <div className={`text-xl font-bold leading-none mb-1.5 ${greeks.netTheta > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {greeks.netTheta > 0 ? '+' : ''}${greeks.netTheta.toFixed(2)}
+                </div>
+                <p className="text-xs text-gray-600">
+                  7 天累積 {greeks.netTheta >= 0 ? '+' : ''}${theta7d} ／ 30 天 {greeks.netTheta >= 0 ? '+' : ''}${theta30d}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {greeks.netTheta > 0 ? '⏱ 時間流逝對你有利（賣方收租）' : '⏱ 時間流逝對你不利（買方付費）'}
+                </p>
               </div>
             </div>
-            <p className="text-sm text-gray-500 mt-1">
-              {greeks.netDelta > 0.1 ? '部位偏多頭，股票上漲時獲利' :
-               greeks.netDelta < -0.1 ? '部位偏空頭，股票下跌時獲利' :
-               '部位接近 Delta 中性，方向風險低'}
-              {greeks.netTheta > 0 ? '。時間流逝對你有利（賣方）' : '。時間流逝對你不利（買方）'}
-            </p>
+
+            {/* 策略影響說明 */}
+            <div className="text-xs text-gray-700 leading-relaxed bg-purple-50 rounded-lg px-3 py-2.5 border border-purple-100">
+              <span className="font-medium text-purple-800">影響說明：</span>
+              {greeks.netDelta > 0.1
+                ? `股票每漲 $1，組合理論獲利 $${deltaPerPoint}（Delta ${'+'}${greeks.netDelta.toFixed(2)}）；若股票下跌則反向虧損。`
+                : greeks.netDelta < -0.1
+                ? `股票每跌 $1，組合理論獲利 $${deltaPerPoint}（Delta ${greeks.netDelta.toFixed(2)}）；若股票上漲則反向虧損。`
+                : `部位接近 Delta 中性（${greeks.netDelta > 0 ? '+' : ''}${greeks.netDelta.toFixed(2)}），方向風險低，股價小幅波動影響有限。`
+              }
+              {greeks.netTheta > 0
+                ? ` Theta 每日為你產生 $${greeks.netTheta.toFixed(2)} 時間租金，7 天可積累 $${theta7d}，即使股票不動也有收益。`
+                : ` Theta 每日耗損 $${Math.abs(greeks.netTheta).toFixed(2)}，7 天損耗 $${Math.abs(parseFloat(theta7d)).toFixed(2)}，須讓標的在到期前到位。`
+              }
+            </div>
           </Block>
-        ) : null
+        )
       })()}
 
       {/* Block 6: 主要風險 */}
