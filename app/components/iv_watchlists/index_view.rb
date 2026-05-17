@@ -95,15 +95,22 @@ class IvWatchlists::IndexView < ApplicationComponent
               return;
             }
 
-            var forceLastTick = function(scale) {
-              var last = scale.chart.data.labels.length - 1;
-              if (last >= 0 && !scale.ticks.some(function(t) { return t.value === last; })) {
-                scale.ticks.push({ value: last });
-              }
+            var makeXTicks = function(maxLabels, intraday) {
+              return {
+                color: '#666', autoSkip: false,
+                maxRotation: intraday ? 45 : 0, minRotation: 0,
+                font: { size: 9 },
+                callback: function(value, index, ticks) {
+                  var n = ticks.length;
+                  var step = Math.max(1, Math.floor(n / maxLabels));
+                  if (index === 0 || index === n - 1 || index % step === 0) return this.getLabelForValue(value);
+                  return null;
+                }
+              };
             };
             var xAxisCfg = data.intraday
-              ? { ticks: { color: '#666', maxTicksLimit: 14, maxRotation: 45, minRotation: 0, font: { size: 9 } }, grid: { color: '#1e1e1e' }, afterBuildTicks: forceLastTick }
-              : { ticks: { color: '#666', maxTicksLimit: 8,  maxRotation: 0,  font: { size: 9 } }, grid: { color: '#1e1e1e' }, afterBuildTicks: forceLastTick };
+              ? { ticks: makeXTicks(14, true),  grid: { color: '#1e1e1e' } }
+              : { ticks: makeXTicks(8,  false), grid: { color: '#1e1e1e' } };
 
             var ivCanvas = document.getElementById('chart-iv-' + rowId);
             if (ivCanvas && typeof Chart !== 'undefined') {
