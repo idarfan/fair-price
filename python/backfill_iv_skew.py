@@ -64,8 +64,8 @@ def existing_dates(cur, ticker: str) -> set[date]:
     return {row[0] for row in cur.fetchall()}
 
 
-def fetch_hv_series(ticker: str) -> dict[date, float]:
-    """Return {date: annualised_HV} for the past BACKFILL_DAYS calendar days."""
+def fetch_hv_series(ticker: str) -> tuple[dict[date, float], dict[date, float]]:
+    """Return ({date: HV}, {date: close_price}) for the past BACKFILL_DAYS calendar days."""
     raw = yf.download(
         ticker,
         period=f"{BACKFILL_DAYS + 30}d",
@@ -74,7 +74,7 @@ def fetch_hv_series(ticker: str) -> dict[date, float]:
         auto_adjust=True,
     )
     if raw.empty:
-        return {}
+        return {}, {}
 
     closes = raw["Close"]
     if hasattr(closes, "squeeze"):
@@ -84,13 +84,17 @@ def fetch_hv_series(ticker: str) -> dict[date, float]:
     log_ret = np.log(closes / closes.shift(1)).dropna()
     rolling_hv = log_ret.rolling(HV_WINDOW).std() * math.sqrt(252)
 
-    result: dict[date, float] = {}
     cutoff = date.today() - timedelta(days=BACKFILL_DAYS)
+    hv_result: dict[date, float] = {}
+    price_result: dict[date, float] = {}
+
     for dt, hv in rolling_hv.dropna().items():
         d = dt.date() if hasattr(dt, "date") else dt
         if d >= cutoff:
-            result[d] = float(hv)
-    return result
+            hv_result[d] = float(hv)
+            price_result[d] = round(float(closes[dt]), 2)
+
+    return hv_result, price_result
 
 
 def compute_percentile_rank(value: float, all_values: list[float]) -> float:
@@ -105,13 +109,13 @@ def backfill_ticker(cur, ticker: str) -> int:
     put_mult, call_mult = SKEW_PARAMS.get(ticker, DEFAULT_SKEW)
     existing = existing_dates(cur, ticker)
 
-    hv_series = fetch_hv_series(ticker)
+    hv_series, price_series = fetch_hv_series(ticker)
     if not hv_series:
         print(f"  [WARN] {ticker}: no HV data from yfinance, skipping")
         return 0
 
     # Compute skew values for all dates first (needed for rank)
-    rows: list[tuple[date, float, float, float]] = []
+    rows: list[tuple[date, float, float, float, float]] = []
     for d, hv in sorted(hv_series.items()):
         if d in existing:
             continue
@@ -120,7 +124,8 @@ def backfill_ticker(cur, ticker: str) -> int:
         put_iv  = round(hv * put_mult, 6)
         call_iv = round(hv * call_mult, 6)
         skew    = round((put_iv - call_iv) * 100, 4)
-        rows.append((d, put_iv, call_iv, skew))
+        price   = price_series.get(d, 0.0)
+        rows.append((d, put_iv, call_iv, skew, price))
 
     if not rows:
         print(f"  {ticker}: all dates already present, nothing to insert")
@@ -130,7 +135,7 @@ def backfill_ticker(cur, ticker: str) -> int:
     all_skews = [r[3] for r in rows]
     inserted  = 0
 
-    for d, put_iv, call_iv, skew in rows:
+    for d, put_iv, call_iv, skew, price in rows:
         rank = compute_percentile_rank(skew, all_skews)
         cur.execute("""
             INSERT INTO skew_rank_daily
@@ -138,6 +143,16 @@ def backfill_ticker(cur, ticker: str) -> int:
             VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
             ON CONFLICT (ticker, snapshot_date) DO NOTHING
         """, (ticker, d, put_iv, call_iv, skew, rank))
+
+        if price > 0:
+            cur.execute("""
+                INSERT INTO iv_daily_snapshots
+                  (ticker, snapshot_date, current_price, created_at, updated_at)
+                VALUES (%s, %s, %s, NOW(), NOW())
+                ON CONFLICT (ticker, snapshot_date) DO UPDATE
+                  SET current_price = EXCLUDED.current_price
+            """, (ticker, d, price))
+
         inserted += 1
 
     return inserted
