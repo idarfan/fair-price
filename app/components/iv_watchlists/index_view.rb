@@ -16,8 +16,8 @@ class IvWatchlists::IndexView < ApplicationComponent
   def view_template
     div(class: "max-w-3xl mx-auto px-4 py-8") do
       div(class: "mb-8") do
-        h1(class: "text-2xl font-semibold text-white") { "IV Skew 追蹤清單" }
-        p(class: "text-gray-400 text-sm mt-1") { "管理每日自動抓取 IV Skew 的美股標的" }
+        h1(class: "text-2xl font-semibold text-gray-900") { "IV Skew 追蹤清單" }
+        p(class: "text-gray-600 text-sm mt-1") { "管理每日自動抓取 IV Skew 的美股標的" }
       end
 
       render AddSymbolForm.new
