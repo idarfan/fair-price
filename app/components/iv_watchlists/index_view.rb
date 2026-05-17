@@ -301,7 +301,7 @@ class IvWatchlists::IndexView < ApplicationComponent
 
         div(id: "chart-panel-#{@item.id}", class: "hidden px-5 pb-5 pt-2 bg-gray-950") do
           div(class: "flex gap-2 mb-3") do
-            [30, 60, 90, 180].each do |d|
+            [7, 30, 60, 90, 180].each do |d|
               button(
                 type: "button",
                 class: "px-3 py-1 text-xs rounded border transition-colors #{d == 90 ? 'bg-blue-600 border-blue-500 text-white' : 'bg-gray-800 border-gray-600 text-gray-400 hover:text-white'}",
