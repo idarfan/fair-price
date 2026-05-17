@@ -95,9 +95,15 @@ class IvWatchlists::IndexView < ApplicationComponent
               return;
             }
 
-            var xTickOpts = data.intraday
-              ? { color: '#666', maxTicksLimit: 14, maxRotation: 45, minRotation: 0, font: { size: 9 } }
-              : { color: '#666', maxTicksLimit: 8,  maxRotation: 0,  font: { size: 9 } };
+            var forceLastTick = function(scale) {
+              var last = scale.chart.data.labels.length - 1;
+              if (last >= 0 && !scale.ticks.some(function(t) { return t.value === last; })) {
+                scale.ticks.push({ value: last });
+              }
+            };
+            var xAxisCfg = data.intraday
+              ? { ticks: { color: '#666', maxTicksLimit: 14, maxRotation: 45, minRotation: 0, font: { size: 9 } }, grid: { color: '#1e1e1e' }, afterBuildTicks: forceLastTick }
+              : { ticks: { color: '#666', maxTicksLimit: 8,  maxRotation: 0,  font: { size: 9 } }, grid: { color: '#1e1e1e' }, afterBuildTicks: forceLastTick };
 
             var ivCanvas = document.getElementById('chart-iv-' + rowId);
             if (ivCanvas && typeof Chart !== 'undefined') {
@@ -119,7 +125,7 @@ class IvWatchlists::IndexView < ApplicationComponent
                     tooltip: { backgroundColor: '#1a1a1a', titleColor: '#ccc', bodyColor: '#aaa' }
                   },
                   scales: {
-                    x:  { ticks: xTickOpts, grid: { color: '#1e1e1e' } },
+                    x:  xAxisCfg,
                     y:  { position: 'left',  ticks: { color: '#aaa', font: { size: 9 } }, grid: { color: '#1e1e1e' }, title: { display: true, text: 'IV %',  color: '#aaa', font: { size: 9 } } },
                     y2: { position: 'right', ticks: { color: '#D4A017', font: { size: 9 } }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Price', color: '#D4A017', font: { size: 9 } } }
                   }
@@ -146,7 +152,7 @@ class IvWatchlists::IndexView < ApplicationComponent
                     }
                   },
                   scales: {
-                    x: { ticks: xTickOpts, grid: { color: '#1e1e1e' } },
+                    x: xAxisCfg,
                     y: { ticks: { color: '#aaa', font: { size: 9 } }, grid: { color: '#1e1e1e' }, title: { display: true, text: 'Skew %', color: '#aaa', font: { size: 9 } } }
                   }
                 },
