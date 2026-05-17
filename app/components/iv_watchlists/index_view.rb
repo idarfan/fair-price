@@ -114,7 +114,7 @@ class IvWatchlists::IndexView < ApplicationComponent
                     legend: { labels: { color: '#aaa', font: { size: 10 } } },
                     tooltip: {
                       backgroundColor: '#1a1a1a', titleColor: '#ccc', bodyColor: '#aaa',
-                      callbacks: { afterBody: function(items) { return items[0] && items[0].raw >= data.p75 ? ['⚠️ 恐憐區（> 75th pct）'] : []; } }
+                      callbacks: { afterBody: function(items) { return items[0] && items[0].raw >= data.p75 ? ['⚠️ 恐慌區（> 75th pct）'] : []; } }
                     }
                   },
                   scales: {
@@ -317,6 +317,28 @@ class IvWatchlists::IndexView < ApplicationComponent
             span { "🟢 Call IV" }
             span { "🟡 股價（右軸）" }
             span { "🟣 Skew > 75th pct = 恐慌區" }
+          end
+
+          div(class: "mt-4 bg-gray-900 border border-gray-700/50 rounded-lg px-4 py-3") do
+            p(class: "text-xs font-medium text-gray-400 mb-2") { "📖 底部訊號閱讀順序" }
+            div(class: "space-y-1.5 text-xs text-gray-500") do
+              div(class: "flex items-start gap-2") do
+                span(class: "text-gray-600 font-mono flex-shrink-0") { "1." }
+                span { "📉 黃虛線（股價）持續往下" }
+              end
+              div(class: "flex items-start gap-2") do
+                span(class: "text-gray-600 font-mono flex-shrink-0") { "2." }
+                span { "🔵→🩷 柱子從藍色變桃紅色 → 進入警戒，不要動作" }
+              end
+              div(class: "flex items-start gap-2") do
+                span(class: "text-gray-600 font-mono flex-shrink-0") { "3." }
+                span { "⏳ 桃紅色持續 2～3 根 → 恐慌累積期，繼續觀望" }
+              end
+              div(class: "flex items-start gap-2") do
+                span(class: "text-green-500 font-mono flex-shrink-0") { "4." }
+                span(class: "text-green-400 font-medium") { "📏 下一根桃紅柱明顯縮短 ← 底部訊號，恐慌釋放完畢，反彈即將來臨" }
+              end
+            end
           end
         end
       end
