@@ -627,3 +627,57 @@ PYEOF
 | `app/frontend/**/*.tsx` | 不需要（Vite HMR 自動熱重載）|
 
 **規則：** 每次 commit 涉及 Ruby/Python 檔案，commit 訊息後立即執行對應重啟指令，再驗證。
+
+---
+
+### 錯誤 14：Phlex 2.x 封鎖 on* 事件屬性（2026-05-17）
+
+**現象：** 在 Phlex 元件裡直接寫 `onclick: "..."` → 執行時拋出 `Phlex::ArgumentError: Unsafe attribute name detected: onclick`。
+
+**根因：** Phlex 2.x 將所有 `on*` 事件處理屬性列為不安全（XSS 防護），呼叫時直接 raise。
+
+**正確替代方案（依複雜度選擇）：**
+
+| 場景 | 做法 |
+|------|------|
+| 純收合/展開 | 原生 `<details>/<summary>`（零 JS） |
+| 簡單互動 | Stimulus controller + `data: { action: "click->..." }` |
+| 頁面底部統一 | `render_scripts` 裡的 inline JS（事件綁定在此，不在元素上） |
+
+**PostToolUse Hook 已新增：**  
+`post-edit-phlex-unsafe-attrs.sh` — 修改 `app/components/**/*.rb` 後自動掃描 on* 屬性，發現即 block 並給出替代方案提示。
+
+---
+
+### 錯誤 15：Chart.js canvas.width（物理像素）≠ chartArea（CSS 像素）（2026-05-17）
+
+**現象：** 用 `ivC.canvas.width - ivC.chartArea.right` 計算 `rightPad`，DPR≥1 時值正確，但 DPR=2 的螢幕上 `canvas.width` 是 CSS 寬度的 2 倍，導致 padding 被放大，Skew 圖的柱子只填一半寬度。
+
+**根因：** `canvas.width`（HTML Canvas attribute）= 物理像素 × devicePixelRatio；`chartArea.right`（Chart.js layout）= CSS 像素。兩者不在同一座標系。
+
+**正確做法：**
+- 不要用 `canvas.width`，改用 `chart.width`（Chart.js 儲存的 CSS 寬度）
+- 或改用與 CSS 像素一致的 `afterFit` 回呼讀取 `scale.width`
+
+**最終解法：** Skew chart 加隱藏 `y2` spacer 軸，`afterFit` 裡 `scale.width = ivC.scales['y2'].width`，直接對齊，完全不需要計算 canvas 尺寸。
+
+**規則：** Chart.js 跨圖計算尺寸時，一律用 `chart.width/height`（CSS pixels），不用 `canvas.width/height`（physical pixels）。
+
+---
+
+### 錯誤 16：市場資料 rake task 缺少週末 guard（2026-05-17）
+
+**現象：** `iv:skew_snapshot` 和 `iv:daily_snapshot` 在週末也執行，往 `skew_rank_daily` 寫入無效資料（週六日美股不開盤，IV 資料無意義）。
+
+**根因：** rake task 沒有檢查 ET 時區的星期幾。
+
+**修正：**
+```ruby
+et = Time.current.in_time_zone("Eastern Time (US & Canada)")
+if et.wday == 0 || et.wday == 6
+  puts "[task] 週末跳過"
+  next
+end
+```
+
+**規則：** 任何抓取美股 IV/價格/財報資料的排程 rake task，**第一步必須加週末 guard**（用 ET 時區判斷 wday 0=日、6=六）。
