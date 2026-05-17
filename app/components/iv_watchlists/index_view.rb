@@ -154,7 +154,7 @@ class IvWatchlists::IndexView < ApplicationComponent
                   scales: {
                     x: xAxisCfg,
                     y:  { ticks: { color: '#aaa', font: { size: 9 } }, grid: { color: '#1e1e1e' }, title: { display: true, text: 'Skew %', color: '#aaa', font: { size: 9 } } },
-                    y2: { position: 'right', display: false }
+                    y2: { position: 'right', ticks: { display: false }, grid: { display: false }, border: { display: false } }
                   }
                 },
                 plugins: [makeCrosshair(rowId)]
