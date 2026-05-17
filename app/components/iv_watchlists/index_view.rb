@@ -165,17 +165,19 @@ class IvWatchlists::IndexView < ApplicationComponent
                 plugins: [makeCrosshair(rowId, false)]
               });
             }
-            // 同步兩圖 chartArea，讓十字線在視覺上對齊
+            // 同步兩圖 chartArea（雙向補齊左右 margin）
             requestAnimationFrame(function() {
-              var ivC   = ivCharts[rowId + '-iv'];
-              var skewC = ivCharts[rowId + '-skew'];
-              if (!ivC || !skewC) return;
-              var rPad = Math.max(0, (ivC.canvas.width - ivC.chartArea.right) - (skewC.canvas.width - skewC.chartArea.right));
-              var lPad = Math.max(0, ivC.chartArea.left - skewC.chartArea.left);
-              if (rPad > 0 || lPad > 0) {
-                skewC.options.layout = { padding: { right: rPad, left: lPad } };
+              requestAnimationFrame(function() {
+                var ivC   = ivCharts[rowId + '-iv'];
+                var skewC = ivCharts[rowId + '-skew'];
+                if (!ivC || !skewC) return;
+                var tL = Math.max(ivC.chartArea.left,                        skewC.chartArea.left);
+                var tR = Math.max(ivC.canvas.width - ivC.chartArea.right,    skewC.canvas.width - skewC.chartArea.right);
+                ivC.options.layout   = { padding: { left: tL - ivC.chartArea.left,   right: tR - (ivC.canvas.width   - ivC.chartArea.right)   } };
+                skewC.options.layout = { padding: { left: tL - skewC.chartArea.left, right: tR - (skewC.canvas.width - skewC.chartArea.right) } };
+                ivC.update('none');
                 skewC.update('none');
-              }
+              });
             });
           }
 
