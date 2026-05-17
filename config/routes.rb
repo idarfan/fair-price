@@ -109,6 +109,14 @@ Rails.application.routes.draw do
   # IV Analysis
   get "iv_analysis", to: "iv_analysis#index", as: :iv_analysis
 
-  # Lookbook component previews (development only)
+# IV Skew Watchlist
+resources :iv_watchlists, only: [ :index, :create, :destroy ] do
+  member do
+    patch :toggle
+  end
+end
+
+# Lookbook component previews (development only)
+
   mount Lookbook::Engine, at: "/lookbook" if defined?(Lookbook)
 end

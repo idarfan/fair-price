@@ -5,6 +5,7 @@ class FairValue::AppSwitcherComponent < ApplicationComponent
     { icon: "📊", label: "FairPrice",      href: "/",              desc: "美股公允價值分析" },
     { icon: "📈", label: "Daily Momentum", href: "/momentum",      desc: "每日動量報告" },
     { icon: "📡", label: "IV 分析",        href: "/iv_analysis",   desc: "IV Rank · IV Percentile · ATM IV 歷史追蹤" },
+    { icon: "📋", label: "IV Skew 追蹤", href: "/iv_watchlists", desc: "Put/Call Skew · 底部訊號偵測" },
     { icon: "🔔", label: "Watchlist",      href: "/watchlist",     desc: "自選股到價通知" },
     { icon: "📉", label: "Options",        href: "/options",       desc: "美股期權分析｜策略推薦｜IV Rank" },
     { icon: "🏦", label: "持股結構",       href: "/ownership",     desc: "Watchlist 持股結構變化圖表" },

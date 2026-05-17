@@ -12,7 +12,7 @@ namespace :iv do
   desc "抓取所有 watchlist ticker 的當日 25-delta Skew 快照"
   task skew_snapshot: :environment do
     puts "[iv:skew_snapshot] 開始執行，#{Time.current.in_time_zone("Eastern Time (US & Canada)").strftime("%Y-%m-%d %H:%M ET")}"
-    tickers = WatchedTicker.active.pluck(:ticker)
+    tickers = (IvWatchlist.active.pluck(:symbol) + WatchedTicker.active.pluck(:ticker)).uniq
     success = 0
     failures = 0
     tickers.each do |ticker|
