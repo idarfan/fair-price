@@ -47,6 +47,45 @@ class IvWatchlists::IndexView < ApplicationComponent
           };
 
           var ivCharts = {};
+          var crosshairIdx = {};
+
+          function makeCrosshair(rowId, isIv) {
+            return {
+              id: 'crosshair',
+              afterEvent: function(chart, args) {
+                var e = args.event;
+                if (e.type === 'mousemove' && chart.tooltip._active && chart.tooltip._active.length) {
+                  crosshairIdx[rowId] = chart.tooltip._active[0].index;
+                  var pk = isIv ? (rowId + '-skew') : (rowId + '-iv');
+                  var p  = ivCharts[pk];
+                  if (p) p.draw();
+                } else if (e.type === 'mouseout') {
+                  crosshairIdx[rowId] = null;
+                  var pk = isIv ? (rowId + '-skew') : (rowId + '-iv');
+                  var p  = ivCharts[pk];
+                  if (p) p.draw();
+                }
+              },
+              afterDraw: function(chart) {
+                var idx = crosshairIdx[rowId];
+                if (idx == null) return;
+                var meta = chart.getDatasetMeta(0);
+                if (!meta || !meta.data || !meta.data[idx]) return;
+                var x   = meta.data[idx].x;
+                var ctx = chart.ctx;
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(x, chart.chartArea.top);
+                ctx.lineTo(x, chart.chartArea.bottom);
+                ctx.setLineDash([4, 4]);
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+              }
+            };
+          }
 
           async function loadIvChart(symbol, rowId, days) {
             var loadingEl = document.querySelector('[data-iv-chart-target="loading-' + rowId + '"]');
@@ -96,7 +135,8 @@ class IvWatchlists::IndexView < ApplicationComponent
                     y:  { position: 'left',  ticks: { color: '#aaa', font: { size: 9 } }, grid: { color: '#1e1e1e' }, title: { display: true, text: 'IV %',  color: '#aaa', font: { size: 9 } } },
                     y2: { position: 'right', ticks: { color: '#D4A017', font: { size: 9 } }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Price', color: '#D4A017', font: { size: 9 } } }
                   }
-                }
+                },
+                plugins: [makeCrosshair(rowId, true)]
               });
             }
 
@@ -121,7 +161,8 @@ class IvWatchlists::IndexView < ApplicationComponent
                     x: { ticks: { color: '#666', maxTicksLimit: 8, font: { size: 9 } }, grid: { color: '#1e1e1e' } },
                     y: { ticks: { color: '#aaa', font: { size: 9 } }, grid: { color: '#1e1e1e' }, title: { display: true, text: 'Skew %', color: '#aaa', font: { size: 9 } } }
                   }
-                }
+                },
+                plugins: [makeCrosshair(rowId, false)]
               });
             }
           }
