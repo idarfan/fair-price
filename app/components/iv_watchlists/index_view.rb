@@ -165,6 +165,18 @@ class IvWatchlists::IndexView < ApplicationComponent
                 plugins: [makeCrosshair(rowId, false)]
               });
             }
+            // 同步兩圖 chartArea，讓十字線在視覺上對齊
+            requestAnimationFrame(function() {
+              var ivC   = ivCharts[rowId + '-iv'];
+              var skewC = ivCharts[rowId + '-skew'];
+              if (!ivC || !skewC) return;
+              var rPad = Math.max(0, (ivC.canvas.width - ivC.chartArea.right) - (skewC.canvas.width - skewC.chartArea.right));
+              var lPad = Math.max(0, ivC.chartArea.left - skewC.chartArea.left);
+              if (rPad > 0 || lPad > 0) {
+                skewC.options.layout = { padding: { right: rPad, left: lPad } };
+                skewC.update('none');
+              }
+            });
           }
 
           document.addEventListener('click', async function(e) {
