@@ -5,7 +5,7 @@ class IvWatchlists::IndexView < ApplicationComponent
     "index"     => "bg-blue-500/10 text-blue-300 border-blue-500/30",
     "leveraged" => "bg-orange-500/10 text-orange-300 border-orange-500/30",
     "macro"     => "bg-purple-500/10 text-purple-300 border-purple-500/30",
-    "general"   => "bg-gray-500/10 text-gray-300 border-gray-500/30"
+    "general"   => "bg-gray-500/10 text-gray-300 border-gray-500/30",
   }.freeze
 
   def initialize(grouped:, new_item:)
@@ -44,41 +44,152 @@ class IvWatchlists::IndexView < ApplicationComponent
             return m ? m.content : '';
           };
 
-          document.addEventListener('click', async function(e) {
-            // Toggle active
-            var toggleBtn = e.target.closest('[data-action="click->watchlist#toggle"]');
-            if (toggleBtn) {
-              var res = await fetch(toggleBtn.dataset.url, {
-                method: 'PATCH',
-                headers: { 'X-CSRF-Token': csrf(), 'Accept': 'application/json' }
-              });
-              var data = await res.json();
-              if (!data.success) return;
-              toggleBtn.classList.toggle('bg-green-600', data.active);
-              toggleBtn.classList.toggle('bg-gray-600', !data.active);
-              var dot = toggleBtn.querySelector('span');
-              dot.classList.toggle('left-5', data.active);
-              dot.classList.toggle('left-1', !data.active);
+          var ivCharts = {};
+
+          async function loadIvChart(symbol, rowId, days) {
+            var loadingEl = document.querySelector('[data-iv-chart-target="loading-' + rowId + '"]');
+            if (loadingEl) loadingEl.classList.remove('hidden');
+
+            if (ivCharts[rowId + '-iv'])   { ivCharts[rowId + '-iv'].destroy();   delete ivCharts[rowId + '-iv']; }
+            if (ivCharts[rowId + '-skew']) { ivCharts[rowId + '-skew'].destroy(); delete ivCharts[rowId + '-skew']; }
+
+            var res  = await fetch('/iv_watchlists/chart_data/' + symbol + '?days=' + days);
+            var data = await res.json();
+
+            if (loadingEl) loadingEl.classList.add('hidden');
+
+            if (data.error === 'no_data') {
+              var canvas = document.getElementById('chart-iv-' + rowId);
+              if (!canvas) return;
+              canvas.height = 80;
+              var ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#888';
+              ctx.font = '13px sans-serif';
+              ctx.textAlign = 'center';
+              ctx.fillText('尚無資料，請等待每日抓取累積', canvas.width / 2, 44);
               return;
             }
 
-            // Remove
-            var removeBtn = e.target.closest('[data-action="click->watchlist#remove"]');
+            var ivCanvas = document.getElementById('chart-iv-' + rowId);
+            if (ivCanvas && typeof Chart !== 'undefined') {
+              ivCharts[rowId + '-iv'] = new Chart(ivCanvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                  labels: data.labels,
+                  datasets: [
+                    { label: 'Put IV %',  data: data.put_iv,  borderColor: '#E85D5D', borderWidth: 1.5, pointRadius: 0, tension: 0.3, yAxisID: 'y'  },
+                    { label: 'Call IV %', data: data.call_iv, borderColor: '#2ECC9A', borderWidth: 1.5, pointRadius: 0, tension: 0.3, yAxisID: 'y'  },
+                    { label: '股價', data: data.price, borderColor: '#D4A017', borderWidth: 1.2, borderDash: [4,3], pointRadius: 0, tension: 0.3, yAxisID: 'y2' }
+                  ]
+                },
+                options: {
+                  responsive: true, maintainAspectRatio: false,
+                  interaction: { mode: 'index', intersect: false },
+                  plugins: {
+                    legend: { labels: { color: '#aaa', font: { size: 10 } } },
+                    tooltip: { backgroundColor: '#1a1a1a', titleColor: '#ccc', bodyColor: '#aaa' }
+                  },
+                  scales: {
+                    x:  { ticks: { color: '#666', maxTicksLimit: 8, font: { size: 9 } }, grid: { color: '#1e1e1e' } },
+                    y:  { position: 'left',  ticks: { color: '#aaa', font: { size: 9 } }, grid: { color: '#1e1e1e' }, title: { display: true, text: 'IV %',  color: '#aaa', font: { size: 9 } } },
+                    y2: { position: 'right', ticks: { color: '#D4A017', font: { size: 9 } }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Price', color: '#D4A017', font: { size: 9 } } }
+                  }
+                }
+              });
+            }
+
+            var skewCanvas = document.getElementById('chart-skew-' + rowId);
+            if (skewCanvas && typeof Chart !== 'undefined') {
+              var barColors = data.skew.map(function(v) {
+                return v >= data.p75 ? 'rgba(224,64,176,0.75)' : 'rgba(85,119,170,0.75)';
+              });
+              ivCharts[rowId + '-skew'] = new Chart(skewCanvas.getContext('2d'), {
+                type: 'bar',
+                data: { labels: data.labels, datasets: [{ label: 'Skew %', data: data.skew, backgroundColor: barColors, borderWidth: 0 }] },
+                options: {
+                  responsive: true, maintainAspectRatio: false,
+                  plugins: {
+                    legend: { labels: { color: '#aaa', font: { size: 10 } } },
+                    tooltip: {
+                      backgroundColor: '#1a1a1a', titleColor: '#ccc', bodyColor: '#aaa',
+                      callbacks: { afterBody: function(items) { return items[0] && items[0].raw >= data.p75 ? ['⚠️ 恐憐區（> 75th pct）'] : []; } }
+                    }
+                  },
+                  scales: {
+                    x: { ticks: { color: '#666', maxTicksLimit: 8, font: { size: 9 } }, grid: { color: '#1e1e1e' } },
+                    y: { ticks: { color: '#aaa', font: { size: 9 } }, grid: { color: '#1e1e1e' }, title: { display: true, text: 'Skew %', color: '#aaa', font: { size: 9 } } }
+                  }
+                }
+              });
+            }
+          }
+
+          document.addEventListener('click', async function(e) {
+            var toggleBtn = e.target.closest('[data-action="click->watchlist#toggle:stop"]');
+            if (toggleBtn) {
+              e.stopPropagation();
+              var res = await fetch(toggleBtn.dataset.url, {
+                method: 'PATCH', headers: { 'X-CSRF-Token': csrf(), 'Accept': 'application/json' }
+              });
+              var d = await res.json();
+              if (!d.success) return;
+              toggleBtn.classList.toggle('bg-green-600', d.active);
+              toggleBtn.classList.toggle('bg-gray-600', !d.active);
+              var dot = toggleBtn.querySelector('span');
+              dot.classList.toggle('left-5', d.active);
+              dot.classList.toggle('left-1', !d.active);
+              return;
+            }
+
+            var removeBtn = e.target.closest('[data-action="click->watchlist#remove:stop"]');
             if (removeBtn) {
+              e.stopPropagation();
               if (!confirm('確定移除 ' + removeBtn.dataset.symbol + '？')) return;
               var res = await fetch(removeBtn.dataset.url, {
-                method: 'DELETE',
-                headers: { 'X-CSRF-Token': csrf(), 'Accept': 'application/json' }
+                method: 'DELETE', headers: { 'X-CSRF-Token': csrf(), 'Accept': 'application/json' }
               });
-              var data = await res.json();
-              if (data.success) {
+              var d = await res.json();
+              if (d.success) {
                 var row = document.getElementById('watchlist-row-' + removeBtn.dataset.id);
                 if (row) row.remove();
               }
               return;
             }
 
-            // Quick add chip
+            var chartRow = e.target.closest('[data-action="click->iv-chart#toggle"]');
+            if (chartRow) {
+              var symbol = chartRow.dataset.symbol;
+              var rowId  = chartRow.dataset.rowId;
+              var panel  = document.getElementById('chart-panel-' + rowId);
+              var arrow  = document.querySelector('[data-iv-chart-target="arrow-' + rowId + '"]');
+              if (!panel) return;
+              var isOpen = !panel.classList.contains('hidden');
+              if (isOpen) {
+                panel.classList.add('hidden');
+                if (arrow) arrow.style.transform = '';
+              } else {
+                panel.classList.remove('hidden');
+                if (arrow) arrow.style.transform = 'rotate(90deg)';
+                await loadIvChart(symbol, rowId, 90);
+              }
+              return;
+            }
+
+            var dayBtn = e.target.closest('[data-action="click->iv-chart#changeDays"]');
+            if (dayBtn) {
+              var symbol = dayBtn.dataset.symbol;
+              var rowId  = dayBtn.dataset.rowId;
+              var panel  = document.getElementById('chart-panel-' + rowId);
+              panel.querySelectorAll('[data-action="click->iv-chart#changeDays"]').forEach(function(btn) {
+                btn.classList.remove('bg-blue-600','border-blue-500','text-white');
+                btn.classList.add('bg-gray-800','border-gray-600','text-gray-400');
+              });
+              dayBtn.classList.add('bg-blue-600','border-blue-500','text-white');
+              dayBtn.classList.remove('bg-gray-800','border-gray-600','text-gray-400');
+              await loadIvChart(symbol, rowId, parseInt(dayBtn.dataset.days));
+              return;
+            }
+
             var chip = e.target.closest('[data-action="click->watchlist-form#quickAdd"]');
             if (chip) {
               var input = document.querySelector('[data-watchlist-form-target="input"]');
@@ -90,58 +201,38 @@ class IvWatchlists::IndexView < ApplicationComponent
     end
   end
 
-  # ── 新增表單 ────────────────────────────────────────────
   class AddSymbolForm < ApplicationComponent
     QUICK_SYMBOLS = %w[AAPL NVDA TSLA MSFT AMZN META GOOGL AMD].freeze
 
     def view_template
       div(class: "bg-gray-900 border border-gray-700 rounded-xl p-6") do
         h2(class: "text-sm font-medium text-gray-300 mb-4") { "新增標的" }
-
-        form(
-          action: "/iv_watchlists",
-          method: "post",
-          class: "flex flex-col sm:flex-row gap-3"
-        ) do
-          input(type: "hidden", name: "authenticity_token",
-                value: helpers.form_authenticity_token)
-
+        form(action: "/iv_watchlists", method: "post", class: "flex flex-col sm:flex-row gap-3") do
+          input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
           input(
-            type: "text",
-            name: "iv_watchlist[symbol]",
-            placeholder: "美股代號，例如 NVDA",
-            maxlength: "10",
-            autocomplete: "off",
-            class: "flex-1 bg-gray-800 border border-gray-600 rounded-lg px-4 py-2
-                    text-white placeholder-gray-500 uppercase
-                    focus:outline-none focus:border-blue-500 transition-colors",
+            type: "text", name: "iv_watchlist[symbol]",
+            placeholder: "美股代號，例如 NVDA", maxlength: "10", autocomplete: "off",
+            class: "flex-1 bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-500 uppercase focus:outline-none focus:border-blue-500 transition-colors",
             data: { watchlist_form_target: "input" }
           )
-
           select(
             name: "iv_watchlist[group_tag]",
-            class: "bg-gray-800 border border-gray-600 rounded-lg px-3 py-2
-                    text-gray-300 focus:outline-none focus:border-blue-500 transition-colors"
+            class: "bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-gray-300 focus:outline-none focus:border-blue-500 transition-colors"
           ) do
             IvWatchlist::GROUP_TAGS.each { |tag| option(value: tag) { tag.capitalize } }
           end
-
           button(
             type: "submit",
-            class: "bg-blue-600 hover:bg-blue-500 text-white font-medium
-                    rounded-lg px-5 py-2 transition-colors whitespace-nowrap"
+            class: "bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg px-5 py-2 transition-colors whitespace-nowrap"
           ) { "+ 加入" }
         end
-
         div(class: "mt-4") do
           p(class: "text-xs text-gray-500 mb-2") { "快速加入：" }
           div(class: "flex flex-wrap gap-2") do
             QUICK_SYMBOLS.each do |sym|
               button(
                 type: "button",
-                class: "px-3 py-1 text-xs bg-gray-800 hover:bg-gray-700
-                        text-gray-300 border border-gray-600 rounded-full
-                        transition-colors cursor-pointer",
+                class: "px-3 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-600 rounded-full transition-colors cursor-pointer",
                 data: { symbol: sym, action: "click->watchlist-form#quickAdd" }
               ) { sym }
             end
@@ -151,7 +242,6 @@ class IvWatchlists::IndexView < ApplicationComponent
     end
   end
 
-  # ── 群組區塊 ────────────────────────────────────────────
   class GroupSection < ApplicationComponent
     def initialize(group_tag:, items:)
       @group_tag = group_tag
@@ -162,13 +252,10 @@ class IvWatchlists::IndexView < ApplicationComponent
       div(class: "bg-gray-900 border border-gray-700 rounded-xl overflow-hidden") do
         div(class: "flex items-center gap-3 px-5 py-3 border-b border-gray-700") do
           span(
-            class: "text-xs font-medium px-2 py-0.5 rounded border
-                    #{IvWatchlists::IndexView::GROUP_COLORS.fetch(@group_tag,
-                        IvWatchlists::IndexView::GROUP_COLORS['general'])}"
+            class: "text-xs font-medium px-2 py-0.5 rounded border #{IvWatchlists::IndexView::GROUP_COLORS.fetch(@group_tag, IvWatchlists::IndexView::GROUP_COLORS['general'])}"
           ) { @group_tag.upcase }
           span(class: "text-gray-400 text-sm") { "#{@items.size} 個標的" }
         end
-
         div(class: "divide-y divide-gray-800") do
           @items.each { |item| render SymbolRow.new(item:) }
         end
@@ -176,54 +263,59 @@ class IvWatchlists::IndexView < ApplicationComponent
     end
   end
 
-  # ── 單行標的 ────────────────────────────────────────────
   class SymbolRow < ApplicationComponent
     def initialize(item:)
       @item = item
     end
 
     def view_template
-      div(
-        class: "flex items-center justify-between px-5 py-3
-                hover:bg-gray-800/50 transition-colors",
-        id: "watchlist-row-#{@item.id}"
-      ) do
-        div(class: "flex items-center gap-3") do
-          span(class: "text-white font-mono font-medium text-sm") { @item.symbol }
-          span(class: "text-gray-500 text-xs") {
-            "加入於 #{@item.created_at.strftime('%Y/%m/%d')}"
-          }
+      div(id: "watchlist-row-#{@item.id}", class: "border-b border-gray-800 last:border-0") do
+        div(
+          class: "flex items-center justify-between px-5 py-3 hover:bg-gray-800/50 transition-colors cursor-pointer select-none",
+          data:  { action: "click->iv-chart#toggle", symbol: @item.symbol, row_id: @item.id }
+        ) do
+          div(class: "flex items-center gap-3") do
+            span(class: "text-gray-500 text-xs transition-transform duration-200", data: { iv_chart_target: "arrow-#{@item.id}" }) { "▶" }
+            span(class: "text-white font-mono font-medium text-sm") { @item.symbol }
+            span(class: "text-gray-500 text-xs") { "加入於 #{@item.created_at.strftime('%Y/%m/%d')}" }
+          end
+          div(class: "flex items-center gap-3") do
+            button(
+              type: "button",
+              class: "relative w-9 h-5 rounded-full transition-colors #{@item.active? ? 'bg-green-600' : 'bg-gray-600'}",
+              data:  { action: "click->watchlist#toggle:stop", url: "/iv_watchlists/#{@item.id}/toggle", id: @item.id },
+              title: @item.active? ? "點擊停用" : "點擊啟用"
+            ) do
+              span(class: "absolute top-1 w-3 h-3 bg-white rounded-full transition-all #{@item.active? ? 'left-5' : 'left-1'}")
+            end
+            button(
+              type: "button",
+              class: "text-gray-600 hover:text-red-400 transition-colors px-1",
+              data:  { action: "click->watchlist#remove:stop", url: "/iv_watchlists/#{@item.id}", symbol: @item.symbol, id: @item.id },
+              title: "移除 #{@item.symbol}"
+            ) { "✕" }
+          end
         end
 
-        div(class: "flex items-center gap-3") do
-          button(
-            type: "button",
-            class: "relative w-9 h-5 rounded-full transition-colors
-                    #{@item.active? ? 'bg-green-600' : 'bg-gray-600'}",
-            data: {
-              action: "click->watchlist#toggle",
-              url:    "/iv_watchlists/#{@item.id}/toggle",
-              id:     @item.id
-            },
-            title: @item.active? ? "點擊停用" : "點擊啟用"
-          ) do
-            span(
-              class: "absolute top-1 w-3 h-3 bg-white rounded-full transition-all
-                      #{@item.active? ? 'left-5' : 'left-1'}"
-            )
+        div(id: "chart-panel-#{@item.id}", class: "hidden px-5 pb-5 pt-2 bg-gray-950") do
+          div(class: "flex gap-2 mb-3") do
+            [30, 60, 90, 180].each do |d|
+              button(
+                type: "button",
+                class: "px-3 py-1 text-xs rounded border transition-colors #{d == 90 ? 'bg-blue-600 border-blue-500 text-white' : 'bg-gray-800 border-gray-600 text-gray-400 hover:text-white'}",
+                data:  { action: "click->iv-chart#changeDays", symbol: @item.symbol, days: d, row_id: @item.id }
+              ) { "#{d}天" }
+            end
           end
-
-          button(
-            type: "button",
-            class: "text-gray-600 hover:text-red-400 transition-colors px-1",
-            data: {
-              action:  "click->watchlist#remove",
-              url:     "/iv_watchlists/#{@item.id}",
-              symbol:  @item.symbol,
-              id:      @item.id
-            },
-            title: "移除 #{@item.symbol}"
-          ) { "✕" }
+          div(class: "text-gray-500 text-sm text-center py-4 hidden", data: { iv_chart_target: "loading-#{@item.id}" }) { "載入中..." }
+          div(class: "relative", style: "height:280px") { canvas(id: "chart-iv-#{@item.id}") }
+          div(class: "relative mt-3", style: "height:120px") { canvas(id: "chart-skew-#{@item.id}") }
+          div(class: "flex gap-4 mt-2 text-xs text-gray-500") do
+            span { "🔴 Put IV" }
+            span { "🟢 Call IV" }
+            span { "🟡 股價（右軸）" }
+            span { "🟣 Skew > 75th pct = 恐慌區" }
+          end
         end
       end
     end

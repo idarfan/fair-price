@@ -36,7 +36,10 @@ Rails.application.routes.draw do
           constraints: { symbol: TICKER_CONSTRAINT }
 
       # Margin Trade Calculator
-      resources :margin_positions, only: [ :index, :create, :update, :destroy ] do
+      get "iv_skew/:ticker/history", to: "iv_skew#history",
+          constraints: { ticker: TICKER_CONSTRAINT }
+
+            resources :margin_positions, only: [ :index, :create, :update, :destroy ] do
         collection { get :price_lookup }
         member      { post :close }
       end
@@ -113,6 +116,9 @@ Rails.application.routes.draw do
 resources :iv_watchlists, only: [ :index, :create, :destroy ] do
   member do
     patch :toggle
+  end
+  collection do
+    get "chart_data/:symbol", to: "iv_watchlists#chart_data", as: :iv_watchlist_chart_data
   end
 end
 
