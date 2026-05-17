@@ -8,23 +8,44 @@ class IvWatchlistsController < ApplicationController
   end
 
   def chart_data
-    symbol = params[:symbol].to_s.upcase.strip
-    days   = (params[:days] || 90).to_i.clamp(7, 365)
+    symbol   = params[:symbol].to_s.upcase.strip
+    days     = (params[:days] || 90).to_i.clamp(7, 365)
+    intraday = days <= 7
 
-    rows = ActiveRecord::Base.connection.execute(<<~SQL)
-      SELECT
-        to_char(s.snapshot_date, 'YYYY-MM-DD') AS date,
-        ROUND(s.put_iv_025  * 100, 2)          AS put_iv,
-        ROUND(s.call_iv_025 * 100, 2)          AS call_iv,
-        ROUND(s.skew_pts::numeric,  2)          AS skew,
-        d.current_price                         AS stock_price
-      FROM skew_rank_daily s
-      LEFT JOIN iv_daily_snapshots d
-        ON d.ticker = s.ticker AND d.snapshot_date = s.snapshot_date
-      WHERE s.ticker = #{ActiveRecord::Base.connection.quote(symbol)}
-        AND s.snapshot_date >= CURRENT_DATE - INTERVAL '#{days} days'
-      ORDER BY s.snapshot_date ASC
-    SQL
+    q = ActiveRecord::Base.connection.quote(symbol)
+
+    rows = if intraday
+      ActiveRecord::Base.connection.execute(<<~SQL)
+        SELECT
+          to_char(
+            snapshot_time AT TIME ZONE 'UTC' AT TIME ZONE 'America/New_York',
+            'MM/DD HH24:MI'
+          )                                     AS date,
+          ROUND(put_iv_025  * 100, 2)           AS put_iv,
+          ROUND(call_iv_025 * 100, 2)           AS call_iv,
+          ROUND(skew_pts::numeric, 2)           AS skew,
+          current_price                         AS stock_price
+        FROM skew_rank_intradays
+        WHERE ticker = #{q}
+          AND snapshot_time >= NOW() - INTERVAL '#{days} days'
+        ORDER BY snapshot_time ASC
+      SQL
+    else
+      ActiveRecord::Base.connection.execute(<<~SQL)
+        SELECT
+          to_char(s.snapshot_date, 'YYYY-MM-DD') AS date,
+          ROUND(s.put_iv_025  * 100, 2)          AS put_iv,
+          ROUND(s.call_iv_025 * 100, 2)          AS call_iv,
+          ROUND(s.skew_pts::numeric,  2)          AS skew,
+          d.current_price                         AS stock_price
+        FROM skew_rank_daily s
+        LEFT JOIN iv_daily_snapshots d
+          ON d.ticker = s.ticker AND d.snapshot_date = s.snapshot_date
+        WHERE s.ticker = #{q}
+          AND s.snapshot_date >= CURRENT_DATE - INTERVAL '#{days} days'
+        ORDER BY s.snapshot_date ASC
+      SQL
+    end
 
     if rows.ntuples.zero?
       render json: { error: "no_data", symbol: symbol }
@@ -37,13 +58,14 @@ class IvWatchlistsController < ApplicationController
     p75    = sorted[p75_idx].round(2)
 
     render json: {
-      symbol:  symbol,
-      p75:     p75,
-      labels:  rows.map { |r| r["date"] },
-      put_iv:  rows.map { |r| r["put_iv"].to_f },
-      call_iv: rows.map { |r| r["call_iv"].to_f },
-      skew:    rows.map { |r| r["skew"].to_f },
-      price:   rows.map { |r| r["stock_price"].to_f }
+      symbol:   symbol,
+      intraday: intraday,
+      p75:      p75,
+      labels:   rows.map { |r| r["date"] },
+      put_iv:   rows.map { |r| r["put_iv"].to_f },
+      call_iv:  rows.map { |r| r["call_iv"].to_f },
+      skew:     rows.map { |r| r["skew"].to_f },
+      price:    rows.map { |r| r["stock_price"].to_f }
     }
   end
 

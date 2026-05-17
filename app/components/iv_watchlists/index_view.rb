@@ -95,6 +95,10 @@ class IvWatchlists::IndexView < ApplicationComponent
               return;
             }
 
+            var xTickOpts = data.intraday
+              ? { color: '#666', maxTicksLimit: 14, maxRotation: 45, minRotation: 0, font: { size: 9 } }
+              : { color: '#666', maxTicksLimit: 8,  maxRotation: 0,  font: { size: 9 } };
+
             var ivCanvas = document.getElementById('chart-iv-' + rowId);
             if (ivCanvas && typeof Chart !== 'undefined') {
               ivCharts[rowId + '-iv'] = new Chart(ivCanvas.getContext('2d'), {
@@ -115,7 +119,7 @@ class IvWatchlists::IndexView < ApplicationComponent
                     tooltip: { backgroundColor: '#1a1a1a', titleColor: '#ccc', bodyColor: '#aaa' }
                   },
                   scales: {
-                    x:  { ticks: { color: '#666', maxTicksLimit: 8, font: { size: 9 } }, grid: { color: '#1e1e1e' } },
+                    x:  { ticks: xTickOpts, grid: { color: '#1e1e1e' } },
                     y:  { position: 'left',  ticks: { color: '#aaa', font: { size: 9 } }, grid: { color: '#1e1e1e' }, title: { display: true, text: 'IV %',  color: '#aaa', font: { size: 9 } } },
                     y2: { position: 'right', ticks: { color: '#D4A017', font: { size: 9 } }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Price', color: '#D4A017', font: { size: 9 } } }
                   }
@@ -142,7 +146,7 @@ class IvWatchlists::IndexView < ApplicationComponent
                     }
                   },
                   scales: {
-                    x: { ticks: { color: '#666', maxTicksLimit: 8, font: { size: 9 } }, grid: { color: '#1e1e1e' } },
+                    x: { ticks: xTickOpts, grid: { color: '#1e1e1e' } },
                     y: { ticks: { color: '#aaa', font: { size: 9 } }, grid: { color: '#1e1e1e' }, title: { display: true, text: 'Skew %', color: '#aaa', font: { size: 9 } } }
                   }
                 },

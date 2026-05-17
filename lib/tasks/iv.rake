@@ -27,6 +27,32 @@ namespace :iv do
     exit 1 if failures > 0 && success == 0
   end
 
+  desc "盤中 30 分鐘 25-delta Skew 快照（交易時段自動跳過非市場時間）"
+  task skew_intraday_snapshot: :environment do
+    et_now = Time.current.in_time_zone("Eastern Time (US & Canada)").strftime("%Y-%m-%d %H:%M ET")
+    unless SkewIntradaySnapshotService.within_market_hours?
+      puts "[iv:skew_intraday_snapshot] 非交易時段，跳過 (#{et_now})"
+      next
+    end
+
+    puts "[iv:skew_intraday_snapshot] 開始執行，#{et_now}"
+    tickers  = IvWatchlist.active.pluck(:symbol)
+    success  = 0
+    failures = 0
+
+    tickers.each do |ticker|
+      result = SkewIntradaySnapshotService.fetch_and_store(ticker)
+      puts "[iv:skew_intraday_snapshot] ✅ #{ticker} skew_pts=#{result[:skew_pts]} slot=#{result[:slot]}"
+      success += 1
+    rescue => e
+      warn "[iv:skew_intraday_snapshot] ❌ #{ticker} 失敗 — #{e.message}"
+      failures += 1
+    end
+
+    puts "[iv:skew_intraday_snapshot] 完成 — 成功: #{success} / 失敗: #{failures} / 總計: #{tickers.size}"
+    exit 1 if failures > 0 && success == 0
+  end
+
   desc "補抓單一 ticker 當日 IV（用法：rake iv:backfill[AAPL]）"
   task :backfill, [:ticker] => :environment do |_t, args|
     ticker = args[:ticker].to_s.upcase.strip

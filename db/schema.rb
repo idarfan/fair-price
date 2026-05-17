@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_17_043305) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_17_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -174,6 +174,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_17_043305) do
     t.string "ticker", null: false
     t.datetime "updated_at", null: false
     t.index ["ticker", "snapshot_date"], name: "index_skew_rank_daily_on_ticker_and_snapshot_date", unique: true
+  end
+
+  create_table "skew_rank_intradays", force: :cascade do |t|
+    t.decimal "call_iv_025", precision: 10, scale: 6
+    t.datetime "created_at", null: false
+    t.decimal "current_price", precision: 10, scale: 2
+    t.decimal "put_iv_025", precision: 10, scale: 6
+    t.decimal "skew_pts", precision: 8, scale: 4
+    t.datetime "snapshot_time", null: false
+    t.string "ticker", null: false
+    t.datetime "updated_at", null: false
+    t.index ["snapshot_time"], name: "index_skew_rank_intradays_on_snapshot_time"
+    t.index ["ticker", "snapshot_time"], name: "index_skew_rank_intradays_on_ticker_and_snapshot_time", unique: true
   end
 
   create_table "tracked_tickers", force: :cascade do |t|
