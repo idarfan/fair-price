@@ -3,7 +3,12 @@
 namespace :iv do
   desc "抓取所有 watchlist ticker 的當日 ATM IV 快照"
   task daily_snapshot: :environment do
-    puts "[iv:daily_snapshot] 開始執行，#{Time.current.in_time_zone("Eastern Time (US & Canada)").strftime("%Y-%m-%d %H:%M ET")}"
+    et = Time.current.in_time_zone("Eastern Time (US & Canada)")
+    if et.wday == 0 || et.wday == 6
+      puts "[iv:daily_snapshot] 週末跳過 (#{et.strftime('%Y-%m-%d %A')})"
+      next
+    end
+    puts "[iv:daily_snapshot] 開始執行，#{et.strftime("%Y-%m-%d %H:%M ET")}"
     result = WatchedTickersService.daily_fetch_all
     puts "[iv:daily_snapshot] 完成 — 成功: #{result[:success]} / 跳過: #{result[:skipped]} / 失敗: #{result[:failures]} / 總計: #{result[:total]}"
     exit 1 if result[:failures] > 0 && result[:success] == 0
@@ -11,7 +16,12 @@ namespace :iv do
 
   desc "抓取所有 watchlist ticker 的當日 25-delta Skew 快照"
   task skew_snapshot: :environment do
-    puts "[iv:skew_snapshot] 開始執行，#{Time.current.in_time_zone("Eastern Time (US & Canada)").strftime("%Y-%m-%d %H:%M ET")}"
+    et = Time.current.in_time_zone("Eastern Time (US & Canada)")
+    if et.wday == 0 || et.wday == 6
+      puts "[iv:skew_snapshot] 週末跳過 (#{et.strftime('%Y-%m-%d %A')})"
+      next
+    end
+    puts "[iv:skew_snapshot] 開始執行，#{et.strftime("%Y-%m-%d %H:%M ET")}"
     tickers = (IvWatchlist.active.pluck(:symbol) + WatchedTicker.active.pluck(:ticker)).uniq
     success = 0
     failures = 0
