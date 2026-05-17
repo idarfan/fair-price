@@ -149,7 +149,6 @@ class IvWatchlists::IndexView < ApplicationComponent
                 plugins: [makeCrosshair(rowId)]
               });
             }
-            });
           }
 
           document.addEventListener('click', async function(e) {
