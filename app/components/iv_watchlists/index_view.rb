@@ -558,7 +558,24 @@ class IvWatchlists::IndexView < ApplicationComponent
           div(class: "my-2 ml-3 px-4 py-2.5 bg-gray-100 rounded-lg border border-gray-200 font-mono text-gray-800 text-sm") do
             plain("Skew = 25-delta Put IV  −  25-delta Call IV")
           end
-          p { plain("25-delta Put 的行使價約低於現貨 5–8%；25-delta Call 約高於現貨 5–8%。Skew > 0 表示市場對下跌保護的需求大於上漲押注，屬於常態。Skew 數值越高，代表市場越恐慌、願意花越多成本買 Put 保護。") }
+          div(class: "my-2 ml-3 px-4 py-3 bg-blue-50 rounded-lg border border-blue-200") do
+            p(class: "text-xs font-semibold text-blue-800 mb-1.5") { "為什麼選 25-delta？" }
+            p(class: "text-xs text-blue-900 mb-1.5") do
+              plain("25-delta Put = 買一個保護，行使價大約在現價以下 5–8% 的 Put。這個距離剛好在：")
+            end
+            div(class: "space-y-1 mb-1.5") do
+              div(class: "flex items-start gap-2 text-xs text-blue-800") do
+                span(class: "text-blue-500 flex-shrink-0") { "✗" }
+                plain("不是平值（ATM）— 太貴、對價格變動太敏感")
+              end
+              div(class: "flex items-start gap-2 text-xs text-blue-800") do
+                span(class: "text-blue-500 flex-shrink-0") { "✗" }
+                plain("不是深度虛值（far OTM）— 太便宜、保護效果差")
+              end
+            end
+            p(class: "text-xs text-blue-700 font-medium") { "→ 業界以 25-delta（或 30-delta）作為衡量市場恐慌程度的標準觀察位置。" }
+          end
+          p { plain("Skew > 0 表示市場對下跌保護的需求大於上漲押注，屬於常態。Skew 數值越高，代表市場越恐慌、願意花越多成本買 Put 保護。") }
         end
       end
     end
