@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_08_081846) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_17_043305) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -43,6 +43,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_081846) do
     t.decimal "strike", precision: 10, scale: 2
     t.string "ticker"
     t.datetime "updated_at", null: false
+  end
+
+  create_table "iv_watchlists", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.string "group_tag", default: "general"
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.index ["group_tag"], name: "index_iv_watchlists_on_group_tag"
+    t.index ["symbol"], name: "index_iv_watchlists_on_symbol", unique: true
   end
 
   create_table "margin_positions", force: :cascade do |t|

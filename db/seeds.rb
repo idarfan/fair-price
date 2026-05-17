@@ -7,3 +7,16 @@ if WatchlistItem.none?
   end
   puts "Seeded #{WatchlistItem.count} watchlist items"
 end
+
+[
+  { symbol: 'QQQ',  group_tag: 'index' },
+  { symbol: 'SPY',  group_tag: 'index' },
+  { symbol: 'IWM',  group_tag: 'index' },
+  { symbol: 'SQQQ', group_tag: 'leveraged' },
+  { symbol: 'TQQQ', group_tag: 'leveraged' },
+  { symbol: 'GLD',  group_tag: 'macro' },
+  { symbol: 'TLT',  group_tag: 'macro' }
+].each do |attrs|
+  IvWatchlist.find_or_create_by(symbol: attrs[:symbol]).update(attrs)
+end
+puts "Seeded #{IvWatchlist.count} IV watchlist items"
