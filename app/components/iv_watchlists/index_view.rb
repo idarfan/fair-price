@@ -47,42 +47,26 @@ class IvWatchlists::IndexView < ApplicationComponent
           };
 
           var ivCharts = {};
-          var crosshairIdx = {};
-
-          function makeCrosshair(rowId, isIv) {
+          function makeCrosshair(rowId) {
             return {
               id: 'crosshair',
               afterEvent: function(chart, args) {
-                var e = args.event;
+                var e    = args.event;
+                var line = document.getElementById('ch-line-' + rowId);
+                if (!line) return;
                 if (e.type === 'mousemove' && chart.tooltip._active && chart.tooltip._active.length) {
-                  crosshairIdx[rowId] = chart.tooltip._active[0].index;
-                  var pk = isIv ? (rowId + '-skew') : (rowId + '-iv');
-                  var p  = ivCharts[pk];
-                  if (p) p.draw();
+                  var idx  = chart.tooltip._active[0].index;
+                  var ivC  = ivCharts[rowId + '-iv'];
+                  if (!ivC) return;
+                  var meta = ivC.getDatasetMeta(0);
+                  if (!meta.data[idx]) return;
+                  var cRect = ivC.canvas.getBoundingClientRect();
+                  var wRect = line.parentElement.getBoundingClientRect();
+                  line.style.left    = (meta.data[idx].x + cRect.left - wRect.left) + 'px';
+                  line.style.display = 'block';
                 } else if (e.type === 'mouseout') {
-                  crosshairIdx[rowId] = null;
-                  var pk = isIv ? (rowId + '-skew') : (rowId + '-iv');
-                  var p  = ivCharts[pk];
-                  if (p) p.draw();
+                  line.style.display = 'none';
                 }
-              },
-              afterDraw: function(chart) {
-                var idx = crosshairIdx[rowId];
-                if (idx == null) return;
-                var meta = chart.getDatasetMeta(0);
-                if (!meta || !meta.data || !meta.data[idx]) return;
-                var x   = meta.data[idx].x;
-                var ctx = chart.ctx;
-                ctx.save();
-                ctx.beginPath();
-                ctx.moveTo(x, chart.chartArea.top);
-                ctx.lineTo(x, chart.chartArea.bottom);
-                ctx.setLineDash([4, 4]);
-                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.restore();
               }
             };
           }
@@ -136,7 +120,7 @@ class IvWatchlists::IndexView < ApplicationComponent
                     y2: { position: 'right', ticks: { color: '#D4A017', font: { size: 9 } }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Price', color: '#D4A017', font: { size: 9 } } }
                   }
                 },
-                plugins: [makeCrosshair(rowId, true)]
+                plugins: [makeCrosshair(rowId)]
               });
             }
 
@@ -162,22 +146,9 @@ class IvWatchlists::IndexView < ApplicationComponent
                     y: { ticks: { color: '#aaa', font: { size: 9 } }, grid: { color: '#1e1e1e' }, title: { display: true, text: 'Skew %', color: '#aaa', font: { size: 9 } } }
                   }
                 },
-                plugins: [makeCrosshair(rowId, false)]
+                plugins: [makeCrosshair(rowId)]
               });
             }
-            // 同步兩圖 chartArea（雙向補齊左右 margin）
-            requestAnimationFrame(function() {
-              requestAnimationFrame(function() {
-                var ivC   = ivCharts[rowId + '-iv'];
-                var skewC = ivCharts[rowId + '-skew'];
-                if (!ivC || !skewC) return;
-                var tL = Math.max(ivC.chartArea.left,                        skewC.chartArea.left);
-                var tR = Math.max(ivC.canvas.width - ivC.chartArea.right,    skewC.canvas.width - skewC.chartArea.right);
-                ivC.options.layout   = { padding: { left: tL - ivC.chartArea.left,   right: tR - (ivC.canvas.width   - ivC.chartArea.right)   } };
-                skewC.options.layout = { padding: { left: tL - skewC.chartArea.left, right: tR - (skewC.canvas.width - skewC.chartArea.right) } };
-                ivC.update('none');
-                skewC.update('none');
-              });
             });
           }
 
@@ -365,8 +336,12 @@ class IvWatchlists::IndexView < ApplicationComponent
             end
           end
           div(class: "text-gray-500 text-sm text-center py-4 hidden", data: { iv_chart_target: "loading-#{@item.id}" }) { "載入中..." }
-          div(class: "relative", style: "height:280px") { canvas(id: "chart-iv-#{@item.id}") }
-          div(class: "relative mt-3", style: "height:120px") { canvas(id: "chart-skew-#{@item.id}") }
+          div(id: "charts-wrap-#{@item.id}", class: "relative") do
+            div(id: "ch-line-#{@item.id}", class: "absolute top-0 bottom-0 hidden pointer-events-none z-20",
+                style: "width:0; border-left:1px dashed rgba(255,255,255,0.4);")
+            div(class: "relative", style: "height:280px") { canvas(id: "chart-iv-#{@item.id}") }
+            div(class: "relative mt-3", style: "height:120px") { canvas(id: "chart-skew-#{@item.id}") }
+          end
           div(class: "flex gap-4 mt-2 text-xs text-gray-500") do
             span { "🔴 Put IV" }
             span { "🟢 Call IV" }
