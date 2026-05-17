@@ -142,9 +142,6 @@ class IvWatchlists::IndexView < ApplicationComponent
             }
 
             // 讀取 IV 圖右軸實際寬度，作為 Skew 圖右側 padding，確保兩圖 chartArea 對齊
-            var ivC = ivCharts[rowId + '-iv'];
-            var rightPad = (ivC && ivC.chartArea) ? (ivC.canvas.width - ivC.chartArea.right) : 52;
-
             var skewCanvas = document.getElementById('chart-skew-' + rowId);
             if (skewCanvas && typeof Chart !== 'undefined') {
               var barColors = data.skew.map(function(v) {
@@ -155,17 +152,30 @@ class IvWatchlists::IndexView < ApplicationComponent
                 data: { labels: data.labels, datasets: [{ label: 'Skew %', data: data.skew, backgroundColor: barColors, borderWidth: 0 }] },
                 options: {
                   responsive: true, maintainAspectRatio: false,
-                  layout: { padding: { right: rightPad } },
                   plugins: {
                     legend: { labels: { color: '#aaa', font: { size: 10 } } },
                     tooltip: {
                       backgroundColor: '#1a1a1a', titleColor: '#ccc', bodyColor: '#aaa',
-                      callbacks: { afterBody: function(items) { return items[0] && items[0].raw >= data.p75 ? ['⚠️ 恐慌區（> 75th pct）'] : []; } }
+                      callbacks: { afterBody: function(items) { return items[0] && items[0].raw >= data.p75 ? ['\u26a0\ufe0f 恐慌區（> 75th pct）'] : []; } }
                     }
                   },
                   scales: {
                     x: xAxisCfg,
-                    y: { ticks: { color: '#aaa', font: { size: 9 } }, grid: { color: '#1e1e1e' }, title: { display: true, text: 'Skew %', color: '#aaa', font: { size: 9 } } }
+                    y: { ticks: { color: '#aaa', font: { size: 9 } }, grid: { color: '#1e1e1e' }, title: { display: true, text: 'Skew %', color: '#aaa', font: { size: 9 } } },
+                    y2: {
+                      position: 'right',
+                      display: true,
+                      afterFit: function(scale) {
+                        var ivC = ivCharts[rowId + '-iv'];
+                        if (ivC && ivC.scales && ivC.scales['y2']) {
+                          scale.width = ivC.scales['y2'].width;
+                        }
+                      },
+                      ticks: { display: false, maxTicksLimit: 0 },
+                      grid: { display: false },
+                      border: { display: false },
+                      title: { display: false }
+                    }
                   }
                 },
                 plugins: [makeCrosshair(rowId)]
