@@ -27,13 +27,15 @@ namespace :iv do
     exit 1 if failures > 0 && success == 0
   end
 
-  desc "盤中 30 分鐘 25-delta Skew 快照（交易時段自動跳過非市場時間）"
+  desc "盤中 30 分鐘 25-delta Skew 快照（交易時段自動跳過非市場時間；FORCE=1 強制執行）"
   task skew_intraday_snapshot: :environment do
     et_now = Time.current.in_time_zone("Eastern Time (US & Canada)").strftime("%Y-%m-%d %H:%M ET")
-    unless SkewIntradaySnapshotService.within_market_hours?
-      puts "[iv:skew_intraday_snapshot] 非交易時段，跳過 (#{et_now})"
+    forced = ENV["FORCE"].to_s == "1"
+    unless forced || SkewIntradaySnapshotService.within_market_hours?
+      puts "[iv:skew_intraday_snapshot] 非交易時段，跳過 (#{et_now})（強制執行：rake iv:skew_intraday_snapshot FORCE=1）"
       next
     end
+    puts "[iv:skew_intraday_snapshot] 強制執行模式" if forced
 
     puts "[iv:skew_intraday_snapshot] 開始執行，#{et_now}"
     tickers  = IvWatchlist.active.pluck(:symbol)
