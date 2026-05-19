@@ -10,10 +10,11 @@ class IvWatchlists::IndexView::StrategyGuide < ApplicationComponent
   ].freeze
 
   WHEEL_ROWS = [
-    { signal: "Skew 開始飆高（藍→桃紅）",      meaning: "QQQ 下跌中，SQQQ 上漲",           action: "不要新開 CSP，持倉觀望",         color: "text-yellow-400" },
-    { signal: "Skew 持續桃紅 2～3 根",           meaning: "恐慌累積期",                       action: "繼續觀望，不動",                 color: "text-orange-400" },
-    { signal: "桃紅後首根明顯縮短",              meaning: "底部訊號，QQQ 即將反彈，SQQQ 頂部臨近", action: "準備進場評估 SQQQ CSP",      color: "text-green-400" },
-    { signal: "Skew 回落至藍色、收窄",           meaning: "QQQ 回升確認",                     action: "可重新開 SQQQ CSP 收 Premium", color: "text-blue-400" },
+    { signal: "Skew 藍→桃紅",                    meaning: "SQQQ 短期急速暴漲，市場恐慌爆發",  action: "不要新開 CSP，等待頂部確認",                       highlight: false, color: "text-red-400" },
+    { signal: "Skew 持續桃紅 2～3 根",            meaning: "SQQQ 高位震盪，IV 整體拉高",       action: "繼續觀望，等收斂訊號",                              highlight: false, color: "text-orange-400" },
+    { signal: "桃紅後首根明顯縮短",               meaning: "SQQQ 頂部臨近，股價即將回落",      action: "✅ 最佳進場點，開高 Strike OTM CSP，權利金最厚",    highlight: true,  color: "text-green-400" },
+    { signal: "Skew 回落至藍色、股價開始下跌",    meaning: "SQQQ 從高位回落，IV 仍高",         action: "✅ 可開 CSP，Strike 設在高於現價，緩衝空間大",       highlight: false, color: "text-blue-400" },
+    { signal: "Skew 藍柱穩定、股價已在低位",      meaning: "IV 下降，整體平靜",                action: "⚠️ 權利金變薄，評估是否划算再進場",                  highlight: false, color: "text-yellow-400" },
   ].freeze
 
   def view_template
@@ -71,8 +72,8 @@ class IvWatchlists::IndexView::StrategyGuide < ApplicationComponent
             end
           end
           tbody do
-            WHEEL_ROWS.each_with_index do |row, i|
-              tr(class: "border-t border-gray-800 #{ i == 2 ? 'bg-green-950/30' : '' }") do
+            WHEEL_ROWS.each do |row|
+              tr(class: "border-t border-gray-800 #{ row[:highlight] ? 'bg-green-950/30' : '' }") do
                 td(class: "px-5 py-3 text-gray-300 font-mono leading-relaxed") { row[:signal] }
                 td(class: "px-5 py-3 text-gray-400 leading-relaxed") { row[:meaning] }
                 td(class: "px-5 py-3 #{row[:color]} font-medium leading-relaxed") { row[:action] }
@@ -84,10 +85,9 @@ class IvWatchlists::IndexView::StrategyGuide < ApplicationComponent
 
       div(class: "px-6 py-3 bg-gray-800/40 border-t border-gray-700") do
         p(class: "text-xs text-gray-500") do
-          plain("💡 CSP = Cash-Secured Put｜收 Premium 的前提是：Skew 已確認收斂，股價反彈開始。桃紅柱子期間不進場。")
+          plain("💡 CSP 甜蜜點 = SQQQ 股價在低位 + IV 仍高 + 賣高於現價的 OTM Strike → 權利金厚、擔保金略多、緩衝大")
         end
       end
     end
   end
 end
-

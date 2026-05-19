@@ -16,18 +16,45 @@ class IvWatchlists::IndexView::IvSkewExplainer < ApplicationComponent
     { icon: "📈", border: "border-l-4 border-blue-400 bg-blue-50",    label_cls: "text-blue-700",   label: "Skew 回落至藍色、持續收窄",         desc: "市場情緒正常化，多方確認接手，股價回升趨勢確立。" },
   ].freeze
 
-  CSP_DO = [
-    "Skew 曾連續 2–3 根桃紅柱（> 75th pct）",
-    "首根明顯縮短的桃紅柱出現 → 恐慌頂部，空頭動能衰竭",
-    "股價企穩或反彈，不再創新低",
-    "IV 排名高位，Put Premium 最豐厚",
+  SIGNAL_TABLE = [
+    {
+      phenomenon: "Skew 藍→桃紅",
+      market:     "SQQQ 短期急速暴漲，市場恐慌爆發",
+      action:     "不要新開 CSP，等待頂部確認",
+      status:     :wait,
+    },
+    {
+      phenomenon: "Skew 持續桃紅 2～3 根",
+      market:     "SQQQ 高位震盪，IV 整體拉高",
+      action:     "繼續觀望，等收斂訊號",
+      status:     :wait,
+    },
+    {
+      phenomenon: "桃紅後首根明顯縮短",
+      market:     "SQQQ 頂部臨近，股價即將回落",
+      action:     "✅ 最佳進場點，開高 Strike OTM CSP，權利金最厚",
+      status:     :best,
+    },
+    {
+      phenomenon: "Skew 回落至藍色、股價開始下跌",
+      market:     "SQQQ 從高位回落，IV 仍高",
+      action:     "✅ 可開 CSP，Strike 設在高於現價，緩衝空間大",
+      status:     :ok,
+    },
+    {
+      phenomenon: "Skew 藍柱穩定、股價已在低位",
+      market:     "IV 下降，整體平靜",
+      action:     "⚠️ 權利金變薄，評估是否划算再進場",
+      status:     :caution,
+    },
   ].freeze
 
-  CSP_DONT = [
-    "Skew 仍在飆升中（即使 Premium 高，下跌風險未解除）",
-    "突發系統性風險：Fed 決策、財報前夕、地緣政治衝擊",
-    "股價跌破重要支撐且趨勢未確認反轉",
-  ].freeze
+  STATUS_STYLES = {
+    wait:    { row: "bg-red-50",    action: "text-red-700 font-medium" },
+    best:    { row: "bg-green-50",  action: "text-green-700 font-semibold" },
+    ok:      { row: "bg-blue-50",   action: "text-blue-700 font-medium" },
+    caution: { row: "bg-yellow-50", action: "text-yellow-700 font-medium" },
+  }.freeze
 
   def view_template
     details(class: "mb-6 rounded-xl border border-gray-200 bg-white overflow-hidden group/exp shadow-sm") do
@@ -125,38 +152,24 @@ class IvWatchlists::IndexView::IvSkewExplainer < ApplicationComponent
     div do
       div(class: "flex items-center gap-2 mb-3") do
         div(class: "w-1 h-4 rounded bg-green-500") {}
-        h3(class: "text-sm font-semibold text-gray-900") { "CSP 開倉最佳時機" }
+        h3(class: "text-sm font-semibold text-gray-900") { "Put/Call Skew 訊號 → 操作含意" }
       end
-      p(class: "text-sm text-gray-700 mb-3 leading-relaxed") do
-        plain("Cash-Secured Put（CSP）核心優勢是在")
-        span(class: "text-yellow-700 font-semibold bg-yellow-50 px-1 rounded") { "高 IV 時開倉收更豐厚的 Premium" }
-        plain("。Skew 提供精確的進出場訊號：")
-      end
-      div(class: "grid grid-cols-2 gap-3") do
-        div(class: "rounded-lg border border-green-200 bg-green-50 p-3") do
-          div(class: "flex items-center gap-1.5 mb-2.5") do
-            span(class: "text-sm") { "✅" }
-            span(class: "text-sm font-semibold text-green-800") { "全部符合才進場" }
-          end
-          div(class: "space-y-2") do
-            CSP_DO.each_with_index do |item, i|
-              div(class: "flex items-start gap-1.5") do
-                span(class: "text-green-700 font-mono text-xs flex-shrink-0 mt-0.5") { "#{i + 1}." }
-                span(class: "text-xs text-gray-700 leading-relaxed") { item }
-              end
+      div(class: "rounded-lg border border-gray-200 overflow-hidden") do
+        table(class: "w-full text-sm") do
+          thead do
+            tr(class: "bg-gray-100 text-gray-700") do
+              th(class: "px-3 py-2 text-left font-semibold text-xs") { "觀察到的現象" }
+              th(class: "px-3 py-2 text-left font-semibold text-xs") { "市場含意" }
+              th(class: "px-3 py-2 text-left font-semibold text-xs") { "操作含意" }
             end
           end
-        end
-        div(class: "rounded-lg border border-red-200 bg-red-50 p-3") do
-          div(class: "flex items-center gap-1.5 mb-2.5") do
-            span(class: "text-sm") { "❌" }
-            span(class: "text-sm font-semibold text-red-800") { "應避免進場的情況" }
-          end
-          div(class: "space-y-2") do
-            CSP_DONT.each do |item|
-              div(class: "flex items-start gap-1.5") do
-                span(class: "text-red-600 font-mono text-xs flex-shrink-0 mt-0.5") { "—" }
-                span(class: "text-xs text-gray-700 leading-relaxed") { item }
+          tbody do
+            SIGNAL_TABLE.each do |row|
+              styles = STATUS_STYLES[row[:status]]
+              tr(class: "border-t border-gray-200 #{styles[:row]}") do
+                td(class: "px-3 py-2 text-xs text-gray-800 font-medium align-top") { row[:phenomenon] }
+                td(class: "px-3 py-2 text-xs text-gray-600 align-top") { row[:market] }
+                td(class: "px-3 py-2 text-xs #{styles[:action]} align-top") { row[:action] }
               end
             end
           end
@@ -164,12 +177,9 @@ class IvWatchlists::IndexView::IvSkewExplainer < ApplicationComponent
       end
       div(class: "mt-3 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200") do
         p(class: "text-sm text-amber-800 leading-relaxed") do
-          plain("💡 口訣：")
-          span(class: "font-semibold") { "「等桃紅柱縮短才動手，高 IV 收 Premium，Skew 飆升不開倉」" }
+          plain("💡 CSP 甜蜜點 = SQQQ 股價在低位 + IV 仍高 + 賣高於現價的 OTM Strike → 權利金厚、擔保金略多、緩衝大")
         end
       end
     end
   end
 end
-
-
