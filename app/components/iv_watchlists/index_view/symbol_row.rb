@@ -59,15 +59,15 @@ class IvWatchlists::IndexView::SymbolRow < ApplicationComponent
         end
 
         div(class: "mt-4 bg-gray-900 border border-gray-700/50 rounded-lg px-4 py-3") do
-          p(class: "text-xs font-medium text-gray-400 mb-2") { "📖 底部訊號閱讀順序" }
-          div(class: "space-y-1.5 text-xs text-gray-500") do
+          p(class: "text-2xl font-medium text-gray-400 mb-2") { "📖 底部訊號閱讀順序" }
+          div(class: "space-y-1.5 text-2xl text-gray-500") do
             div(class: "flex items-start gap-2") do
               span(class: "text-gray-600 font-mono flex-shrink-0") { "1." }
               span { "📉 黃虛線（股價）持續往下" }
             end
             div(class: "flex items-start gap-2") do
               span(class: "text-gray-600 font-mono flex-shrink-0") { "2." }
-              span { "🔵→🩷 柱子從藍色變桃紅色 → 進入警戒，不要動作" }
+              span { "🔵→🩷 柱子從藍色變桃紅色 → Put IV 被拉高，權利金變厚，開始評估 CSP 進場時機" }
             end
             div(class: "flex items-start gap-2") do
               span(class: "text-gray-600 font-mono flex-shrink-0") { "3." }
@@ -75,8 +75,14 @@ class IvWatchlists::IndexView::SymbolRow < ApplicationComponent
             end
             div(class: "flex items-start gap-2") do
               span(class: "text-green-500 font-mono flex-shrink-0") { "4." }
-              span(class: "text-green-400 font-medium") { "📏 下一根桃紅柱明顯縮短 ← 底部訊號，恐慌釋放完畢，反彈即將來臨" }
+              span(class: "text-green-400 font-medium") { "📏 桃紅柱明顯縮短那根 → 確認進場，開 CSP" }
             end
+          end
+          div(class: "mt-3 px-3 py-2.5 rounded-lg bg-gray-800 border border-gray-600 text-2xl text-gray-400 leading-relaxed space-y-1") do
+            p(class: "text-gray-200 font-semibold") { "桃紅柱 = Skew 值超過歷史第 75 百分位" }
+            p { plain("不是 Put IV 絕對值超過 Call IV，而是：") }
+            p(class: "text-gray-300 font-medium pl-2 border-l-2 border-pink-500") { "Put IV 相對 Call IV 的差距，縮小到歷史上前 25% 最窄的程度" }
+            p { plain("意思是 Put IV 被拉高、兩者差距異常縮小，超過歷史 75th percentile 閾值就標為桃紅。") }
           end
         end
       end
