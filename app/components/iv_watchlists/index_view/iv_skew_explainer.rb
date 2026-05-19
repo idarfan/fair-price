@@ -61,10 +61,10 @@ class IvWatchlists::IndexView::IvSkewExplainer < ApplicationComponent
       summary(class: "flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-gray-50 transition-colors list-none select-none border-b border-gray-200") do
         div(class: "flex items-center gap-2.5") do
           span(class: "text-base") { "📖" }
-          span(class: "text-2xl font-semibold text-gray-800") { "IV Skew 完整說明" }
-          span(class: "text-2xl text-gray-400 font-normal ml-1") { "— 是什麼、如何解讀、CSP 開倉時機" }
+          span(class: "text-[22px] font-semibold text-gray-800") { "IV Skew 完整說明" }
+          span(class: "text-[22px] text-gray-400 font-normal ml-1") { "— 是什麼、如何解讀、CSP 開倉時機" }
         end
-        span(class: "text-gray-400 text-2xl transition-transform duration-200 group-open/exp:rotate-180", style: "display:inline-block") { "▼" }
+        span(class: "text-gray-400 text-[22px] transition-transform duration-200 group-open/exp:rotate-180", style: "display:inline-block") { "▼" }
       end
       div(class: "px-5 py-5 space-y-6 bg-white") do
         render_what_is_skew
@@ -81,29 +81,29 @@ class IvWatchlists::IndexView::IvSkewExplainer < ApplicationComponent
     div do
       div(class: "flex items-center gap-2 mb-3") do
         div(class: "w-1 h-4 rounded bg-blue-500") {}
-        h3(class: "text-2xl font-semibold text-gray-900") { "IV Skew 是什麼？" }
+        h3(class: "text-[22px] font-semibold text-gray-900") { "IV Skew 是什麼？" }
       end
-      div(class: "space-y-2 text-2xl text-gray-700 leading-relaxed") do
+      div(class: "space-y-2 text-[22px] text-gray-700 leading-relaxed") do
         p { plain("IV Skew（隱含波動率偏度）衡量相同到期日下，不同行使價期權之間 IV 差異。本工具使用：") }
-        div(class: "my-2 ml-3 px-4 py-2.5 bg-gray-100 rounded-lg border border-gray-200 font-mono text-gray-800 text-2xl") do
+        div(class: "my-2 ml-3 px-4 py-2.5 bg-gray-100 rounded-lg border border-gray-200 font-mono text-gray-800 text-[22px]") do
           plain("Skew = 25-delta Put IV  −  25-delta Call IV")
         end
         div(class: "my-2 ml-3 px-4 py-3 bg-blue-50 rounded-lg border border-blue-200") do
-          p(class: "text-2xl font-semibold text-blue-800 mb-1.5") { "為什麼選 25-delta？" }
-          p(class: "text-2xl text-blue-900 mb-1.5") do
+          p(class: "text-[22px] font-semibold text-blue-800 mb-1.5") { "為什麼選 25-delta？" }
+          p(class: "text-[22px] text-blue-900 mb-1.5") do
             plain("25-delta Put = 買一個保護，行使價大約在現價以下 5–8% 的 Put。這個距離剛好在：")
           end
           div(class: "space-y-1 mb-1.5") do
-            div(class: "flex items-start gap-2 text-2xl text-blue-800") do
+            div(class: "flex items-start gap-2 text-[22px] text-blue-800") do
               span(class: "text-blue-500 flex-shrink-0") { "✗" }
               plain("不是平值（ATM）— 太貴、對價格變動太敏感")
             end
-            div(class: "flex items-start gap-2 text-2xl text-blue-800") do
+            div(class: "flex items-start gap-2 text-[22px] text-blue-800") do
               span(class: "text-blue-500 flex-shrink-0") { "✗" }
               plain("不是深度虛值（far OTM）— 太便宜、保護效果差")
             end
           end
-          p(class: "text-2xl text-blue-700 font-medium") { "→ 業界以 25-delta（或 30-delta）作為衡量市場恐慌程度的標準觀察位置。" }
+          p(class: "text-[22px] text-blue-700 font-medium") { "→ 業界以 25-delta（或 30-delta）作為衡量市場恐慌程度的標準觀察位置。" }
         end
         p { plain("Skew > 0 表示市場對下跌保護的需求大於上漲押注，屬於常態。Skew 數值越高，代表市場越恐慌、願意花越多成本買 Put 保護。") }
       end
@@ -114,14 +114,14 @@ class IvWatchlists::IndexView::IvSkewExplainer < ApplicationComponent
     div do
       div(class: "flex items-center gap-2 mb-3") do
         div(class: "w-1 h-4 rounded bg-purple-500") {}
-        h3(class: "text-2xl font-semibold text-gray-900") { "市場情緒計：Skew 的四種狀態" }
+        h3(class: "text-[22px] font-semibold text-gray-900") { "市場情緒計：Skew 的四種狀態" }
       end
       div(class: "space-y-2") do
         SKEW_STATES.each do |s|
           div(class: "flex items-center gap-3 px-3 py-2.5 rounded-lg border #{s[:badge]}") do
             div(class: "w-2.5 h-2.5 rounded-full flex-shrink-0 #{s[:dot]}") {}
-            span(class: "text-2xl font-semibold") { s[:label] }
-            span(class: "text-2xl opacity-75 ml-1") { "— #{s[:desc]}" }
+            span(class: "text-[22px] font-semibold") { s[:label] }
+            span(class: "text-[22px] opacity-75 ml-1") { "— #{s[:desc]}" }
           end
         end
       end
@@ -132,15 +132,15 @@ class IvWatchlists::IndexView::IvSkewExplainer < ApplicationComponent
     div do
       div(class: "flex items-center gap-2 mb-3") do
         div(class: "w-1 h-4 rounded bg-yellow-500") {}
-        h3(class: "text-2xl font-semibold text-gray-900") { "如何用 Skew 預判股價方向" }
+        h3(class: "text-[22px] font-semibold text-gray-900") { "如何用 Skew 預判股價方向" }
       end
       div(class: "space-y-2") do
         PRICE_ROWS.each do |row|
           div(class: "flex items-start gap-3 px-3 py-2.5 rounded-lg #{row[:border]}") do
             span(class: "text-base flex-shrink-0") { row[:icon] }
             div do
-              span(class: "text-2xl font-semibold #{row[:label_cls]}") { row[:label] }
-              p(class: "text-2xl text-gray-600 mt-0.5 leading-relaxed") { row[:desc] }
+              span(class: "text-[22px] font-semibold #{row[:label_cls]}") { row[:label] }
+              p(class: "text-[22px] text-gray-600 mt-0.5 leading-relaxed") { row[:desc] }
             end
           end
         end
@@ -152,31 +152,31 @@ class IvWatchlists::IndexView::IvSkewExplainer < ApplicationComponent
     div do
       div(class: "flex items-center gap-2 mb-3") do
         div(class: "w-1 h-4 rounded bg-green-500") {}
-        h3(class: "text-2xl font-semibold text-gray-900") { "Put/Call Skew 訊號 → 操作含意" }
+        h3(class: "text-[22px] font-semibold text-gray-900") { "Put/Call Skew 訊號 → 操作含意" }
       end
       div(class: "rounded-lg border border-gray-200 overflow-hidden") do
-        table(class: "w-full text-2xl") do
+        table(class: "w-full text-[22px]") do
           thead do
             tr(class: "bg-gray-100 text-gray-700") do
-              th(class: "px-3 py-2 text-left font-semibold text-2xl") { "觀察到的現象" }
-              th(class: "px-3 py-2 text-left font-semibold text-2xl") { "市場含意" }
-              th(class: "px-3 py-2 text-left font-semibold text-2xl") { "操作含意" }
+              th(class: "px-3 py-2 text-left font-semibold text-[22px]") { "觀察到的現象" }
+              th(class: "px-3 py-2 text-left font-semibold text-[22px]") { "市場含意" }
+              th(class: "px-3 py-2 text-left font-semibold text-[22px]") { "操作含意" }
             end
           end
           tbody do
             SIGNAL_TABLE.each do |row|
               styles = STATUS_STYLES[row[:status]]
               tr(class: "border-t border-gray-200 #{styles[:row]}") do
-                td(class: "px-3 py-2 text-2xl text-gray-800 font-medium align-top") { row[:phenomenon] }
-                td(class: "px-3 py-2 text-2xl text-gray-600 align-top") { row[:market] }
-                td(class: "px-3 py-2 text-2xl #{styles[:action]} align-top") { row[:action] }
+                td(class: "px-3 py-2 text-[22px] text-gray-800 font-medium align-top") { row[:phenomenon] }
+                td(class: "px-3 py-2 text-[22px] text-gray-600 align-top") { row[:market] }
+                td(class: "px-3 py-2 text-[22px] #{styles[:action]} align-top") { row[:action] }
               end
             end
           end
         end
       end
       div(class: "mt-3 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200") do
-        p(class: "text-2xl text-amber-800 leading-relaxed") do
+        p(class: "text-[22px] text-amber-800 leading-relaxed") do
           plain("💡 CSP 甜蜜點 = SQQQ 股價在低位 + IV 仍高 + 賣高於現價的 OTM Strike → 權利金厚、擔保金略多、緩衝大")
         end
       end

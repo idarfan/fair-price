@@ -30,28 +30,28 @@ class IvWatchlists::IndexView::StrategyGuide < ApplicationComponent
     div(class: "bg-gray-900 border border-gray-700 rounded-xl p-6") do
       div(class: "flex items-center gap-2 mb-5") do
         span(class: "text-lg") { "📊" }
-        h2(class: "text-2xl font-semibold text-gray-200") { "Skew 底部訊號閱讀順序" }
-        span(class: "text-2xl text-gray-500 ml-2") { "（依序觀察 4 個步驟）" }
+        h2(class: "text-[22px] font-semibold text-gray-200") { "Skew 底部訊號閱讀順序" }
+        span(class: "text-[22px] text-gray-500 ml-2") { "（依序觀察 4 個步驟）" }
       end
 
       div(class: "space-y-3") do
         SIGNAL_STEPS.each_with_index do |step, i|
           div(class: "flex gap-4 items-start") do
             div(class: "flex flex-col items-center flex-shrink-0") do
-              div(class: "w-7 h-7 rounded-full bg-gray-800 border border-gray-600 flex items-center justify-center text-2xl font-bold text-gray-300") { (i + 1).to_s }
+              div(class: "w-7 h-7 rounded-full bg-gray-800 border border-gray-600 flex items-center justify-center text-[22px] font-bold text-gray-300") { (i + 1).to_s }
               div(class: "w-px h-4 bg-gray-700 mt-1") unless i == SIGNAL_STEPS.size - 1
             end
             div(class: "pb-2") do
               div(class: "flex items-center gap-2 mb-0.5") do
                 span(class: "text-base") { step[:icon] }
-                span(class: "#{ i == 3 ? 'text-green-300 font-semibold' : 'text-gray-200' } text-2xl") { step[:label] }
+                span(class: "#{ i == 3 ? 'text-green-300 font-semibold' : 'text-gray-200' } text-[22px]") { step[:label] }
               end
-              p(class: "text-2xl text-gray-500 leading-relaxed") { step[:desc] }
+              p(class: "text-[22px] text-gray-500 leading-relaxed") { step[:desc] }
             end
           end
         end
       end
-      div(class: "mt-5 px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-2xl text-gray-400 leading-relaxed space-y-1.5") do
+      div(class: "mt-5 px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-[22px] text-gray-400 leading-relaxed space-y-1.5") do
         p(class: "text-gray-200 font-semibold") { "桃紅柱 = Skew 值超過歷史第 75 百分位" }
         p { plain("不是 Put IV 絕對值超過 Call IV，而是：") }
         p(class: "text-gray-300 font-medium pl-2 border-l-2 border-pink-500") { "Put IV 相對 Call IV 的差距，縮小到歷史上前 25% 最窄的程度" }
@@ -64,12 +64,12 @@ class IvWatchlists::IndexView::StrategyGuide < ApplicationComponent
     div(class: "bg-gray-900 border border-gray-700 rounded-xl overflow-hidden") do
       div(class: "flex items-center gap-2 px-6 py-4 border-b border-gray-700") do
         span(class: "text-lg") { "🎡" }
-        h2(class: "text-2xl font-semibold text-gray-200") { "SQQQ Wheel 策略對照表" }
-        span(class: "text-2xl text-gray-500 ml-2") { "Put/Call Skew 訊號 → 操作含意" }
+        h2(class: "text-[22px] font-semibold text-gray-200") { "SQQQ Wheel 策略對照表" }
+        span(class: "text-[22px] text-gray-500 ml-2") { "Put/Call Skew 訊號 → 操作含意" }
       end
 
       div(class: "overflow-x-auto") do
-        table(class: "w-full text-2xl") do
+        table(class: "w-full text-[22px]") do
           thead do
             tr(class: "bg-gray-800/60") do
               th(class: "px-5 py-3 text-left text-gray-400 font-medium w-1/3") { "觀察到的現象" }
@@ -90,7 +90,7 @@ class IvWatchlists::IndexView::StrategyGuide < ApplicationComponent
       end
 
       div(class: "px-6 py-3 bg-gray-800/40 border-t border-gray-700") do
-        p(class: "text-2xl text-gray-500") do
+        p(class: "text-[22px] text-gray-500") do
           plain("💡 CSP 甜蜜點 = SQQQ 股價在低位 + IV 仍高 + 賣高於現價的 OTM Strike → 權利金厚、擔保金略多、緩衝大")
         end
       end
