@@ -4,9 +4,9 @@
 class IvWatchlists::IndexView::StrategyGuide < ApplicationComponent
   SIGNAL_STEPS = [
     { icon: "📉", label: "股價持續下跌", desc: "黃虛線（股價右軸）持續往下，市場進入恐慌模式" },
-    { icon: "🔵", label: "股價持續下跌，Skew 維持藍柱", desc: "進入觀望，不要開新 CSP" },
+    { icon: "🔵→🩷", label: "柱子從藍色變桃紅色", desc: "Put IV 被拉高，權利金變厚，開始評估 CSP 進場時機" },
     { icon: "⏳", label: "桃紅色持續 2～3 根", desc: "恐慌情緒累積期，繼續觀望，不要急著進場" },
-    { icon: "📏", label: "下一根桃紅柱明顯縮短", desc: "← 底部訊號：Skew 開始收斂，恐慌釋放完畢，反彈即將來臨" },
+    { icon: "📏", label: "桃紅柱明顯縮短那根", desc: "確認進場，開 CSP" },
   ].freeze
 
   WHEEL_ROWS = [
