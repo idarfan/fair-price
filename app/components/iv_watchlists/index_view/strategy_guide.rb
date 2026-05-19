@@ -51,6 +51,12 @@ class IvWatchlists::IndexView::StrategyGuide < ApplicationComponent
           end
         end
       end
+      div(class: "mt-5 px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-xs text-gray-400 leading-relaxed space-y-1.5") do
+        p(class: "text-gray-200 font-semibold") { "桃紅柱 = Skew 值超過歷史第 75 百分位" }
+        p { plain("不是 Put IV 絕對值超過 Call IV，而是：") }
+        p(class: "text-gray-300 font-medium pl-2 border-l-2 border-pink-500") { "Put IV 相對 Call IV 的差距，縮小到歷史上前 25% 最窄的程度" }
+        p { plain("意思是 Put IV 被拉高、兩者差距異常縮小，超過歷史 75th percentile 閾值就標為桃紅。") }
+      end
     end
   end
 
