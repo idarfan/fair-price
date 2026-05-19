@@ -1,6 +1,6 @@
 #!/bin/bash
 # IV 每日 ATM IV 快照
-# pm2 cron: 30 4 * * 2-6（台灣時間 04:30 火〜土 = UTC 20:30 週一〜五，美股收盤後）
+# pm2 cron: 30 20 * * 1-5（UTC，收盤後 16:30 ET = 20:30 UTC；pm2 daemon 必須以 TZ=UTC 啟動）
 
 set -e
 

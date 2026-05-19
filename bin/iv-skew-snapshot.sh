@@ -1,6 +1,6 @@
 #!/bin/bash
 # IV 每日 25-delta Skew 快照
-# pm2 cron: 45 4 * * 2-6（台灣時間 04:45 火〜土 = UTC 20:45 週一〜五，美股收盤後）
+# pm2 cron: 45 20 * * 1-5（UTC，收盤後 16:45 ET = 20:45 UTC；pm2 daemon 必須以 TZ=UTC 啟動）
 
 set -e
 
