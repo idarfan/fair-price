@@ -30,18 +30,25 @@ class WatchedTickersService
       end
 
       begin
-        data = IvSidecarService.fetch_atm_iv(ticker)
+        data   = IvSidecarService.fetch_atm_iv(ticker)
+        atm_iv = data[:atm_iv].to_f
+
+        if atm_iv <= 0
+          Rails.logger.warn "[IvDaily] #{ticker}: skipped — atm_iv invalid (#{data[:atm_iv].inspect})"
+          skipped += 1
+          next
+        end
 
         IvDailySnapshot.create!(
           ticker:        ticker,
           snapshot_date: today,
-          atm_iv:        data[:atm_iv],
+          atm_iv:        atm_iv,
           atm_strike:    data[:atm_strike],
           current_price: data[:current_price]
         )
 
         WatchedTicker.find_by(ticker: ticker)&.update!(last_fetched_at: Time.current)
-        Rails.logger.info "[IvDaily] #{ticker}: saved atm_iv=#{data[:atm_iv]}"
+        Rails.logger.info "[IvDaily] #{ticker}: saved atm_iv=#{atm_iv}"
         success += 1
       rescue => e
         Rails.logger.error "[IvDaily] #{ticker}: FAILED — #{e.message}"
