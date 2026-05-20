@@ -31,7 +31,10 @@ class IvStatsService
   end
 
   def calculate
-    snapshots = IvDailySnapshot.for_ticker(@ticker).ordered.pluck(:atm_iv).map(&:to_f)
+    snapshots = IvDailySnapshot.for_ticker(@ticker).ordered
+                               .where.not(atm_iv: nil)
+                               .where("atm_iv > 0")
+                               .pluck(:atm_iv).map(&:to_f)
     available = snapshots.size
 
     quality = QUALITY_THRESHOLDS.find { |_, range| range.cover?(available) }&.first || :insufficient
