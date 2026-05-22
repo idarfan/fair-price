@@ -401,6 +401,13 @@ class IvAnalysis::PageComponent < ApplicationComponent
             return { text: '觀望', color: '#9ca3af' };
           }
 
+          function ttsIcons(text) {
+            var spk = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="11" height="11" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 1.414 3 3 0 010 4.243 1 1 0 01-1.414-1.414 1 1 0 000-1.415 1 1 0 010-1.414z"/></svg>';
+            var s = 'background:none;border:none;cursor:pointer;padding:1px 2px;line-height:1;vertical-align:middle;display:inline-flex;align-items:center';
+            return '<button class="card-tts-btn" data-tts-text="' + text + '" data-tts-gender="male" style="color:#3b82f6;' + s + '" title="男聲朗讀">' + spk + '</button>' +
+                   '<button class="card-tts-btn" data-tts-text="' + text + '" data-tts-gender="female" style="color:#ef4444;' + s + '" title="女聲朗讀">' + spk + '</button>';
+          }
+
           function buildGaugeCard(item, mode) {
             var W = 128, H = 86, cx = 64, cy = 68, r = 50, sw = 10;
             var isIvr = mode !== 'skew';
@@ -454,7 +461,7 @@ class IvAnalysis::PageComponent < ApplicationComponent
               (rank !== null ? rank.toFixed(1) : '—') + '</text>';
             var rankTipHtml = !isIvr
               ? '<div style="text-align:center;margin-top:-12px;margin-bottom:2px">' +
-                '<span data-tip-key="rank" style="cursor:pointer;color:#94a3b8;font-size:9px;user-select:none">❓ Skew Rank</span>' +
+                '<span data-tip-key="rank" style="cursor:pointer;color:#94a3b8;font-size:9px;user-select:none">❓ Skew Rank</span>' + ttsIcons('Skew Rank') +
                 '</div>'
               : '';
 
@@ -471,7 +478,7 @@ class IvAnalysis::PageComponent < ApplicationComponent
               var atmStr = item.latest_atm_iv !== null && item.latest_atm_iv !== undefined
                 ? 'ATM IV: ' + (parseFloat(item.latest_atm_iv) * 100).toFixed(1) + '%'
                 : (rank === null ? '尚無資料' : '');
-              detailLine = '<div style="text-align:center;font-size:10px;color:#9ca3af;margin-top:-2px">' + atmStr + '</div>';
+              detailLine = '<div style="text-align:center;font-size:10px;color:#9ca3af;margin-top:-2px">' + atmStr + ttsIcons('ATM IV') + '</div>';
             } else {
               var putStr  = item.put_iv_025  !== null && item.put_iv_025  !== undefined
                 ? (parseFloat(item.put_iv_025)  * 100).toFixed(1) + '%' : '—';
@@ -483,13 +490,13 @@ class IvAnalysis::PageComponent < ApplicationComponent
               detailLine =
                 '<div style="text-align:center;font-size:10px;color:#9ca3af;margin-top:-2px">' +
                   'Put: ' + putStr +
-                  '<span data-tip-key="put" style="' + tipStyle + '">❓</span>' +
+                  '<span data-tip-key="put" style="' + tipStyle + '">❓</span>' + ttsIcons('Put') +
                   ' | Call: ' + callStr +
-                  '<span data-tip-key="call" style="' + tipStyle + '">❓</span>' +
+                  '<span data-tip-key="call" style="' + tipStyle + '">❓</span>' + ttsIcons('Call') +
                 '</div>' +
                 '<div style="text-align:center;font-size:10px;color:#9ca3af">' +
                   'Skew: ' + skewStr +
-                  '<span data-tip-key="skew" style="' + tipStyle + '">❓</span>' +
+                  '<span data-tip-key="skew" style="' + tipStyle + '">❓</span>' + ttsIcons('Skew') +
                 '</div>';
             }
 
@@ -587,6 +594,12 @@ class IvAnalysis::PageComponent < ApplicationComponent
               card.addEventListener('mouseout', function() {
                 card.style.boxShadow = '';
                 card.style.transform = '';
+              });
+            });
+            cardsEl.querySelectorAll('.card-tts-btn').forEach(function(btn) {
+              btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (typeof window.ttsSpeak === 'function') window.ttsSpeak(btn.dataset.ttsText, btn.dataset.ttsGender);
               });
             });
           }

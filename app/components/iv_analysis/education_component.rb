@@ -1332,6 +1332,8 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
             currentAudio = audio;
           }
 
+          window.ttsSpeak = speak;
+
           // ── Wire TTS buttons ──────────────────────────────────────────
           document.querySelectorAll('.tts-btn').forEach(function (btn) {
             btn.addEventListener('click', function (e) {
