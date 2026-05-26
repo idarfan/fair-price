@@ -860,7 +860,7 @@ module.exports = {
       restart_delay: 3000,
     },
 ${telegram_apps}
-    // ── 歐歐每日盤前報告（台灣時間 21:00 & 22:00，腳本內部偵測 EDT/EST）
+    // ── 歐歐每日盤前報告（迴圈模式，腳本內部判斷週一至五 09:00–09:04 ET）
     {
       name: 'ouou-pre-market',
       script: './bin/ouou-pre-market.sh',
@@ -872,9 +872,11 @@ ${telegram_apps}
         PATH: '${full_path}',
         RBENV_ROOT: '${rbenv_root}',
       },
-      cron_restart: '0 21,22 * * 1-5',
-      autorestart: false,
+      autorestart: true,
       watch: false,
+      max_restarts: 10,
+      min_uptime: '10s',
+      restart_delay: 5000,
     },
 
     // ── IV Sidecar（Python Flask on :${SIDECAR_PORT}）
@@ -905,7 +907,7 @@ ${telegram_apps}
       watch: false,
     },
 
-    // ── IV 每日 ATM IV 快照（美股收盤後 04:30 台灣時間，週二〜六）
+    // ── IV 每日 ATM IV 快照（收盤後 16:30 ET = 20:30 UTC；pm2 daemon 以 TZ=UTC 啟動）
     {
       name: 'iv-daily-snapshot',
       script: './bin/iv-daily-snapshot.sh',
@@ -916,12 +918,12 @@ ${telegram_apps}
         RBENV_ROOT: '${rbenv_root}',
         PATH: '${full_path}',
       },
-      cron_restart: '30 4 * * 2-6',
+      cron_restart: '30 20 * * 1-5',
       autorestart: false,
       watch: false,
     },
 
-    // ── IV 每日 25-delta Skew 快照（美股收盤後 04:45 台灣時間，週二〜六）
+    // ── IV 每日 25-delta Skew 快照（收盤後 16:45 ET = 20:45 UTC）
     {
       name: 'iv-skew-snapshot',
       script: './bin/iv-skew-snapshot.sh',
@@ -932,7 +934,23 @@ ${telegram_apps}
         RBENV_ROOT: '${rbenv_root}',
         PATH: '${full_path}',
       },
-      cron_restart: '45 4 * * 2-6',
+      cron_restart: '45 20 * * 1-5',
+      autorestart: false,
+      watch: false,
+    },
+
+    // ── IV 盤中 30 分鐘 Skew 快照（ET 09:00-16:00 = UTC 13:00-20:00）
+    {
+      name: 'iv-skew-intraday',
+      script: './bin/iv-skew-intraday.sh',
+      cwd: '${APP_DIR}',
+      interpreter: '/bin/bash',
+      env: {
+        HOME: '${HOME_DIR}',
+        RBENV_ROOT: '${rbenv_root}',
+        PATH: '${full_path}',
+      },
+      cron_restart: '*/30 13-20 * * 1-5',
       autorestart: false,
       watch: false,
     },
@@ -996,45 +1014,45 @@ RAILS_SCRIPT
   # ── bin/ouou-pre-market.sh ──────────────────────────────
   cat > bin/ouou-pre-market.sh << 'PRE_MARKET'
 #!/bin/bash
-# 歐歐每日盤前報告
-# pm2 cron: 0 21,22 * * 1-5（台灣時間 21:00 & 22:00，週一至五）
-# 腳本自動偵測美東時間（EDT/EST），僅在紐約時間 09:00–09:04 執行。
-# 夏令（EDT, UTC-4）: 21:00 TWN = 09:00 EDT → 執行
-# 冬令（EST, UTC-5）: 22:00 TWN = 09:00 EST → 執行
-
-set -e
+# 歐歐每日盤前報告 — 迴圈模式
+# pm2 autorestart: true，crash 後自動重啟
+# 每 55 秒檢查一次紐約時間，僅在 09:00–09:04 ET 執行。
 
 export HOME=HOME_DIR_PLACEHOLDER
 export RBENV_ROOT="$HOME/.rbenv"
 export PATH="$RBENV_ROOT/shims:$RBENV_ROOT/bin:/usr/bin:/bin"
 
-# ── DST 自動偵測：只在紐約時間 09:00–09:04 執行 ──────────────────
-NY_HOUR=$(TZ=America/New_York date +%H)
-NY_MIN=$(TZ=America/New_York date +%M)
-
-if [[ "$NY_HOUR" != "09" || "$NY_MIN" -gt 4 ]]; then
-  echo "[ouou-pre-market] 跳過：紐約時間 ${NY_HOUR}:${NY_MIN}（非盤前窗口）"
-  exit 0
-fi
-
-echo "[ouou-pre-market] 啟動：紐約時間 ${NY_HOUR}:${NY_MIN} ($(TZ=America/New_York date +%Z))"
-
 eval "$(rbenv init -)"
 
 cd APP_DIR_PLACEHOLDER
 
-# 載入 .env
 if [ -f .env ]; then
-  set -a; source .env; set +a
+  set -a
+  source .env
+  set +a
 fi
 
-exec bundle exec rake ouou:pre_market
+while true; do
+  NY_HOUR=$(TZ=America/New_York date +%H)
+  NY_MIN=$(TZ=America/New_York date +%M)
+
+  NY_DOW=$(TZ=America/New_York date +%u)   # 1=週一 … 7=週日
+
+  if [[ "$NY_DOW" -le 5 && "$NY_HOUR" == "09" && $((10#$NY_MIN)) -le 4 ]]; then
+    echo "[ouou-pre-market] 啟動：紐約時間 ${NY_HOUR}:${NY_MIN}（$(TZ=America/New_York date +%Z)）"
+    bundle exec rake ouou:pre_market || echo "[ouou-pre-market] ❌ rake 失敗，繼續迴圈"
+    sleep 300
+  else
+    echo "[ouou-pre-market] 跳過：紐約時間 ${NY_HOUR}:${NY_MIN}（非盤前窗口）"
+    sleep 55
+  fi
+done
 PRE_MARKET
   # 替換 placeholder（避免 heredoc 與 bash 變數混用）
   sed -i "s|HOME_DIR_PLACEHOLDER|${HOME_DIR}|g" bin/ouou-pre-market.sh
   sed -i "s|APP_DIR_PLACEHOLDER|${APP_DIR}|g"   bin/ouou-pre-market.sh
   chmod +x bin/ouou-pre-market.sh
-  ok "bin/ouou-pre-market.sh 更新完成（DST 自動偵測）"
+  ok "bin/ouou-pre-market.sh 更新完成（迴圈模式）"
 
   # ── scripts/backup_db.sh ────────────────────────────────
   mkdir -p scripts
@@ -1074,7 +1092,7 @@ BACKUP_SCRIPT
   ok "scripts/backup_db.sh 建立完成"
 
   # ── bin/iv-daily-snapshot.sh + bin/iv-skew-snapshot.sh ─
-  for snapshot_bin in bin/iv-daily-snapshot.sh bin/iv-skew-snapshot.sh; do
+  for snapshot_bin in bin/iv-daily-snapshot.sh bin/iv-skew-snapshot.sh bin/iv-skew-intraday.sh; do
     [[ -f "$snapshot_bin" ]] || continue
     perl -pi -e "s|/home/idarfan/fairprice|${APP_DIR}|g" "$snapshot_bin"
     perl -pi -e "s|/home/idarfan|${HOME_DIR}|g"          "$snapshot_bin"
@@ -1100,13 +1118,13 @@ phase10_pm2() {
   step "pm2 服務啟動"
 
   # 停止舊的 fairprice 相關 process（若存在）
-  for proc in fairprice-rails fairprice-vite fairprice-iv-sidecar ouou-pre-market ouou-telegram-bot fairprice-db-backup iv-daily-snapshot iv-skew-snapshot kokoro-tts; do
+  for proc in fairprice-rails fairprice-vite fairprice-iv-sidecar ouou-pre-market ouou-telegram-bot fairprice-db-backup iv-daily-snapshot iv-skew-snapshot iv-skew-intraday kokoro-tts; do
     pm2 delete "$proc" &>/dev/null || true
   done
 
   set -a; source .env; set +a
 
-  pm2 start ecosystem.config.cjs
+  TZ=UTC pm2 start ecosystem.config.cjs
   pm2 save
   ok "pm2 processes 已啟動並儲存"
 
@@ -1194,6 +1212,7 @@ phase12_summary() {
   echo "  ║  pm2 logs fairprice-iv-sidecar  IV log           ║"
   echo "  ║  pm2 logs iv-daily-snapshot     IV 快照 log      ║"
   echo "  ║  pm2 logs iv-skew-snapshot      Skew 快照 log    ║"
+  echo "  ║  pm2 logs iv-skew-intraday      盤中 Skew log    ║"
   echo "  ║  pm2 logs kokoro-tts            TTS log          ║"
   echo "  ╠══════════════════════════════════════════════════╣"
   echo "  ║  資料庫備份：每天 22:00 自動執行                 ║"
