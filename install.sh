@@ -326,12 +326,18 @@ phase3c_kokoro_tts() {
   local kokoro_dir="${HOME_DIR}/kokoro_tts"
   mkdir -p "${kokoro_dir}/cache"
 
-  # ── Python 套件 ─────────────────────────────────────────
-  if python3 -c "import kokoro_onnx" &>/dev/null; then
+  # ── Python 套件（用 venv 隔離，避免 PEP 668 系統封鎖）──────
+  local kokoro_venv="${HOME_DIR}/kokoro-venv"
+  if [[ ! -d "${kokoro_venv}" ]]; then
+    info "建立 Python venv: ${kokoro_venv}..."
+    python3 -m venv "${kokoro_venv}"
+    ok "venv 建立完成"
+  fi
+  if "${kokoro_venv}/bin/python" -c "import kokoro_onnx" &>/dev/null; then
     skip "kokoro-onnx 已安裝"
   else
     info "安裝 kokoro-onnx soundfile..."
-    pip3 install --user --quiet kokoro-onnx soundfile
+    "${kokoro_venv}/bin/pip" install --quiet kokoro-onnx soundfile
     ok "kokoro-onnx 安裝完成"
   fi
 
@@ -960,7 +966,7 @@ ${telegram_apps}
       name: 'kokoro-tts',
       script: '${HOME_DIR}/kokoro_tts/server.py',
       cwd: '${HOME_DIR}/kokoro_tts',
-      interpreter: 'python3',
+      interpreter: '${HOME_DIR}/kokoro-venv/bin/python',
       autorestart: true,
       watch: false,
       max_restarts: 5,
