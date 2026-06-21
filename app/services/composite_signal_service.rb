@@ -10,9 +10,9 @@ class CompositeSignalService
     watching: "觀察中"
   }.freeze
 
-  def initialize(symbol)
+  def initialize(symbol, date: Date.today)
     @symbol = symbol.upcase
-    @today  = Date.today
+    @today  = date
   end
 
   def call
