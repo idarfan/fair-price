@@ -9,24 +9,24 @@ class TechnicalDashboardsController < ApplicationController
     @scrape_status = nil
     @scrape_errors = []
 
-    return unless @symbol.present?
-
-    if fresh_data_exists?(@symbol)
-      @result        = CompositeSignalService.new(@symbol).call
-      @scrape_status = :cached
-    else
-      scrape = BarchartScraperService.new(@symbol).call
-
-      case scrape[:status]
-      when "barchart_session_expired"
-        @scrape_status = :session_expired
-      when "success", "partial_error"
+    if @symbol.present?
+      if fresh_data_exists?(@symbol)
         @result        = CompositeSignalService.new(@symbol).call
-        @scrape_status = :fetched
-        @scrape_errors = scrape[:errors]
+        @scrape_status = :cached
       else
-        @scrape_status = :error
-        @scrape_errors = scrape[:errors]
+        scrape = BarchartScraperService.new(@symbol).call
+
+        case scrape[:status]
+        when "barchart_session_expired"
+          @scrape_status = :session_expired
+        when "success", "partial_error"
+          @result        = CompositeSignalService.new(@symbol).call
+          @scrape_status = :fetched
+          @scrape_errors = scrape[:errors]
+        else
+          @scrape_status = :error
+          @scrape_errors = scrape[:errors]
+        end
       end
     end
 

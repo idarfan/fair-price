@@ -63,7 +63,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
   def render_search_form
     form(
       id:     "td-form",
-      action: helpers.technical_dashboard_path,
+      action: "/technical_dashboard",
       method: "get",
       class:  "flex items-center gap-3"
     ) do
