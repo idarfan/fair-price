@@ -2,6 +2,10 @@
 Barchart Options Flow scraper (CDP direct WebSocket — no Playwright)
 Output: JSON to stdout
 Usage: python3 options_flow_scraper.py MU
+
+Filters: Size >= 10, Premium >= $10 (as shown in filter UI)
+Reads per-trade rows from bc-data-grid._data using .raw sub-objects.
+Also triggers CSV download for backup.
 """
 import asyncio
 import json
@@ -14,18 +18,13 @@ from cdp_helper import prepare_page, cdp_eval
 
 
 TARGET_PATH = "options-flow"
+GRID_SETTLE_S = 2.5
 
+# Exchange condition codes that correspond to block-style (auction-based) trades.
+# AUTO/SLAN = regular electronic; SLFT/TLFT = floor trades; MLET/MLAT = multi-leg.
+BLOCK_CODES = {"ISOI", "MLAT"}
 
-def parse_dollar(s):
-    if not s:
-        return None
-    try:
-        return int(float(re.sub(r"[$,\s]", "", s)))
-    except ValueError:
-        return None
-
-
-EXTRACT_JS = """
+SUMMARY_JS = """
 (() => {
     const container = document.querySelector('div.bc-futures-options-quotes-totals');
     if (!container) return null;
@@ -39,6 +38,140 @@ EXTRACT_JS = """
 })()
 """
 
+EXTRACT_ROWS_JS = """
+(() => {
+    const grid = document.querySelector('bc-data-grid');
+    if (!grid || !grid._data) return [];
+    return grid._data.map(row => {
+        const r = row.raw || row;
+        const tc = (r.tradeCondition || '').split(' - ')[0].trim();
+        return {
+            symbolType:     r.symbolType,
+            side:           r.side,
+            premium:        typeof r.premium === 'number'   ? r.premium   : null,
+            tradeSize:      typeof r.tradeSize === 'number' ? r.tradeSize : null,
+            dte:            r.dte,
+            tradeCondition: tc,
+            delta:          r.delta
+        };
+    });
+})()
+"""
+
+PAGINATION_JS = """
+(() => {
+    const nextLinks = [...document.querySelectorAll(
+        '.bc-table-pagination a.next:not(.ng-hide)'
+    )];
+    return nextLinks.map(a => a.textContent.trim()).filter(t => /^\\d+$/.test(t));
+})()
+"""
+
+
+def parse_dollar(s):
+    if not s:
+        return None
+    try:
+        return int(float(re.sub(r"[$,\s]", "", s)))
+    except ValueError:
+        return None
+
+
+async def apply_filters(ws):
+    js = """
+    (() => {
+        const premInp = document.querySelector('input[name="premium1"]');
+        if (premInp && (premInp.value === '' || premInp.value === '0')) {
+            premInp.value = '10';
+            premInp.dispatchEvent(new Event('input',  {bubbles: true}));
+            premInp.dispatchEvent(new Event('change', {bubbles: true}));
+        }
+        const btn = document.querySelector('.bc-button.ok.light-blue');
+        if (btn) btn.click();
+        return !!btn;
+    })()
+    """
+    return await cdp_eval(ws, js, timeout=5)
+
+
+async def click_page(ws, page_num):
+    js = f"""
+    (() => {{
+        const links = [...document.querySelectorAll(
+            '.bc-table-pagination a.next:not(.ng-hide)'
+        )];
+        const target = links.find(a => a.textContent.trim() === '{page_num}');
+        if (target) {{ target.click(); return true; }}
+        return false;
+    }})()
+    """
+    return await cdp_eval(ws, js, timeout=5)
+
+
+async def extract_all_rows(ws):
+    """Paginate through all pages and collect every row."""
+    all_rows = []
+
+    page_rows = await cdp_eval(ws, EXTRACT_ROWS_JS, timeout=10) or []
+    all_rows.extend(page_rows)
+
+    page_num = 2
+    MAX_PAGES = 20
+    while page_num <= MAX_PAGES:
+        next_pages = await cdp_eval(ws, PAGINATION_JS, timeout=5) or []
+        if str(page_num) not in next_pages:
+            break
+        clicked = await click_page(ws, str(page_num))
+        if not clicked:
+            break
+        await asyncio.sleep(GRID_SETTLE_S)
+        page_rows = await cdp_eval(ws, EXTRACT_ROWS_JS, timeout=10) or []
+        if not page_rows:
+            break
+        all_rows.extend(page_rows)
+        page_num += 1
+
+    return all_rows
+
+
+def compute_flow_metrics(rows):
+    call_rows = [r for r in rows if r.get("symbolType") == "Call"]
+    put_rows  = [r for r in rows if r.get("symbolType") == "Put"]
+
+    def prem_sum(lst, side=None):
+        return sum(
+            r["premium"] for r in lst
+            if r.get("premium") is not None
+            and (side is None or r.get("side") == side)
+        )
+
+    call_prem = prem_sum(call_rows)
+    put_prem  = prem_sum(put_rows)
+    ratio = round(call_prem / put_prem, 3) if put_prem > 0 else None
+
+    return {
+        "call_premium_total": call_prem,
+        "put_premium_total":  put_prem,
+        "call_put_ratio":     ratio,
+        "large_call_count":   sum(1 for r in call_rows if (r.get("premium") or 0) >= 500_000),
+        "large_put_count":    sum(1 for r in put_rows  if (r.get("premium") or 0) >= 500_000),
+        "ask_call_premium":   prem_sum(call_rows, side="ask"),
+        "ask_put_premium":    prem_sum(put_rows,  side="ask"),
+        "sweep_block_count":  sum(1 for r in rows if r.get("tradeCondition") in BLOCK_CODES),
+        "total_trades_loaded": len(rows),
+    }
+
+
+async def trigger_csv_download(ws):
+    js = """
+    (() => {
+        const btn = document.querySelector('span.js-download-button.js-main-title, .js-download-button');
+        if (btn) { btn.click(); return true; }
+        return false;
+    })()
+    """
+    return await cdp_eval(ws, js, timeout=5)
+
 
 async def main(symbol):
     _, ws = await prepare_page(symbol, TARGET_PATH, settle_ms=8000)
@@ -46,16 +179,25 @@ async def main(symbol):
         print(json.dumps({"status": "error", "error": "No Chrome CDP page found"}))
         return
 
-    stats = await cdp_eval(ws, EXTRACT_JS)
-
+    stats = await cdp_eval(ws, SUMMARY_JS)
     if stats is None:
         print(json.dumps({"status": "barchart_session_expired"}))
         return
 
     if len(stats) < 3:
-        print(json.dumps({"status": "dom_structure_changed",
-                          "error": f"Only {len(stats)} stats found"}))
+        print(json.dumps({
+            "status": "dom_structure_changed",
+            "error": f"Only {len(stats)} stats found",
+        }))
         return
+
+    await apply_filters(ws)
+    await asyncio.sleep(GRID_SETTLE_S)
+
+    all_rows = await extract_all_rows(ws)
+    flow_metrics = compute_flow_metrics(all_rows)
+
+    await trigger_csv_download(ws)
 
     bearish_raw = parse_dollar(stats.get("Bearish Trade Sentiment"))
     data = {
@@ -65,7 +207,8 @@ async def main(symbol):
         "bullish_delta":     parse_dollar(stats.get("Bullish Delta")),
         "bearish_delta":     parse_dollar(stats.get("Bearish Delta")),
         "delta_imbalance":   parse_dollar(stats.get("Delta Imbalance")),
-        "status":            "success",
+        **flow_metrics,
+        "status": "success",
     }
     print(json.dumps(data))
 

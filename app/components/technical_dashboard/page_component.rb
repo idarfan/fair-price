@@ -54,6 +54,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
       render_status_bar if @scrape_status
       if @result
         render_score_row
+        render_flow_detail
         render_divergences
         render_data_detail
       end
@@ -203,7 +204,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
       )
       render_score_card(
         title:    "Options Flow",
-        subtitle: "淨情緒 · Delta Imbalance",
+        subtitle: "C/P比率 · 主動買 · 大單分析",
         data:     flow,
         gauge_t:  options_flow_gauge_t(flow),
         palette:  :tech
@@ -225,12 +226,8 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
 
   def options_flow_gauge_t(data)
     return 0.5 if data[:missing]
-    sigs  = Array(data[:signals])
-    bulls = sigs.count { |s| s[:sentiment] == :bullish }
-    bears = sigs.count { |s| s[:sentiment] == :bearish }
-    return 0.85 if bulls >= 2
-    return 0.15 if bears >= 2
-    0.5
+    pts = (data[:points] || 0).clamp(-5, 5)
+    (pts + 5.0) / 10.0
   end
 
   def render_score_card(title:, subtitle:, data:, gauge_t:, palette: :tech)
@@ -350,6 +347,95 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
         <text x="100" y="131" font-size="13" font-weight="bold" text-anchor="middle" fill="#{nc}">#{label}</text>
       </svg>
     SVG
+  end
+
+
+  # ---------------------------------------------------------------------------
+  # Options Flow detailed breakdown panel
+  # ---------------------------------------------------------------------------
+  def render_flow_detail
+    flow = @result[:options_flow]
+    return if flow[:missing]
+
+    call_prem  = flow[:call_premium_total].to_i
+    put_prem   = flow[:put_premium_total].to_i
+    total_prem = call_prem + put_prem
+    return if total_prem == 0
+
+    call_pct = (call_prem.to_f / total_prem * 100).round(1)
+    put_pct  = (100 - call_pct).round(1)
+    ratio    = flow[:call_put_ratio]
+
+    ask_call = flow[:ask_call_premium].to_i
+    ask_put  = flow[:ask_put_premium].to_i
+    ask_total = ask_call + ask_put
+
+    lg_call  = flow[:large_call_count].to_i
+    lg_put   = flow[:large_put_count].to_i
+    total_t  = flow[:total_trades].to_i
+
+    div(class: "rounded-xl border border-gray-200 bg-white p-4 space-y-3") do
+      div(class: "flex items-center justify-between") do
+        p(class: "text-xs font-semibold text-gray-400 uppercase tracking-wider") { plain "Options Flow 細節" }
+        span(class: "text-xs text-gray-400") { plain "#{total_t} 筆交易" } if total_t > 0
+      end
+
+      # Call vs Put premium bar
+      div(class: "space-y-1") do
+        div(class: "flex justify-between text-xs text-gray-500 mb-0.5") do
+          span(class: "text-blue-500 font-medium") { plain "Call $#{sprintf("%.1f", call_prem / 1_000_000.0)}M (#{call_pct}%)" }
+          span(class: "text-red-500 font-medium")  { plain "Put $#{sprintf("%.1f", put_prem  / 1_000_000.0)}M (#{put_pct}%)" }
+        end
+        div(class: "h-3 rounded-full bg-red-200 overflow-hidden flex") do
+          div(class: "h-full bg-blue-500 rounded-l-full", style: "width:#{call_pct}%")
+        end
+        if ratio
+          ratio_color = ratio >= 1.5 ? "text-blue-600" : ratio <= 0.67 ? "text-red-600" : "text-gray-500"
+          p(class: "text-xs #{ratio_color} font-semibold mt-0.5") { plain "C/P 比率 #{sprintf("%.2f", ratio)}" }
+        end
+      end
+
+      # Ask-side (aggressive buyers) + large orders row
+      div(class: "grid grid-cols-2 gap-3 pt-1 border-t border-gray-100") do
+        # Ask-side
+        div do
+          p(class: "text-xs font-medium text-gray-500 mb-1") { plain "主動買（Ask成交）" }
+          if ask_total > 0
+            ask_call_pct = (ask_call.to_f / ask_total * 100).round(1)
+            div(class: "space-y-0.5") do
+              div(class: "flex justify-between text-xs") do
+                span(class: "text-blue-500") { plain "Call $#{sprintf("%.1f", ask_call / 1_000_000.0)}M" }
+                span(class: "text-red-500")  { plain "Put $#{sprintf("%.1f", ask_put  / 1_000_000.0)}M" }
+              end
+              div(class: "h-2 rounded-full bg-red-100 overflow-hidden") do
+                div(class: "h-full bg-blue-400 rounded-l-full", style: "width:#{ask_call_pct}%")
+              end
+            end
+          else
+            p(class: "text-xs text-gray-400") { plain "無資料" }
+          end
+        end
+
+        # Large orders ($500K+)
+        div do
+          p(class: "text-xs font-medium text-gray-500 mb-1") { plain "大單 (≥$500K)" }
+          if lg_call > 0 || lg_put > 0
+            div(class: "flex gap-4") do
+              div(class: "text-center") do
+                p(class: "text-lg font-bold text-blue-500") { plain lg_call.to_s }
+                p(class: "text-xs text-gray-400") { plain "Call" }
+              end
+              div(class: "text-center") do
+                p(class: "text-lg font-bold text-red-500") { plain lg_put.to_s }
+                p(class: "text-xs text-gray-400") { plain "Put" }
+              end
+            end
+          else
+            p(class: "text-xs text-gray-400") { plain "無大單" }
+          end
+        end
+      end
+    end
   end
 
   # ---------------------------------------------------------------------------

@@ -97,11 +97,11 @@ class CompositeSignalService
 
     score = if points >= 4
               :bullish
-            elsif points <= -3
+    elsif points <= -3
               :bearish
-            else
+    else
               :neutral
-            end
+    end
 
     { score: score, signals: signals, points: points }
   end
@@ -195,45 +195,102 @@ class CompositeSignalService
   end
 
   # ---------------------------------------------------------------------------
-  # Options Flow score: Net Trade Sentiment + Delta Imbalance
+  # Options Flow score: Net Trade Sentiment + Delta Imbalance + detailed metrics
   # ---------------------------------------------------------------------------
   def options_flow_score(flow)
     return { score: :neutral, signals: [], missing: true } unless flow
 
     signals = []
+    points  = 0
 
     net   = flow.net_sentiment
     delta = flow.delta_imbalance
 
     if net
-      amt = "$#{format("%.1f", net.abs / 1_000_000.0)}M"
+      amt = "$#{sprintf("%.1f", net.abs / 1_000_000.0)}M"
       if net > 0
+        points += 1
         signals << { text: "淨交易情緒 +#{amt}（買方主導）", sentiment: :bullish }
       else
+        points -= 1
         signals << { text: "淨交易情緒 -#{amt}（賣方主導）", sentiment: :bearish }
       end
     end
 
     if delta
       if delta > 0
+        points += 1
         signals << { text: "Delta Imbalance +#{delta.abs.to_i}（買權 Delta 過剩）", sentiment: :bullish }
       else
+        points -= 1
         signals << { text: "Delta Imbalance #{delta.to_i}（賣權 Delta 過剩）", sentiment: :bearish }
       end
     end
 
-    bulls = signals.count { |s| s[:sentiment] == :bullish }
-    bears = signals.count { |s| s[:sentiment] == :bearish }
+    # Call/Put premium ratio (primary directional signal)
+    ratio = flow.call_put_ratio&.to_f
+    if ratio
+      if ratio >= 2.0
+        points += 2
+        signals << { text: "Call/Put 比率 #{sprintf("%.2f", ratio)}（強力偏多）", sentiment: :bullish }
+      elsif ratio >= 1.5
+        points += 1
+        signals << { text: "Call/Put 比率 #{sprintf("%.2f", ratio)}（偏多）", sentiment: :bullish }
+      elsif ratio <= 0.5
+        points -= 2
+        signals << { text: "Call/Put 比率 #{sprintf("%.2f", ratio)}（強力偏空）", sentiment: :bearish }
+      elsif ratio <= 0.67
+        points -= 1
+        signals << { text: "Call/Put 比率 #{sprintf("%.2f", ratio)}（偏空）", sentiment: :bearish }
+      else
+        signals << { text: "Call/Put 比率 #{sprintf("%.2f", ratio)}（中性）", sentiment: :neutral }
+      end
+    end
 
-    score = if bulls > bears
+    # Ask-side (aggressive buyer) analysis
+    ask_call = flow.ask_call_premium&.to_i || 0
+    ask_put  = flow.ask_put_premium&.to_i  || 0
+    if ask_call > 0 || ask_put > 0
+      ask_ratio = ask_put > 0 ? ask_call.to_f / ask_put : Float::INFINITY
+      if ask_ratio >= 2.0
+        points += 1
+        signals << { text: "主動買 Call $#{sprintf("%.1f", ask_call / 1_000_000.0)}M vs Put $#{sprintf("%.1f", ask_put / 1_000_000.0)}M（機構積極買入看漲）", sentiment: :bullish }
+      elsif ask_ratio <= 0.5
+        points -= 1
+        signals << { text: "主動買 Put $#{sprintf("%.1f", ask_put / 1_000_000.0)}M vs Call $#{sprintf("%.1f", ask_call / 1_000_000.0)}M（機構積極買入看跌）", sentiment: :bearish }
+      end
+    end
+
+    # Large orders (premium >= $500K)
+    large_call = flow.large_call_count || 0
+    large_put  = flow.large_put_count  || 0
+    if large_call > 0 || large_put > 0
+      if large_call > large_put
+        points += 1
+        signals << { text: "大單 Call #{large_call} 筆 vs Put #{large_put} 筆（機構佈局偏多）", sentiment: :bullish }
+      elsif large_put > large_call
+        points -= 1
+        signals << { text: "大單 Put #{large_put} 筆 vs Call #{large_call} 筆（機構佈局偏空）", sentiment: :bearish }
+      end
+    end
+
+    score = if points >= 2
               :bullish
-    elsif bears > bulls
+    elsif points <= -2
               :bearish
     else
               :neutral
     end
 
-    { score: score, signals: signals }
+    { score: score, signals: signals, points: points,
+      call_premium_total: flow.call_premium_total,
+      put_premium_total:  flow.put_premium_total,
+      call_put_ratio:     ratio,
+      large_call_count:   large_call,
+      large_put_count:    large_put,
+      ask_call_premium:   ask_call,
+      ask_put_premium:    ask_put,
+      total_trades:       flow.total_trades_loaded }
   end
 
   # ---------------------------------------------------------------------------
