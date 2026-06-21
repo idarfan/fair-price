@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_21_135943) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_21_143447) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -152,6 +152,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_21_135943) do
 
   create_table "options_flows", force: :cascade do |t|
     t.bigint "ask_call_premium"
+    t.decimal "ask_call_put_ratio"
     t.bigint "ask_put_premium"
     t.bigint "bearish_delta"
     t.bigint "bearish_sentiment"
@@ -162,13 +163,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_21_135943) do
     t.datetime "created_at", null: false
     t.bigint "delta_imbalance"
     t.datetime "fetched_at", null: false
+    t.integer "high_delta_call_count"
     t.integer "large_call_count"
     t.integer "large_put_count"
+    t.bigint "long_dte_call_premium"
     t.bigint "net_sentiment"
     t.bigint "put_premium_total"
+    t.bigint "short_dte_put_premium"
     t.date "snapshot_date", null: false
     t.integer "sweep_block_count"
     t.string "symbol", null: false
+    t.jsonb "top_large_orders"
     t.integer "total_trades_loaded"
     t.datetime "updated_at", null: false
     t.index ["symbol", "snapshot_date"], name: "index_options_flows_on_symbol_and_snapshot_date", unique: true

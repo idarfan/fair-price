@@ -227,37 +227,25 @@ class CompositeSignalService
       end
     end
 
-    # Call/Put premium ratio (primary directional signal)
-    ratio = flow.call_put_ratio&.to_f
-    if ratio
-      if ratio >= 2.0
-        points += 2
-        signals << { text: "Call/Put 比率 #{sprintf("%.2f", ratio)}（強力偏多）", sentiment: :bullish }
-      elsif ratio >= 1.5
-        points += 1
-        signals << { text: "Call/Put 比率 #{sprintf("%.2f", ratio)}（偏多）", sentiment: :bullish }
-      elsif ratio <= 0.5
-        points -= 2
-        signals << { text: "Call/Put 比率 #{sprintf("%.2f", ratio)}（強力偏空）", sentiment: :bearish }
-      elsif ratio <= 0.67
-        points -= 1
-        signals << { text: "Call/Put 比率 #{sprintf("%.2f", ratio)}（偏空）", sentiment: :bearish }
-      else
-        signals << { text: "Call/Put 比率 #{sprintf("%.2f", ratio)}（中性）", sentiment: :neutral }
-      end
-    end
-
-    # Ask-side (aggressive buyer) analysis
-    ask_call = flow.ask_call_premium&.to_i || 0
-    ask_put  = flow.ask_put_premium&.to_i  || 0
-    if ask_call > 0 || ask_put > 0
-      ask_ratio = ask_put > 0 ? ask_call.to_f / ask_put : Float::INFINITY
+    # Ask-side C/P ratio (directional — excludes bid/mid noise)
+    ask_ratio = flow.ask_call_put_ratio&.to_f
+    ask_call  = flow.ask_call_premium&.to_i || 0
+    ask_put   = flow.ask_put_premium&.to_i  || 0
+    if ask_ratio
       if ask_ratio >= 2.0
+        points += 2
+        signals << { text: "主動買 C/P #{sprintf("%.2f", ask_ratio)}（Ask-side Call $#{sprintf("%.1f", ask_call / 1_000_000.0)}M 強力主導）", sentiment: :bullish }
+      elsif ask_ratio >= 1.5
         points += 1
-        signals << { text: "主動買 Call $#{sprintf("%.1f", ask_call / 1_000_000.0)}M vs Put $#{sprintf("%.1f", ask_put / 1_000_000.0)}M（機構積極買入看漲）", sentiment: :bullish }
+        signals << { text: "主動買 C/P #{sprintf("%.2f", ask_ratio)}（Ask-side 偏多）", sentiment: :bullish }
       elsif ask_ratio <= 0.5
+        points -= 2
+        signals << { text: "主動買 C/P #{sprintf("%.2f", ask_ratio)}（Ask-side Put 強力主導）", sentiment: :bearish }
+      elsif ask_ratio <= 0.67
         points -= 1
-        signals << { text: "主動買 Put $#{sprintf("%.1f", ask_put / 1_000_000.0)}M vs Call $#{sprintf("%.1f", ask_call / 1_000_000.0)}M（機構積極買入看跌）", sentiment: :bearish }
+        signals << { text: "主動買 C/P #{sprintf("%.2f", ask_ratio)}（Ask-side 偏空）", sentiment: :bearish }
+      else
+        signals << { text: "主動買 C/P #{sprintf("%.2f", ask_ratio)}（Ask-side 中性）", sentiment: :neutral }
       end
     end
 
@@ -267,11 +255,32 @@ class CompositeSignalService
     if large_call > 0 || large_put > 0
       if large_call > large_put
         points += 1
-        signals << { text: "大單 Call #{large_call} 筆 vs Put #{large_put} 筆（機構佈局偏多）", sentiment: :bullish }
+        signals << { text: "機構大單 Call #{large_call} 筆 vs Put #{large_put} 筆（≥$500K）", sentiment: :bullish }
       elsif large_put > large_call
         points -= 1
-        signals << { text: "大單 Put #{large_put} 筆 vs Call #{large_call} 筆（機構佈局偏空）", sentiment: :bearish }
+        signals << { text: "機構大單 Put #{large_put} 筆 vs Call #{large_call} 筆（≥$500K）", sentiment: :bearish }
+      else
+        signals << { text: "機構大單 Call #{large_call} = Put #{large_put} 筆（方向均衡）", sentiment: :neutral }
       end
+    end
+
+    # High-delta call (ask-side, delta >= 0.70) — strong directional conviction
+    high_delta = flow.high_delta_call_count || 0
+    if high_delta >= 2
+      points += 1
+      signals << { text: "高 Delta Call（≥0.70）#{high_delta} 筆主動買入（強確信方向押注）", sentiment: :bullish }
+    elsif high_delta == 1
+      signals << { text: "高 Delta Call（≥0.70）#{high_delta} 筆主動買入", sentiment: :bullish }
+    end
+
+    # Long DTE institutional vs short DTE hedging
+    long_dte_prem  = flow.long_dte_call_premium&.to_i || 0
+    short_dte_prem = flow.short_dte_put_premium&.to_i || 0
+    if long_dte_prem >= 500_000
+      signals << { text: "長 DTE Call（>180天）$#{sprintf("%.1f", long_dte_prem / 1_000_000.0)}M（機構長線佈局）", sentiment: :bullish }
+    end
+    if short_dte_prem >= 500_000
+      signals << { text: "短 DTE Put（<30天）$#{sprintf("%.1f", short_dte_prem / 1_000_000.0)}M（短線對沖壓力）", sentiment: :bearish }
     end
 
     score = if points >= 2
@@ -282,14 +291,21 @@ class CompositeSignalService
               :neutral
     end
 
-    { score: score, signals: signals, points: points,
+    { score:              score,
+      signals:            signals,
+      points:             points,
       call_premium_total: flow.call_premium_total,
       put_premium_total:  flow.put_premium_total,
-      call_put_ratio:     ratio,
+      call_put_ratio:     flow.call_put_ratio&.to_f,
+      ask_call_put_ratio: ask_ratio,
       large_call_count:   large_call,
       large_put_count:    large_put,
       ask_call_premium:   ask_call,
       ask_put_premium:    ask_put,
+      high_delta_call:    high_delta,
+      long_dte_call_prem: long_dte_prem,
+      short_dte_put_prem: short_dte_prem,
+      top_large_orders:   Array(flow.top_large_orders),
       total_trades:       flow.total_trades_loaded }
   end
 

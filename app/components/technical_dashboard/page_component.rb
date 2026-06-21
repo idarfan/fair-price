@@ -365,77 +365,168 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
     call_pct = (call_prem.to_f / total_prem * 100).round(1)
     put_pct  = (100 - call_pct).round(1)
     ratio    = flow[:call_put_ratio]
+    ask_ratio = flow[:ask_call_put_ratio]
 
     ask_call = flow[:ask_call_premium].to_i
     ask_put  = flow[:ask_put_premium].to_i
     ask_total = ask_call + ask_put
 
-    lg_call  = flow[:large_call_count].to_i
-    lg_put   = flow[:large_put_count].to_i
-    total_t  = flow[:total_trades].to_i
+    lg_call    = flow[:large_call_count].to_i
+    lg_put     = flow[:large_put_count].to_i
+    total_t    = flow[:total_trades].to_i
+    high_delta = flow[:high_delta_call].to_i
+    long_dte   = flow[:long_dte_call_prem].to_i
+    short_dte  = flow[:short_dte_put_prem].to_i
+    top_orders = Array(flow[:top_large_orders])
 
-    div(class: "rounded-xl border border-gray-200 bg-white p-4 space-y-3") do
+    div(class: "rounded-xl border border-gray-200 bg-white p-4 space-y-4") do
+      # Header
       div(class: "flex items-center justify-between") do
         p(class: "text-xs font-semibold text-gray-400 uppercase tracking-wider") { plain "Options Flow 細節" }
         span(class: "text-xs text-gray-400") { plain "#{total_t} 筆交易" } if total_t > 0
       end
 
-      # Call vs Put premium bar
-      div(class: "space-y-1") do
-        div(class: "flex justify-between text-xs text-gray-500 mb-0.5") do
+      # --- Section 1: Total C/P bar + Ask-side C/P ---
+      div(class: "space-y-2") do
+        p(class: "text-xs font-semibold text-gray-500 mb-1") { plain "全量 Call vs Put（含 bid/mid）" }
+        div(class: "flex justify-between text-xs mb-0.5") do
           span(class: "text-blue-500 font-medium") { plain "Call $#{sprintf("%.1f", call_prem / 1_000_000.0)}M (#{call_pct}%)" }
-          span(class: "text-red-500 font-medium")  { plain "Put $#{sprintf("%.1f", put_prem  / 1_000_000.0)}M (#{put_pct}%)" }
+          span(class: "text-red-500 font-medium")  { plain "Put $#{sprintf("%.1f", put_prem / 1_000_000.0)}M (#{put_pct}%)" }
         end
         div(class: "h-3 rounded-full bg-red-200 overflow-hidden flex") do
           div(class: "h-full bg-blue-500 rounded-l-full", style: "width:#{call_pct}%")
         end
-        if ratio
-          ratio_color = ratio >= 1.5 ? "text-blue-600" : ratio <= 0.67 ? "text-red-600" : "text-gray-500"
-          p(class: "text-xs #{ratio_color} font-semibold mt-0.5") { plain "C/P 比率 #{sprintf("%.2f", ratio)}" }
+        div(class: "flex items-center gap-4 mt-1") do
+          if ratio
+            ratio_color = ratio >= 1.5 ? "text-blue-600" : ratio <= 0.67 ? "text-red-600" : "text-gray-500"
+            span(class: "text-xs #{ratio_color} font-semibold") { plain "總 C/P 比率 #{sprintf("%.2f", ratio)}" }
+          end
+          if ask_ratio
+            ask_color = ask_ratio >= 1.5 ? "text-blue-700" : ask_ratio <= 0.67 ? "text-red-700" : "text-gray-500"
+            span(class: "text-xs #{ask_color} font-bold") { plain "Ask-only C/P #{sprintf("%.2f", ask_ratio)} ★" }
+          end
         end
       end
 
-      # Ask-side (aggressive buyers) + large orders row
-      div(class: "grid grid-cols-2 gap-3 pt-1 border-t border-gray-100") do
-        # Ask-side
-        div do
-          p(class: "text-xs font-medium text-gray-500 mb-1") { plain "主動買（Ask成交）" }
-          if ask_total > 0
-            ask_call_pct = (ask_call.to_f / ask_total * 100).round(1)
-            div(class: "space-y-0.5") do
-              div(class: "flex justify-between text-xs") do
-                span(class: "text-blue-500") { plain "Call $#{sprintf("%.1f", ask_call / 1_000_000.0)}M" }
-                span(class: "text-red-500")  { plain "Put $#{sprintf("%.1f", ask_put  / 1_000_000.0)}M" }
-              end
-              div(class: "h-2 rounded-full bg-red-100 overflow-hidden") do
-                div(class: "h-full bg-blue-400 rounded-l-full", style: "width:#{ask_call_pct}%")
-              end
+      # --- Section 2: Ask-side breakdown ---
+      div(class: "pt-2 border-t border-gray-100") do
+        p(class: "text-xs font-semibold text-gray-500 mb-1") { plain "主動買（Ask 成交 — 最具方向意義）" }
+        if ask_total > 0
+          ask_call_pct = (ask_call.to_f / ask_total * 100).round(1)
+          div(class: "flex justify-between text-xs mb-0.5") do
+            span(class: "text-blue-500") { plain "Call $#{sprintf("%.1f", ask_call / 1_000_000.0)}M (#{ask_call_pct}%)" }
+            span(class: "text-red-500")  { plain "Put $#{sprintf("%.1f", ask_put / 1_000_000.0)}M (#{(100 - ask_call_pct).round(1)}%)" }
+          end
+          div(class: "h-2 rounded-full bg-red-100 overflow-hidden") do
+            div(class: "h-full bg-blue-400 rounded-l-full", style: "width:#{ask_call_pct}%")
+          end
+        else
+          p(class: "text-xs text-gray-400") { plain "無 Ask 成交紀錄" }
+        end
+      end
+
+      # --- Section 3: Key indicators row ---
+      div(class: "grid grid-cols-3 gap-2 pt-2 border-t border-gray-100") do
+        # Large orders
+        div(class: "text-center") do
+          p(class: "text-xs font-semibold text-gray-500 mb-1") { plain "大單 (≥$500K)" }
+          div(class: "flex justify-center gap-3") do
+            div do
+              p(class: "text-base font-bold text-blue-500") { plain lg_call.to_s }
+              p(class: "text-xs text-gray-400") { plain "Call" }
             end
-          else
-            p(class: "text-xs text-gray-400") { plain "無資料" }
+            div do
+              p(class: "text-base font-bold text-red-500") { plain lg_put.to_s }
+              p(class: "text-xs text-gray-400") { plain "Put" }
+            end
           end
         end
-
-        # Large orders ($500K+)
+        # High-delta calls
+        div(class: "text-center") do
+          p(class: "text-xs font-semibold text-gray-500 mb-1") { plain "高 Delta Call" }
+          p(class: "text-xs text-gray-400 mb-0.5") { plain "≥0.70 ask-side" }
+          p(class: "text-base font-bold #{high_delta >= 2 ? "text-blue-500" : "text-gray-400"}") { plain high_delta.to_s }
+        end
+        # DTE signals
         div do
-          p(class: "text-xs font-medium text-gray-500 mb-1") { plain "大單 (≥$500K)" }
-          if lg_call > 0 || lg_put > 0
-            div(class: "flex gap-4") do
-              div(class: "text-center") do
-                p(class: "text-lg font-bold text-blue-500") { plain lg_call.to_s }
-                p(class: "text-xs text-gray-400") { plain "Call" }
+          p(class: "text-xs font-semibold text-gray-500 mb-1") { plain "DTE 分析" }
+          if long_dte >= 100_000
+            div(class: "flex items-center gap-1 mb-0.5") do
+              span(class: "text-blue-400 text-xs") { plain "▲" }
+              span(class: "text-xs text-blue-600") { plain "長線 $#{sprintf("%.1f", long_dte / 1_000_000.0)}M" }
+            end
+          end
+          if short_dte >= 100_000
+            div(class: "flex items-center gap-1") do
+              span(class: "text-red-400 text-xs") { plain "▼" }
+              span(class: "text-xs text-red-600") { plain "短期對沖 $#{sprintf("%.1f", short_dte / 1_000_000.0)}M" }
+            end
+          end
+          if long_dte < 100_000 && short_dte < 100_000
+            p(class: "text-xs text-gray-400") { plain "無顯著 DTE 訊號" }
+          end
+        end
+      end
+
+      # --- Section 4: Top large orders table ---
+      unless top_orders.empty?
+        div(class: "pt-2 border-t border-gray-100") do
+          p(class: "text-xs font-semibold text-gray-500 mb-2") { plain "機構大單明細（≥$500K，依 Premium 排序）" }
+          div(class: "overflow-x-auto") do
+            table(class: "w-full text-xs") do
+              thead do
+                tr(class: "text-gray-400 border-b border-gray-100") do
+                  th(class: "text-left py-1 pr-2 font-medium") { plain "型" }
+                  th(class: "text-left py-1 pr-2 font-medium") { plain "Strike" }
+                  th(class: "text-left py-1 pr-2 font-medium") { plain "到期" }
+                  th(class: "text-right py-1 pr-2 font-medium") { plain "DTE" }
+                  th(class: "text-center py-1 pr-2 font-medium") { plain "Side" }
+                  th(class: "text-right py-1 pr-2 font-medium") { plain "Premium" }
+                  th(class: "text-right py-1 font-medium") { plain "Delta" }
+                end
               end
-              div(class: "text-center") do
-                p(class: "text-lg font-bold text-red-500") { plain lg_put.to_s }
-                p(class: "text-xs text-gray-400") { plain "Put" }
+              tbody do
+                top_orders.each do |ord|
+                  is_call = ord["symbolType"] == "Call"
+                  is_ask  = ord["side"] == "ask"
+                  row_color = is_call ? "text-blue-600" : "text-red-600"
+                  exp = format_expiry(ord["expiration"])
+                  delta_val = ord["delta"] ? sprintf("%.2f", ord["delta"].to_f.abs) : "—"
+                  prem_m = ord["premium"] ? sprintf("$%.1fM", ord["premium"].to_i / 1_000_000.0) : "—"
+                  tr(class: "border-b border-gray-50 hover:bg-gray-50") do
+                    td(class: "py-1 pr-2 font-bold #{row_color}") { plain is_call ? "C" : "P" }
+                    td(class: "py-1 pr-2 font-mono text-gray-700") { plain ord["strikePrice"].to_s }
+                    td(class: "py-1 pr-2 text-gray-500") { plain exp }
+                    td(class: "py-1 pr-2 text-right text-gray-500") { plain (ord["dte"] || "—").to_s }
+                    td(class: "py-1 pr-2 text-center") do
+                      side_color = is_ask ? "text-green-600 font-bold" : "text-gray-400"
+                      span(class: side_color) { plain (ord["side"] || "—").upcase }
+                    end
+                    td(class: "py-1 pr-2 text-right font-medium #{row_color}") { plain prem_m }
+                    td(class: "py-1 text-right text-gray-500") { plain delta_val }
+                  end
+                end
               end
             end
-          else
-            p(class: "text-xs text-gray-400") { plain "無大單" }
           end
         end
       end
     end
+  end
+
+  def format_expiry(exp_str)
+    return "—" if exp_str.nil? || exp_str.empty?
+    # Handle "MM/DD/YY" format
+    if exp_str.match?(/^\d{2}\/\d{2}\/\d{2}$/)
+      m, d, y = exp_str.split("/")
+      return "#{m}/#{d}/#{y}"
+    end
+    # Handle ISO timestamp "2027-01-15T..."
+    if exp_str.match?(/^(\d{4})-(\d{2})-(\d{2})/)
+      m = exp_str.match(/^(\d{4})-(\d{2})-(\d{2})/)
+      return "#{m[2]}/#{m[3]}/#{m[1][2..]}"
+    end
+    exp_str.to_s[0, 10]
   end
 
   # ---------------------------------------------------------------------------

@@ -21,7 +21,6 @@ TARGET_PATH = "options-flow"
 GRID_SETTLE_S = 2.5
 
 # Exchange condition codes that correspond to block-style (auction-based) trades.
-# AUTO/SLAN = regular electronic; SLFT/TLFT = floor trades; MLET/MLAT = multi-leg.
 BLOCK_CODES = {"ISOI", "MLAT"}
 
 SUMMARY_JS = """
@@ -50,9 +49,11 @@ EXTRACT_ROWS_JS = """
             side:           r.side,
             premium:        typeof r.premium === 'number'   ? r.premium   : null,
             tradeSize:      typeof r.tradeSize === 'number' ? r.tradeSize : null,
-            dte:            r.dte,
+            dte:            typeof r.dte === 'number'       ? r.dte       : null,
+            delta:          typeof r.delta === 'number'     ? r.delta     : null,
             tradeCondition: tc,
-            delta:          r.delta
+            strikePrice:    r.strikePrice,
+            expiration:     r.expiration
         };
     });
 })()
@@ -111,7 +112,6 @@ async def click_page(ws, page_num):
 async def extract_all_rows(ws):
     """Paginate through all pages and collect every row."""
     all_rows = []
-
     page_rows = await cdp_eval(ws, EXTRACT_ROWS_JS, timeout=10) or []
     all_rows.extend(page_rows)
 
@@ -145,20 +145,77 @@ def compute_flow_metrics(rows):
             and (side is None or r.get("side") == side)
         )
 
+    # Total premiums (all sides)
     call_prem = prem_sum(call_rows)
     put_prem  = prem_sum(put_rows)
     ratio = round(call_prem / put_prem, 3) if put_prem > 0 else None
 
+    # Ask-side only (directional — aggressive buyers)
+    ask_call = prem_sum(call_rows, side="ask")
+    ask_put  = prem_sum(put_rows,  side="ask")
+    ask_ratio = round(ask_call / ask_put, 3) if ask_put > 0 else None
+
+    # Large orders (premium >= $500K), ask-side only for directional signal
+    large_orders = [
+        r for r in rows
+        if (r.get("premium") or 0) >= 500_000
+    ]
+    large_call_count = sum(1 for r in large_orders if r.get("symbolType") == "Call")
+    large_put_count  = sum(1 for r in large_orders if r.get("symbolType") == "Put")
+
+    # Top 10 large orders (by premium desc) for display
+    top_orders = sorted(
+        [r for r in large_orders if r.get("premium")],
+        key=lambda r: r["premium"],
+        reverse=True
+    )[:10]
+    top_orders_clean = [
+        {
+            "symbolType":  r.get("symbolType"),
+            "side":        r.get("side"),
+            "premium":     r.get("premium"),
+            "tradeSize":   r.get("tradeSize"),
+            "dte":         r.get("dte"),
+            "delta":       r.get("delta"),
+            "strikePrice": r.get("strikePrice"),
+            "expiration":  r.get("expiration"),
+        }
+        for r in top_orders
+    ]
+
+    # High-delta call (ask-side, delta >= 0.70) — strong directional
+    high_delta_call_count = sum(
+        1 for r in call_rows
+        if r.get("side") == "ask"
+        and r.get("delta") is not None
+        and abs(r["delta"]) >= 0.70
+    )
+
+    # Long DTE call (ask-side, DTE > 180) — institutional positioning
+    long_dte_call_premium = prem_sum(
+        [r for r in call_rows if r.get("side") == "ask" and (r.get("dte") or 0) > 180]
+    )
+
+    # Short DTE put (ask-side, DTE < 30) — short-term hedging
+    short_dte_put_premium = prem_sum(
+        [r for r in put_rows if r.get("side") == "ask" and (r.get("dte") or 999) < 30]
+    )
+
     return {
-        "call_premium_total": call_prem,
-        "put_premium_total":  put_prem,
-        "call_put_ratio":     ratio,
-        "large_call_count":   sum(1 for r in call_rows if (r.get("premium") or 0) >= 500_000),
-        "large_put_count":    sum(1 for r in put_rows  if (r.get("premium") or 0) >= 500_000),
-        "ask_call_premium":   prem_sum(call_rows, side="ask"),
-        "ask_put_premium":    prem_sum(put_rows,  side="ask"),
-        "sweep_block_count":  sum(1 for r in rows if r.get("tradeCondition") in BLOCK_CODES),
-        "total_trades_loaded": len(rows),
+        "call_premium_total":    call_prem,
+        "put_premium_total":     put_prem,
+        "call_put_ratio":        ratio,
+        "ask_call_premium":      ask_call,
+        "ask_put_premium":       ask_put,
+        "ask_call_put_ratio":    ask_ratio,
+        "large_call_count":      large_call_count,
+        "large_put_count":       large_put_count,
+        "high_delta_call_count": high_delta_call_count,
+        "long_dte_call_premium": long_dte_call_premium,
+        "short_dte_put_premium": short_dte_put_premium,
+        "top_large_orders":      top_orders_clean,
+        "sweep_block_count":     sum(1 for r in rows if r.get("tradeCondition") in BLOCK_CODES),
+        "total_trades_loaded":   len(rows),
     }
 
 
