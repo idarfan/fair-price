@@ -9,6 +9,13 @@ class TechnicalDashboardsController < ApplicationController
     @scrape_status = nil
     @scrape_errors = []
 
+    @recent_symbols = FetchLog.where(status: "success")
+                              .where("fetched_at > ?", 7.days.ago)
+                              .group(:symbol)
+                              .order("MAX(fetched_at) DESC")
+                              .pluck(:symbol)
+                              .first(10)
+
     if @symbol.present?
       if fresh_data_exists?(@symbol)
         @result        = CompositeSignalService.new(@symbol).call
@@ -31,10 +38,11 @@ class TechnicalDashboardsController < ApplicationController
     end
 
     render TechnicalDashboard::PageComponent.new(
-      symbol:        @symbol,
-      result:        @result,
-      scrape_status: @scrape_status,
-      scrape_errors: @scrape_errors,
+      symbol:         @symbol,
+      result:         @result,
+      scrape_status:  @scrape_status,
+      scrape_errors:  @scrape_errors,
+      recent_symbols: @recent_symbols,
     )
   end
 

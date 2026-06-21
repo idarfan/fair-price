@@ -22,17 +22,19 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
     confirm_bear: { bg: "bg-red-900/20",    border: "border-red-500/30",    icon: "🔴", text: "text-red-300" }
   }.freeze
 
-  def initialize(symbol: nil, result: nil, scrape_status: nil, scrape_errors: [])
+  def initialize(symbol: nil, result: nil, scrape_status: nil, scrape_errors: [], recent_symbols: [])
     @symbol        = symbol
     @result        = result
     @scrape_status = scrape_status
-    @scrape_errors = Array(scrape_errors)
+    @scrape_errors    = Array(scrape_errors)
+    @recent_symbols   = Array(recent_symbols)
   end
 
   def view_template
     div(class: "space-y-6") do
       render_header
       render_search_form
+      render_recent_symbols unless @recent_symbols.empty?
       render_status_bar if @scrape_status
       if @result
         render_score_row
@@ -89,6 +91,21 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
       ) do
         div(class: "w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin")
         plain "抓取資料中，請稍候…（約 20-30 秒）"
+      end
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Recent query history chips
+  # ---------------------------------------------------------------------------
+  def render_recent_symbols
+    div(class: "flex items-center gap-2 flex-wrap") do
+      span(class: "text-xs text-gray-400 shrink-0") { plain "近期查詢：" }
+      @recent_symbols.each do |sym|
+        a(
+          href:  "/technical_dashboard?symbol=#{sym}",
+          class: "px-2.5 py-0.5 rounded-full text-xs font-mono border "                  "#{sym == @symbol ? 'bg-blue-100 border-blue-400 text-blue-700 font-bold' : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600'}"
+        ) { plain sym }
       end
     end
   end
