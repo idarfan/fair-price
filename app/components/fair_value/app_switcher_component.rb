@@ -11,7 +11,8 @@ class FairValue::AppSwitcherComponent < ApplicationComponent
     { icon: "🏦", label: "持股結構",       href: "/ownership",     desc: "Watchlist 持股結構變化圖表" },
     { icon: "💹", label: "融資試算",       href: "/margin",               desc: "美股融資交易獲利試算與持股管理" },
     { icon: "📍", label: "期權歷史價格",   href: "/option_price_tracker", desc: "期權 Premium 歷史價格追蹤與分析" },
-    { icon: "🎯", label: "期權收益計算",   href: "/option_profit_calc",   desc: "期權賣出目標價試算｜達成預期獲利" }
+    { icon: "🎯", label: "期權收益計算",   href: "/option_profit_calc",   desc: "期權賣出目標價試算｜達成預期獲利" },
+    { icon: "🧭", label: "三維度判斷",     href: "/technical_dashboard",  desc: "技術面·基本面·Options Flow 獨立訊號並列" },
   ].freeze
 
   def initialize(navbar: false)

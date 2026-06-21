@@ -10,9 +10,63 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_17_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_21_085900) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "fetch_logs", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "error_detail"
+    t.string "fetch_type", null: false
+    t.datetime "fetched_at", null: false
+    t.string "status", null: false
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.index ["status"], name: "index_fetch_logs_on_status"
+    t.index ["symbol", "fetched_at"], name: "index_fetch_logs_on_symbol_and_fetched_at"
+  end
+
+  create_table "fundamentals", force: :cascade do |t|
+    t.integer "analyst_hold"
+    t.integer "analyst_moderate_buy"
+    t.integer "analyst_sell"
+    t.integer "analyst_strong_buy"
+    t.decimal "annual_income_m", precision: 12, scale: 2
+    t.decimal "annual_revenue_m", precision: 12, scale: 2
+    t.decimal "beta_60m", precision: 6, scale: 4
+    t.datetime "created_at", null: false
+    t.decimal "dividend_annual", precision: 8, scale: 4
+    t.decimal "dividend_yield", precision: 6, scale: 4
+    t.string "earnings_time"
+    t.decimal "ebit_m", precision: 12, scale: 2
+    t.decimal "ebitda_m", precision: 12, scale: 2
+    t.decimal "eps_ttm", precision: 10, scale: 4
+    t.decimal "expected_move_pct", precision: 8, scale: 4
+    t.datetime "fetched_at", null: false
+    t.decimal "hist_vol", precision: 8, scale: 4
+    t.decimal "iv", precision: 8, scale: 4
+    t.integer "iv_percentile"
+    t.decimal "iv_rank", precision: 5, scale: 2
+    t.bigint "market_cap_k"
+    t.date "most_recent_earnings_date"
+    t.decimal "most_recent_eps", precision: 10, scale: 4
+    t.date "next_earnings_date"
+    t.integer "open_interest"
+    t.integer "options_avg_volume"
+    t.integer "options_volume"
+    t.decimal "pb_ratio", precision: 8, scale: 2
+    t.decimal "pcf_ratio", precision: 8, scale: 2
+    t.decimal "pe_ttm", precision: 8, scale: 2
+    t.decimal "ps_ratio", precision: 8, scale: 2
+    t.decimal "put_call_oi_ratio", precision: 6, scale: 4
+    t.decimal "put_call_vol_ratio", precision: 6, scale: 4
+    t.string "sector"
+    t.bigint "shares_outstanding_k"
+    t.date "snapshot_date", null: false
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "snapshot_date"], name: "index_fundamentals_on_symbol_and_snapshot_date", unique: true
+  end
 
   create_table "iv_daily_snapshots", force: :cascade do |t|
     t.decimal "atm_iv", precision: 8, scale: 4
@@ -94,6 +148,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_17_100000) do
     t.index ["snapshot_date"], name: "index_option_snapshots_on_snapshot_date"
     t.index ["tracked_ticker_id"], name: "index_option_snapshots_on_tracked_ticker_id"
     t.check_constraint "bid > 0::numeric OR ask > 0::numeric OR last_price > 0::numeric", name: "chk_option_has_market_quote"
+  end
+
+  create_table "options_flows", force: :cascade do |t|
+    t.bigint "bearish_delta"
+    t.bigint "bearish_sentiment"
+    t.bigint "bullish_delta"
+    t.bigint "bullish_sentiment"
+    t.datetime "created_at", null: false
+    t.bigint "delta_imbalance"
+    t.datetime "fetched_at", null: false
+    t.bigint "net_sentiment"
+    t.date "snapshot_date", null: false
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "snapshot_date"], name: "index_options_flows_on_symbol_and_snapshot_date", unique: true
   end
 
   create_table "options_snapshots", force: :cascade do |t|
@@ -187,6 +256,99 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_17_100000) do
     t.datetime "updated_at", null: false
     t.index ["snapshot_time"], name: "index_skew_rank_intradays_on_snapshot_time"
     t.index ["ticker", "snapshot_time"], name: "index_skew_rank_intradays_on_ticker_and_snapshot_time", unique: true
+  end
+
+  create_table "technical_analyses", force: :cascade do |t|
+    t.decimal "adr_100d", precision: 10, scale: 4
+    t.decimal "adr_14d", precision: 10, scale: 4
+    t.decimal "adr_20d", precision: 10, scale: 4
+    t.decimal "adr_50d", precision: 10, scale: 4
+    t.decimal "adr_9d", precision: 10, scale: 4
+    t.decimal "adr_pct_100d", precision: 8, scale: 4
+    t.decimal "adr_pct_14d", precision: 8, scale: 4
+    t.decimal "adr_pct_20d", precision: 8, scale: 4
+    t.decimal "adr_pct_50d", precision: 8, scale: 4
+    t.decimal "adr_pct_9d", precision: 8, scale: 4
+    t.decimal "adx_100d", precision: 8, scale: 4
+    t.decimal "adx_14d", precision: 8, scale: 4
+    t.decimal "adx_20d", precision: 8, scale: 4
+    t.decimal "adx_50d", precision: 8, scale: 4
+    t.decimal "adx_9d", precision: 8, scale: 4
+    t.decimal "atr_100d", precision: 10, scale: 4
+    t.decimal "atr_14d", precision: 10, scale: 4
+    t.decimal "atr_20d", precision: 10, scale: 4
+    t.decimal "atr_50d", precision: 10, scale: 4
+    t.decimal "atr_9d", precision: 10, scale: 4
+    t.decimal "atr_pct_100d", precision: 8, scale: 4
+    t.decimal "atr_pct_14d", precision: 8, scale: 4
+    t.decimal "atr_pct_20d", precision: 8, scale: 4
+    t.decimal "atr_pct_50d", precision: 8, scale: 4
+    t.decimal "atr_pct_9d", precision: 8, scale: 4
+    t.datetime "created_at", null: false
+    t.decimal "di_minus_100d", precision: 8, scale: 4
+    t.decimal "di_minus_14d", precision: 8, scale: 4
+    t.decimal "di_minus_20d", precision: 8, scale: 4
+    t.decimal "di_minus_50d", precision: 8, scale: 4
+    t.decimal "di_minus_9d", precision: 8, scale: 4
+    t.decimal "di_plus_100d", precision: 8, scale: 4
+    t.decimal "di_plus_14d", precision: 8, scale: 4
+    t.decimal "di_plus_20d", precision: 8, scale: 4
+    t.decimal "di_plus_50d", precision: 8, scale: 4
+    t.decimal "di_plus_9d", precision: 8, scale: 4
+    t.datetime "fetched_at", null: false
+    t.decimal "hist_vol_100d", precision: 8, scale: 4
+    t.decimal "hist_vol_14d", precision: 8, scale: 4
+    t.decimal "hist_vol_20d", precision: 8, scale: 4
+    t.decimal "hist_vol_50d", precision: 8, scale: 4
+    t.decimal "hist_vol_9d", precision: 8, scale: 4
+    t.decimal "ma_100d", precision: 10, scale: 2
+    t.decimal "ma_200d", precision: 10, scale: 2
+    t.decimal "ma_20d", precision: 10, scale: 2
+    t.decimal "ma_50d", precision: 10, scale: 2
+    t.decimal "ma_5d", precision: 10, scale: 2
+    t.bigint "ma_avg_vol_100d"
+    t.bigint "ma_avg_vol_200d"
+    t.bigint "ma_avg_vol_20d"
+    t.bigint "ma_avg_vol_50d"
+    t.bigint "ma_avg_vol_5d"
+    t.bigint "ma_avg_vol_ytd"
+    t.decimal "ma_pct_chg_100d", precision: 8, scale: 4
+    t.decimal "ma_pct_chg_200d", precision: 8, scale: 4
+    t.decimal "ma_pct_chg_20d", precision: 8, scale: 4
+    t.decimal "ma_pct_chg_50d", precision: 8, scale: 4
+    t.decimal "ma_pct_chg_5d", precision: 8, scale: 4
+    t.decimal "ma_pct_chg_ytd", precision: 8, scale: 4
+    t.decimal "ma_price_chg_100d", precision: 10, scale: 2
+    t.decimal "ma_price_chg_200d", precision: 10, scale: 2
+    t.decimal "ma_price_chg_20d", precision: 10, scale: 2
+    t.decimal "ma_price_chg_50d", precision: 10, scale: 2
+    t.decimal "ma_price_chg_5d", precision: 10, scale: 2
+    t.decimal "ma_price_chg_ytd", precision: 10, scale: 2
+    t.decimal "ma_ytd", precision: 10, scale: 2
+    t.date "snapshot_date", null: false
+    t.decimal "stoch_d_100d", precision: 8, scale: 4
+    t.decimal "stoch_d_14d", precision: 8, scale: 4
+    t.decimal "stoch_d_20d", precision: 8, scale: 4
+    t.decimal "stoch_d_50d", precision: 8, scale: 4
+    t.decimal "stoch_d_9d", precision: 8, scale: 4
+    t.decimal "stoch_k_100d", precision: 8, scale: 4
+    t.decimal "stoch_k_14d", precision: 8, scale: 4
+    t.decimal "stoch_k_20d", precision: 8, scale: 4
+    t.decimal "stoch_k_50d", precision: 8, scale: 4
+    t.decimal "stoch_k_9d", precision: 8, scale: 4
+    t.decimal "stoch_raw_100d", precision: 8, scale: 4
+    t.decimal "stoch_raw_14d", precision: 8, scale: 4
+    t.decimal "stoch_raw_20d", precision: 8, scale: 4
+    t.decimal "stoch_raw_50d", precision: 8, scale: 4
+    t.decimal "stoch_raw_9d", precision: 8, scale: 4
+    t.decimal "stoch_rs_100d", precision: 8, scale: 4
+    t.decimal "stoch_rs_14d", precision: 8, scale: 4
+    t.decimal "stoch_rs_20d", precision: 8, scale: 4
+    t.decimal "stoch_rs_50d", precision: 8, scale: 4
+    t.decimal "stoch_rs_9d", precision: 8, scale: 4
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "snapshot_date"], name: "index_technical_analyses_on_symbol_and_snapshot_date", unique: true
   end
 
   create_table "tracked_tickers", force: :cascade do |t|

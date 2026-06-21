@@ -42,3 +42,17 @@
 @media (hover: hover) {
   .hover\:bg-blue-400:hover { background-color: var(--color-blue-400, oklch(70.7% .165 254.624)); }
 }
+
+/* Technical Dashboard score card color variants — static declarations for Tailwind scanner */
+.border-green-500 { border-color: var(--color-green-500, oklch(72.3% .219 149.579)); }
+.border-red-500   { border-color: var(--color-red-500,   oklch(63.7% .237 25.331));  }
+.border-gray-500  { border-color: var(--color-gray-500,  oklch(55.1% .027 264.364)); }
+.border-yellow-500{ border-color: var(--color-yellow-500,oklch(79.5% .184 86.047));  }
+.text-green-400  { color: var(--color-green-400,  oklch(79.2% .209 151.711)); }
+.text-red-400    { color: var(--color-red-400,    oklch(70.4% .191 22.216));  }
+.text-gray-400   { color: var(--color-gray-400,   oklch(70.7% .022 261.325)); }
+.text-yellow-400 { color: var(--color-yellow-400, oklch(85.2% .199 91.936));  }
+.bg-green-500\/10  { background-color: color-mix(in srgb, oklch(72.3% .219 149.579) 10%, transparent); }
+.bg-red-500\/10    { background-color: color-mix(in srgb, oklch(63.7% .237 25.331)  10%, transparent); }
+.bg-gray-500\/10   { background-color: color-mix(in srgb, oklch(55.1% .027 264.364) 10%, transparent); }
+.bg-yellow-500\/10 { background-color: color-mix(in srgb, oklch(79.5% .184 86.047)  10%, transparent); }

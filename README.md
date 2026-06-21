@@ -1,5 +1,16 @@
 # FairPrice
 
+### 2026-06-21 — 技術面/基本面/Options Flow 三維度判斷儀表板
+
+- 新增 Barchart CDP scraper 三件套（, , ）
+- 直接 WebSocket 連 CDP（非 Playwright），解決 Windows Chrome 背景 tab 凍結問題（Target.activateTarget）
+- 新增 DB 表：, , , 
+- ：依序爬取三維度資料，任一步驟 session 過期即中止
+- ：三個獨立分數（技術/基本面/Options Flow），絕不合併，背離時生成警示文字
+- Phlex ：深色評分卡、背離警示、5 分鐘快取
+- 路由：，已加入側邊欄 🧭 三維度判斷
+
+
 美股公平價值分析 + 每日動能報告工具，運行於 port 3003。
 
 ## 技術棧

@@ -112,6 +112,9 @@ Rails.application.routes.draw do
   # IV Analysis
   get "iv_analysis", to: "iv_analysis#index", as: :iv_analysis
 
+  # Technical / Fundamental / Options Flow Dashboard
+  get "technical_dashboard", to: "technical_dashboards#index", as: :technical_dashboard
+
 # IV Skew Watchlist
 resources :iv_watchlists, only: [ :index, :create, :destroy ] do
   member do
