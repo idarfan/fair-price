@@ -166,65 +166,146 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
   # Three score cards
   # ---------------------------------------------------------------------------
   def render_score_row
+    tech = @result[:technical]
+    fund = @result[:fundamental]
+    flow = @result[:options_flow]
+
     div(class: "grid grid-cols-3 gap-4") do
       render_score_card(
-        title:   "技術面",
+        title:    "技術面",
         subtitle: "MA · ADX · Stochastic",
-        data:    @result[:technical]
+        data:     tech,
+        gauge_t:  technical_gauge_t(tech)
       )
       render_score_card(
-        title:   "基本面",
+        title:    "基本面",
         subtitle: "分析師評級 · EPS · P/E",
-        data:    @result[:fundamental]
+        data:     fund,
+        gauge_t:  fundamental_gauge_t(fund)
       )
       render_score_card(
-        title:   "Options Flow",
+        title:    "Options Flow",
         subtitle: "淨情緒 · Delta Imbalance",
-        data:    @result[:options_flow]
+        data:     flow,
+        gauge_t:  options_flow_gauge_t(flow)
       )
     end
   end
 
-  def render_score_card(title:, subtitle:, data:)
+  def technical_gauge_t(data)
+    return 0.5 if data[:missing]
+    pts = (data[:points] || 0).clamp(-8, 8)
+    (pts + 8.0) / 16.0
+  end
+
+  def fundamental_gauge_t(data)
+    return 0.5 if data[:missing] || data[:score] == :watching
+    pts = (data[:points] || 0).clamp(-4, 4)
+    (pts + 4.0) / 8.0
+  end
+
+  def options_flow_gauge_t(data)
+    return 0.5 if data[:missing]
+    sigs  = Array(data[:signals])
+    bulls = sigs.count { |s| s[:sentiment] == :bullish }
+    bears = sigs.count { |s| s[:sentiment] == :bearish }
+    return 0.85 if bulls >= 2
+    return 0.15 if bears >= 2
+    0.5
+  end
+
+  def render_score_card(title:, subtitle:, data:, gauge_t:)
     score = data[:score]
     meta  = SCORE_META[score]
     color = meta[:color]
-
-    # Static class strings — all variants declared in application.css
     border_class = "border-#{color}-500"
     text_class   = "text-#{color}-400"
     bg_class     = "bg-#{color}-500/10"
 
-    div(class: "rounded-xl border-2 bg-gray-900 p-5 space-y-4 #{border_class}") do
-      # Title + score
-      div(class: "flex items-start justify-between") do
+    # Signal counts
+    sigs   = Array(data[:signals])
+    n_bear = sigs.count { |s| s[:sentiment] == :bearish }
+    n_neu  = sigs.count { |s| s[:sentiment] == :neutral }
+    n_bull = sigs.count { |s| s[:sentiment] == :bullish }
+
+    div(class: "rounded-xl border-2 bg-gray-900 p-4 space-y-3 #{border_class}") do
+      # Header row
+      div(class: "flex items-center justify-between") do
         div do
           p(class: "text-xs font-semibold text-gray-400 uppercase tracking-wider") { plain title }
-          p(class: "text-xs text-gray-500 mt-0.5") { plain subtitle }
+          p(class: "text-xs text-gray-600 mt-0.5") { plain subtitle }
         end
-        div(class: "text-right") do
-          div(class: "text-3xl font-bold #{text_class}") { plain meta[:icon] }
-          div(class: "text-xs font-bold mt-1 px-2 py-0.5 rounded-full inline-block #{bg_class} #{text_class}") do
-            plain meta[:label]
+        div(class: "text-xs font-bold px-2 py-0.5 rounded-full #{bg_class} #{text_class}") do
+          plain meta[:label]
+        end
+      end
+
+      # Gauge SVG
+      raw(gauge_svg(t: gauge_t, missing: data[:missing]))
+
+      # Signal counts
+      unless data[:missing]
+        div(class: "flex justify-around text-center border-t border-gray-800 pt-2") do
+          div do
+            p(class: "text-lg font-bold text-red-400") { plain n_bear.to_s }
+            p(class: "text-xs text-gray-500") { plain "空" }
+          end
+          div do
+            p(class: "text-lg font-bold text-gray-400") { plain n_neu.to_s }
+            p(class: "text-xs text-gray-500") { plain "中性" }
+          end
+          div do
+            p(class: "text-lg font-bold text-green-400") { plain n_bull.to_s }
+            p(class: "text-xs text-gray-500") { plain "多" }
           end
         end
       end
 
-      # Signals
-      if data[:missing]
-        p(class: "text-xs text-gray-500 italic") { plain "尚無資料" }
-      else
-        div(class: "space-y-1.5") do
-          Array(data[:signals]).first(5).each do |sig|
+      # Key signals (max 3)
+      unless data[:missing] || sigs.empty?
+        div(class: "space-y-1") do
+          sigs.first(3).each do |sig|
             dot = SIGNAL_DOT[sig[:sentiment]] || "bg-gray-400"
-            div(class: "flex items-start gap-2") do
+            div(class: "flex items-start gap-1.5") do
               span(class: "w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 #{dot}")
-              span(class: "text-xs text-gray-300 leading-snug") { plain sig[:text] }
+              span(class: "text-xs text-gray-400 leading-snug") { plain sig[:text] }
             end
           end
         end
       end
     end
+  end
+
+  def gauge_svg(t:, missing: false)
+    t = missing ? 0.5 : t.clamp(0.0, 1.0)
+    theta = Math::PI * (1.0 - t)
+    nx    = (100 + 65 * Math.cos(theta)).round(1)
+    ny    = (100 - 65 * Math.sin(theta)).round(1)
+
+    # Needle base dot and line color
+    needle_color = missing ? "#6b7280" : "#f3f4f6"
+
+    <<~SVG.html_safe
+      <svg viewBox="0 0 200 118" width="100%" xmlns="http://www.w3.org/2000/svg" style="display:block">
+        <!-- Background track -->
+        <path d="M 20,100 A 80,80 0 0,1 180,100" fill="none" stroke="#374151" stroke-width="10" stroke-linecap="round"/>
+        <!-- Zone arcs -->
+        <path d="M 20,100 A 80,80 0 0,1 35.3,53" fill="none" stroke="#ef4444" stroke-width="10" stroke-linecap="round"/>
+        <path d="M 35.3,53 A 80,80 0 0,1 75.3,23.9" fill="none" stroke="#f87171" stroke-width="10"/>
+        <path d="M 75.3,23.9 A 80,80 0 0,1 124.7,23.9" fill="none" stroke="#6b7280" stroke-width="10"/>
+        <path d="M 124.7,23.9 A 80,80 0 0,1 164.7,53" fill="none" stroke="#818cf8" stroke-width="10"/>
+        <path d="M 164.7,53 A 80,80 0 0,1 180,100" fill="none" stroke="#3b82f6" stroke-width="10" stroke-linecap="round"/>
+        <!-- Zone labels -->
+        <text x="10" y="114" font-size="8" text-anchor="middle" fill="#6b7280">強空</text>
+        <text x="43" y="52" font-size="8" text-anchor="middle" fill="#6b7280">空</text>
+        <text x="100" y="14" font-size="8" text-anchor="middle" fill="#6b7280">中性</text>
+        <text x="157" y="52" font-size="8" text-anchor="middle" fill="#6b7280">多</text>
+        <text x="190" y="114" font-size="8" text-anchor="middle" fill="#6b7280">強多</text>
+        <!-- Needle -->
+        <line x1="100" y1="100" x2="#{nx}" y2="#{ny}" stroke="#{needle_color}" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="100" cy="100" r="5" fill="#{needle_color}"/>
+      </svg>
+    SVG
   end
 
   # ---------------------------------------------------------------------------
