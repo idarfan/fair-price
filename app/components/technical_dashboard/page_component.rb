@@ -22,6 +22,22 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
     confirm_bear: { bg: "bg-red-900/20",    border: "border-red-500/30",    icon: "🔴", text: "text-red-300" }
   }.freeze
 
+  TECH_GRADIENT = [
+    [0.00, [239, 68,  68]],
+    [0.25, [248, 113, 113]],
+    [0.50, [156, 163, 175]],
+    [0.75, [129, 140, 248]],
+    [1.00, [59,  130, 246]],
+  ].freeze
+
+  ANALYST_GRADIENT = [
+    [0.00, [239, 68,  68]],
+    [0.25, [249, 115, 22]],
+    [0.50, [234, 179,  8]],
+    [0.75, [132, 204, 22]],
+    [1.00, [34,  197, 94]],
+  ].freeze
+
   def initialize(symbol: nil, result: nil, scrape_status: nil, scrape_errors: [], recent_symbols: [])
     @symbol        = symbol
     @result        = result
@@ -175,19 +191,22 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
         title:    "技術面",
         subtitle: "MA · ADX · Stochastic",
         data:     tech,
-        gauge_t:  technical_gauge_t(tech)
+        gauge_t:  technical_gauge_t(tech),
+        palette:  :tech
       )
       render_score_card(
         title:    "基本面",
         subtitle: "分析師評級 · EPS · P/E",
         data:     fund,
-        gauge_t:  fundamental_gauge_t(fund)
+        gauge_t:  fundamental_gauge_t(fund),
+        palette:  :analyst
       )
       render_score_card(
         title:    "Options Flow",
         subtitle: "淨情緒 · Delta Imbalance",
         data:     flow,
-        gauge_t:  options_flow_gauge_t(flow)
+        gauge_t:  options_flow_gauge_t(flow),
+        palette:  :tech
       )
     end
   end
@@ -214,7 +233,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
     0.5
   end
 
-  def render_score_card(title:, subtitle:, data:, gauge_t:)
+  def render_score_card(title:, subtitle:, data:, gauge_t:, palette: :tech)
     score = data[:score]
     meta  = SCORE_META[score]
     color = meta[:color]
@@ -228,7 +247,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
     n_neu  = sigs.count { |s| s[:sentiment] == :neutral }
     n_bull = sigs.count { |s| s[:sentiment] == :bullish }
 
-    div(class: "rounded-xl border-2 bg-gray-900 p-4 space-y-3 #{border_class}") do
+    div(class: "rounded-xl border-2 bg-white shadow-sm p-4 space-y-3 #{border_class}") do
       # Header row
       div(class: "flex items-center justify-between") do
         div do
@@ -241,7 +260,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
       end
 
       # Gauge SVG
-      raw(gauge_svg(t: gauge_t, missing: data[:missing]))
+      raw(gauge_svg(t: gauge_t, missing: data[:missing], label: meta[:label], palette: palette))
 
       # Signal counts
       unless data[:missing]
@@ -268,7 +287,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
             dot = SIGNAL_DOT[sig[:sentiment]] || "bg-gray-400"
             div(class: "flex items-start gap-1.5") do
               span(class: "w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 #{dot}")
-              span(class: "text-xs text-gray-400 leading-snug") { plain sig[:text] }
+              span(class: "text-xs text-gray-600 leading-snug") { plain sig[:text] }
             end
           end
         end
@@ -276,34 +295,59 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
     end
   end
 
-  def gauge_svg(t:, missing: false)
-    t = missing ? 0.5 : t.clamp(0.0, 1.0)
+  def gauge_color(t, stops)
+    t = t.clamp(0.0, 1.0)
+    lo_i = (stops.rindex { |t0, _| t0 <= t } || 0)
+    hi_i = [lo_i + 1, stops.length - 1].min
+    lo_t, lo_c = stops[lo_i]
+    hi_t, hi_c = stops[hi_i]
+    f = hi_t > lo_t ? (t - lo_t).to_f / (hi_t - lo_t) : 0.0
+    r = (lo_c[0] + f * (hi_c[0] - lo_c[0])).round
+    g = (lo_c[1] + f * (hi_c[1] - lo_c[1])).round
+    b = (lo_c[2] + f * (hi_c[2] - lo_c[2])).round
+    "rgb(#{r},#{g},#{b})"
+  end
+
+  def gauge_svg(t:, label:, missing: false, palette: :tech)
+    t     = missing ? 0.5 : t.clamp(0.0, 1.0)
+    stops = palette == :analyst ? ANALYST_GRADIENT : TECH_GRADIENT
+    n     = 40
+
+    segs = (0...n).map do |i|
+      t0 = i.to_f / n
+      t1 = (i + 1).to_f / n
+      theta0 = Math::PI * (1.0 - t0)
+      theta1 = Math::PI * (1.0 - t1)
+      x0 = (100 + 80 * Math.cos(theta0)).round(3)
+      y0 = (100 - 80 * Math.sin(theta0)).round(3)
+      x1 = (100 + 80 * Math.cos(theta1)).round(3)
+      y1 = (100 - 80 * Math.sin(theta1)).round(3)
+      color = gauge_color((t0 + t1) / 2.0, stops)
+      %(<path d="M #{x0},#{y0} A 80,80 0 0,1 #{x1},#{y1}" fill="none" stroke="#{color}" stroke-width="12"/>)
+    end.join
+
+    c0 = gauge_color(0.0, stops)
+    c1 = gauge_color(1.0, stops)
+
     theta = Math::PI * (1.0 - t)
     nx    = (100 + 65 * Math.cos(theta)).round(1)
     ny    = (100 - 65 * Math.sin(theta)).round(1)
-
-    # Needle base dot and line color
-    needle_color = missing ? "#6b7280" : "#f3f4f6"
+    nc    = missing ? "#9ca3af" : "#111827"
 
     <<~SVG.html_safe
-      <svg viewBox="0 0 200 118" width="100%" xmlns="http://www.w3.org/2000/svg" style="display:block">
-        <!-- Background track -->
-        <path d="M 20,100 A 80,80 0 0,1 180,100" fill="none" stroke="#374151" stroke-width="10" stroke-linecap="round"/>
-        <!-- Zone arcs -->
-        <path d="M 20,100 A 80,80 0 0,1 35.3,53" fill="none" stroke="#ef4444" stroke-width="10" stroke-linecap="round"/>
-        <path d="M 35.3,53 A 80,80 0 0,1 75.3,23.9" fill="none" stroke="#f87171" stroke-width="10"/>
-        <path d="M 75.3,23.9 A 80,80 0 0,1 124.7,23.9" fill="none" stroke="#6b7280" stroke-width="10"/>
-        <path d="M 124.7,23.9 A 80,80 0 0,1 164.7,53" fill="none" stroke="#818cf8" stroke-width="10"/>
-        <path d="M 164.7,53 A 80,80 0 0,1 180,100" fill="none" stroke="#3b82f6" stroke-width="10" stroke-linecap="round"/>
-        <!-- Zone labels -->
-        <text x="10" y="114" font-size="8" text-anchor="middle" fill="#6b7280">強空</text>
-        <text x="43" y="52" font-size="8" text-anchor="middle" fill="#6b7280">空</text>
-        <text x="100" y="14" font-size="8" text-anchor="middle" fill="#6b7280">中性</text>
-        <text x="157" y="52" font-size="8" text-anchor="middle" fill="#6b7280">多</text>
-        <text x="190" y="114" font-size="8" text-anchor="middle" fill="#6b7280">強多</text>
-        <!-- Needle -->
-        <line x1="100" y1="100" x2="#{nx}" y2="#{ny}" stroke="#{needle_color}" stroke-width="2.5" stroke-linecap="round"/>
-        <circle cx="100" cy="100" r="5" fill="#{needle_color}"/>
+      <svg viewBox="-10 -5 220 140" width="100%" xmlns="http://www.w3.org/2000/svg" style="display:block">
+        <path d="M 20,100 A 80,80 0 0,1 180,100" fill="none" stroke="#e5e7eb" stroke-width="12" stroke-linecap="round"/>
+        #{segs}
+        <circle cx="20"  cy="100" r="6" fill="#{c0}"/>
+        <circle cx="180" cy="100" r="6" fill="#{c1}"/>
+        <text x="2"   y="115" font-size="8" text-anchor="start"  fill="#9ca3af">強空</text>
+        <text x="22"  y="57"  font-size="8" text-anchor="middle" fill="#9ca3af">空</text>
+        <text x="100" y="10"  font-size="8" text-anchor="middle" fill="#9ca3af">中性</text>
+        <text x="178" y="57"  font-size="8" text-anchor="middle" fill="#9ca3af">多</text>
+        <text x="198" y="115" font-size="8" text-anchor="end"    fill="#9ca3af">強多</text>
+        <line x1="100" y1="100" x2="#{nx}" y2="#{ny}" stroke="#{nc}" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="100" cy="100" r="5" fill="#{nc}"/>
+        <text x="100" y="131" font-size="13" font-weight="bold" text-anchor="middle" fill="#{nc}">#{label}</text>
       </svg>
     SVG
   end
