@@ -519,7 +519,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
                   delta_val = ord["delta"] ? sprintf("%.2f", ord["delta"].to_f.abs) : "—"
                   prem_m    = ord["premium"] ? sprintf("$%.1fM", ord["premium"].to_i / 1_000_000.0) : "—"
                   driver    = flow_driver(ord)
-                  tr(class: "border-b border-gray-50 hover:bg-gray-50") do
+                  tr(class: "border-b border-gray-100 hover:bg-purple-50") do
                     td(class: "py-1 pr-2 #{type_color}") { plain is_call ? "Call" : "Put" }
                     td(class: "py-1 pr-2 font-mono text-gray-700") { plain ord["strikePrice"].to_s }
                     td(class: "py-1 pr-2 text-gray-500") { plain exp }
