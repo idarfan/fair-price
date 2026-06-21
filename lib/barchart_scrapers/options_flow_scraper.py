@@ -163,9 +163,9 @@ def compute_flow_metrics(rows):
     large_call_count = sum(1 for r in large_orders if r.get("symbolType") == "Call")
     large_put_count  = sum(1 for r in large_orders if r.get("symbolType") == "Put")
 
-    # Top 10 large orders (by premium desc) for display
+    # Top 10 orders by premium (all rows, not limited to large_orders threshold)
     top_orders = sorted(
-        [r for r in large_orders if r.get("premium")],
+        [r for r in rows if r.get("premium")],
         key=lambda r: r["premium"],
         reverse=True
     )[:10]

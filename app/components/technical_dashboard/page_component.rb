@@ -490,7 +490,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
       # --- Section 4: Top large orders table ---
       unless top_orders.empty?
         div(class: "pt-2 border-t border-gray-100") do
-          p(class: "text-xs font-semibold text-gray-500 mb-2") { plain "機構大單明細（≥$500K，依 Premium 排序）" }
+          p(class: "text-xs font-semibold text-gray-500 mb-2") { plain "前十大單明細（依 Premium 排序）" }
           div(class: "overflow-x-auto") do
             table(class: "w-full text-xs") do
               thead do
