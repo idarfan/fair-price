@@ -355,7 +355,10 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
   # ---------------------------------------------------------------------------
   def render_flow_detail
     flow = @result[:options_flow]
-    return if flow[:missing]
+    if flow[:missing]
+      render_barchart_login_prompt if @scrape_status == :session_expired
+      return
+    end
 
     call_prem  = flow[:call_premium_total].to_i
     put_prem   = flow[:put_premium_total].to_i
@@ -390,19 +393,19 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
       div(class: "space-y-2") do
         p(class: "text-xs font-semibold text-gray-500 mb-1") { plain "全量 Call vs Put（含 bid/mid）" }
         div(class: "flex justify-between text-xs mb-0.5") do
-          span(class: "text-blue-500 font-medium") { plain "Call $#{sprintf("%.1f", call_prem / 1_000_000.0)}M (#{call_pct}%)" }
+          span(class: "text-green-600 font-medium") { plain "Call $#{sprintf("%.1f", call_prem / 1_000_000.0)}M (#{call_pct}%)" }
           span(class: "text-red-500 font-medium")  { plain "Put $#{sprintf("%.1f", put_prem / 1_000_000.0)}M (#{put_pct}%)" }
         end
         div(class: "h-3 rounded-full bg-red-200 overflow-hidden flex") do
-          div(class: "h-full bg-blue-500 rounded-l-full", style: "width:#{call_pct}%")
+          div(class: "h-full bg-green-600 rounded-l-full", style: "width:#{call_pct}%")
         end
         div(class: "flex items-center gap-4 mt-1") do
           if ratio
-            ratio_color = ratio >= 1.5 ? "text-blue-600" : ratio <= 0.67 ? "text-red-600" : "text-gray-500"
+            ratio_color = ratio >= 1.5 ? "text-green-600" : ratio <= 0.67 ? "text-red-600" : "text-gray-500"
             span(class: "text-xs #{ratio_color} font-semibold") { plain "總 C/P 比率 #{sprintf("%.2f", ratio)}" }
           end
           if ask_ratio
-            ask_color = ask_ratio >= 1.5 ? "text-blue-700" : ask_ratio <= 0.67 ? "text-red-700" : "text-gray-500"
+            ask_color = ask_ratio >= 1.5 ? "text-green-700" : ask_ratio <= 0.67 ? "text-red-700" : "text-gray-500"
             span(class: "text-xs #{ask_color} font-bold") { plain "Ask-only C/P #{sprintf("%.2f", ask_ratio)} ★" }
           end
         end
@@ -414,11 +417,11 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
         if ask_total > 0
           ask_call_pct = (ask_call.to_f / ask_total * 100).round(1)
           div(class: "flex justify-between text-xs mb-0.5") do
-            span(class: "text-blue-500") { plain "Call $#{sprintf("%.1f", ask_call / 1_000_000.0)}M (#{ask_call_pct}%)" }
+            span(class: "text-green-600") { plain "Call $#{sprintf("%.1f", ask_call / 1_000_000.0)}M (#{ask_call_pct}%)" }
             span(class: "text-red-500")  { plain "Put $#{sprintf("%.1f", ask_put / 1_000_000.0)}M (#{(100 - ask_call_pct).round(1)}%)" }
           end
           div(class: "h-2 rounded-full bg-red-100 overflow-hidden") do
-            div(class: "h-full bg-blue-400 rounded-l-full", style: "width:#{ask_call_pct}%")
+            div(class: "h-full bg-green-500 rounded-l-full", style: "width:#{ask_call_pct}%")
           end
         else
           p(class: "text-xs text-gray-400") { plain "無 Ask 成交紀錄" }
@@ -445,7 +448,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
         div(class: "text-center") do
           p(class: "text-xs font-semibold text-gray-500 mb-1") { plain "高 Delta Call" }
           p(class: "text-xs text-gray-400 mb-0.5") { plain "≥0.70 ask-side" }
-          p(class: "text-base font-bold #{high_delta >= 2 ? "text-blue-500" : "text-gray-400"}") { plain high_delta.to_s }
+          p(class: "text-base font-bold #{high_delta >= 2 ? "text-green-600" : "text-gray-400"}") { plain high_delta.to_s }
         end
         # DTE signals
         div do
@@ -476,40 +479,91 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
             table(class: "w-full text-xs") do
               thead do
                 tr(class: "text-gray-400 border-b border-gray-100") do
-                  th(class: "text-left py-1 pr-2 font-medium") { plain "型" }
+                  th(class: "text-left py-1 pr-2 font-medium") { plain "型別" }
                   th(class: "text-left py-1 pr-2 font-medium") { plain "Strike" }
                   th(class: "text-left py-1 pr-2 font-medium") { plain "到期" }
                   th(class: "text-right py-1 pr-2 font-medium") { plain "DTE" }
                   th(class: "text-center py-1 pr-2 font-medium") { plain "Side" }
                   th(class: "text-right py-1 pr-2 font-medium") { plain "Premium" }
-                  th(class: "text-right py-1 font-medium") { plain "Delta" }
+                  th(class: "text-right py-1 pr-2 font-medium") { plain "Delta" }
+                  th(class: "text-left py-1 font-medium") { plain "解讀" }
                 end
               end
               tbody do
                 top_orders.each do |ord|
-                  is_call = ord["symbolType"] == "Call"
-                  is_ask  = ord["side"] == "ask"
-                  row_color = is_call ? "text-blue-600" : "text-red-600"
-                  exp = format_expiry(ord["expiration"])
+                  is_call    = ord["symbolType"] == "Call"
+                  type_color = is_call ? "text-green-700 font-bold" : "text-red-700 font-bold"
+                  side_str   = (ord["side"] || "mid").downcase
+                  side_color = case side_str
+                               when "ask" then "text-green-600 font-bold"
+                               when "bid" then "text-red-600 font-bold"
+                               else            "text-amber-600 font-bold"
+                               end
+                  exp       = format_expiry(ord["expiration"])
                   delta_val = ord["delta"] ? sprintf("%.2f", ord["delta"].to_f.abs) : "—"
-                  prem_m = ord["premium"] ? sprintf("$%.1fM", ord["premium"].to_i / 1_000_000.0) : "—"
+                  prem_m    = ord["premium"] ? sprintf("$%.1fM", ord["premium"].to_i / 1_000_000.0) : "—"
+                  driver    = flow_driver(ord)
                   tr(class: "border-b border-gray-50 hover:bg-gray-50") do
-                    td(class: "py-1 pr-2 font-bold #{row_color}") { plain is_call ? "C" : "P" }
+                    td(class: "py-1 pr-2 #{type_color}") { plain is_call ? "Call" : "Put" }
                     td(class: "py-1 pr-2 font-mono text-gray-700") { plain ord["strikePrice"].to_s }
                     td(class: "py-1 pr-2 text-gray-500") { plain exp }
                     td(class: "py-1 pr-2 text-right text-gray-500") { plain (ord["dte"] || "—").to_s }
                     td(class: "py-1 pr-2 text-center") do
-                      side_color = is_ask ? "text-green-600 font-bold" : "text-gray-400"
-                      span(class: side_color) { plain (ord["side"] || "—").upcase }
+                      span(class: side_color) { plain side_str.upcase }
                     end
-                    td(class: "py-1 pr-2 text-right font-medium #{row_color}") { plain prem_m }
-                    td(class: "py-1 text-right text-gray-500") { plain delta_val }
+                    td(class: "py-1 pr-2 text-right font-medium #{type_color}") { plain prem_m }
+                    td(class: "py-1 pr-2 text-right text-gray-500") { plain delta_val }
+                    td(class: "py-1 text-gray-500 whitespace-nowrap") { plain driver }
                   end
                 end
               end
             end
           end
         end
+      end
+    end
+  end
+
+  def render_barchart_login_prompt
+    div(class: "rounded-xl border border-amber-200 bg-amber-50 p-4") do
+      div(class: "flex items-start gap-3") do
+        span(class: "text-2xl leading-none mt-0.5") { plain "🔑" }
+        div do
+          p(class: "font-semibold text-sm text-amber-800") { plain "需要登入 Barchart 才能載入 Options Flow" }
+          p(class: "text-sm text-amber-700 mt-1 leading-relaxed") do
+            plain "請在 Chrome 前往 "
+            a(href: "https://www.barchart.com/login", target: "_blank",
+              class: "underline font-medium hover:text-amber-900") { plain "barchart.com" }
+            plain "，用 Google 帳號登入後，回來重新查詢。"
+          end
+          p(class: "text-xs text-amber-600 mt-1.5") { plain "系統使用你目前 Chrome 中的登入 session，無需在此輸入密碼。" }
+        end
+      end
+    end
+  end
+
+  def flow_driver(ord)
+    type  = ord["symbolType"].to_s
+    side  = (ord["side"] || "mid").downcase
+    dte   = ord["dte"].to_i
+    delta = ord["delta"].to_f.abs
+
+    if type == "Call"
+      case side
+      when "ask"
+        if delta >= 0.70 then "高確信看多押注"
+        elsif dte > 180  then "長線機構佈局"
+        else                  "主動看多"
+        end
+      when "bid" then "造市商賣出（中性）"
+      else             "方向不明"
+      end
+    else
+      case side
+      when "ask"
+        dte < 30 ? "短線緊急對沖" : "主動看空/對沖"
+      when "bid" then "造市商賣 Put（中性）"
+      else             "方向不明"
       end
     end
   end
