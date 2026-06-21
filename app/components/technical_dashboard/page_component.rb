@@ -496,7 +496,8 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
               thead do
                 tr(class: "text-gray-400 border-b border-gray-100") do
                   th(class: "text-left py-1 pr-2 font-medium") { plain "型別" }
-                  th(class: "text-left py-1 pr-2 font-medium") { plain "Strike" }
+                  th(class: "text-right py-1 pr-2 font-medium") { plain "Strike" }
+                  th(class: "text-right py-1 pr-2 font-medium") { plain "Price" }
                   th(class: "text-left py-1 pr-2 font-medium") { plain "到期" }
                   th(class: "text-right py-1 pr-2 font-medium") { plain "DTE" }
                   th(class: "text-center py-1 pr-2 font-medium") { plain "Side" }
@@ -515,13 +516,21 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
                                when "bid" then "text-red-600 font-bold"
                                else            "text-amber-600 font-bold"
                                end
-                  exp       = format_expiry(ord["expiration"])
-                  delta_val = ord["delta"] ? sprintf("%.2f", ord["delta"].to_f.abs) : "—"
-                  prem_m    = ord["premium"] ? "$#{ord['premium'].to_i.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\1,').reverse}" : "—"
-                  driver    = flow_driver(ord)
+                  exp        = format_expiry(ord["expiration"])
+                  delta_val  = ord["delta"] ? sprintf("%.2f", ord["delta"].to_f.abs) : "—"
+                  prem_m     = ord["premium"] ? "$#{ord['premium'].to_i.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\1,').reverse}" : "—"
+                  trade_price = if ord["lastPrice"]
+                                  sprintf("$%.2f", ord["lastPrice"].to_f)
+                                elsif ord["premium"] && ord["tradeSize"].to_i > 0
+                                  sprintf("$%.2f", ord["premium"].to_f / (ord["tradeSize"].to_i * 100))
+                                else
+                                  "—"
+                                end
+                  driver     = flow_driver(ord)
                   tr(class: "border-b border-gray-100 hover:bg-purple-50") do
                     td(class: "py-1 pr-2 #{type_color}") { plain is_call ? "Call" : "Put" }
-                    td(class: "py-1 pr-2 font-mono text-gray-700") { plain ord["strikePrice"].to_s }
+                    td(class: "py-1 pr-2 text-right font-mono text-gray-700") { plain ord["strikePrice"].to_s }
+                    td(class: "py-1 pr-2 text-right font-mono text-gray-600") { plain trade_price }
                     td(class: "py-1 pr-2 text-gray-500") { plain exp }
                     td(class: "py-1 pr-2 text-right text-gray-500") { plain (ord["dte"] || "—").to_s }
                     td(class: "py-1 pr-2 text-center") do
