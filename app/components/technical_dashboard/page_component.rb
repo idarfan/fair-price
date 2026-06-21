@@ -517,7 +517,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
                                end
                   exp       = format_expiry(ord["expiration"])
                   delta_val = ord["delta"] ? sprintf("%.2f", ord["delta"].to_f.abs) : "—"
-                  prem_m    = ord["premium"] ? sprintf("$%.1fM", ord["premium"].to_i / 1_000_000.0) : "—"
+                  prem_m    = ord["premium"] ? "$#{ord['premium'].to_i.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\1,').reverse}" : "—"
                   driver    = flow_driver(ord)
                   tr(class: "border-b border-gray-100 hover:bg-purple-50") do
                     td(class: "py-1 pr-2 #{type_color}") { plain is_call ? "Call" : "Put" }
