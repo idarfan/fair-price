@@ -783,7 +783,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
 
           details do
             summary(class: "cursor-pointer text-xs text-amber-600 hover:text-amber-800 select-none mt-1") { raw "⚠️ Max Pain 判讀提醒".html_safe }
-            div(class: "mt-1 text-xs text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1") do
+            div(class: "mt-1 text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1", style: "font-size:22px") do
               p { "Max Pain 理論假設選擇權賣方有能力將股價推向 OI 最集中的價位，但在市值大、流動性好的標的上，股票本身的成交量遠大於選擇權的槓桿影響力，此效應通常較弱。" }
               p { raw "遠月合約 OI 結構較為分散，深度價外的高 OI 較可能反映 PMCC 長腿或長期避險需求，<strong>不宜直接解讀為方向性訊號</strong>。".html_safe }
               p { raw "<strong>使用建議</strong>：僅作為「到期日附近短期磁吸效應」的參考，到期日越遠，參考價值越低。".html_safe }
@@ -800,7 +800,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
 
           details do
             summary(class: "cursor-pointer text-xs text-amber-600 hover:text-amber-800 select-none mt-1") { raw "⚠️ OI 分布判讀提醒".html_safe }
-            div(class: "mt-1 text-xs text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1") do
+            div(class: "mt-1 text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1", style: "font-size:22px") do
               p { "高 OI 集中的 strike 無法直接判斷多空方向：Put OI 可能是保護性避險（偏空），也可能是賣 Put 收保費（偏多）；Call OI 同理。" }
               p { raw "<strong>使用建議</strong>：須搭配 Options Flow 的 Trade 方向（成交於 Ask 或 Bid）及 Code 交叉比對，不可單憑 OI 集中度判斷。".html_safe }
             end
@@ -816,7 +816,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
 
           details do
             summary(class: "cursor-pointer text-xs text-amber-600 hover:text-amber-800 select-none mt-1") { raw "⚠️ Vol Skew 判讀提醒".html_safe }
-            div(class: "mt-1 text-xs text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1") do
+            div(class: "mt-1 text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1", style: "font-size:22px") do
               p { "下傾斜（Put 端 IV 高於 Call 端）是選擇權市場的結構性常態，反映避險需求長期偏 Put，本身不是看空訊號。" }
               p { raw "單一時間點的 Skew 形狀<strong>不具判斷力</strong>，必須與該標的自身歷史 Skew 比較（Skew Rank）才能判斷是否異常。".html_safe }
               p { raw "<strong>使用建議</strong>：本圖為單次快照，需對照歷史 Skew 百分位，不可僅憑曲線形狀下結論。".html_safe }
@@ -833,7 +833,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
 
           details do
             summary(class: "cursor-pointer text-xs text-amber-600 hover:text-amber-800 select-none mt-1") { raw "⚠️ Max Pain by Expiry 判讀提醒".html_safe }
-            div(class: "mt-1 text-xs text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1") do
+            div(class: "mt-1 text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1", style: "font-size:22px") do
               p { "若某個到期日的數值明顯偏離其他到期日，優先檢查是否緊鄰財報公布日期。" }
               p { "財報前後市場會大量布局跨事件選擇權倉位，使該到期日的 OI 結構暫時失真，Max Pain 的參考價值會明顯降低。" }
               p { raw "<strong>使用建議</strong>：財報前後 14 天內的到期日數據，Max Pain 可信度打折。".html_safe }
