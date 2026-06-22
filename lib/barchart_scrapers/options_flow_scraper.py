@@ -171,7 +171,7 @@ def compute_flow_metrics(rows):
         [r for r in rows if r.get("premium")],
         key=lambda r: r["premium"],
         reverse=True
-    )[:10]
+    )[:20]
     top_orders_clean = [
         {
             "symbolType":  r.get("symbolType"),

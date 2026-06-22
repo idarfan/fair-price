@@ -62,6 +62,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
         render_divergences
       end
     end
+    render_dte_filter_script
     render_loading_script
   end
 
@@ -521,7 +522,15 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
       # --- Section 4: Top large orders table ---
       unless top_orders.empty?
         div(class: "pt-2 border-t border-gray-100") do
-          p(class: "text-xs font-semibold text-gray-500 mb-2") { plain "前十大單明細（依 Premium 排序）" }
+          div(class: "flex items-center justify-between mb-2") do
+            p(class: "text-xs font-semibold text-gray-500") { plain "前二十大單明細（依 Premium 排序）" }
+            button(
+              id:    "dte-filter-btn",
+              type:  "button",
+              class: "px-2.5 py-0.5 rounded-full text-xs border border-gray-300 text-gray-500 " \
+                     "hover:border-purple-400 hover:text-purple-600 transition-colors select-none"
+            ) { plain "排除 DTE=0" }
+          end
           div(class: "overflow-x-auto") do
             table(class: "w-full text-2xl") do
               thead do
@@ -564,7 +573,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
                                  when "bid" then "text-red-600 font-bold"
                                  else            "text-gray-900 font-bold"
                                  end
-                  tr(class: "border-b border-gray-100 hover:bg-purple-50") do
+                  tr(class: "border-b border-gray-100 hover:bg-purple-50", "data-dte": (ord["dte"] || -1).to_s) do
                     td(class: "py-1 pr-2 #{type_color}") { plain is_call ? "Call" : "Put" }
                     td(class: "py-1 pr-2 text-right font-mono text-gray-700") { plain ord["strikePrice"].to_s }
                     td(class: "py-1 pr-2 text-right font-mono #{price_color}") { plain trade_price }
@@ -733,6 +742,28 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
   # ---------------------------------------------------------------------------
   # JS: show loading state when form submits
   # ---------------------------------------------------------------------------
+  def render_dte_filter_script
+    script do
+      raw <<~JS.html_safe
+        (function () {
+          var btn = document.getElementById('dte-filter-btn');
+          if (!btn) return;
+          var active = false;
+          btn.addEventListener('click', function () {
+            active = !active;
+            btn.textContent = active ? '全部顯示' : '排除 DTE=0';
+            btn.classList.toggle('bg-purple-100',  active);
+            btn.classList.toggle('border-purple-500', active);
+            btn.classList.toggle('text-purple-700', active);
+            document.querySelectorAll('tr[data-dte="0"]').forEach(function (row) {
+              row.style.display = active ? 'none' : '';
+            });
+          });
+        })();
+      JS
+    end
+  end
+
   def render_loading_script
     script do
       raw <<~JS.html_safe
