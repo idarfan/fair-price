@@ -55,9 +55,9 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
       render_status_bar if @scrape_status
       if @result
         render_score_row
+        render_data_detail
         render_flow_detail
         render_divergences
-        render_data_detail
       end
     end
     render_loading_script
