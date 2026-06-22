@@ -1,6 +1,6 @@
 require "open3"
 
-# Scrapes Technical Analysis, Fundamentals, and Options Flow from Barchart
+# Scrapes Technical Analysis, Fundamentals, Options Flow, and Max Pain from Barchart
 # using an existing Chrome CDP session (user must be logged in manually).
 #
 # Usage:
@@ -25,7 +25,7 @@ class BarchartScraperService
       return result
     end
 
-    %w[technical fundamental options_flow].each do |type|
+    %w[technical fundamental options_flow max_pain].each do |type|
       fetch_result = run_scraper(type)
       if fetch_result[:status] == "barchart_session_expired"
         result[:status] = "barchart_session_expired"
@@ -80,7 +80,8 @@ class BarchartScraperService
     model = {
       "technical"    => TechnicalAnalysis,
       "fundamental"  => Fundamental,
-      "options_flow" => OptionsFlow
+      "options_flow" => OptionsFlow,
+      "max_pain"     => MaxPainSnapshot
     }[type]
 
     permitted = data.select { |k, _| model.column_names.include?(k.to_s) }
