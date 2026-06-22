@@ -30,6 +30,10 @@ class FinnhubService
     result&.dig("earningsCalendar") || []
   end
 
+  def profile(symbol)
+    get("/stock/profile2", symbol: symbol.upcase)
+  end
+
   def basic_metrics(symbol)
     get("/stock/metric", symbol: symbol.upcase, metric: "all")
   end

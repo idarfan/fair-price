@@ -17,6 +17,8 @@ class TechnicalDashboardsController < ApplicationController
                               .pluck(:symbol)
                               .first(10)
 
+    @stock_quote = @symbol.present? ? fetch_stock_quote(@symbol) : nil
+
     if @symbol.present?
       if fresh_data_exists?(@symbol, @date)
         @result        = CompositeSignalService.new(@symbol, date: @date).call
@@ -47,6 +49,7 @@ class TechnicalDashboardsController < ApplicationController
       scrape_status:  @scrape_status,
       scrape_errors:  @scrape_errors,
       recent_symbols: @recent_symbols,
+      stock_quote:    @stock_quote,
     )
   end
 
@@ -57,6 +60,23 @@ class TechnicalDashboardsController < ApplicationController
             .where("fetched_at > ?", FRESH_WINDOW.ago)
             .where("DATE(fetched_at) = ?", date)
             .exists?
+  end
+
+  def fetch_stock_quote(symbol)
+    svc   = FinnhubService.new
+    quote = svc.quote(symbol)
+    return nil if quote.nil? || quote["c"].to_f.zero?
+    prof  = svc.profile(symbol) || {}
+    {
+      price:    quote["c"].to_f,
+      change:   quote["d"].to_f,
+      change_p: quote["dp"].to_f,
+      ts:       quote["t"].to_i,
+      name:     prof["name"].to_s,
+      exchange: prof["exchange"].to_s
+    }
+  rescue StandardError
+    nil
   end
 
   def parse_date_param(val)

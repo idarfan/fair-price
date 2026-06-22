@@ -38,13 +38,14 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
     [1.00, [34,  197, 94]],
   ].freeze
 
-  def initialize(symbol: nil, date: Date.today, result: nil, scrape_status: nil, scrape_errors: [], recent_symbols: [])
+  def initialize(symbol: nil, date: Date.today, result: nil, scrape_status: nil, scrape_errors: [], recent_symbols: [], stock_quote: nil)
     @symbol        = symbol
     @date          = date
     @result        = result
     @scrape_status = scrape_status
     @scrape_errors    = Array(scrape_errors)
     @recent_symbols   = Array(recent_symbols)
+    @stock_quote      = stock_quote
   end
 
   def view_template
@@ -52,6 +53,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
       render_header
       render_search_form
       render_recent_symbols unless @recent_symbols.empty?
+      render_stock_quote if @stock_quote
       render_status_bar if @scrape_status
       if @result
         render_score_row
@@ -131,6 +133,35 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
           href:  "/technical_dashboard?symbol=#{sym}",
           class: "px-2.5 py-0.5 rounded-full text-xs font-mono border "                  "#{sym == @symbol ? 'bg-blue-100 border-blue-400 text-blue-700 font-bold' : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600'}"
         ) { plain sym }
+      end
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Stock quote bar
+  # ---------------------------------------------------------------------------
+  def render_stock_quote
+    q        = @stock_quote
+    price    = sprintf("%.2f", q[:price])
+    chg      = q[:change]
+    chg_p    = q[:change_p]
+    chg_str  = sprintf("%+.2f (%+.2f%%)", chg, chg_p)
+    up       = chg >= 0
+    chg_cls  = up ? "text-green-600" : "text-red-600"
+    ts_str   = q[:ts] > 0 ? Time.at(q[:ts]).in_time_zone("Eastern Time (US & Canada)").strftime("%m/%d/%y") : ""
+    exch     = q[:exchange].present? ? " [#{q[:exchange]}]" : ""
+    name_sym = [q[:name].presence, @symbol.presence].compact.join(" ")
+    name_sym = "(#{@symbol})" if q[:name].blank? && @symbol.present?
+    name_sym = "#{q[:name]} (#{@symbol})" if q[:name].present?
+
+    div(class: "flex items-baseline gap-4 px-1") do
+      div do
+        p(class: "text-sm font-semibold text-gray-700") { plain name_sym }
+        div(class: "flex items-baseline gap-2 mt-0.5") do
+          span(class: "text-xl font-bold text-gray-900") { plain "$#{price}" }
+          span(class: "text-sm font-medium #{chg_cls}") { plain chg_str }
+          span(class: "text-xs text-gray-400") { plain "#{ts_str}#{exch}" }
+        end
       end
     end
   end
