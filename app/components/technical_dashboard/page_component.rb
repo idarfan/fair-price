@@ -747,211 +747,263 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
     mp = @result&.dig(:max_pain)
     return unless mp && mp[:strikes]&.any?
 
-    strikes      = mp[:strikes]
+    symbol       = @result[:symbol]
+    strikes      = mp[:strikes].map(&:to_s)
     call_pain    = mp[:call_pain]
     put_pain     = mp[:put_pain]
+    call_oi      = mp[:call_oi]
+    put_oi       = mp[:put_oi].map { |v| -(v.abs) }
     iv_combined  = mp[:iv_combined]
     max_pain_str = mp[:max_pain_strike]
     last_price   = mp[:last_price]
     expiration   = mp[:expiration]&.gsub(/-m$/, "")
     dte          = mp[:dte]
-    symbol       = @result[:symbol]
+    by_expiry    = mp[:max_pain_by_expiry] || []
 
-    pain_json = { strikes: strikes, call_pain: call_pain, put_pain: put_pain,
-                  max_pain_strike: max_pain_str, last_price: last_price }.to_json
-    skew_json = { strikes: strikes, iv_combined: iv_combined,
-                  last_price: last_price }.to_json
+    exp_label    = expiration ? "#{expiration} (#{dte} DTE)" : ""
 
-    section_title = "Max Pain & Vol Skew"
-    exp_label = expiration ? "#{expiration} (#{dte} DTE)" : ""
+    pain_json    = { strikes: strikes, call_pain: call_pain, put_pain: put_pain,
+                     max_pain_strike: max_pain_str, last_price: last_price,
+                     exp_label: exp_label, symbol: symbol }.to_json
+    oi_json      = { strikes: strikes, call_oi: call_oi, put_oi: put_oi,
+                     last_price: last_price, exp_label: exp_label, symbol: symbol }.to_json
+    skew_json    = { strikes: strikes, iv_combined: iv_combined,
+                     last_price: last_price, exp_label: exp_label, symbol: symbol }.to_json
+    contract_json = { by_expiry: by_expiry, last_price: last_price, symbol: symbol }.to_json
 
-    div(class: "bg-white rounded-xl border border-gray-200 p-4 space-y-4") do
-      div(class: "flex items-center justify-between") do
-        h2(class: "text-sm font-semibold text-gray-700") { section_title }
-        span(class: "text-xs text-gray-400") { exp_label }
-      end
+    div(class: "bg-white rounded-xl border border-gray-200 p-4 space-y-6") do
+      h2(class: "text-sm font-semibold text-gray-700") { "Max Pain & Vol Skew" }
 
-      # Max Pain chart
+      # Chart 1: Max Pain
       div do
-        p(class: "text-xs font-medium text-gray-500 mb-1") do
-          mp_val = max_pain_str ? "$#{max_pain_str.to_i}" : "N/A"
-          lp_val = last_price   ? "$#{sprintf("%.2f", last_price)}" : "N/A"
-          "Max Pain: #{mp_val}　現價: #{lp_val}"
+        div(class: "relative", style: "height:260px") do
+          canvas(id: "mp-c1-#{symbol}", class: "w-full h-full")
         end
-        canvas(id: "mp-pain-chart-#{symbol}", class: "w-full", style: "height:240px")
-        script(type: "application/json", id: "mp-pain-data-#{symbol}") { raw pain_json.html_safe }
+        script(type: "application/json", id: "mp-d1-#{symbol}") { raw pain_json.html_safe }
       end
 
-      # Vol Skew chart
+      # Chart 2: Open Interest by Strike
       div do
-        p(class: "text-xs font-medium text-gray-500 mb-1") { "Volatility Skew（各 Strike 的 IV%）" }
-        canvas(id: "mp-skew-chart-#{symbol}", class: "w-full", style: "height:200px")
-        script(type: "application/json", id: "mp-skew-data-#{symbol}") { raw skew_json.html_safe }
+        div(class: "relative", style: "height:220px") do
+          canvas(id: "mp-c2-#{symbol}", class: "w-full h-full")
+        end
+        script(type: "application/json", id: "mp-d2-#{symbol}") { raw oi_json.html_safe }
+      end
+
+      # Chart 3: Vol Skew
+      div do
+        div(class: "relative", style: "height:220px") do
+          canvas(id: "mp-c3-#{symbol}", class: "w-full h-full")
+        end
+        script(type: "application/json", id: "mp-d3-#{symbol}") { raw skew_json.html_safe }
+      end
+
+      # Chart 4: Max Pain by Contract
+      div do
+        div(class: "relative", style: "height:200px") do
+          canvas(id: "mp-c4-#{symbol}", class: "w-full h-full")
+        end
+        script(type: "application/json", id: "mp-d4-#{symbol}") { raw contract_json.html_safe }
       end
     end
 
     script do
       raw <<~JS.html_safe
         (function () {
-          var symbol = #{symbol.to_json};
+          var sym = #{symbol.to_json};
 
-          // --- Vertical line plugin (no annotation plugin needed) ---
+          // Vertical line plugin — category scale: find nearest label index
           var vlinePlugin = {
-            id: 'vline',
+            id: 'mp_vline_' + sym,
             afterDraw: function(chart) {
-              var lines = chart.options.vlines || [];
-              if (!lines.length) return;
-              var ctx  = chart.ctx;
+              var lines = chart.options.vlines;
+              if (!lines || !lines.length) return;
+              var ctx   = chart.ctx;
               var xAxis = chart.scales.x;
               var yAxis = chart.scales.y;
+              var labels = xAxis.getLabels ? xAxis.getLabels() : [];
               lines.forEach(function(vl) {
-                var xVal  = vl.value;
-                var color = vl.color || 'rgba(0,0,0,0.4)';
-                var dash  = vl.dash  || [];
-                // find pixel for this x value (scatter-style: value is numeric)
                 var xPx;
-                if (typeof xAxis.getPixelForValue === 'function') {
-                  xPx = xAxis.getPixelForValue(xVal);
+                if (labels.length > 0) {
+                  var nearestIdx = 0, minDiff = Infinity;
+                  labels.forEach(function(lbl, idx) {
+                    var diff = Math.abs(parseFloat(lbl) - vl.value);
+                    if (diff < minDiff) { minDiff = diff; nearestIdx = idx; }
+                  });
+                  xPx = xAxis.getPixelForValue(nearestIdx);
                 } else {
-                  return;
+                  xPx = xAxis.getPixelForValue(vl.value);
                 }
-                if (xPx < xAxis.left || xPx > xAxis.right) return;
+                if (!xPx || xPx < xAxis.left || xPx > xAxis.right) return;
                 ctx.save();
                 ctx.beginPath();
-                ctx.setLineDash(dash);
-                ctx.strokeStyle = color;
+                ctx.setLineDash(vl.dash || []);
+                ctx.strokeStyle = vl.color || 'rgba(0,0,0,0.4)';
                 ctx.lineWidth   = 1.5;
                 ctx.moveTo(xPx, yAxis.top);
                 ctx.lineTo(xPx, yAxis.bottom);
                 ctx.stroke();
-                // Label
-                ctx.fillStyle = color;
-                ctx.font      = '10px sans-serif';
-                ctx.fillText(vl.label || '', xPx + 3, yAxis.top + 12);
+                if (vl.label) {
+                  ctx.fillStyle = vl.color || 'rgba(0,0,0,0.5)';
+                  ctx.font = '10px sans-serif';
+                  ctx.fillText(vl.label, xPx + 3, yAxis.top + 12);
+                }
                 ctx.restore();
               });
             }
           };
 
-          // --- Max Pain chart ---
+          var GRID   = '#e5e7eb';
+          var TICK   = { color: '#6b7280', font: { size: 10 } };
+          var LEGEND = { position: 'top', labels: { color: '#6b7280', font: { size: 11 }, boxWidth: 12 } };
+
+          // ── Chart 1: Max Pain ──────────────────────────────────────────
           (function() {
-            var el = document.getElementById('mp-pain-data-' + symbol);
-            var cv = document.getElementById('mp-pain-chart-' + symbol);
+            var el = document.getElementById('mp-d1-' + sym);
+            var cv = document.getElementById('mp-c1-' + sym);
             if (!el || !cv || typeof Chart === 'undefined') return;
             var d = JSON.parse(el.textContent);
-            var labels = d.strikes;
-
             new Chart(cv, {
               type: 'bar',
               plugins: [vlinePlugin],
               data: {
-                labels: labels,
+                labels: d.strikes,
                 datasets: [
-                  {
-                    label: 'Call Pain',
-                    data: d.call_pain,
-                    backgroundColor: 'rgba(59,130,246,0.6)',
-                    borderColor: 'rgba(59,130,246,0.8)',
-                    borderWidth: 1,
-                    borderRadius: 2
-                  },
-                  {
-                    label: 'Put Pain',
-                    data: d.put_pain,
-                    backgroundColor: 'rgba(249,115,22,0.6)',
-                    borderColor: 'rgba(249,115,22,0.8)',
-                    borderWidth: 1,
-                    borderRadius: 2
-                  }
+                  { label: 'Calls - Max Pain', data: d.call_pain,
+                    backgroundColor: 'rgba(34,197,94,0.65)', borderColor: 'rgba(22,163,74,0.8)',
+                    borderWidth: 1, borderRadius: 2 },
+                  { label: 'Puts - Max Pain', data: d.put_pain,
+                    backgroundColor: 'rgba(239,68,68,0.65)', borderColor: 'rgba(220,38,38,0.8)',
+                    borderWidth: 1, borderRadius: 2 }
                 ]
               },
               options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: false,
-                plugins: {
-                  legend: { position: 'top', labels: { color: '#6b7280', font: { size: 11 } } },
-                  tooltip: {
-                    callbacks: {
-                      title: function(items) { return 'Strike: $' + items[0].label; },
-                      label: function(item) {
-                        return item.dataset.label + ': ' + item.raw.toLocaleString();
-                      }
-                    }
-                  }
+                responsive: true, maintainAspectRatio: false, animation: false,
+                plugins: { legend: LEGEND,
+                  tooltip: { callbacks: {
+                    title: function(i) { return 'Strike: $' + i[0].label; },
+                    label: function(i) { return i.dataset.label + ': ' + i.raw.toLocaleString(); }
+                  }}
                 },
                 vlines: [
-                  d.max_pain_strike ? { value: d.max_pain_strike, color: 'rgba(234,179,8,0.9)',  dash: [],    label: 'Max Pain $' + d.max_pain_strike } : null,
-                  d.last_price      ? { value: d.last_price,      color: 'rgba(107,114,128,0.7)', dash: [4,3], label: 'Last $' + d.last_price.toFixed(2) } : null
+                  d.max_pain_strike ? { value: d.max_pain_strike, color: 'rgba(37,99,235,0.8)',  dash: [5,3], label: 'Max Pain $' + d.max_pain_strike } : null,
+                  d.last_price      ? { value: d.last_price,      color: 'rgba(107,114,128,0.6)', dash: [4,3], label: 'Last $' + d.last_price.toFixed(2) } : null
                 ].filter(Boolean),
                 scales: {
-                  x: {
-                    ticks: { color: '#6b7280', font: { size: 10 }, maxRotation: 45 },
-                    grid:  { color: '#f3f4f6' }
-                  },
-                  y: {
-                    ticks: { color: '#6b7280', font: { size: 10 } },
-                    grid:  { color: '#e5e7eb' }
-                  }
+                  x: { ticks: Object.assign({}, TICK, { maxRotation: 45 }), grid: { color: GRID } },
+                  y: { ticks: Object.assign({}, TICK, { callback: function(v) { return v >= 1000 ? (v/1000).toFixed(0)+'k' : v; } }), grid: { color: GRID } }
                 }
               }
             });
           })();
 
-          // --- Vol Skew chart ---
+          // ── Chart 2: Open Interest by Strike ──────────────────────────
           (function() {
-            var el = document.getElementById('mp-skew-data-' + symbol);
-            var cv = document.getElementById('mp-skew-chart-' + symbol);
+            var el = document.getElementById('mp-d2-' + sym);
+            var cv = document.getElementById('mp-c2-' + sym);
             if (!el || !cv || typeof Chart === 'undefined') return;
             var d = JSON.parse(el.textContent);
+            new Chart(cv, {
+              type: 'bar',
+              plugins: [vlinePlugin],
+              data: {
+                labels: d.strikes,
+                datasets: [
+                  { label: 'Call OI', data: d.call_oi,
+                    backgroundColor: 'rgba(59,130,246,0.65)', borderColor: 'rgba(37,99,235,0.8)',
+                    borderWidth: 1, borderRadius: 2 },
+                  { label: 'Put OI', data: d.put_oi,
+                    backgroundColor: 'rgba(249,115,22,0.65)', borderColor: 'rgba(234,88,12,0.8)',
+                    borderWidth: 1, borderRadius: 2 }
+                ]
+              },
+              options: {
+                responsive: true, maintainAspectRatio: false, animation: false,
+                plugins: { legend: LEGEND,
+                  tooltip: { callbacks: {
+                    title: function(i) { return 'Strike: $' + i[0].label; },
+                    label: function(i) { return i.dataset.label + ': ' + Math.abs(i.raw); }
+                  }}
+                },
+                vlines: d.last_price ? [{ value: d.last_price, color: 'rgba(107,114,128,0.6)', dash: [4,3], label: 'Last $' + d.last_price.toFixed(2) }] : [],
+                scales: {
+                  x: { ticks: Object.assign({}, TICK, { maxRotation: 45 }), grid: { color: GRID } },
+                  y: { ticks: TICK, grid: { color: GRID } }
+                }
+              }
+            });
+          })();
 
+          // ── Chart 3: Volatility Skew ───────────────────────────────────
+          (function() {
+            var el = document.getElementById('mp-d3-' + sym);
+            var cv = document.getElementById('mp-c3-' + sym);
+            if (!el || !cv || typeof Chart === 'undefined') return;
+            var d = JSON.parse(el.textContent);
             new Chart(cv, {
               type: 'line',
               plugins: [vlinePlugin],
               data: {
                 labels: d.strikes,
                 datasets: [
-                  {
-                    label: 'IV Combined (%)',
-                    data: d.iv_combined,
-                    borderColor: 'rgba(139,92,246,0.9)',
-                    backgroundColor: 'rgba(139,92,246,0.08)',
-                    borderWidth: 2,
-                    pointRadius: 2,
-                    fill: true,
-                    tension: 0.3
-                  }
+                  { label: 'Call & Put IV (%)', data: d.iv_combined,
+                    borderColor: 'rgba(234,179,8,0.9)', backgroundColor: 'rgba(234,179,8,0.08)',
+                    borderWidth: 2, pointRadius: 2.5, pointBackgroundColor: 'rgba(234,179,8,0.9)',
+                    fill: true, tension: 0.3 }
                 ]
               },
               options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: false,
-                plugins: {
-                  legend: { position: 'top', labels: { color: '#6b7280', font: { size: 11 } } },
-                  tooltip: {
-                    callbacks: {
-                      title: function(items) { return 'Strike: $' + items[0].label; },
-                      label: function(item) { return 'IV: ' + item.raw.toFixed(2) + '%'; }
-                    }
-                  }
+                responsive: true, maintainAspectRatio: false, animation: false,
+                plugins: { legend: LEGEND,
+                  tooltip: { callbacks: {
+                    title: function(i) { return 'Strike: $' + i[0].label; },
+                    label: function(i) { return 'IV: ' + i.raw.toFixed(2) + '%'; }
+                  }}
                 },
-                vlines: [
-                  d.last_price ? { value: d.last_price, color: 'rgba(107,114,128,0.7)', dash: [4,3], label: 'Last $' + d.last_price.toFixed(2) } : null
-                ].filter(Boolean),
+                vlines: d.last_price ? [{ value: d.last_price, color: 'rgba(107,114,128,0.6)', dash: [4,3], label: 'Last $' + d.last_price.toFixed(2) }] : [],
                 scales: {
-                  x: {
-                    ticks: { color: '#6b7280', font: { size: 10 }, maxRotation: 45 },
-                    grid:  { color: '#f3f4f6' }
-                  },
-                  y: {
-                    ticks: {
-                      color: '#6b7280',
-                      font: { size: 10 },
-                      callback: function(v) { return v.toFixed(1) + '%'; }
-                    },
-                    grid: { color: '#e5e7eb' }
-                  }
+                  x: { ticks: Object.assign({}, TICK, { maxRotation: 45 }), grid: { color: GRID } },
+                  y: { ticks: Object.assign({}, TICK, { callback: function(v) { return v.toFixed(1) + '%'; } }), grid: { color: GRID } }
+                }
+              }
+            });
+          })();
+
+          // ── Chart 4: Max Pain by Contract ─────────────────────────────
+          (function() {
+            var el = document.getElementById('mp-d4-' + sym);
+            var cv = document.getElementById('mp-c4-' + sym);
+            if (!el || !cv || typeof Chart === 'undefined') return;
+            var d = JSON.parse(el.textContent);
+            if (!d.by_expiry || !d.by_expiry.length) return;
+            var labels  = d.by_expiry.map(function(r) { return r.expiry; });
+            var values  = d.by_expiry.map(function(r) { return r.max_pain_strike; });
+            var lpLine  = d.last_price ? values.map(function() { return d.last_price; }) : [];
+            new Chart(cv, {
+              type: 'line',
+              data: {
+                labels: labels,
+                datasets: [
+                  { label: 'Max Pain by Expiry', data: values,
+                    borderColor: 'rgba(59,130,246,0.9)', backgroundColor: 'rgba(59,130,246,0.1)',
+                    borderWidth: 2, pointRadius: 4, pointBackgroundColor: 'rgba(59,130,246,0.9)',
+                    fill: false, tension: 0 },
+                  d.last_price ? { label: 'Last Price $' + d.last_price.toFixed(2), data: lpLine,
+                    borderColor: 'rgba(236,72,153,0.7)', borderDash: [5,3],
+                    borderWidth: 1.5, pointRadius: 0, fill: false } : null
+                ].filter(Boolean)
+              },
+              options: {
+                responsive: true, maintainAspectRatio: false, animation: false,
+                plugins: { legend: LEGEND,
+                  tooltip: { callbacks: {
+                    title: function(i) { return i[0].label; },
+                    label: function(i) { return i.dataset.label.split(' ')[0] + ' ' + i.dataset.label.split(' ')[1] + ': $' + i.raw; }
+                  }}
+                },
+                scales: {
+                  x: { ticks: Object.assign({}, TICK, { maxRotation: 45 }), grid: { color: GRID } },
+                  y: { ticks: Object.assign({}, TICK, { callback: function(v) { return '$' + v; } }), grid: { color: GRID } }
                 }
               }
             });
@@ -960,6 +1012,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
       JS
     end
   end
+
 
   def render_dte_filter_script
     script do
