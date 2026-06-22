@@ -880,10 +880,34 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
               options: {
                 responsive: true, maintainAspectRatio: false, animation: false,
                 plugins: { legend: LEGEND,
-                  tooltip: { callbacks: {
-                    title: function(i) { return 'Strike: $' + i[0].label; },
-                    label: function(i) { return i.dataset.label + ': ' + i.raw.toLocaleString(); }
-                  }}
+                  tooltip: {
+                    enabled: false, mode: 'index', intersect: false,
+                    external: function(context) {
+                      var tipId = 'mp-tip-' + sym;
+                      var tipEl = document.getElementById(tipId);
+                      if (!tipEl) {
+                        tipEl = document.createElement('div');
+                        tipEl.id = tipId;
+                        tipEl.style.cssText = 'position:absolute;top:8px;right:8px;background:rgba(255,255,255,0.97);border:1px solid #d1d5db;border-radius:4px;padding:7px 11px;font-size:11px;line-height:1.7;z-index:10;pointer-events:none;box-shadow:0 2px 6px rgba(0,0,0,0.13);min-width:140px;';
+                        cv.parentElement.appendChild(tipEl);
+                      }
+                      var tip = context.tooltip;
+                      if (tip.opacity === 0) { tipEl.style.opacity='0'; return; }
+                      tipEl.style.opacity = '1';
+                      var strike = tip.title && tip.title[0] ? tip.title[0] : '';
+                      var callVal = null, putVal = null;
+                      (tip.dataPoints || []).forEach(function(dp) {
+                        if (dp.dataset.label.indexOf('Call') >= 0) callVal = dp.raw;
+                        else if (dp.dataset.label.indexOf('Put') >= 0) putVal = dp.raw;
+                      });
+                      function fmt(v) { return v != null ? '$' + Number(v).toLocaleString('en-US', {minimumFractionDigits:2}) : 'N/A'; }
+                      tipEl.innerHTML =
+                        '<div style="font-weight:600;margin-bottom:2px;color:#111;">Strike: ' + strike + '</div>' +
+                        '<div style="color:#16a34a;">Call: ' + fmt(callVal) + '</div>' +
+                        '<div style="color:#dc2626;">Put: ' + fmt(putVal) + '</div>' +
+                        (d.max_pain_strike ? '<div style="margin-top:4px;color:#2563eb;font-size:10px;">Max Pain: $' + d.max_pain_strike + '</div>' : '');
+                    }
+                  }
                 },
                 vlines: [
                   d.max_pain_strike ? { value: d.max_pain_strike, color: 'rgba(37,99,235,0.8)',  dash: [5,3], label: 'Max Pain $' + d.max_pain_strike } : null,
