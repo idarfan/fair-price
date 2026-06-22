@@ -492,7 +492,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
         div(class: "pt-2 border-t border-gray-100") do
           p(class: "text-xs font-semibold text-gray-500 mb-2") { plain "前十大單明細（依 Premium 排序）" }
           div(class: "overflow-x-auto") do
-            table(class: "w-full text-xs") do
+            table(class: "w-full text-2xl") do
               thead do
                 tr(class: "text-gray-400 border-b border-gray-100") do
                   th(class: "text-left py-1 pr-2 font-medium") { plain "型別" }
