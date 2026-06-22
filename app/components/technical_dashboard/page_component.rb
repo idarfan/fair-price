@@ -520,6 +520,47 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
         end
       end
 
+      # --- Section 5: CSV BuyToOpen / SellToOpen 分類統計 ---
+      if flow[:trade_csv_loaded]
+        bto_call_prem = flow[:bto_call_ask_prem].to_i
+        bto_put_prem  = flow[:bto_put_ask_prem].to_i
+        sto_put_prem  = flow[:sto_put_bid_prem].to_i
+        bto_call_cnt  = flow[:bto_call_ask_cnt].to_i
+        bto_put_cnt   = flow[:bto_put_ask_cnt].to_i
+        sto_put_cnt   = flow[:sto_put_bid_cnt].to_i
+        dir_count     = flow[:directional_count].to_i
+        ml_count      = flow[:multi_leg_count].to_i
+        canc_count    = flow[:cancelled_count].to_i
+        inst_count    = flow[:institutional_count].to_i
+
+        div(class: "pt-2 border-t border-gray-100") do
+          p(class: "text-xs font-semibold text-gray-500 mb-2") { plain "CSV 開倉方向統計（BuyToOpen / SellToOpen）" }
+          div(class: "grid grid-cols-3 gap-2") do
+            div(class: "text-center") do
+              p(class: "text-base font-bold text-green-600") { plain "$#{sprintf("%.1f", bto_call_prem / 1_000_000.0)}M" }
+              p(class: "text-xs text-gray-500") { plain "BTO Call Ask" }
+              p(class: "text-xs text-gray-400") { plain "#{bto_call_cnt} 筆 ↑ 開倉看多" }
+            end
+            div(class: "text-center") do
+              p(class: "text-base font-bold text-red-500") { plain "$#{sprintf("%.1f", bto_put_prem / 1_000_000.0)}M" }
+              p(class: "text-xs text-gray-500") { plain "BTO Put Ask" }
+              p(class: "text-xs text-gray-400") { plain "#{bto_put_cnt} 筆 ↓ 開倉看空/避險" }
+            end
+            div(class: "text-center") do
+              p(class: "text-base font-bold text-blue-500") { plain "$#{sprintf("%.1f", sto_put_prem / 1_000_000.0)}M" }
+              p(class: "text-xs text-gray-500") { plain "STO Put Bid" }
+              p(class: "text-xs text-gray-400") { plain "#{sto_put_cnt} 筆 ↑ 賣 Put 收租" }
+            end
+          end
+          div(class: "flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-400") do
+            span { plain "方向性 #{dir_count} 筆" }
+            span { plain "多腿排除 #{ml_count} 筆" }
+            span { plain "取消排除 #{canc_count} 筆" }
+            span { plain "機構 #{inst_count} 筆" } if inst_count > 0
+          end
+        end
+      end
+
       # --- Section 4: Top large orders table ---
       unless top_orders.empty?
         div(class: "pt-2 border-t border-gray-100") do

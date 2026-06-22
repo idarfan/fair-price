@@ -20,10 +20,11 @@ class CompositeSignalService
     fund = Fundamental.find_by(symbol: @symbol, snapshot_date: @today)
     flow = OptionsFlow.find_by(symbol: @symbol, snapshot_date: @today)
     mp   = MaxPainSnapshot.find_by(symbol: @symbol, snapshot_date: @today)
+    trade_stats = load_trade_stats(@symbol, @today)
 
     ts = technical_score(tech)
     fs = fundamental_score(fund)
-    os = options_flow_score(flow)
+    os = options_flow_score(flow, trade_stats)
 
     {
       symbol:       @symbol,
@@ -199,7 +200,7 @@ class CompositeSignalService
   # ---------------------------------------------------------------------------
   # Options Flow score: Net Trade Sentiment + Delta Imbalance + detailed metrics
   # ---------------------------------------------------------------------------
-  def options_flow_score(flow)
+  def options_flow_score(flow, trade_stats = {})
     return { score: :neutral, signals: [], missing: true } unless flow
 
     signals = []
@@ -285,6 +286,40 @@ class CompositeSignalService
       signals << { text: "短 DTE Put（<30天）$#{sprintf("%.1f", short_dte_prem / 1_000_000.0)}M（短線對沖壓力）", sentiment: :bearish }
     end
 
+    # --- Trade-level signals from CSV (OptionsFlowTrade) ---
+    if trade_stats.any?
+      bto_call = trade_stats[:bto_call_ask_prem].to_i
+      bto_put  = trade_stats[:bto_put_ask_prem].to_i
+      sto_put  = trade_stats[:sto_put_bid_prem].to_i
+      inst_cnt = trade_stats[:institutional_count].to_i
+      urg_cnt  = trade_stats[:urgency_count].to_i
+
+      if bto_call > 0 || bto_put > 0
+        bto_ratio = bto_put > 0 ? bto_call.to_f / bto_put : 99.9
+        label     = "BuyToOpen C/P #{sprintf("%.2f", [bto_ratio, 99.9].min)}"
+        if bto_ratio >= 2.0
+          points += 1
+          signals << { text: "#{label} — 開倉方向確認偏多（CSV 驗證）", sentiment: :bullish }
+        elsif bto_ratio <= 0.5
+          points -= 1
+          signals << { text: "#{label} — 開倉方向確認偏空（CSV 驗證）", sentiment: :bearish }
+        end
+      end
+
+      if sto_put >= 500_000
+        signals << { text: "SellToOpen Put $#{sprintf("%.1f", sto_put / 1_000_000.0)}M — Put 賣方收租（偏多）", sentiment: :bullish }
+        points += 1
+      end
+
+      if inst_cnt >= 3
+        signals << { text: "機構場內大單 #{inst_cnt} 筆（SLFT/MLFT/TLFT）", sentiment: :neutral }
+      end
+
+      if urg_cnt >= 2
+        signals << { text: "急迫性成交 #{urg_cnt} 筆（ISOI）— 機構主動追價", sentiment: :neutral }
+      end
+    end
+
     score = if points >= 2
               :bullish
     elsif points <= -2
@@ -308,7 +343,47 @@ class CompositeSignalService
       long_dte_call_prem: long_dte_prem,
       short_dte_put_prem: short_dte_prem,
       top_large_orders:   Array(flow.top_large_orders),
-      total_trades:       flow.total_trades_loaded }
+      total_trades:       flow.total_trades_loaded,
+      # CSV trade-level stats
+      trade_csv_loaded:   trade_stats.any?,
+      total_count:        trade_stats[:total_count],
+      directional_count:  trade_stats[:directional_count],
+      cancelled_count:    trade_stats[:cancelled_count],
+      multi_leg_count:    trade_stats[:multi_leg_count],
+      institutional_count: trade_stats[:institutional_count],
+      urgency_count:      trade_stats[:urgency_count],
+      bto_call_ask_prem:  trade_stats[:bto_call_ask_prem],
+      bto_call_ask_cnt:   trade_stats[:bto_call_ask_cnt],
+      bto_put_ask_prem:   trade_stats[:bto_put_ask_prem],
+      bto_put_ask_cnt:    trade_stats[:bto_put_ask_cnt],
+      sto_put_bid_prem:   trade_stats[:sto_put_bid_prem],
+      sto_put_bid_cnt:    trade_stats[:sto_put_bid_cnt] }
+  end
+
+  def load_trade_stats(symbol, date)
+    base = OptionsFlowTrade.for_symbol_date(symbol, date)
+    return {} unless base.exists?
+
+    directional = base.where(is_cancelled: false, is_multi_leg: false, is_stock_combo: false)
+
+    {
+      total_count:         base.count,
+      cancelled_count:     base.where(is_cancelled: true).count,
+      multi_leg_count:     base.where(is_multi_leg: true).count,
+      stock_combo_count:   base.where(is_stock_combo: true).count,
+      institutional_count: base.where(likely_institutional: true).count,
+      urgency_count:       base.where(urgency_high: true).count,
+      directional_count:   directional.count,
+      bto_call_ask_prem:   directional.where(option_type: "Call", side: "ask", open_close: "BuyToOpen").sum(:premium).to_i,
+      bto_call_ask_cnt:    directional.where(option_type: "Call", side: "ask", open_close: "BuyToOpen").count,
+      bto_put_ask_prem:    directional.where(option_type: "Put",  side: "ask", open_close: "BuyToOpen").sum(:premium).to_i,
+      bto_put_ask_cnt:     directional.where(option_type: "Put",  side: "ask", open_close: "BuyToOpen").count,
+      sto_put_bid_prem:    directional.where(option_type: "Put",  side: "bid", open_close: "SellToOpen").sum(:premium).to_i,
+      sto_put_bid_cnt:     directional.where(option_type: "Put",  side: "bid", open_close: "SellToOpen").count,
+    }
+  rescue => e
+    Rails.logger.error("load_trade_stats error: #{e.message}")
+    {}
   end
 
   # ---------------------------------------------------------------------------
