@@ -547,7 +547,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
                 end
               end
               tbody do
-                top_orders.each do |ord|
+                top_orders.each_with_index do |ord, idx|
                   is_call    = ord["symbolType"] == "Call"
                   type_color = is_call ? "text-green-700 font-bold" : "text-red-700 font-bold"
                   side_str   = (ord["side"] || "mid").downcase
@@ -573,7 +573,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
                                  when "bid" then "text-red-600 font-bold"
                                  else            "text-gray-900 font-bold"
                                  end
-                  tr(class: "border-b border-gray-100 hover:bg-purple-50", "data-dte": (ord["dte"] || -1).to_s) do
+                  tr(class: "border-b border-gray-100 hover:bg-purple-50", "data-dte": (ord["dte"] || -1).to_s, "data-rank": (idx + 1).to_s) do
                     td(class: "py-1 pr-2 #{type_color}") { plain is_call ? "Call" : "Put" }
                     td(class: "py-1 pr-2 text-right font-mono text-gray-700") { plain ord["strikePrice"].to_s }
                     td(class: "py-1 pr-2 text-right font-mono #{price_color}") { plain trade_price }
@@ -749,15 +749,27 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
           var btn = document.getElementById('dte-filter-btn');
           if (!btn) return;
           var active = false;
+
+          function applyDisplay() {
+            var rows = Array.from(document.querySelectorAll('tr[data-rank]'));
+            var visible = 0;
+            rows.forEach(function (row) {
+              var dte  = parseInt(row.dataset.dte, 10);
+              var show = (!active || dte !== 0) && visible < 20;
+              if (show) visible++;
+              row.style.display = show ? '' : 'none';
+            });
+          }
+
+          applyDisplay();
+
           btn.addEventListener('click', function () {
             active = !active;
             btn.textContent = active ? '全部顯示' : '排除 DTE=0';
-            btn.classList.toggle('bg-purple-100',  active);
+            btn.classList.toggle('bg-purple-100',    active);
             btn.classList.toggle('border-purple-500', active);
-            btn.classList.toggle('text-purple-700', active);
-            document.querySelectorAll('tr[data-dte="0"]').forEach(function (row) {
-              row.style.display = active ? 'none' : '';
-            });
+            btn.classList.toggle('text-purple-700',  active);
+            applyDisplay();
           });
         })();
       JS
