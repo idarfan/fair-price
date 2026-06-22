@@ -23,22 +23,26 @@ class TechnicalDashboardsController < ApplicationController
       if fresh_data_exists?(@symbol, @date)
         @result        = CompositeSignalService.new(@symbol, date: @date).call
         @scrape_status = :cached
-      elsif @date == Date.today
-        scrape = BarchartScraperService.new(@symbol).call
 
-        case scrape[:status]
-        when "barchart_session_expired"
+        # Surface job errors from the last analyze call (e.g. session expired)
+        job_status = params[:job_status]
+        if job_status == "session_expired"
           @scrape_status = :session_expired
-        when "success", "partial_error"
-          @result        = CompositeSignalService.new(@symbol, date: @date).call
-          @scrape_status = :fetched
-          @scrape_errors = scrape[:errors]
+        elsif job_status == "error"
+          @scrape_status = :error
+          @scrape_errors = [ "抓取過程發生錯誤，部分資料可能不完整" ]
+        end
+      elsif params[:job_status].present?
+        # Job completed but no success data — show the error state
+        case params[:job_status]
+        when "session_expired"
+          @scrape_status = :session_expired
         else
           @scrape_status = :error
-          @scrape_errors = scrape[:errors]
+          @scrape_errors = [ "抓取失敗，請確認 Barchart 連線後重試" ]
         end
       else
-        @scrape_status = :no_data
+        @scrape_status = @date == Date.today ? :ready_to_fetch : :no_data
       end
     end
 
@@ -51,6 +55,31 @@ class TechnicalDashboardsController < ApplicationController
       recent_symbols: @recent_symbols,
       stock_quote:    @stock_quote,
     )
+  end
+
+  def analyze
+    symbol = params[:symbol]&.upcase&.strip&.gsub(/[^A-Z0-9.\-]/, "")
+    date   = parse_date_param(params[:date]) || Date.today
+
+    return render json: { error: "symbol required" }, status: :unprocessable_entity if symbol.blank?
+
+    if fresh_data_exists?(symbol, date)
+      return render json: { status: "ready", symbol: symbol, date: date.to_s }
+    end
+
+    job_id = SecureRandom.hex(8)
+    Rails.cache.write("td_job_#{job_id}", { status: "pending" }, expires_in: 5.minutes)
+    TechnicalDashboardAnalyzeJob.perform_later(symbol, date.to_s, job_id)
+
+    render json: { job_id: job_id, symbol: symbol, date: date.to_s }
+  end
+
+  def status
+    job_id = params[:job_id].to_s.gsub(/[^a-f0-9]/, "")
+    return render json: { status: "error", error: "missing job_id" }, status: :unprocessable_entity if job_id.blank?
+
+    cached = Rails.cache.read("td_job_#{job_id}")
+    render json: cached || { status: "not_found" }
   end
 
   private

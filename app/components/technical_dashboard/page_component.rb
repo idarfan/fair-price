@@ -197,6 +197,11 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
         title: "抓取失敗",
         body:  @scrape_errors.join("；")
       )
+    when :ready_to_fetch
+      div(class: "flex items-center gap-1.5 text-xs text-blue-500") do
+        span { plain "📡" }
+        plain "點擊「分析」按鈕開始抓取資料（約 20-30 秒）"
+      end
     when :cached
       div(class: "flex items-center gap-1.5 text-xs text-gray-400") do
         span { plain "⚡" }
@@ -1205,6 +1210,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
   end
 
   def render_loading_script
+    csrf = helpers.form_authenticity_token rescue ""
     script do
       raw <<~JS.html_safe
         (function () {
@@ -1213,17 +1219,69 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
           var loading = document.getElementById('td-loading');
           if (!form || !btn || !loading) return;
 
-          form.addEventListener('submit', function () {
+          // Auto-uppercase
+          var inp = document.getElementById('td-symbol-input');
+          if (inp) inp.addEventListener('input', function () { this.value = this.value.toUpperCase(); });
+
+          form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var symbol = inp ? inp.value.trim().toUpperCase() : '';
+            var dateEl = document.getElementById('td-date-input');
+            var date   = dateEl ? dateEl.value : '';
+            if (!symbol) return;
+
+            // Show loading state immediately
             btn.disabled = true;
             btn.textContent = '分析中…';
             btn.classList.add('opacity-50', 'cursor-not-allowed');
             loading.classList.remove('hidden');
             loading.classList.add('flex');
-          });
 
-          // Auto-uppercase the input
-          var inp = document.getElementById('td-symbol-input');
-          if (inp) inp.addEventListener('input', function () { this.value = this.value.toUpperCase(); });
+            var csrfToken = document.querySelector('meta[name="csrf-token"]');
+            var token = csrfToken ? csrfToken.content : '#{csrf}';
+
+            // POST to background analyze endpoint
+            fetch('/technical_dashboard/analyze', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+              body: JSON.stringify({ symbol: symbol, date: date })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (data.status === 'ready') {
+                window.location.href = '/technical_dashboard?symbol=' + symbol + '&date=' + date;
+                return;
+              }
+              var jobId = data.job_id;
+              if (!jobId) {
+                window.location.href = '/technical_dashboard?symbol=' + symbol + '&date=' + date;
+                return;
+              }
+              // Poll job status every 2.5s
+              var attempts = 0;
+              var pollInterval = setInterval(function () {
+                attempts++;
+                if (attempts > 30) { // 75s timeout
+                  clearInterval(pollInterval);
+                  window.location.href = '/technical_dashboard?symbol=' + symbol + '&date=' + date + '&job_status=error';
+                  return;
+                }
+                fetch('/technical_dashboard/status?job_id=' + jobId)
+                  .then(function(r) { return r.json(); })
+                  .then(function(s) {
+                    if (s.status === 'pending' || s.status === 'not_found') return; // keep polling
+                    clearInterval(pollInterval);
+                    var qs = '?symbol=' + symbol + '&date=' + date + '&job_status=' + s.status;
+                    window.location.href = '/technical_dashboard' + qs;
+                  })
+                  .catch(function () { /* keep polling on network error */ });
+              }, 2500);
+            })
+            .catch(function () {
+              // Network error — fallback to direct navigation
+              window.location.href = '/technical_dashboard?symbol=' + symbol + '&date=' + date;
+            });
+          });
         })();
       JS
     end
