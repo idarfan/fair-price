@@ -1261,7 +1261,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
               var attempts = 0;
               var pollInterval = setInterval(function () {
                 attempts++;
-                if (attempts > 30) { // 75s timeout
+                if (attempts > 60) { // 150s timeout
                   clearInterval(pollInterval);
                   window.location.href = '/technical_dashboard?symbol=' + symbol + '&date=' + date + '&job_status=error';
                   return;
