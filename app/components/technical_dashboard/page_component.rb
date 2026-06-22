@@ -944,10 +944,33 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
               options: {
                 responsive: true, maintainAspectRatio: false, animation: false,
                 plugins: { legend: LEGEND,
-                  tooltip: { callbacks: {
-                    title: function(i) { return 'Strike: $' + i[0].label; },
-                    label: function(i) { return i.dataset.label + ': ' + Math.abs(i.raw); }
-                  }}
+                  tooltip: {
+                    enabled: false, mode: 'index', intersect: false,
+                    external: function(context) {
+                      var tipId = 'mp-tip2-' + sym;
+                      var tipEl = document.getElementById(tipId);
+                      if (!tipEl) {
+                        tipEl = document.createElement('div');
+                        tipEl.id = tipId;
+                        tipEl.style.cssText = 'position:absolute;top:8px;right:8px;background:rgba(255,255,255,0.97);border:1px solid #d1d5db;border-radius:4px;padding:7px 11px;font-size:11px;line-height:1.7;z-index:10;pointer-events:none;box-shadow:0 2px 6px rgba(0,0,0,0.13);min-width:130px;';
+                        cv.parentElement.appendChild(tipEl);
+                      }
+                      var tip = context.tooltip;
+                      if (tip.opacity === 0) { tipEl.style.opacity='0'; return; }
+                      tipEl.style.opacity = '1';
+                      var strike = tip.title && tip.title[0] ? tip.title[0] : '';
+                      var callOI = null, putOI = null;
+                      (tip.dataPoints || []).forEach(function(dp) {
+                        if (dp.dataset.label.indexOf('Call') >= 0) callOI = dp.raw;
+                        else if (dp.dataset.label.indexOf('Put') >= 0) putOI = dp.raw;
+                      });
+                      function fmt(v) { return v != null ? Number(Math.abs(v)).toLocaleString('en-US') : 'N/A'; }
+                      tipEl.innerHTML =
+                        '<div style="font-weight:600;margin-bottom:2px;color:#111;">Strike: ' + strike + '</div>' +
+                        '<div style="color:#2563eb;">Call OI: ' + fmt(callOI) + '</div>' +
+                        '<div style="color:#ea580c;">Put OI: ' + fmt(putOI) + '</div>';
+                    }
+                  }
                 },
                 vlines: d.last_price ? [{ value: d.last_price, color: 'rgba(107,114,128,0.6)', dash: [4,3], label: 'Last $' + d.last_price.toFixed(2) }] : [],
                 scales: {
@@ -979,10 +1002,29 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
               options: {
                 responsive: true, maintainAspectRatio: false, animation: false,
                 plugins: { legend: LEGEND,
-                  tooltip: { callbacks: {
-                    title: function(i) { return 'Strike: $' + i[0].label; },
-                    label: function(i) { return 'IV: ' + i.raw.toFixed(2) + '%'; }
-                  }}
+                  tooltip: {
+                    enabled: false, mode: 'index', intersect: false,
+                    external: function(context) {
+                      var tipId = 'mp-tip3-' + sym;
+                      var tipEl = document.getElementById(tipId);
+                      if (!tipEl) {
+                        tipEl = document.createElement('div');
+                        tipEl.id = tipId;
+                        tipEl.style.cssText = 'position:absolute;top:8px;right:8px;background:rgba(255,255,255,0.97);border:1px solid #d1d5db;border-radius:4px;padding:7px 11px;font-size:11px;line-height:1.7;z-index:10;pointer-events:none;box-shadow:0 2px 6px rgba(0,0,0,0.13);min-width:120px;';
+                        cv.parentElement.appendChild(tipEl);
+                      }
+                      var tip = context.tooltip;
+                      if (tip.opacity === 0) { tipEl.style.opacity='0'; return; }
+                      tipEl.style.opacity = '1';
+                      var strike = tip.title && tip.title[0] ? tip.title[0] : '';
+                      var iv = null;
+                      (tip.dataPoints || []).forEach(function(dp) { if (dp.raw != null) iv = dp.raw; });
+                      tipEl.innerHTML =
+                        '<div style="font-weight:600;margin-bottom:2px;color:#111;">Strike: ' + strike + '</div>' +
+                        '<div style="color:#ca8a04;">IV: ' + (iv != null ? iv.toFixed(2) + '%' : 'N/A') + '</div>' +
+                        (d.last_price ? '<div style="margin-top:4px;color:#6b7280;font-size:10px;">Last: $' + d.last_price.toFixed(2) + '</div>' : '');
+                    }
+                  }
                 },
                 vlines: d.last_price ? [{ value: d.last_price, color: 'rgba(107,114,128,0.6)', dash: [4,3], label: 'Last $' + d.last_price.toFixed(2) }] : [],
                 scales: {
@@ -1020,10 +1062,32 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
               options: {
                 responsive: true, maintainAspectRatio: false, animation: false,
                 plugins: { legend: LEGEND,
-                  tooltip: { callbacks: {
-                    title: function(i) { return i[0].label; },
-                    label: function(i) { return i.dataset.label.split(' ')[0] + ' ' + i.dataset.label.split(' ')[1] + ': $' + i.raw; }
-                  }}
+                  tooltip: {
+                    enabled: false, mode: 'index', intersect: false,
+                    external: function(context) {
+                      var tipId = 'mp-tip4-' + sym;
+                      var tipEl = document.getElementById(tipId);
+                      if (!tipEl) {
+                        tipEl = document.createElement('div');
+                        tipEl.id = tipId;
+                        tipEl.style.cssText = 'position:absolute;top:8px;right:8px;background:rgba(255,255,255,0.97);border:1px solid #d1d5db;border-radius:4px;padding:7px 11px;font-size:11px;line-height:1.7;z-index:10;pointer-events:none;box-shadow:0 2px 6px rgba(0,0,0,0.13);min-width:150px;';
+                        cv.parentElement.appendChild(tipEl);
+                      }
+                      var tip = context.tooltip;
+                      if (tip.opacity === 0) { tipEl.style.opacity='0'; return; }
+                      tipEl.style.opacity = '1';
+                      var expiry = tip.title && tip.title[0] ? tip.title[0] : '';
+                      var mpVal = null, lpVal = null;
+                      (tip.dataPoints || []).forEach(function(dp) {
+                        if (dp.dataset.label.indexOf('Max Pain') >= 0) mpVal = dp.raw;
+                        else if (dp.dataset.label.indexOf('Last') >= 0) lpVal = dp.raw;
+                      });
+                      tipEl.innerHTML =
+                        '<div style="font-weight:600;margin-bottom:2px;color:#111;">' + expiry + '</div>' +
+                        '<div style="color:#2563eb;">Max Pain: $' + (mpVal != null ? mpVal.toFixed(2) : 'N/A') + '</div>' +
+                        (lpVal != null ? '<div style="color:#db2777;">Last Price: $' + lpVal.toFixed(2) + '</div>' : '');
+                    }
+                  }
                 },
                 scales: {
                   x: { ticks: Object.assign({}, TICK, { maxRotation: 45 }), grid: { color: GRID } },
