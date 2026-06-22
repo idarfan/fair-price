@@ -526,11 +526,17 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
                                 else
                                   "—"
                                 end
-                  driver     = flow_driver(ord)
+                  driver       = flow_driver(ord)
+                  driver_tip   = flow_driver_tip(ord)
+                  price_color  = case side_str
+                                 when "ask" then "text-green-600 font-bold"
+                                 when "bid" then "text-red-600 font-bold"
+                                 else            "text-gray-900 font-bold"
+                                 end
                   tr(class: "border-b border-gray-100 hover:bg-purple-50") do
                     td(class: "py-1 pr-2 #{type_color}") { plain is_call ? "Call" : "Put" }
                     td(class: "py-1 pr-2 text-right font-mono text-gray-700") { plain ord["strikePrice"].to_s }
-                    td(class: "py-1 pr-2 text-right font-mono text-gray-600") { plain trade_price }
+                    td(class: "py-1 pr-2 text-right font-mono #{price_color}") { plain trade_price }
                     td(class: "py-1 pr-2 text-gray-500") { plain exp }
                     td(class: "py-1 pr-2 text-right text-gray-500") { plain (ord["dte"] || "—").to_s }
                     td(class: "py-1 pr-2 text-center") do
@@ -538,7 +544,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
                     end
                     td(class: "py-1 pr-2 text-right font-medium #{type_color}") { plain prem_m }
                     td(class: "py-1 pr-2 text-right text-gray-500") { plain delta_val }
-                    td(class: "py-1 text-gray-500 whitespace-nowrap") { plain driver }
+                    td("data-tooltip": driver_tip, class: "py-1 text-gray-600 whitespace-nowrap") { plain driver }
                   end
                 end
               end
@@ -591,6 +597,29 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
       else             "方向不明"
       end
     end
+  end
+
+  def flow_driver_tip(ord)
+    type  = ord["symbolType"].to_s
+    side  = (ord["side"] || "mid").downcase
+    dte   = ord["dte"].to_i
+    delta = ord["delta"].to_f.abs
+    strike = ord["strikePrice"]
+    parts = []
+    parts << "#{type} $#{strike}"  if strike
+    parts << "DTE #{dte}"          if dte > 0
+    parts << "Delta #{sprintf("%.2f", delta)}" if delta > 0
+    parts << case side
+             when "ask" then "ASK：主動買入（方向性）"
+             when "bid" then "BID：造市商賣出（非方向性）"
+             else            "MID：方向不明"
+             end
+    if type == "Call" && side == "ask"
+      parts << (delta >= 0.70 ? "高 Delta — 強確信押注" : dte > 180 ? "長線 — 機構佈局" : "看多押注")
+    elsif type == "Put" && side == "ask"
+      parts << (dte < 30 ? "短 DTE — 緊急對沖" : "看空/對沖")
+    end
+    parts.join(" | ")
   end
 
   def format_expiry(exp_str)
