@@ -91,6 +91,53 @@ class BarchartScraperService
     record = model.find_or_initialize_by(symbol: @symbol, snapshot_date: @today)
     record.assign_attributes(permitted)
     record.save!
+
+    persist_trades(data["trades"]) if type == "options_flow" && data["trades"].is_a?(Array)
+  end
+
+  def persist_trades(trades)
+    return if trades.empty?
+
+    now = Time.current
+    classified = trades.map { |t| classify_trade(t, now) }
+
+    # Delete existing trades for this symbol+date before bulk insert
+    OptionsFlowTrade.where(symbol: @symbol, snapshot_date: @today).delete_all
+    OptionsFlowTrade.insert_all(classified)
+  end
+
+  def classify_trade(trade, fetched_at)
+    code = trade["trade_condition"].to_s
+
+    {
+      symbol:               @symbol,
+      snapshot_date:        @today,
+      fetched_at:           fetched_at,
+      option_type:          trade["option_type"],
+      strike:               trade["strike"],
+      expires_at:           trade["expires_at"],
+      dte:                  trade["dte"],
+      trade_price:          trade["trade_price"],
+      size:                 trade["size"],
+      side:                 trade["side"],
+      premium:              trade["premium"],
+      volume:               trade["volume"],
+      open_interest:        trade["open_interest"],
+      iv:                   trade["iv"],
+      delta:                trade["delta"],
+      trade_condition:      code.presence,
+      open_close:           trade["open_close"],
+      trade_time:           trade["trade_time"],
+      is_cancelled:         OptionsFlowTrade::CANCELLED_CODES.include?(code),
+      is_multi_leg:         OptionsFlowTrade::MULTI_LEG_CODES.include?(code),
+      is_stock_combo:       OptionsFlowTrade::STOCK_COMBO_CODES.include?(code),
+      urgency_high:         code == "ISOI",
+      likely_institutional: OptionsFlowTrade::INSTITUTIONAL_CODES.include?(code),
+      low_liquidity_period: code == "EXHT",
+      timing_anomaly:       OptionsFlowTrade::TIMING_ANOMALY_CODES.include?(code),
+      created_at:           fetched_at,
+      updated_at:           fetched_at
+    }
   end
 
   def log_fetch(type, status, detail)

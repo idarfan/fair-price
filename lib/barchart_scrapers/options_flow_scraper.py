@@ -5,20 +5,29 @@ Usage: python3 options_flow_scraper.py MU
 
 Filters: Size >= 10, Premium >= $10 (as shown in filter UI)
 Reads per-trade rows from bc-data-grid._data using .raw sub-objects.
-Also triggers CSV download for backup.
+Downloads CSV to csv_files/options_flow/{SYMBOL}_{YYYY-MM-DD}.csv,
+parses it, and returns both summary metrics + raw trades array.
 """
 import asyncio
+import csv
 import json
+import os
 import re
 import sys
-import os
+import time
+from datetime import date
+from pathlib import Path
+
+import websockets
 
 sys.path.insert(0, os.path.dirname(__file__))
 from cdp_helper import prepare_page, cdp_eval
 
-
 TARGET_PATH = "options-flow"
 GRID_SETTLE_S = 2.5
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+CSV_DIR = PROJECT_ROOT / "csv_files" / "options_flow"
 
 # Exchange condition codes that correspond to block-style (auction-based) trades.
 BLOCK_CODES = {"ISOI", "MLAT"}
@@ -72,6 +81,118 @@ PAGINATION_JS = """
 """
 
 
+# ---------------------------------------------------------------------------
+# CSV parse helpers
+# ---------------------------------------------------------------------------
+
+def _parse_num(s):
+    if not s:
+        return None
+    try:
+        return float(re.sub(r"[$,%\s]", "", str(s)))
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_int(s):
+    v = _parse_num(s)
+    return int(v) if v is not None else None
+
+
+def _parse_dollar(s):
+    if not s:
+        return None
+    try:
+        return int(float(re.sub(r"[$,\s]", "", str(s))))
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_pct(s):
+    """Parse "25.4%" -> 0.254 or "0.254" -> 0.254."""
+    if not s:
+        return None
+    s = str(s).strip()
+    try:
+        val = float(re.sub(r"[%\s]", "", s))
+        return round(val / 100, 6) if val > 1 else val
+    except (ValueError, TypeError):
+        return None
+
+
+def parse_csv_trades(csv_path):
+    trades = []
+    try:
+        with open(csv_path, newline="", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                trades.append({
+                    "option_type":     (row.get("Type") or "").strip() or None,
+                    "strike":          _parse_num(row.get("Strike")),
+                    "expires_at":      (row.get("Expires") or "").strip() or None,
+                    "dte":             _parse_int(row.get("DTE")),
+                    "trade_price":     _parse_num(row.get("Trade")),
+                    "size":            _parse_int(row.get("Size")),
+                    "side":            (row.get("Side") or "").strip().lower() or None,
+                    "premium":         _parse_dollar(row.get("Premium")),
+                    "volume":          _parse_int(row.get("Volume")),
+                    "open_interest":   _parse_int(row.get("Open Int")),
+                    "iv":              _parse_pct(row.get("IV")),
+                    "delta":           _parse_num(row.get("Delta")),
+                    "trade_condition": (row.get("Code") or "").strip() or None,
+                    "open_close":      (row.get("*") or "").strip() or None,
+                    "trade_time":      (row.get("Time") or "").strip() or None,
+                })
+    except Exception as exc:
+        return {"error": str(exc)}
+    return trades
+
+
+# ---------------------------------------------------------------------------
+# CDP download helpers
+# ---------------------------------------------------------------------------
+
+async def set_download_path(ws_url, download_dir):
+    download_dir.mkdir(parents=True, exist_ok=True)
+    async with websockets.connect(ws_url, open_timeout=10) as ws:
+        await ws.send(json.dumps({
+            "id": 99,
+            "method": "Page.setDownloadBehavior",
+            "params": {
+                "behavior": "allow",
+                "downloadPath": str(download_dir),
+            },
+        }))
+        try:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+        except asyncio.TimeoutError:
+            pass
+
+
+async def wait_for_csv(download_dir, timeout=30):
+    before = set(download_dir.glob("*.csv"))
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        await asyncio.sleep(0.8)
+        after = set(download_dir.glob("*.csv"))
+        new_files = after - before
+        if new_files:
+            return new_files.pop()
+    return None
+
+
+def rename_to_convention(csv_path, symbol, today_str):
+    target = csv_path.parent / f"{symbol}_{today_str}.csv"
+    if target.exists():
+        target.unlink()
+    csv_path.rename(target)
+    return target
+
+
+# ---------------------------------------------------------------------------
+# Grid / flow helpers
+# ---------------------------------------------------------------------------
+
 def parse_dollar(s):
     if not s:
         return None
@@ -113,94 +234,67 @@ async def click_page(ws, page_num):
 
 
 async def extract_all_rows(ws):
-    """Paginate through all pages and collect every row."""
     all_rows = []
     page_rows = await cdp_eval(ws, EXTRACT_ROWS_JS, timeout=10) or []
     all_rows.extend(page_rows)
 
-    page_num = 2
-    MAX_PAGES = 20
-    while page_num <= MAX_PAGES:
+    visited = set()
+    while True:
         next_pages = await cdp_eval(ws, PAGINATION_JS, timeout=5) or []
-        if str(page_num) not in next_pages:
+        next_pages = [p for p in next_pages if p not in visited]
+        if not next_pages:
             break
-        clicked = await click_page(ws, str(page_num))
-        if not clicked:
-            break
+        next_p = next_pages[0]
+        visited.add(next_p)
+        await click_page(ws, next_p)
         await asyncio.sleep(GRID_SETTLE_S)
         page_rows = await cdp_eval(ws, EXTRACT_ROWS_JS, timeout=10) or []
-        if not page_rows:
-            break
         all_rows.extend(page_rows)
-        page_num += 1
 
     return all_rows
+
+
+def prem_sum(rows):
+    return sum(r.get("premium") or 0 for r in rows)
 
 
 def compute_flow_metrics(rows):
     call_rows = [r for r in rows if r.get("symbolType") == "Call"]
     put_rows  = [r for r in rows if r.get("symbolType") == "Put"]
-
-    def prem_sum(lst, side=None):
-        return sum(
-            r["premium"] for r in lst
-            if r.get("premium") is not None
-            and (side is None or r.get("side") == side)
-        )
-
-    # Total premiums (all sides)
     call_prem = prem_sum(call_rows)
     put_prem  = prem_sum(put_rows)
-    ratio = round(call_prem / put_prem, 3) if put_prem > 0 else None
+    ratio     = round(call_prem / put_prem, 4) if put_prem else None
+    ask_call  = prem_sum([r for r in call_rows if r.get("side") == "ask"])
+    ask_put   = prem_sum([r for r in put_rows  if r.get("side") == "ask"])
+    ask_ratio = round(ask_call / ask_put, 4) if ask_put else None
 
-    # Ask-side only (directional — aggressive buyers)
-    ask_call = prem_sum(call_rows, side="ask")
-    ask_put  = prem_sum(put_rows,  side="ask")
-    ask_ratio = round(ask_call / ask_put, 3) if ask_put > 0 else None
-
-    # Large orders (premium >= $500K), ask-side only for directional signal
-    large_orders = [
-        r for r in rows
-        if (r.get("premium") or 0) >= 500_000
-    ]
+    large_orders     = [r for r in rows if (r.get("premium") or 0) >= 500_000]
     large_call_count = sum(1 for r in large_orders if r.get("symbolType") == "Call")
     large_put_count  = sum(1 for r in large_orders if r.get("symbolType") == "Put")
 
-    # Top 10 orders by premium (all rows, not limited to large_orders threshold)
     top_orders = sorted(
         [r for r in rows if r.get("premium")],
-        key=lambda r: r["premium"],
-        reverse=True
+        key=lambda r: r["premium"], reverse=True
     )[:40]
     top_orders_clean = [
-        {
-            "symbolType":  r.get("symbolType"),
-            "side":        r.get("side"),
-            "premium":     r.get("premium"),
-            "tradeSize":   r.get("tradeSize"),
-            "dte":         r.get("dte"),
-            "delta":       r.get("delta"),
-            "strikePrice": r.get("strikePrice"),
-            "expiration":  r.get("expiration"),
-            "tradePrice":  r.get("tradePrice"),
-        }
+        {k: r.get(v) for k, v in {
+            "symbolType": "symbolType", "side": "side", "premium": "premium",
+            "tradeSize": "tradeSize", "dte": "dte", "delta": "delta",
+            "strikePrice": "strikePrice", "expiration": "expiration",
+            "tradePrice": "tradePrice",
+        }.items()}
         for r in top_orders
     ]
 
-    # High-delta call (ask-side, delta >= 0.70) — strong directional
     high_delta_call_count = sum(
         1 for r in call_rows
         if r.get("side") == "ask"
         and r.get("delta") is not None
         and abs(r["delta"]) >= 0.70
     )
-
-    # Long DTE call (ask-side, DTE > 180) — institutional positioning
     long_dte_call_premium = prem_sum(
         [r for r in call_rows if r.get("side") == "ask" and (r.get("dte") or 0) > 180]
     )
-
-    # Short DTE put (ask-side, DTE < 30) — short-term hedging
     short_dte_put_premium = prem_sum(
         [r for r in put_rows if r.get("side") == "ask" and (r.get("dte") or 999) < 30]
     )
@@ -234,7 +328,12 @@ async def trigger_csv_download(ws):
     return await cdp_eval(ws, js, timeout=5)
 
 
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
 async def main(symbol):
+    today_str = date.today().isoformat()
     _, ws = await prepare_page(symbol, TARGET_PATH, settle_ms=8000)
     if not ws:
         print(json.dumps({"status": "error", "error": "No Chrome CDP page found"}))
@@ -258,7 +357,26 @@ async def main(symbol):
     all_rows = await extract_all_rows(ws)
     flow_metrics = compute_flow_metrics(all_rows)
 
-    await trigger_csv_download(ws)
+    # Set download dir then click
+    await set_download_path(ws, CSV_DIR)
+    await asyncio.sleep(0.3)
+    clicked = await trigger_csv_download(ws)
+
+    trades = []
+    csv_error = None
+    if clicked:
+        csv_path = await wait_for_csv(CSV_DIR, timeout=30)
+        if csv_path:
+            final_path = rename_to_convention(csv_path, symbol, today_str)
+            result = parse_csv_trades(final_path)
+            if isinstance(result, list):
+                trades = result
+            else:
+                csv_error = result.get("error")
+        else:
+            csv_error = "csv_download_timeout"
+    else:
+        csv_error = "download_button_not_found"
 
     bearish_raw = parse_dollar(stats.get("Bearish Trade Sentiment"))
     data = {
@@ -269,7 +387,9 @@ async def main(symbol):
         "bearish_delta":     parse_dollar(stats.get("Bearish Delta")),
         "delta_imbalance":   parse_dollar(stats.get("Delta Imbalance")),
         **flow_metrics,
-        "status": "success",
+        "trades":            trades,
+        "csv_error":         csv_error,
+        "status":            "success",
     }
     print(json.dumps(data))
 

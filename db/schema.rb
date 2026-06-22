@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_22_090111) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_22_125342) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -168,6 +168,38 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_22_090111) do
     t.index ["snapshot_date"], name: "index_option_snapshots_on_snapshot_date"
     t.index ["tracked_ticker_id"], name: "index_option_snapshots_on_tracked_ticker_id"
     t.check_constraint "bid > 0::numeric OR ask > 0::numeric OR last_price > 0::numeric", name: "chk_option_has_market_quote"
+  end
+
+  create_table "options_flow_trades", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.decimal "delta", precision: 5, scale: 4
+    t.integer "dte"
+    t.timestamptz "expires_at"
+    t.datetime "fetched_at", null: false
+    t.boolean "is_cancelled", default: false, null: false
+    t.boolean "is_multi_leg", default: false, null: false
+    t.boolean "is_stock_combo", default: false, null: false
+    t.decimal "iv", precision: 6, scale: 4
+    t.boolean "likely_institutional", default: false, null: false
+    t.boolean "low_liquidity_period", default: false, null: false
+    t.string "open_close"
+    t.integer "open_interest"
+    t.string "option_type"
+    t.bigint "premium"
+    t.string "side"
+    t.integer "size"
+    t.date "snapshot_date", null: false
+    t.decimal "strike", precision: 10, scale: 2
+    t.string "symbol", null: false
+    t.boolean "timing_anomaly", default: false, null: false
+    t.string "trade_condition"
+    t.decimal "trade_price", precision: 8, scale: 4
+    t.string "trade_time"
+    t.datetime "updated_at", null: false
+    t.boolean "urgency_high", default: false, null: false
+    t.integer "volume"
+    t.index ["symbol", "snapshot_date", "is_cancelled", "is_multi_leg"], name: "idx_oft_directional"
+    t.index ["symbol", "snapshot_date"], name: "index_options_flow_trades_on_symbol_and_snapshot_date"
   end
 
   create_table "options_flows", force: :cascade do |t|
