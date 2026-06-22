@@ -519,9 +519,9 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
                   exp        = format_expiry(ord["expiration"])
                   delta_val  = ord["delta"] ? sprintf("%.2f", ord["delta"].to_f.abs) : "—"
                   prem_m     = ord["premium"] ? "$#{ord['premium'].to_i.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\1,').reverse}" : "—"
-                  trade_price = if ord["lastPrice"]
-                                  sprintf("$%.2f", ord["lastPrice"].to_f)
-                                elsif ord["premium"] && ord["tradeSize"].to_i > 0
+                  trade_price = if ord["tradePrice"] && ord["tradePrice"].to_f > 0
+                                  sprintf("$%.2f", ord["tradePrice"].to_f)
+                                elsif ord["premium"].to_f > 0 && ord["tradeSize"].to_i > 0
                                   sprintf("$%.2f", ord["premium"].to_f / (ord["tradeSize"].to_i * 100))
                                 else
                                   "—"

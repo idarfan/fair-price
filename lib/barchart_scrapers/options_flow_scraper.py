@@ -51,7 +51,9 @@ EXTRACT_ROWS_JS = """
             tradeSize:      typeof r.tradeSize === 'number' ? r.tradeSize : null,
             dte:            typeof r.dte === 'number'       ? r.dte       : null,
             delta:          typeof r.delta === 'number'     ? r.delta     : null,
-            lastPrice:      typeof r.lastPrice === 'number' ? r.lastPrice : null,
+            tradePrice:     typeof r.tradePrice === 'number' ? r.tradePrice
+                            : typeof r.lastPrice === 'number' ? r.lastPrice
+                            : null,
             tradeCondition: tc,
             strikePrice:    r.strikePrice,
             expiration:     r.expiration
@@ -180,7 +182,7 @@ def compute_flow_metrics(rows):
             "delta":       r.get("delta"),
             "strikePrice": r.get("strikePrice"),
             "expiration":  r.get("expiration"),
-            "lastPrice":   r.get("lastPrice"),
+            "tradePrice":  r.get("tradePrice"),
         }
         for r in top_orders
     ]
