@@ -1,0 +1,836 @@
+{
+  "applyBtnCls": "bc-button ok light-blue",
+  "containerTag": "FORM",
+  "containerCls": "bc-form row ng-pristine ng-valid",
+  "containerHTML": " <div class=\"small-12 column\"> <!-- ngIf: !hideSymbol --> <div class=\"form-group\"> <bc-checkbox-dropdown cb-label=\"'Options Type'\" cb-id=\"'bc-symbol-type-param'\" cb-list=\"symbolTypeList\" cb-model=\"params.symbolType\"><div>\n    <label class=\"form-label bc-dropdown-list-link\" data-dropdown-toggle=\"#bc-symbol-type-param\" data-bc-dropdown-fix=\"\" data-bc-accessibility=\"\" data-type=\"'link'\" data-ng-class=\"{'disabled': cbDisabled}\" tabindex=\"0\" role=\"link\">\n        Options Type\n        <i class=\"bc-glyph-sort-desc close\"></i>\n        <i class=\"bc-glyph-sort-asc open\"></i>\n    </label>\n    <div id=\"bc-symbol-type-param\" class=\"f-dropdown bc-dropdown-list-wrapper bc-dropdown-fix  \">\n        <ul class=\"bc-dropdown-list\">\n            <!-- ngRepeat: item in cbList --><li data-ng-repeat=\"item in cbList\">\n                <div class=\"input-checkbox\">\n                    <input id=\"bc-symbol-type-param-Call\" data-checklist-value=\"item\" data-ng-disabled=\"cbDisabled\" data-ng-click=\"checkAll(item)\" type=\"checkbox\" ng-model=\"checked\" class=\"ng-pristine ng-untouched ng-valid\" data-checklist-model=\"cbModel\" style=\"\">\n\n                    <label class=\"checkbox clearfix\" for=\"bc-symbol-type-param-Call\" data-bc-accessibility=\"\" data-checkbox-checked=\"cbModel.indexOf(item) !== -1\" tabindex=\"0\" role=\"checkbox\" aria-checked=\"true\">\n                        <span class=\"bc-glyph-check\"></span>\n                        <span class=\"name\" data-ng-bind-html=\"cbListNames[item] || item\">Call</span>\n                    </label>\n                </div>\n\n            </li><!-- end ngRepeat: item in cbList --><li data-ng-repeat=\"item in cbList\">\n                <div class=\"input-checkbox\">\n                    <input id=\"bc-symbol-type-param-Put\" data-checklist-value=\"item\" data-ng-disabled=\"cbDisabled\" data-ng-click=\"checkAll(item)\" type=\"checkbox\" ng-model=\"checked\" class=\"ng-pristine ng-untouched ng-valid\" data-checklist-model=\"cbModel\" style=\"\">\n\n                    <label class=\"checkbox clearfix\" for=\"",
+  "inputs": [
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-symbol-type-param-Call",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "Call"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-symbol-type-param-Put",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "Put"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "name": "delta",
+      "id": "",
+      "value": "gt",
+      "placeholder": "",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "number",
+      "name": "delta1",
+      "id": "",
+      "value": "",
+      "placeholder": "",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "number",
+      "name": "delta2",
+      "id": "",
+      "value": "",
+      "placeholder": "",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-exp-type-param-Monthly",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "Monthly"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-exp-type-param-Weekly",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "Weekly"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "name": "expiration",
+      "id": "",
+      "value": "all",
+      "placeholder": "",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "name": "expirationDate",
+      "id": "",
+      "value": "",
+      "placeholder": "MM/DD/YYYY",
+      "label": ""
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "name": "dte",
+      "id": "",
+      "value": "gt",
+      "placeholder": "",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "number",
+      "name": "dte1",
+      "id": "",
+      "value": "",
+      "placeholder": "",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "number",
+      "name": "dte2",
+      "id": "",
+      "value": "",
+      "placeholder": "",
+      "label": ""
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "name": "premium",
+      "id": "",
+      "value": "gt",
+      "placeholder": "",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "number",
+      "name": "premium1",
+      "id": "",
+      "value": "",
+      "placeholder": "",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "number",
+      "name": "premium2",
+      "id": "",
+      "value": "",
+      "placeholder": "",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-sentiment-param-ALL",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "ALL"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-sentiment-param-Bullish",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "Bullish"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-sentiment-param-Bearish",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "Bearish"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-sentiment-param-Neither",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "Neither"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-side-param-ALL",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "ALL"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-side-param-Bid",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "Bid"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-side-param-Ask",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "Ask"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-side-param-Mid",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "Mid"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-flags-param-ALL",
+      "value": "on",
+      "checked": false,
+      "placeholder": "",
+      "label": "ALL"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-flags-param-Block",
+      "value": "on",
+      "checked": false,
+      "placeholder": "",
+      "label": "Block"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-flags-param-Sweep",
+      "value": "on",
+      "checked": false,
+      "placeholder": "",
+      "label": "Sweep"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-flags-param-Regular",
+      "value": "on",
+      "checked": false,
+      "placeholder": "",
+      "label": "Regular"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-flags-param-Cross",
+      "value": "on",
+      "checked": false,
+      "placeholder": "",
+      "label": "Cross"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-flags-param-Floor",
+      "value": "on",
+      "checked": false,
+      "placeholder": "",
+      "label": "Floor"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-flags-param-Non RTH",
+      "value": "on",
+      "checked": false,
+      "placeholder": "",
+      "label": "Non RTH"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-ALL",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "ALL"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-AUTO",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "AUTO"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-CANC",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "CANC"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-CBMO",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "CBMO"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-CNCL",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "CNCL"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-CNCO",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "CNCO"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-CNOL",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "CNOL"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-EXHT",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "EXHT"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-ISOI",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "ISOI"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-LATE",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "LATE"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-MASL",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "MASL"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-MCTP",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "MCTP"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-MESL",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "MESL"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-MFSL",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "MFSL"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-MLAT",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "MLAT"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-MLCT",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "MLCT"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-MLET",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "MLET"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-MLFT",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "MLFT"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-OPEN",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "OPEN"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-OPNL",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "OPNL"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-OSEQ",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "OSEQ"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-REOP",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "REOP"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-SCLI",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "SCLI"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-SLAI",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "SLAI"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-SLAN",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "SLAN"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-SLCN",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "SLCN"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-SLFT",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "SLFT"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-TASL",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "TASL"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-TESL",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "TESL"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-TFSL",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "TFSL"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-TLAT",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "TLAT"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-TLCT",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "TLCT"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-TLET",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "TLET"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-TLFT",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "TLFT"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-code-param-V",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "V"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-label-param-ALL",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "ALL"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-label-param-BuyToOpen",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "Buy To Open"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-label-param-ToOpen",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "To Open"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "name": "",
+      "id": "bc-label-param-SellToOpen",
+      "value": "on",
+      "checked": true,
+      "placeholder": "",
+      "label": "Sell To Open"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "name": "tradeSize",
+      "id": "",
+      "value": "gt",
+      "placeholder": "",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "number",
+      "name": "tradeSize1",
+      "id": "",
+      "value": "10",
+      "placeholder": "",
+      "label": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "number",
+      "name": "tradeSize2",
+      "id": "",
+      "value": "",
+      "placeholder": "",
+      "label": ""
+    }
+  ],
+  "ngElements": [
+    {
+      "tag": "INPUT",
+      "cls": "ng-pristine ng-untouched ng-valid",
+      "ngModel": "checked",
+      "text": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "ng-pristine ng-untouched ng-valid",
+      "ngModel": "checked",
+      "text": ""
+    },
+    {
+      "tag": "SELECT",
+      "cls": "ng-pristine ng-untouched ng-valid",
+      "ngModel": "delta",
+      "text": "greater than less than between"
+    },
+    {
+      "tag": "INPUT",
+      "cls": "form-input ng-pristine ng-untouched ng-valid",
+      "ngModel": "params.delta1",
+      "text": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "form-input  ng-pristine ng-untouched ng-valid",
+      "ngModel": "params.delta2",
+      "text": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "ng-pristine ng-untouched ng-valid",
+      "ngModel": "checked",
+      "text": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "ng-pristine ng-untouched ng-valid",
+      "ngModel": "checked",
+      "text": ""
+    },
+    {
+      "tag": "SELECT",
+      "cls": "ng-pristine ng-untouched ng-valid",
+      "ngModel": "expiration",
+      "text": "All Expiration Dates Only Show Expiration Date Exclude Expir"
+    },
+    {
+      "tag": "INPUT",
+      "cls": "bc-datepicker-control ng-pristine ng-untouched ng-valid",
+      "ngModel": "expirationDate",
+      "text": ""
+    },
+    {
+      "tag": "SELECT",
+      "cls": "ng-pristine ng-untouched ng-valid",
+      "ngModel": "dte",
+      "text": "greater than less than between"
+    },
+    {
+      "tag": "INPUT",
+      "cls": "form-input ng-pristine ng-untouched ng-valid",
+      "ngModel": "params.dte1",
+      "text": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "form-input  ng-pristine ng-untouched ng-valid",
+      "ngModel": "params.dte2",
+      "text": ""
+    },
+    {
+      "tag": "SELECT",
+      "cls": "ng-pristine ng-untouched ng-valid",
+      "ngModel": "premium",
+      "text": "greater than less than between"
+    },
+    {
+      "tag": "INPUT",
+      "cls": "form-input ng-pristine ng-untouched ng-valid",
+      "ngModel": "params.premium1",
+      "text": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "form-input  ng-pristine ng-untouched ng-valid",
+      "ngModel": "params.premium2",
+      "text": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "ng-pristine ng-untouched ng-valid",
+      "ngModel": "checked",
+      "text": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "ng-pristine ng-untouched ng-valid",
+      "ngModel": "checked",
+      "text": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "ng-pristine ng-untouched ng-valid",
+      "ngModel": "checked",
+      "text": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "ng-pristine ng-untouched ng-valid",
+      "ngModel": "checked",
+      "text": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "ng-pristine ng-untouched ng-valid",
+      "ngModel": "checked",
+      "text": ""
+    }
+  ]
+}

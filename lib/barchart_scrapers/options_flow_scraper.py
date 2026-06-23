@@ -226,20 +226,58 @@ def parse_dollar(s):
 
 
 async def apply_filters(ws):
+    """
+    Explicitly set ALL filter groups to ALL before clicking Apply.
+    Never rely on page default/residual state.
+    """
     js = """
     (() => {
-        const premInp = document.querySelector('input[name="premium1"]');
-        if (premInp && (premInp.value === '' || premInp.value === '0')) {
-            premInp.value = '10';
-            premInp.dispatchEvent(new Event('input',  {bubbles: true}));
-            premInp.dispatchEvent(new Event('change', {bubbles: true}));
+        function ensureChecked(id) {
+            const el = document.getElementById(id);
+            if (el && !el.checked) {
+                el.click();
+            }
         }
-        const btn = document.querySelector('.bc-button.ok.light-blue');
-        if (btn) btn.click();
-        return !!btn;
+
+        // Trade Sentiment
+        ['ALL','Bullish','Bearish','Neither'].forEach(v =>
+            ensureChecked('bc-sentiment-param-' + v));
+
+        // Side
+        ['ALL','Bid','Ask','Mid'].forEach(v =>
+            ensureChecked('bc-side-param-' + v));
+
+        // Flags: click ALL only (Angular binding toggles sub-items)
+        ensureChecked('bc-flags-param-ALL');
+
+        // To Open / Label
+        ['ALL','BuyToOpen','ToOpen','SellToOpen'].forEach(v =>
+            ensureChecked('bc-label-param-' + v));
+
+        // Code — ALL master checkbox (sub-codes follow Angular binding)
+        ensureChecked('bc-code-param-ALL');
+
+        // Premium: clear upper bound; set lower to 10 (Barchart default threshold)
+        const prem1 = document.querySelector('input[name="premium1"]');
+        if (prem1) {
+            prem1.value = '10';
+            prem1.dispatchEvent(new Event('input',  {bubbles: true}));
+            prem1.dispatchEvent(new Event('change', {bubbles: true}));
+        }
+        const prem2 = document.querySelector('input[name="premium2"]');
+        if (prem2 && prem2.value !== '') {
+            prem2.value = '';
+            prem2.dispatchEvent(new Event('input',  {bubbles: true}));
+            prem2.dispatchEvent(new Event('change', {bubbles: true}));
+        }
+
+        // Apply
+        const btn = document.querySelector('button.bc-button.ok');
+        if (btn) { btn.click(); return true; }
+        return false;
     })()
     """
-    return await cdp_eval(ws, js, timeout=5)
+    return await cdp_eval(ws, js, timeout=15)
 
 
 async def click_page(ws, page_num):

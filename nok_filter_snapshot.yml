@@ -1,0 +1,49 @@
+- generic [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]
+      - generic [ref=e72]
+      - text: 
+    - generic [ref=e616]:
+      - generic [ref=e618]
+      - generic [ref=e686]
+  - complementary [ref=e695]:
+    - generic [ref=e696]:
+      - generic [ref=e697]: 
+      - text: Options Flow
+    - generic [ref=e699]:
+      - generic [ref=e700]
+      - paragraph [ref=e703]: Barchart’s Options Flow page highlights large option trades that are transacted across all US option exchanges for a particular symbol. Additional Report Date and data filtering options are available for Premier Members, along with the ability to download the data on the page to a .csv file.
+      - paragraph [ref=e704]: Seeing what option strikes large institutional traders are buying or selling can provide both directional sentiment and volatility insights for the underlying security.
+      - paragraph [ref=e705]
+      - paragraph [ref=e708]
+      - list [ref=e711]
+      - paragraph [ref=e721]: What's Included (Latest Date - Options Flow)
+      - paragraph [ref=e722]: For the U.S market, the minimum options trade size is set to greater than 10 to eliminate the noise associated with smaller trades.
+      - paragraph [ref=e723]: The page starts updating for the new trading day at approximately 9:50a.m. ET. Options information is delayed approximately 25 to 30 minutes, and is updated approximately every 5-minutes through-out the trading day.
+      - paragraph [ref=e724]
+      - paragraph [ref=e726]: Click the "Make this my default view" link top right of the page to save your filter preferences for the next time you visit the page.
+      - separator [ref=e727]
+      - paragraph [ref=e728]: Historical Reports & Page Filtering
+      - paragraph [ref=e729]
+      - paragraph [ref=e732]: "On-page filtering is available for either today's report or any historical date you select. Additional filter options include:"
+      - paragraph [ref=e733]: Filters
+      - paragraph [ref=e734]: "The following filters are available on the page to narrow down the information shown:"
+      - list [ref=e735]
+      - paragraph [ref=e806]
+      - paragraph [ref=e808]: Once the data is retrieved, you may download the data to a .csv file using the "download" icon located at the top right of the page. Data shown includes
+      - list [ref=e809]
+      - paragraph [ref=e856]: Special Labels
+      - list [ref=e857]
+  - generic [ref=e867] [cursor=pointer]: 
+  - button "BART AI Ask BART AI Chat" [ref=e868] [cursor=pointer]:
+    - img "BART AI" [ref=e870]
+    - generic [ref=e871]:
+      - generic [ref=e872]: Ask BART
+      - generic [ref=e873]: AI Chat
+  - iframe [ref=e874]:
+    - generic [ref=f34e4]:
+      - generic [ref=f34e5]
+      - generic [ref=f34e21]
+  - link "Terms of Content Use" [ref=e1088] [cursor=pointer]:
+    - /url: /
