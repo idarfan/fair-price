@@ -225,6 +225,25 @@ def parse_dollar(s):
         return None
 
 
+async def expand_filter_panel(ws):
+    """Click 'Filter to Optimize Results' to expand the panel if currently collapsed."""
+    js = """
+    (() => {
+        const btn = document.querySelector('a.filters-control.show-filters');
+        // ng-hide means already expanded; no ng-hide means collapsed → need to click
+        if (btn && !btn.classList.contains('ng-hide')) {
+            btn.click();
+            return 'expanded';
+        }
+        return 'already_open';
+    })()
+    """
+    result = await cdp_eval(ws, js, timeout=5)
+    if result == 'expanded':
+        await asyncio.sleep(1.5)  # wait for Angular to render filter rows
+    return result
+
+
 async def apply_filters(ws):
     """
     Explicitly set ALL filter groups to ALL before clicking Apply.
@@ -413,6 +432,7 @@ async def main(symbol):
         }))
         return
 
+    await expand_filter_panel(ws)
     await apply_filters(ws)
     await asyncio.sleep(GRID_SETTLE_S)
 
