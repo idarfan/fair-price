@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_23_011141) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_23_054549) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -40,6 +40,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_011141) do
     t.string "earnings_time"
     t.decimal "ebit_m", precision: 12, scale: 2
     t.decimal "ebitda_m", precision: 12, scale: 2
+    t.decimal "eps_estimate_current_qtr"
+    t.decimal "eps_growth_est_yoy"
+    t.decimal "eps_prior_year_estimate"
     t.decimal "eps_ttm", precision: 10, scale: 4
     t.decimal "expected_move_pct", precision: 8, scale: 4
     t.datetime "fetched_at", null: false

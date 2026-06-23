@@ -73,9 +73,12 @@ EXTRACT_JS = """
     // Earnings date span
     const earningsEl = document.querySelector('span.right.earnings-background');
     const earningsSpan = earningsEl ? (earningsEl.innerText || '').trim() : '';
+    // Earnings estimates block (bc-rating-and-estimates)
+    const estimatesEl = document.querySelector('div.barchart-content-block.bc-rating-and-estimates');
+    const estimatesText = estimatesEl ? (estimatesEl.innerText || '') : '';
     // Session check
     const sessionOk = !!document.querySelector('div.barchart-content-block.symbol-fundamentals');
-    return { fundText, optText, analystText, earningsSpan, sessionOk };
+    return { fundText, optText, analystText, earningsSpan, estimatesText, sessionOk };
 })()
 """
 
@@ -176,9 +179,23 @@ async def main(symbol):
             m = re.search(pat, at)
             data[key] = int(m.group(1)) if m else 0
 
+    # === Earnings Estimates (current quarter) ===
+    est_text = raw.get("estimatesText", "")
+    if est_text:
+        m = re.search(r"Average Estimate[\s\S]{0,10}?\$?([\d.]+)", est_text)
+        data["eps_estimate_current_qtr"] = float(m.group(1)) if m else None
+
+        m = re.search(r"Prior Year[\s\S]{0,10}?\$?([-\d.]+)", est_text)
+        data["eps_prior_year_estimate"] = float(m.group(1)) if m else None
+
+        m = re.search(r"Growth Rate Est\.[^\n]*\n?\s*([+-]?[\d,]+\.?\d*)%", est_text)
+        if m:
+            data["eps_growth_est_yoy"] = float(m.group(1).replace(",", ""))
+        else:
+            data["eps_growth_est_yoy"] = None
+
     data["status"] = "success"
     print(json.dumps(data))
-
 
 if __name__ == "__main__":
     symbol = sys.argv[1].upper() if len(sys.argv) > 1 else "MU"
