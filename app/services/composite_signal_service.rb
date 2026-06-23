@@ -209,7 +209,7 @@ class CompositeSignalService
     net   = flow.net_sentiment
     delta = flow.delta_imbalance
 
-    if net
+    if net && net != 0
       amt = "$#{sprintf("%.1f", net.abs / 1_000_000.0)}M"
       if net > 0
         points += 1
@@ -220,7 +220,7 @@ class CompositeSignalService
       end
     end
 
-    if delta
+    if delta && delta != 0
       if delta > 0
         points += 1
         signals << { text: "Delta Imbalance +#{delta.abs.to_i}（買權 Delta 過剩）", sentiment: :bullish }
