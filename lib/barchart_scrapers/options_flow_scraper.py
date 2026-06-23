@@ -14,6 +14,7 @@ import json
 import os
 import re
 import sys
+import subprocess
 import time
 from datetime import date
 from pathlib import Path
@@ -152,6 +153,24 @@ def parse_csv_trades(csv_path):
 # CDP download helpers
 # ---------------------------------------------------------------------------
 
+def to_windows_path(linux_path: Path) -> str:
+    """Convert WSL2 Linux path to Windows UNC path for Chrome CDP.
+
+    Chrome runs on Windows, so it cannot resolve Linux paths like
+    /home/... — needs \\wsl.localhost\Ubuntu\home\...
+    Falls back to Linux path string if wslpath is unavailable.
+    """
+    try:
+        result = subprocess.run(
+            ["wslpath", "-w", str(linux_path)],
+            capture_output=True, text=True, check=True,
+        )
+        return result.stdout.strip()
+    except Exception as e:
+        print(f"[warn] wslpath failed: {e}", file=sys.stderr)
+        return str(linux_path)
+
+
 async def set_download_path(ws_url, download_dir):
     download_dir.mkdir(parents=True, exist_ok=True)
     async with websockets.connect(ws_url, open_timeout=10) as ws:
@@ -160,7 +179,7 @@ async def set_download_path(ws_url, download_dir):
             "method": "Page.setDownloadBehavior",
             "params": {
                 "behavior": "allow",
-                "downloadPath": str(download_dir),
+                "downloadPath": to_windows_path(download_dir),  # Windows UNC path for Chrome
             },
         }))
         try:

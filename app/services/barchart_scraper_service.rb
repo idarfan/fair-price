@@ -33,7 +33,12 @@ class BarchartScraperService
         return result
       elsif fetch_result[:status] == "success"
         persist(type, fetch_result[:data])
-        log_fetch(type, "success", nil)
+        if type == "options_flow" && (csv_err = fetch_result[:data]["csv_error"])
+          result[:errors] << "options_flow csv: #{csv_err}"
+          log_fetch(type, "partial_error", "csv_error=#{csv_err}")
+        else
+          log_fetch(type, "success", nil)
+        end
       else
         result[:errors] << "#{type}: #{fetch_result[:error]}"
         log_fetch(type, "error", fetch_result[:error])
