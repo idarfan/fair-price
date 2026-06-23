@@ -56,10 +56,10 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
       render_stock_quote if @stock_quote
       render_status_bar if @scrape_status
       if @result
+        render_divergences
         render_score_row
         render_data_detail
         render_flow_detail
-        render_divergences
         render_options_charts
       end
     end
