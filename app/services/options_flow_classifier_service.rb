@@ -27,8 +27,8 @@ class OptionsFlowClassifierService
   # open_close 值中，方向無法判斷的
   AMBIGUOUS_OPEN_CLOSE = [ "ToOpen", "N/A", "" ].freeze
 
-  # urgency_high 的額外條件：ask-side 且 premium ≥ $500K
-  URGENCY_PREMIUM_THRESHOLD = 500_000
+  # large_premium 門檻：$500K（慣例值，源自第10課框架，尚無統計依據，待日後校正）
+  LARGE_PREMIUM_THRESHOLD = 500_000
 
   # ─── Class-level entry points ────────────────────────────────────────────
 
@@ -51,8 +51,9 @@ class OptionsFlowClassifierService
       "is_cancelled"         => OptionsFlowTrade::CANCELLED_CODES.include?(code),
       "is_multi_leg"         => OptionsFlowTrade::MULTI_LEG_CODES.include?(code),
       "is_stock_combo"       => OptionsFlowTrade::STOCK_COMBO_CODES.include?(code),
-      "urgency_high"         => urgency_high?(code, trade),
+      "urgency_high"         => code == "ISOI",
       "likely_institutional" => OptionsFlowTrade::INSTITUTIONAL_CODES.include?(code),
+      "large_premium"        => trade["premium"].to_i >= LARGE_PREMIUM_THRESHOLD,
       "low_liquidity_period" => code == "EXHT",
       "timing_anomaly"       => OptionsFlowTrade::TIMING_ANOMALY_CODES.include?(code)
     }
@@ -77,6 +78,7 @@ class OptionsFlowClassifierService
         stock_combo:            classified.count { |t| t["is_stock_combo"] },
         urgency_high:           classified.count { |t| t["urgency_high"] },
         likely_institutional:   classified.count { |t| t["likely_institutional"] },
+        large_premium:          classified.count { |t| t["large_premium"] },
         timing_anomaly:         classified.count { |t| t["timing_anomaly"] },
         pure_directional_count: pure.size,
         strategic_count:        strategic.size
@@ -107,12 +109,6 @@ class OptionsFlowClassifierService
     in [ "Call", "bid", "SellToOpen" ] then AMBIGUOUS_CALL_SELL
     else                                  INDETERMINATE
     end
-  end
-
-  # urgency_high：ISOI（ISE 機構競價）或 ask-side 且 premium ≥ $500K
-  def urgency_high?(code, trade)
-    return true if code == "ISOI"
-    trade["side"].to_s.downcase == "ask" && trade["premium"].to_i >= URGENCY_PREMIUM_THRESHOLD
   end
 
   # ─── Aggregate helpers ────────────────────────────────────────────────────
@@ -171,7 +167,7 @@ class OptionsFlowClassifierService
   end
 
   def institutional_pct(trades, total_prem)
-    inst = trades.select { |t| t["likely_institutional"] || t["urgency_high"] }
+    inst = trades.select { |t| t["likely_institutional"] }
     pct(premium_sum(inst), total_prem)
   end
 end
