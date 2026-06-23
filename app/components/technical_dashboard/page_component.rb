@@ -844,7 +844,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
 
           p(class: "text-amber-600 font-semibold mt-1", style: "font-size:14px") { raw "⚠️ OI 分布判讀提醒".html_safe }
             div(class: "mt-1 text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1", style: "font-size:22px") do
-              p { "高 OI 集中的 strike 無法直接判斷多空方向：Put OI 可能是保護性避險（偏空），也可能是賣 Put 收保費（偏多）；Call OI 同理。" }
+              p { "高 OI 集中的 strike 無法直接判斷多空方向：Put OI 可能是保護性避險（偏空），也可能是賣 Put 收保費（偏多）；Call OI 可能是方向性押注（偏多），也可能是持股者賣出 Covered Call 收取權利金（中性偏多策略，非方向性看空）。" }
               p { raw "<strong>使用建議</strong>：須搭配 Options Flow 的 Trade 方向（成交於 Ask 或 Bid）及 Code 交叉比對，不可單憑 OI 集中度判斷。".html_safe }
             end
       end
@@ -859,8 +859,8 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
           p(class: "text-amber-600 font-semibold mt-1", style: "font-size:14px") { raw "⚠️ Vol Skew 判讀提醒".html_safe }
             div(class: "mt-1 text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1", style: "font-size:22px") do
               p { "下傾斜（Put 端 IV 高於 Call 端）是選擇權市場的結構性常態，反映避險需求長期偏 Put，本身不是看空訊號。" }
-              p { raw "單一時間點的 Skew 形狀<strong>不具判斷力</strong>，必須與該標的自身歷史 Skew 比較（Skew Rank）才能判斷是否異常。".html_safe }
-              p { raw "<strong>使用建議</strong>：本圖為單次快照，需對照歷史 Skew 百分位，不可僅憑曲線形狀下結論。".html_safe }
+              p { raw "單一時間點的 Skew 形狀<strong>不具判斷力</strong>，必須與該標的自身歷史 Skew 比較（Skew Rank）才能判斷是否異常。跨標的直接比較 Skew 形狀沒有意義，不同產業、不同標的的「正常」Skew 基準本來就不同。".html_safe }
+              p { raw "<strong>使用建議</strong>：本圖為單次快照，務必對照 IV Skew Tracker 的 Skew Rank 歷史百分位一併判讀，不可僅憑當下曲線形狀下結論。".html_safe }
             end
       end
 
@@ -877,6 +877,18 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
               p { "財報前後市場會大量布局跨事件選擇權倉位，使該到期日的 OI 結構暫時失真，Max Pain 的參考價值會明顯降低。" }
               p { raw "<strong>使用建議</strong>：財報前後 14 天內的到期日數據，Max Pain 可信度打折。".html_safe }
             end
+      end
+
+      # 整合判讀：四圖核心原則（規格文件 §3 整合判讀節）
+      div(class: "mt-2 bg-blue-50 border border-blue-200 rounded-lg p-3") do
+        p(class: "text-blue-800 font-semibold mb-2", style: "font-size:13px") { raw "📋 四圖整合判讀：使用時的核心原則".html_safe }
+        ul(class: "text-gray-600 space-y-1 list-disc pl-4", style: "font-size:12px; line-height:1.6") do
+          li { raw "<strong>Skew 形狀不是方向訊號</strong>：看 Skew Rank（相對自身歷史的排名），不看當下曲線形狀。下傾斜是所有股票的結構性常態，跨標的比較 Skew 形狀沒有意義。".html_safe }
+          li { raw "<strong>財報日期附近 Max Pain 可信度打折</strong>：數值劇烈震盪時，先查是否緊鄰財報，不要直接解讀為市場情緒轉變。".html_safe }
+          li { raw "<strong>不同圖表的訊號可以互相矛盾，這是正常現象</strong>：近月避險 Put 集中、遠月看多 Call 布局可以並存，各代表不同時間維度的參與者行為，不必強行整合成單一結論。".html_safe }
+          li { raw "<strong>Options Flow / Max Pain / Skew 反映倉位分布，不是股價預測</strong>：三者一致才較具參考性；出現背離時，優先懷疑是避險、財報效應、或結構性常態造成的雜訊，而非直接採信訊號表面方向。".html_safe }
+          li { raw "<strong>市值越大，Max Pain 磁吸效應說服力越低</strong>；流動性越差，圖表雜訊比例越高——兩種情況都需更謹慎解讀。".html_safe }
+        end
       end
     end
 
