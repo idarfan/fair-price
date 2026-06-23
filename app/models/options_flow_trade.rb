@@ -9,6 +9,8 @@ class OptionsFlowTrade < ApplicationRecord
 
   validates :symbol, :snapshot_date, :fetched_at, presence: true
 
+  scope :large_premium, -> { where(large_premium: true) }
+
   scope :directional, -> {
     where(is_cancelled: false, is_multi_leg: false, is_stock_combo: false)
   }

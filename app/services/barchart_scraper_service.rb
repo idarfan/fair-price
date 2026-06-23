@@ -135,7 +135,7 @@ class BarchartScraperService
       likely_institutional: c["likely_institutional"],
       low_liquidity_period: c["low_liquidity_period"],
       timing_anomaly:       c["timing_anomaly"],
-      # large_premium and direction: added after migration (step 2)
+      large_premium:        c["large_premium"],
       created_at:           fetched_at,
       updated_at:           fetched_at
     }

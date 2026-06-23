@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_22_125342) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_23_011141) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -180,6 +180,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_22_125342) do
     t.boolean "is_multi_leg", default: false, null: false
     t.boolean "is_stock_combo", default: false, null: false
     t.decimal "iv", precision: 6, scale: 4
+    t.boolean "large_premium", default: false, null: false
     t.boolean "likely_institutional", default: false, null: false
     t.boolean "low_liquidity_period", default: false, null: false
     t.string "open_close"
