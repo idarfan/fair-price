@@ -7,7 +7,7 @@ require "open3"
 #   result = BarchartScraperService.new("MU").call
 #   result[:status]  # => "success" | "barchart_session_expired" | "error"
 class BarchartScraperService
-  CDP_URL    = "http://localhost:9222"
+  CDP_URL    = "http://127.0.0.1:9222"
   SCRIPT_DIR = Rails.root.join("lib", "barchart_scrapers")
 
   def initialize(symbol)
