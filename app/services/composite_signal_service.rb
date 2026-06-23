@@ -178,8 +178,8 @@ class CompositeSignalService
       end
     end
 
-    # Next earnings (not pre-earnings, just informational)
-    if fund.next_earnings_date
+    # Next earnings — only show if date is in the future (post-earnings DB not yet refreshed)
+    if fund.next_earnings_date && fund.next_earnings_date >= Date.today
       signals << {
         text:      "下次財報：#{fund.next_earnings_date}（#{fund.earnings_time}）",
         sentiment: :neutral
