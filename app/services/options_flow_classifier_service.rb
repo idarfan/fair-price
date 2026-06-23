@@ -21,7 +21,7 @@ class OptionsFlowClassifierService
   BULLISH_DIRECTIONAL = "bullish_directional"   # Call ask BuyToOpen
   BULLISH_RENTAL      = "bullish_rental"         # Put  bid SellToOpen（賣 Put 收租）
   BEARISH_DIRECTIONAL = "bearish_directional"   # Put  ask BuyToOpen
-  NEUTRAL_BULLISH     = "neutral_bullish"        # Call bid SellToOpen（Covered Call 或裸賣）
+  AMBIGUOUS_CALL_SELL = "ambiguous_call_sell"    # Call bid SellToOpen（Covered Call 或裸賣 Call，方向不明）
   INDETERMINATE       = "indeterminate"
 
   # open_close 值中，方向無法判斷的
@@ -104,7 +104,7 @@ class OptionsFlowClassifierService
     in [ "Call", "ask", "BuyToOpen" ]  then BULLISH_DIRECTIONAL
     in [ "Put",  "bid", "SellToOpen" ] then BULLISH_RENTAL
     in [ "Put",  "ask", "BuyToOpen" ]  then BEARISH_DIRECTIONAL
-    in [ "Call", "bid", "SellToOpen" ] then NEUTRAL_BULLISH
+    in [ "Call", "bid", "SellToOpen" ] then AMBIGUOUS_CALL_SELL
     else                                  INDETERMINATE
     end
   end
@@ -121,7 +121,7 @@ class OptionsFlowClassifierService
     bto_calls  = trades.select { |t| t["direction"] == BULLISH_DIRECTIONAL }
     sto_puts   = trades.select { |t| t["direction"] == BULLISH_RENTAL }
     bto_puts   = trades.select { |t| t["direction"] == BEARISH_DIRECTIONAL }
-    sto_calls  = trades.select { |t| t["direction"] == NEUTRAL_BULLISH }
+    amb_calls  = trades.select { |t| t["direction"] == AMBIGUOUS_CALL_SELL }
     indet      = trades.select { |t| t["direction"] == INDETERMINATE }
 
     total_prem = premium_sum(trades)
@@ -134,13 +134,13 @@ class OptionsFlowClassifierService
       seller_initiated_put_count:      sto_puts.size,
       buyer_initiated_put_premium:     premium_sum(bto_puts),
       buyer_initiated_put_count:       bto_puts.size,
-      seller_initiated_call_premium:   premium_sum(sto_calls),
-      seller_initiated_call_count:     sto_calls.size,
+      ambiguous_call_sell_premium:     premium_sum(amb_calls),
+      ambiguous_call_sell_count:       amb_calls.size,
       indeterminate_count:             indet.size,
       buyer_initiated_call_pct:        pct(premium_sum(bto_calls), total_prem),
       seller_initiated_put_pct:        pct(premium_sum(sto_puts),  total_prem),
       buyer_initiated_put_pct:         pct(premium_sum(bto_puts),  total_prem),
-      seller_initiated_call_pct:       pct(premium_sum(sto_calls), total_prem),
+      ambiguous_call_sell_pct:         pct(premium_sum(amb_calls), total_prem),
       institutional_weighted_pct:      institutional_pct(trades, total_prem)
     }
   end
