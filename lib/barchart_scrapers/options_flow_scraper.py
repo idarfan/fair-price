@@ -22,7 +22,7 @@ from pathlib import Path
 import websockets
 
 sys.path.insert(0, os.path.dirname(__file__))
-from cdp_helper import prepare_page, cdp_eval
+from cdp_helper import prepare_page, cdp_eval, get_browser_ws
 
 TARGET_PATH = "options-flow"
 GRID_SETTLE_S = 2.5
@@ -157,7 +157,7 @@ def to_windows_path(linux_path: Path) -> str:
     """Convert WSL2 Linux path to Windows UNC path for Chrome CDP.
 
     Chrome runs on Windows, so it cannot resolve Linux paths like
-    /home/... — needs \\wsl.localhost\Ubuntu\home\...
+    /home/... — needs \\\\wsl.localhost\\Ubuntu\\home\\...
     Falls back to Linux path string if wslpath is unavailable.
     """
     try:
@@ -171,19 +171,22 @@ def to_windows_path(linux_path: Path) -> str:
         return str(linux_path)
 
 
-async def set_download_path(ws_url, download_dir):
+async def set_download_path(download_dir):
+    """Use Browser.setDownloadBehavior (browser-level, persists across CDP sessions)."""
     download_dir.mkdir(parents=True, exist_ok=True)
-    async with websockets.connect(ws_url, open_timeout=10) as ws:
+    browser_ws = get_browser_ws()
+    async with websockets.connect(browser_ws, open_timeout=10) as ws:
         await ws.send(json.dumps({
             "id": 99,
-            "method": "Page.setDownloadBehavior",
+            "method": "Browser.setDownloadBehavior",
             "params": {
                 "behavior": "allow",
                 "downloadPath": to_windows_path(download_dir),  # Windows UNC path for Chrome
             },
         }))
         try:
-            await asyncio.wait_for(ws.recv(), timeout=5)
+            resp = await asyncio.wait_for(ws.recv(), timeout=5)
+            import sys; print(f"[debug] Browser.setDownloadBehavior: {resp}", file=sys.stderr)
         except asyncio.TimeoutError:
             pass
 
@@ -196,7 +199,8 @@ async def wait_for_csv(download_dir, timeout=30):
         after = set(download_dir.glob("*.csv"))
         new_files = after - before
         if new_files:
-            return new_files.pop()
+                return new_files.pop()
+    print(f"[debug] wait_for_csv TIMEOUT, after={set(download_dir.glob("*.csv"))}", file=sys.stderr)
     return None
 
 
@@ -339,7 +343,8 @@ def compute_flow_metrics(rows):
 async def trigger_csv_download(ws):
     js = """
     (() => {
-        const btn = document.querySelector('span.js-download-button.js-main-title, .js-download-button');
+        // Real download button: toolbar-level [data-bc-download-button]
+        const btn = document.querySelector('[data-bc-download-button]');
         if (btn) { btn.click(); return true; }
         return false;
     })()
@@ -376,26 +381,41 @@ async def main(symbol):
     all_rows = await extract_all_rows(ws)
     flow_metrics = compute_flow_metrics(all_rows)
 
-    # Set download dir then click
-    await set_download_path(ws, CSV_DIR)
-    await asyncio.sleep(0.3)
-    clicked = await trigger_csv_download(ws)
-
+    # Keep browser WS open for entire download sequence —
+    # Browser.setDownloadBehavior resets when the CDP session closes
     trades = []
     csv_error = None
-    if clicked:
-        csv_path = await wait_for_csv(CSV_DIR, timeout=30)
-        if csv_path:
-            final_path = rename_to_convention(csv_path, symbol, today_str)
-            result = parse_csv_trades(final_path)
-            if isinstance(result, list):
-                trades = result
+    CSV_DIR.mkdir(parents=True, exist_ok=True)
+    async with websockets.connect(get_browser_ws(), open_timeout=10) as bws:
+        await bws.send(json.dumps({
+            "id": 99,
+            "method": "Browser.setDownloadBehavior",
+            "params": {
+                "behavior": "allow",
+                "downloadPath": to_windows_path(CSV_DIR),
+            },
+        }))
+        try:
+            resp = await asyncio.wait_for(bws.recv(), timeout=5)
+            print(f"[debug] Browser.setDownloadBehavior: {resp}", file=sys.stderr)
+        except asyncio.TimeoutError:
+            pass
+
+        clicked = await trigger_csv_download(ws)
+    
+        if clicked:
+            csv_path = await wait_for_csv(CSV_DIR, timeout=30)
+            if csv_path:
+                final_path = rename_to_convention(csv_path, symbol, today_str)
+                result = parse_csv_trades(final_path)
+                if isinstance(result, list):
+                    trades = result
+                else:
+                    csv_error = result.get("error")
             else:
-                csv_error = result.get("error")
+                csv_error = "csv_download_timeout"
         else:
-            csv_error = "csv_download_timeout"
-    else:
-        csv_error = "download_button_not_found"
+            csv_error = "download_button_not_found"
 
     bearish_raw = parse_dollar(stats.get("Bearish Trade Sentiment"))
     data = {

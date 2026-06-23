@@ -10,7 +10,7 @@ import json
 import urllib.request
 import websockets
 
-CDP_BASE = "http://localhost:9222"
+CDP_BASE = "http://127.0.0.1:9222"
 
 
 def get_target(symbol, page_type):
