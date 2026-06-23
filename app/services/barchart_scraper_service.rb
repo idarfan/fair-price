@@ -107,34 +107,35 @@ class BarchartScraperService
   end
 
   def classify_trade(trade, fetched_at)
-    code = trade["trade_condition"].to_s
+    c = OptionsFlowClassifierService.classify(trade)
 
     {
       symbol:               @symbol,
       snapshot_date:        @today,
       fetched_at:           fetched_at,
-      option_type:          trade["option_type"],
-      strike:               trade["strike"],
-      expires_at:           trade["expires_at"],
-      dte:                  trade["dte"],
-      trade_price:          trade["trade_price"],
-      size:                 trade["size"],
-      side:                 trade["side"],
-      premium:              trade["premium"],
-      volume:               trade["volume"],
-      open_interest:        trade["open_interest"],
-      iv:                   trade["iv"],
-      delta:                trade["delta"],
-      trade_condition:      code.presence,
-      open_close:           trade["open_close"],
-      trade_time:           trade["trade_time"],
-      is_cancelled:         OptionsFlowTrade::CANCELLED_CODES.include?(code),
-      is_multi_leg:         OptionsFlowTrade::MULTI_LEG_CODES.include?(code),
-      is_stock_combo:       OptionsFlowTrade::STOCK_COMBO_CODES.include?(code),
-      urgency_high:         code == "ISOI",
-      likely_institutional: OptionsFlowTrade::INSTITUTIONAL_CODES.include?(code),
-      low_liquidity_period: code == "EXHT",
-      timing_anomaly:       OptionsFlowTrade::TIMING_ANOMALY_CODES.include?(code),
+      option_type:          c["option_type"],
+      strike:               c["strike"],
+      expires_at:           c["expires_at"],
+      dte:                  c["dte"],
+      trade_price:          c["trade_price"],
+      size:                 c["size"],
+      side:                 c["side"],
+      premium:              c["premium"],
+      volume:               c["volume"],
+      open_interest:        c["open_interest"],
+      iv:                   c["iv"],
+      delta:                c["delta"],
+      trade_condition:      c["trade_condition"].presence,
+      open_close:           c["open_close"],
+      trade_time:           c["trade_time"],
+      is_cancelled:         c["is_cancelled"],
+      is_multi_leg:         c["is_multi_leg"],
+      is_stock_combo:       c["is_stock_combo"],
+      urgency_high:         c["urgency_high"],
+      likely_institutional: c["likely_institutional"],
+      low_liquidity_period: c["low_liquidity_period"],
+      timing_anomaly:       c["timing_anomaly"],
+      # large_premium and direction: added after migration (step 2)
       created_at:           fetched_at,
       updated_at:           fetched_at
     }
