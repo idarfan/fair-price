@@ -27,6 +27,10 @@ def get_target(symbol, page_type):
     for t in targets:
         if t.get("type") == "page" and "barchart.com" in t.get("url", ""):
             return t["id"], t["webSocketDebuggerUrl"]
+    # Last resort: any page tab (scraper will navigate to correct URL)
+    for t in targets:
+        if t.get("type") == "page":
+            return t["id"], t["webSocketDebuggerUrl"]
     return None, None
 
 
@@ -115,15 +119,14 @@ async def prepare_page(symbol, page_type, settle_ms):
     await asyncio.sleep(1.5)
 
     target_url = f"https://www.barchart.com/stocks/quotes/{symbol}/{page_type}"
-    page_type_path = f"/{page_type}"
 
-    # Check current URL; navigate only if needed
+    # Check current URL; navigate only if the exact target URL isn't loaded
     try:
         current_url = await cdp_eval(ws_url, "window.location.href", timeout=10)
     except TimeoutError:
         current_url = ""
 
-    if page_type_path not in (current_url or ""):
+    if f"/quotes/{symbol}/" not in (current_url or "") or f"/{page_type}" not in (current_url or ""):
         await cdp_navigate(ws_url, target_url, settle_ms=settle_ms)
         # Re-activate after navigation (Chrome may have focused elsewhere)
         await activate_target(target_id)
