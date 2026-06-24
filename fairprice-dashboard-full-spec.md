@@ -134,7 +134,7 @@ Trade, Size, Side, Premium, Volume, "Open Int", IV, Delta, Code, *, Time
 csv_files/
   options_flow/
     {SYMBOL}_{YYYY-MM-DD}.csv       # 例：LIN_2026-06-22.csv
-  fundamentals/                      # 若第6節基本面也走CSV下載,同樣規範
+  fundamentals/                      # 若第7節基本面也走CSV下載,同樣規範
     {SYMBOL}_{YYYY-MM-DD}.csv
 ```
 
@@ -226,7 +226,94 @@ csv_files/
 
 ---
 
-## 3. Max Pain / Skew 圖表判讀提醒（通用版，適用所有美股標的）
+## 3. Max Pain & Vol Skew 資料抓取邏輯（篩選器可控）
+
+### 3.0 頁面與篩選器說明
+
+目標頁面：`https://www.barchart.com/stocks/quotes/{SYMBOL}/max-pain-chart`
+
+頁面上四張圖表（Max Pain by Strike、Open Interest by Strike、Options
+Volatility Skew、Max Pain by Contract）即為資料呈現的全部內容，沒有
+另外獨立的數據明細表——四張圖共用同一份底層資料來源，篩選器變動時
+應一起重新渲染。
+
+頁面提供三個可調整的篩選器：
+
+1. **到期日選擇器**（dropdown，例如 `2026-06-26 (w)`）
+2. **Strikes 範圍篩選器**：`5 Strikes +/-` / `Near the Money` /
+   `20 Strikes +/-` / `50 Strikes +/-` / `Show All`
+3. **Volume / Open Interest 切換**：`Volume` / `Open Interest`
+
+操作順序：設定三個篩選器 → 點擊 **SHOW CHART** 按鈕（圖表重新渲染）
+→ 點擊 **Download** 連結（觸發 CSV 下載）。
+
+### 3.1 預設行為（首次載入，不需使用者操作）
+
+頁面載入後，自動套用以下預設組合並完成抓取：
+
+1. 到期日：最近的到期日（dropdown 第一個選項）
+2. Strikes 範圍：`Show All`
+3. Volume/OI 切換：`Open Interest`
+
+依此預設組合，自動完成「設定篩選器 → SHOW CHART → Download → 存
+CSV」整套流程，首次載入即顯示四張圖表，不需要使用者手動操作。
+
+### 3.2 手動觸發重抓
+
+當使用者在前端介面手動變更以下任一條件：到期日 / Strikes 範圍 /
+Volume-OI 切換，系統需要：
+
+1. 依新的篩選組合，重新走一次「設定篩選器 → SHOW CHART → Download
+   → 存 CSV」流程
+2. **四張圖表一起重新渲染**（因為共用同一份底層資料，不可只更新
+   其中一張）
+3. 前端用 Turbo Stream 或 polling 顯示「更新中」狀態，完成後重新
+   渲染
+
+### 3.3 實作前置確認事項（請先做這些，回報後才寫程式碼）
+
+1. Download 下載的 CSV，是否包含繪製四張圖表所需的全部資料？還是
+   只對應其中一張圖（例如只有 Max Pain by Strike），其他三張圖是
+   頁面用 JS 另外渲染、CSV 裡沒有涵蓋？請實際下載一次並檢視 CSV
+   實際欄位與內容後回報，不要假設。
+
+2. **「Max Pain by Contract」圖表的橫軸是到期日本身**（顯示不同
+   到期日的 Max Pain 如何變化），跟其他三張圖「橫軸是 Strike、
+   固定看單一到期日」的邏輯不同。請確認：這張圖是否會隨「到期日
+   篩選器」變動而改變內容，還是它本身就是顯示「全部到期日」的
+   總覽、不受單一到期日篩選影響？請現場實測驗證，不要假設。
+
+3. 「Show Expected Move」checkbox（預設勾選）是否需要納入可控
+   參數，還是維持固定勾選？
+
+4. 到期日 dropdown 的完整選項清單（請實際讀取列出）。
+
+### 3.4 存放規則
+
+CSV 統一存放於 `csv_files/max_pain_vol_skew/`，檔名格式：
+
+```
+{SYMBOL}_{到期日}_{Strikes範圍}_{Volume或OI}_{下載日期}.csv
+```
+
+例如：`RKLB_2026-06-26_show-all_oi_2026-06-23.csv`
+
+同一組合重複抓取時直接覆蓋舊檔（沿用 2.2.1 節 Options Flow CSV 的
+存放規則）。
+
+### 3.5 安全與操作原則（沿用第1節）
+
+- 點擊 SHOW CHART / Download 全程用 Playwright 模擬點擊，不可攔截
+  或直接呼叫背後的內部 API 端點（依第 1.2 節原則）
+- 登入狀態偵測依第 1.1 節原則：僅偵測是否已登入並提醒，不處理
+  登入流程
+- 用 wait_for_selector 確認圖表/篩選器已完成渲染，不使用固定 sleep
+- 請先讀取三個篩選器與 SHOW CHART/Download 按鈕的 DOM selector，
+  回報後等待確認，再進行實際點擊測試
+
+---
+
+## 4. Max Pain / Skew 圖表判讀提醒（通用版，適用所有美股標的）
 
 以下提醒文字加註於對應圖表下方。
 
@@ -281,7 +368,7 @@ csv_files/
 
 ---
 
-## 4. Barchart Options Flow Code 代碼定義參考
+## 5. Barchart Options Flow Code 代碼定義參考
 
 > 來源：Barchart 官方客服確認。核心原則：這些代碼描述「交易執行方式/管
 > 道/時機」，不是「交易方向」，不可直接拿來判斷多空。
@@ -357,7 +444,7 @@ csv_files/
 
 ---
 
-## 5. 技術面（Technical Analysis）資料
+## 6. 技術面（Technical Analysis）資料
 
 ### 5.1 資料取得方式：Playwright + DOM 解析
 
@@ -395,7 +482,7 @@ Direction (+DI), Negative Direction (-DI), Historic Volatility（Period
 
 ---
 
-## 6. 基本面（Fundamental）資料
+## 7. 基本面（Fundamental）資料
 
 ### 6.1 資料取得方式待探查
 
@@ -407,7 +494,7 @@ P/E、Analyst Rating 等），回報後再決定要抓哪些欄位。
 
 ---
 
-## 7. 資料庫設計
+## 8. 資料庫設計
 
 ### 7.1 `technical_analyses`
 
@@ -434,7 +521,7 @@ error_detail, fetched_at。
 
 ---
 
-## 8. Composite Signal 邏輯
+## 9. Composite Signal 邏輯
 
 `app/services/composite_signal_service.rb`，輸入 symbol，輸出三個獨立分數：
 
@@ -453,7 +540,7 @@ error_detail, fetched_at。
 
 ---
 
-## 9. 路由與前端
+## 10. 路由與前端
 
 1. `config/routes.rb` 新增獨立資源路由（例如
    `resources :technical_dashboards, only: [:index, :show]`）
@@ -471,26 +558,27 @@ error_detail, fetched_at。
 
 ---
 
-## 10. 排程
+## 11. 排程
 
 此功能採「使用者觸發查詢時才抓取」模式，**不需要每日自動排程**，不要額
 外設計 cron / 定時任務。
 
 ---
 
-## 11. 執行方式（請務必分階段進行）
+## 12. 執行方式（請務必分階段進行）
 
 每完成一階段就跟使用者確認，再進入下一階段，**不要一次做完全部**：
 
-- **階段 A**：第 5 節技術面 DOM 探查 → 回報，等待確認
-- **階段 B**：第 6 節基本面 DOM 探查 → 回報，等待確認
-- **階段 C**：第 2.2 節 Options Flow CSV 自動下載（先讀取下載按鈕
-  selector，回報後才執行實際點擊）→ 回報，等待確認
-- **階段 D**：第 7 節資料庫設計 → 列出完整欄位清單，等待確認後才建
-  migration
-- **階段 E**：第 2.3 節分類邏輯 + 第 8 節 Composite Signal 邏輯 → 回報，
-  等待確認
-- **階段 F**：第 9 節路由與前端 → 回報，等待確認
+- **階段 A**：第 6 節技術面 DOM 探查 → ✅ 已完成
+- **階段 B**：第 7 節基本面 DOM 探查 → ✅ 已完成
+- **階段 C**：第 2.2 節 Options Flow CSV 自動下載 → ✅ 已完成
+- **階段 D**：第 8 節資料庫設計 → ✅ 已完成
+- **階段 E**：第 2.3 節分類邏輯 + 第 9 節 Composite Signal 邏輯
+  （含 divergence_flag 背離偵測）→ ✅ 已完成並驗證
+- **階段 F**：第 10 節路由與前端 → ✅ 已完成（背離分析色塊已上移至
+  頁面頂部，三維度卡片並排顯示）
+- **階段 G**（新增）：第 3 節 Max Pain & Vol Skew 篩選器可控邏輯
+  → 待執行，請先完成第 3.3 節的四項前置確認，回報後再寫程式碼
 
 每一步都必須以**實際讀取到的 DOM 結構 / 實際查到的現有 schema** 為準，不
 可假設或猜測。若實際情況與本文件描述不一致，回報差異，等待確認後再繼續。
