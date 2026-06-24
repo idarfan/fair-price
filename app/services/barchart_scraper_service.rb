@@ -32,7 +32,11 @@ class BarchartScraperService
         log_fetch(type, "barchart_session_expired", nil)
         return result
       elsif fetch_result[:status] == "success"
-        persist(type, fetch_result[:data])
+        if type == "max_pain"
+          persist_max_pain(fetch_result[:data])
+        else
+          persist(type, fetch_result[:data])
+        end
         if type == "options_flow" && (csv_err = fetch_result[:data]["csv_error"])
           result[:errors] << "options_flow csv: #{csv_err}"
           log_fetch(type, "partial_error", "csv_error=#{csv_err}")
@@ -85,8 +89,7 @@ class BarchartScraperService
     model = {
       "technical"    => TechnicalAnalysis,
       "fundamental"  => Fundamental,
-      "options_flow" => OptionsFlow,
-      "max_pain"     => MaxPainSnapshot
+      "options_flow" => OptionsFlow
     }[type]
 
     permitted = data.select { |k, _| model.column_names.include?(k.to_s) }
@@ -98,6 +101,50 @@ class BarchartScraperService
     record.save!
 
     persist_trades(data["trades"]) if type == "options_flow" && data["trades"].is_a?(Array)
+  end
+
+  def persist_max_pain(data)
+    now = Time.current
+
+    # 表一：filter-dependent（圖1-3），以完整篩選組合為 unique key
+    MaxPainSnapshot.upsert(
+      {
+        symbol:             @symbol,
+        snapshot_date:      @today,
+        expiration:         data["expiration"],
+        strikes_filter:     data["strikes_filter"],
+        volume_oi_filter:   data["volume_oi_filter"],
+        fetched_at:         now,
+        dte:                data["dte"],
+        last_price:         data["last_price"],
+        max_pain_strike:    data["max_pain_strike"],
+        strikes:            data["strikes"],
+        call_pain:          data["call_pain"],
+        put_pain:           data["put_pain"],
+        call_oi:            data["call_oi"],
+        put_oi:             data["put_oi"],
+        iv_combined:        data["iv_combined"],
+        created_at:         now,
+        updated_at:         now
+      },
+      unique_by: [:symbol, :snapshot_date, :expiration, :strikes_filter, :volume_oi_filter],
+      update_only: [:fetched_at, :dte, :last_price, :max_pain_strike,
+                    :strikes, :call_pain, :put_pain, :call_oi, :put_oi, :iv_combined]
+    )
+
+    # 表二：filter-independent（圖4），symbol+date 唯一，永遠覆蓋最新值
+    MaxPainContractSnapshot.upsert(
+      {
+        symbol:             @symbol,
+        snapshot_date:      @today,
+        fetched_at:         now,
+        max_pain_by_expiry: data["max_pain_by_expiry"],
+        created_at:         now,
+        updated_at:         now
+      },
+      unique_by: [:symbol, :snapshot_date],
+      update_only: [:fetched_at, :max_pain_by_expiry]
+    )
   end
 
   def persist_trades(trades)

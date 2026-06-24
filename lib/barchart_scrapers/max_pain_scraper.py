@@ -24,6 +24,14 @@ from cdp_helper import prepare_page, cdp_eval, cdp_navigate, activate_target
 TARGET_PATH = "max-pain-chart"
 PAGE_SETTLE_S = 8.0
 
+MONEYNESS_MAP = {
+    "le(nearestToLast,10)":  "5_strikes",
+    "le(nearestToLast,20)":  "near_money",
+    "le(nearestToLast,40)":  "20_strikes",
+    "le(nearestToLast,100)": "50_strikes",
+    "le(nearestToLast,200)": "show_all",
+}
+
 EXTRACT_JS = """
 (() => {
   const charts = (window.Highcharts && Highcharts.charts || []).filter(Boolean);
@@ -60,6 +68,11 @@ EXTRACT_JS = """
   const title = maxPainChart.title?.textStr || '';
   const dteMatch = title.match(/(\\d+)\\s*DTE/);
 
+  // Read current filter state from Angular dropdowns (pure DOM read, no side effects)
+  const expSel   = document.querySelector('select[name="expiration"]');
+  const moneySel = document.querySelector('select[name="moneyness"]');
+  const oiSel    = document.querySelector('select[name="openInterest"]');
+
   return {
     title,
     dte:             dteMatch ? parseInt(dteMatch[1]) : null,
@@ -75,19 +88,29 @@ EXTRACT_JS = """
           expiry: p.category,
           max_pain_strike: p.y
         }))
-      : []
+      : [],
+    expiration_raw:  expSel?.value   || null,
+    strikes_raw:     moneySel?.value || null,
+    volume_oi_raw:   oiSel?.value    || null,
   };
 })()
 """
 
 
-def build_output(symbol, expiration, raw):
+def build_output(symbol, expiration_arg, raw):
     """Flatten Highcharts series into arrays keyed by strike."""
     if not raw or "error" in raw:
         return {"status": "charts_not_ready", "detail": raw}
 
     def to_dict(points):
         return {int(p["x"]): p["y"] for p in points}
+
+    # Normalize filter values from DOM readings
+    exp_raw = raw.get("expiration_raw") or ""
+    expiration = exp_raw.replace("string:", "").strip() if exp_raw else (expiration_arg or "")
+
+    strikes_filter   = MONEYNESS_MAP.get(raw.get("strikes_raw", ""), "show_all")
+    volume_oi_filter = raw.get("volume_oi_raw") or "open_interest"
 
     call_pain_map = to_dict(raw.get("call_pain", []))
     put_pain_map  = to_dict(raw.get("put_pain", []))
@@ -104,6 +127,8 @@ def build_output(symbol, expiration, raw):
     return {
         "symbol":           symbol,
         "expiration":       expiration,
+        "strikes_filter":   strikes_filter,
+        "volume_oi_filter": volume_oi_filter,
         "dte":              raw.get("dte"),
         "last_price":       raw.get("last_price"),
         "max_pain_strike":  raw.get("max_pain_strike"),

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_23_054549) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_24_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -127,24 +127,35 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_054549) do
     t.index ["status"], name: "index_margin_positions_on_status"
   end
 
+  create_table "max_pain_contract_snapshots", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "fetched_at", null: false
+    t.jsonb "max_pain_by_expiry", default: []
+    t.date "snapshot_date", null: false
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "snapshot_date"], name: "index_max_pain_contract_snapshots_on_symbol_and_snapshot_date", unique: true
+  end
+
   create_table "max_pain_snapshots", force: :cascade do |t|
     t.jsonb "call_oi", default: []
     t.jsonb "call_pain", default: []
     t.datetime "created_at", null: false
     t.integer "dte"
-    t.string "expiration"
+    t.string "expiration", null: false
     t.datetime "fetched_at", null: false
     t.jsonb "iv_combined", default: []
     t.decimal "last_price", precision: 10, scale: 2
-    t.jsonb "max_pain_by_expiry", default: []
     t.decimal "max_pain_strike", precision: 10, scale: 2
     t.jsonb "put_oi", default: []
     t.jsonb "put_pain", default: []
     t.date "snapshot_date", null: false
     t.jsonb "strikes", default: []
+    t.string "strikes_filter", default: "show_all", null: false
     t.string "symbol", null: false
     t.datetime "updated_at", null: false
-    t.index ["symbol", "snapshot_date"], name: "index_max_pain_snapshots_on_symbol_and_snapshot_date", unique: true
+    t.string "volume_oi_filter", default: "open_interest", null: false
+    t.index ["symbol", "snapshot_date", "expiration", "strikes_filter", "volume_oi_filter"], name: "idx_max_pain_snapshots_filter_unique", unique: true
   end
 
   create_table "option_snapshots", force: :cascade do |t|
