@@ -4,7 +4,12 @@ Output: JSON to stdout
 
 Usage:
   python3 max_pain_scraper.py SYMBOL
-  python3 max_pain_scraper.py SYMBOL YYYY-MM-DD-m   # specific expiration
+  python3 max_pain_scraper.py SYMBOL 2026-08-21-m [show_all] [open_interest]
+
+Filter defaults (when args omitted):
+  expiration   -> first option in dropdown (nearest expiry)
+  strikes      -> show_all
+  volume_oi    -> open_interest
 
 Reads data directly from Highcharts.charts instances on the max-pain-chart page.
 Charts layout (as of 2026-06-22 LIN verification):
@@ -15,6 +20,7 @@ Charts layout (as of 2026-06-22 LIN verification):
 """
 import asyncio
 import json
+import re
 import sys
 import os
 
@@ -31,6 +37,54 @@ MONEYNESS_MAP = {
     "le(nearestToLast,100)": "50_strikes",
     "le(nearestToLast,200)": "show_all",
 }
+
+REVERSE_MONEYNESS_MAP = {v: k for k, v in MONEYNESS_MAP.items()}
+
+# --- JS snippets ---
+
+GET_FIRST_EXPIRY_JS = """
+(() => {
+  const sel = document.querySelector('select[name="expiration"]');
+  if (!sel) return null;
+  const firstOpt = Array.from(sel.options).find(o => o.value && o.value !== '');
+  return firstOpt ? firstOpt.value : null;
+})()
+"""
+
+def make_set_filters_js(expiry_value, moneyness_value, oi_value):
+    return """
+(() => {
+  const expSel   = document.querySelector('select[name="expiration"]');
+  const moneySel = document.querySelector('select[name="moneyness"]');
+  const oiSel    = document.querySelector('select[name="openInterest"]');
+  const showBtn  = document.querySelector('button.bc-button.ok.light-blue');
+
+  if (!expSel || !moneySel || !oiSel || !showBtn) {
+    return { error: 'elements_not_found' };
+  }
+
+  expSel.value   = """ + json.dumps(expiry_value) + """;
+  moneySel.value = """ + json.dumps(moneyness_value) + """;
+  oiSel.value    = """ + json.dumps(oi_value) + """;
+
+  [expSel, moneySel, oiSel].forEach(el =>
+    el.dispatchEvent(new Event('change', { bubbles: true }))
+  );
+
+  showBtn.click();
+
+  return { expSet: expSel.value, moneySet: moneySel.value, oiSet: oiSel.value };
+})()
+"""
+
+def make_wait_chart_js(title_fragment):
+    return """
+(() => {
+  const charts = (window.Highcharts && Highcharts.charts || []).filter(Boolean);
+  if (!charts.length) return false;
+  return (charts[0].title?.textStr || '').includes(""" + json.dumps(title_fragment) + """);
+})()
+"""
 
 EXTRACT_JS = """
 (() => {
@@ -97,7 +151,27 @@ EXTRACT_JS = """
 """
 
 
-def build_output(symbol, expiration_arg, raw):
+# --- Helpers ---
+
+def parse_expiry_arg(arg):
+    """Convert CLI arg "2026-06-26-w" to (display "2026-06-26 (w)", angular "string:2026-06-26 (w)")."""
+    m = re.match(r'^(\d{4}-\d{2}-\d{2})-(w|m)$', arg)
+    if m:
+        date_part, period = m.group(1), m.group(2)
+        display = f"{date_part} ({period})"
+        return display, f"string:{display}"
+    # Already in display form
+    return arg, f"string:{arg}"
+
+
+def expiry_display_to_title_fragment(display):
+    """Convert "2026-06-26 (w)" -> "06/26/26" for chart title matching."""
+    date_part = display.split(" ")[0]   # "2026-06-26"
+    y, m, d = date_part.split("-")
+    return f"{m}/{d}/{y[2:]}"           # "06/26/26"
+
+
+def build_output(symbol, raw):
     """Flatten Highcharts series into arrays keyed by strike."""
     if not raw or "error" in raw:
         return {"status": "charts_not_ready", "detail": raw}
@@ -107,7 +181,7 @@ def build_output(symbol, expiration_arg, raw):
 
     # Normalize filter values from DOM readings
     exp_raw = raw.get("expiration_raw") or ""
-    expiration = exp_raw.replace("string:", "").strip() if exp_raw else (expiration_arg or "")
+    expiration = exp_raw.replace("string:", "").strip() if exp_raw else ""
 
     strikes_filter   = MONEYNESS_MAP.get(raw.get("strikes_raw", ""), "show_all")
     volume_oi_filter = raw.get("volume_oi_raw") or "open_interest"
@@ -143,21 +217,11 @@ def build_output(symbol, expiration_arg, raw):
     }
 
 
-async def main(symbol, expiration=None):
+async def main(symbol, expiry_arg=None, strikes_arg=None, oi_arg=None):
     _, ws = await prepare_page(symbol, TARGET_PATH, settle_ms=int(PAGE_SETTLE_S * 1000))
     if not ws:
         print(json.dumps({"status": "error", "error": "No Chrome CDP page found"}))
         return
-
-    # Navigate to specific expiration if requested
-    if expiration:
-        target_url = (
-            f"https://www.barchart.com/stocks/quotes/{symbol}"
-            f"/{TARGET_PATH}?expiration={expiration}"
-        )
-        current_url = await cdp_eval(ws, "window.location.href", timeout=10) or ""
-        if expiration not in current_url:
-            await cdp_navigate(ws, target_url, settle_ms=int(PAGE_SETTLE_S * 1000))
 
     # Check login
     logged_in = await cdp_eval(ws, "window.bcIsLogedIn", timeout=5)
@@ -165,27 +229,60 @@ async def main(symbol, expiration=None):
         print(json.dumps({"status": "barchart_session_expired"}))
         return
 
-    # Wait for Highcharts to render (retry up to 3×)
-    raw = None
-    for attempt in range(3):
-        raw = await cdp_eval(ws, EXTRACT_JS, timeout=15)
-        if raw and "error" not in raw:
-            break
-        await asyncio.sleep(3)
+    # --- Determine target filter values ---
+    if expiry_arg:
+        expiry_display, expiry_angular = parse_expiry_arg(expiry_arg)
+    else:
+        # Read first available option from dropdown
+        first_val = await cdp_eval(ws, GET_FIRST_EXPIRY_JS, timeout=10)
+        if not first_val:
+            print(json.dumps({"status": "error", "error": "Cannot read expiration dropdown"}))
+            return
+        expiry_angular = first_val                             # "string:2026-06-26 (w)"
+        expiry_display = first_val.replace("string:", "").strip()  # "2026-06-26 (w)"
 
-    if not raw or "error" in raw:
+    strikes_angular = REVERSE_MONEYNESS_MAP.get(strikes_arg or "show_all", "le(nearestToLast,200)")
+    oi_angular      = oi_arg or "open_interest"
+
+    # --- Set filters + click SHOW CHART (always, regardless of current state) ---
+    set_result = await cdp_eval(
+        ws, make_set_filters_js(expiry_angular, strikes_angular, oi_angular), timeout=10
+    )
+    if isinstance(set_result, dict) and "error" in set_result:
+        print(json.dumps({"status": "error", "error": f"Filter setup failed: {set_result}"}))
+        return
+
+    # --- Wait for Highcharts to re-render with expected expiry in title ---
+    title_fragment = expiry_display_to_title_fragment(expiry_display)
+    rendered = False
+    for _ in range(20):   # poll up to 10 seconds (0.5s intervals)
+        check = await cdp_eval(ws, make_wait_chart_js(title_fragment), timeout=5)
+        if check:
+            rendered = True
+            break
+        await asyncio.sleep(0.5)
+
+    if not rendered:
         print(json.dumps({
             "status": "charts_not_ready",
-            "detail": raw,
+            "detail": f"Timed out waiting for title fragment: {title_fragment}",
             "symbol": symbol,
         }))
         return
 
-    result = build_output(symbol, expiration, raw)
+    # --- Extract data ---
+    raw = await cdp_eval(ws, EXTRACT_JS, timeout=15)
+    if not raw or "error" in raw:
+        print(json.dumps({"status": "charts_not_ready", "detail": raw, "symbol": symbol}))
+        return
+
+    result = build_output(symbol, raw)
     print(json.dumps(result))
 
 
 if __name__ == "__main__":
-    sym = sys.argv[1].upper() if len(sys.argv) > 1 else "LIN"
-    exp = sys.argv[2] if len(sys.argv) > 2 else None
-    asyncio.run(main(sym, exp))
+    sym      = sys.argv[1].upper() if len(sys.argv) > 1 else "LIN"
+    exp_arg  = sys.argv[2] if len(sys.argv) > 2 else None
+    stk_arg  = sys.argv[3] if len(sys.argv) > 3 else None
+    oi_arg   = sys.argv[4] if len(sys.argv) > 4 else None
+    asyncio.run(main(sym, exp_arg, stk_arg, oi_arg))
