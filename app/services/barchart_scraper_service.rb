@@ -6,6 +6,11 @@ require "open3"
 # Usage:
 #   result = BarchartScraperService.new("MU").call
 #   result[:status]  # => "success" | "barchart_session_expired" | "error"
+#
+#   # UI-triggered filter re-fetch (does NOT update the contract snapshot):
+#   result = BarchartScraperService.new("RKLB").fetch_max_pain(
+#     expiration: "2026-08-21 (m)", strikes: "near_money", volume_oi: "volume"
+#   )
 class BarchartScraperService
   CDP_URL    = "http://127.0.0.1:9222"
   SCRIPT_DIR = Rails.root.join("lib", "barchart_scrapers")
@@ -15,6 +20,7 @@ class BarchartScraperService
     @today  = Date.today
   end
 
+  # Full daily fetch: all four scraper types, all charts, updates contract snapshot.
   def call
     result = { symbol: @symbol, status: nil, errors: [] }
 
@@ -55,6 +61,28 @@ class BarchartScraperService
     result
   end
 
+  # UI-triggered max pain fetch for a specific filter combination.
+  # Chart 4 (Max Pain by Contract) is filter-independent — NOT re-upserted here.
+  def fetch_max_pain(expiration: nil, strikes: "show_all", volume_oi: "open_interest")
+    return { status: "error", error: "CDP unavailable" } unless cdp_available?
+
+    extra_args = build_max_pain_args(expiration, strikes, volume_oi)
+    fetch_result = run_scraper("max_pain", extra_args: extra_args)
+
+    case fetch_result[:status]
+    when "barchart_session_expired"
+      log_fetch("max_pain", "barchart_session_expired", nil)
+      { status: "barchart_session_expired" }
+    when "success"
+      persist_max_pain(fetch_result[:data], update_contract_snapshot: false)
+      log_fetch("max_pain", "success", "filter=#{expiration}|#{strikes}|#{volume_oi}")
+      { status: "success", data: fetch_result[:data] }
+    else
+      log_fetch("max_pain", "error", fetch_result[:error])
+      { status: "error", error: fetch_result[:error] }
+    end
+  end
+
   private
 
   def cdp_available?
@@ -64,10 +92,24 @@ class BarchartScraperService
     false
   end
 
-  def run_scraper(type)
+  # Convert UI filter values to CLI positional args for the Python scraper.
+  # Strips Angular "string:" prefix from expiration if present.
+  def build_max_pain_args(expiration, strikes, volume_oi)
+    return [] unless expiration.present?
+
+    # "string:2026-08-21 (m)" or "2026-08-21 (m)" -> "2026-08-21-m"
+    cli_expiry = expiration.to_s
+                           .delete_prefix("string:")
+                           .strip
+                           .gsub(" (", "-")
+                           .delete_suffix(")")
+    [cli_expiry, strikes.to_s, volume_oi.to_s]
+  end
+
+  def run_scraper(type, extra_args: [])
     script = SCRIPT_DIR.join("#{type}_scraper.py")
     stdout, stderr, status = Open3.capture3(
-      "python3", script.to_s, @symbol,
+      "python3", script.to_s, @symbol, *extra_args,
       chdir: Rails.root.to_s
     )
 
@@ -103,10 +145,10 @@ class BarchartScraperService
     persist_trades(data["trades"]) if type == "options_flow" && data["trades"].is_a?(Array)
   end
 
-  def persist_max_pain(data)
+  def persist_max_pain(data, update_contract_snapshot: true)
     now = Time.current
 
-    # 表一：filter-dependent（圖1-3），以完整篩選組合為 unique key
+    # Table 1: filter-dependent (charts 1-3), unique on 5-column filter combo
     MaxPainSnapshot.upsert(
       {
         symbol:             @symbol,
@@ -132,7 +174,9 @@ class BarchartScraperService
                     :strikes, :call_pain, :put_pain, :call_oi, :put_oi, :iv_combined]
     )
 
-    # 表二：filter-independent（圖4），symbol+date 唯一，永遠覆蓋最新值
+    return unless update_contract_snapshot
+
+    # Table 2: filter-independent (chart 4), unique on symbol+date
     MaxPainContractSnapshot.upsert(
       {
         symbol:             @symbol,
@@ -153,7 +197,6 @@ class BarchartScraperService
     now = Time.current
     classified = trades.map { |t| classify_trade(t, now) }
 
-    # Delete existing trades for this symbol+date before bulk insert
     OptionsFlowTrade.where(symbol: @symbol, snapshot_date: @today).delete_all
     OptionsFlowTrade.insert_all(classified)
   end
