@@ -1072,7 +1072,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
                 vlines: d.last_price ? [{ value: d.last_price, color: 'rgba(107,114,128,0.6)', dash: [4,3], label: 'Last $' + d.last_price.toFixed(2) }] : [],
                 scales: {
                   x: { ticks: Object.assign({}, TICK, { maxRotation: 45 }), grid: { color: GRID } },
-                  y: { ticks: TICK, grid: { color: GRID } }
+                  y: { title: { display: true, text: d.volume_oi_filter === 'volume' ? 'Volume' : 'Open Interest', color: '#9ca3af', font: { size: 11 } }, ticks: TICK, grid: { color: GRID } }
                 }
               }
             });
