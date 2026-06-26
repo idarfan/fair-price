@@ -290,16 +290,16 @@ Volume-OI 切換，系統需要：
 
 ### 3.4 存放規則
 
-CSV 統一存放於 `csv_files/max_pain_vol_skew/`，檔名格式：
-
-```
-{SYMBOL}_{到期日}_{Strikes範圍}_{Volume或OI}_{下載日期}.csv
-```
-
-例如：`RKLB_2026-06-26_show-all_oi_2026-06-23.csv`
-
-同一組合重複抓取時直接覆蓋舊檔（沿用 2.2.1 節 Options Flow CSV 的
-存放規則）。
+> ⚠️ **此節 CSV 存放規則不適用本實作。**
+>
+> 本實作採用 **CDP 直讀 Highcharts 資料物件**（`Highcharts.charts[N].series`），
+> 不執行任何 CSV 下載，因此 `csv_files/max_pain_vol_skew/` 目錄不會產生任何檔案。
+>
+> **資料庫為唯一儲存媒介：**
+> - 圖1–3（Max Pain by Strike / OI\/Volume by Strike / Vol Skew）→ `max_pain_snapshots`（以 symbol + snapshot_date + expiration + strikes_filter + volume_oi_filter 為唯一鍵）
+> - 圖4（Max Pain by Contract / Expiry）→ `max_pain_contract_snapshots`（以 symbol + snapshot_date 為唯一鍵；含 `available_expirations` JSON 欄位）
+>
+> 如需查閱原始數值，請直接查詢上述資料表，勿期待 CSV 檔案存在。
 
 ### 3.5 安全與操作原則（沿用第1節）
 

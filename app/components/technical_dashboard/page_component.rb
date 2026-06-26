@@ -819,8 +819,10 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
     pain_json    = { strikes: strikes, call_pain: call_pain, put_pain: put_pain,
                      max_pain_strike: max_pain_str, last_price: last_price,
                      exp_label: exp_label, symbol: symbol }.to_json
+    vol_oi_filter = mp[:volume_oi_filter] || "open_interest"
     oi_json      = { strikes: strikes, call_oi: call_oi, put_oi: put_oi,
-                     last_price: last_price, exp_label: exp_label, symbol: symbol }.to_json
+                     last_price: last_price, exp_label: exp_label, symbol: symbol,
+                     volume_oi_filter: vol_oi_filter }.to_json
     skew_json    = { strikes: strikes, iv_combined: iv_combined,
                      last_price: last_price, exp_label: exp_label, symbol: symbol }.to_json
     contract_json = { by_expiry: by_expiry, last_price: last_price, symbol: symbol }.to_json
@@ -852,7 +854,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
         end
         script(type: "application/json", id: "mp-d2-#{symbol}") { raw oi_json.html_safe }
 
-          p(class: "text-amber-600 font-semibold mt-1", style: "font-size:14px") { raw "⚠️ OI 分布判讀提醒".html_safe }
+          p(class: "text-amber-600 font-semibold mt-1", style: "font-size:14px") { raw "⚠️ #{vol_oi_filter == 'volume' ? 'Volume' : 'OI'} 分布判讀提醒".html_safe }
             div(class: "mt-1 text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1", style: "font-size:22px") do
               p { "高 OI 集中的 strike 無法直接判斷多空方向：Put OI 可能是保護性避險（偏空），也可能是賣 Put 收保費（偏多）；Call OI 可能是方向性押注（偏多），也可能是持股者賣出 Covered Call 收取權利金（中性偏多策略，非方向性看空）。" }
               p { raw "<strong>使用建議</strong>：須搭配 Options Flow 的 Trade 方向（成交於 Ask 或 Bid）及 Code 交叉比對，不可單憑 OI 集中度判斷。".html_safe }
@@ -1028,10 +1030,10 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
               data: {
                 labels: d.strikes,
                 datasets: [
-                  { label: 'Call OI', data: d.call_oi,
+                  { label: d.volume_oi_filter === 'volume' ? 'Call Vol' : 'Call OI', data: d.call_oi,
                     backgroundColor: 'rgba(59,130,246,0.65)', borderColor: 'rgba(37,99,235,0.8)',
                     borderWidth: 1, borderRadius: 2 },
-                  { label: 'Put OI', data: d.put_oi,
+                  { label: d.volume_oi_filter === 'volume' ? 'Put Vol' : 'Put OI', data: d.put_oi,
                     backgroundColor: 'rgba(249,115,22,0.65)', borderColor: 'rgba(234,88,12,0.8)',
                     borderWidth: 1, borderRadius: 2 }
                 ]
@@ -1062,8 +1064,8 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
                       function fmt(v) { return v != null ? Number(Math.abs(v)).toLocaleString('en-US') : 'N/A'; }
                       tipEl.innerHTML =
                         '<div style="font-weight:600;margin-bottom:2px;color:#111;">Strike: ' + strike + '</div>' +
-                        '<div style="color:#2563eb;">Call OI: ' + fmt(callOI) + '</div>' +
-                        '<div style="color:#ea580c;">Put OI: ' + fmt(putOI) + '</div>';
+                        '<div style="color:#2563eb;">' + (d.volume_oi_filter === 'volume' ? 'Call Vol: ' : 'Call OI: ') + fmt(callOI) + '</div>' +
+                        '<div style="color:#ea580c;">' + (d.volume_oi_filter === 'volume' ? 'Put Vol: ' : 'Put OI: ') + fmt(putOI) + '</div>';
                     }
                   }
                 },
