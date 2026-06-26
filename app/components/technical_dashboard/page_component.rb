@@ -22,6 +22,14 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
     confirm_bear: { bg: "bg-red-50",    border: "border-red-300",    icon: "🔴", text: "text-red-800" }
   }.freeze
 
+  STRIKES_OPTIONS = [
+    ["show_all",   "Show All"],
+    ["5_strikes",  "5 Strikes +/-"],
+    ["near_money", "Near the Money"],
+    ["20_strikes", "20 Strikes +/-"],
+    ["50_strikes", "50 Strikes +/-"],
+  ].freeze
+
   TECH_GRADIENT = [
     [0.00, [239, 68,  68]],
     [0.25, [248, 113, 113]],
@@ -820,6 +828,8 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
     div(class: "bg-white rounded-xl border border-gray-200 p-4 space-y-6") do
       h2(class: "text-sm font-semibold text-gray-700") { "Max Pain & Vol Skew" }
 
+      render_max_pain_filter_controls(symbol, mp)
+
       # Chart 1: Max Pain
       div do
         div(class: "relative", style: "height:260px") do
@@ -1298,4 +1308,141 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
       JS
     end
   end
+  # ---------------------------------------------------------------------------
+  # Max Pain filter controls (three dropdowns + polling JS)
+  # ---------------------------------------------------------------------------
+  def render_max_pain_filter_controls(symbol, mp)
+    available = (mp[:available_expirations] || []).reject(&:blank?)
+    current_exp     = mp[:expiration].to_s
+    available       = ([current_exp] + available).uniq.reject(&:blank?)
+    current_strikes = mp[:strikes_filter] || "show_all"
+    current_vol_oi  = mp[:volume_oi_filter] || "open_interest"
+
+    div(id: "mp-filter-#{symbol}",
+        class: "flex flex-wrap items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg text-sm") do
+
+      div(class: "flex items-center gap-1.5") do
+        span(class: "text-xs text-gray-500 whitespace-nowrap") { plain "到期日" }
+        select(id: "mp-exp-#{symbol}",
+               class: "text-xs border border-gray-300 rounded px-2 py-1 bg-white") do
+          available.each do |exp|
+            if exp == current_exp
+              option(value: exp, selected: true) { plain exp }
+            else
+              option(value: exp) { plain exp }
+            end
+          end
+        end
+      end
+
+      div(class: "flex items-center gap-1.5") do
+        span(class: "text-xs text-gray-500 whitespace-nowrap") { plain "Strikes" }
+        select(id: "mp-str-#{symbol}",
+               class: "text-xs border border-gray-300 rounded px-2 py-1 bg-white") do
+          STRIKES_OPTIONS.each do |val, label|
+            if val == current_strikes
+              option(value: val, selected: true) { plain label }
+            else
+              option(value: val) { plain label }
+            end
+          end
+        end
+      end
+
+      div(class: "flex items-center gap-1.5") do
+        span(class: "text-xs text-gray-500 whitespace-nowrap") { plain "顯示" }
+        select(id: "mp-oi-#{symbol}",
+               class: "text-xs border border-gray-300 rounded px-2 py-1 bg-white") do
+          [["open_interest", "Open Interest"], ["volume", "Volume"]].each do |val, label|
+            if val == current_vol_oi
+              option(value: val, selected: true) { plain label }
+            else
+              option(value: val) { plain label }
+            end
+          end
+        end
+      end
+
+      span(id: "mp-loading-#{symbol}",
+           class: "hidden text-xs text-blue-600 font-medium animate-pulse") { plain "更新中\u2026" }
+      span(id: "mp-error-#{symbol}",
+           class: "hidden text-xs text-red-600")
+    end
+
+    script { raw mp_filter_js(symbol).html_safe }
+  end
+
+  def mp_filter_js(sym)
+    csrf = "document.querySelector('meta[name=csrf-token]')?.content"
+    <<~JS
+      (function () {
+        var sym  = #{sym.to_json};
+        var base = '/technical_dashboard';
+        function getFilters() {
+          return {
+            expiration: document.getElementById('mp-exp-'  + sym)?.value,
+            strikes:    document.getElementById('mp-str-'  + sym)?.value,
+            volume_oi:  document.getElementById('mp-oi-'   + sym)?.value
+          };
+        }
+        function setLoading(on) {
+          var el  = document.getElementById('mp-loading-' + sym);
+          var err = document.getElementById('mp-error-'   + sym);
+          if (el)  el.classList.toggle('hidden', !on);
+          if (err) { err.classList.add('hidden'); err.textContent = ''; }
+          ['mp-exp-', 'mp-str-', 'mp-oi-'].forEach(function (p) {
+            var s = document.getElementById(p + sym); if (s) s.disabled = on;
+          });
+        }
+        function showError(msg) {
+          setLoading(false);
+          var err = document.getElementById('mp-error-' + sym);
+          if (err) { err.classList.remove('hidden'); err.textContent = msg; }
+        }
+        function redirectWithFilters(f) {
+          var p = new URLSearchParams({
+            symbol: sym, mp_expiration: f.expiration,
+            mp_strikes: f.strikes, mp_vol_oi: f.volume_oi
+          });
+          window.location.href = base + '?' + p.toString();
+        }
+        function pollJob(jobId, f) {
+          var attempts = 0;
+          var timer = setInterval(function () {
+            if (++attempts > 80) { clearInterval(timer); showError('抓取逾時，請重試'); return; }
+            fetch(base + '/status?job_id=' + jobId)
+              .then(function (r) { return r.json(); })
+              .then(function (d) {
+                if (d.status === 'pending' || d.status === 'not_found') return;
+                clearInterval(timer);
+                if (d.status === 'success') { redirectWithFilters(f); }
+                else if (d.status === 'session_expired') { showError('Barchart 登入已過期，請重新登入後重試'); }
+                else { showError('抓取失敗：' + (d.errors?.[0] || d.status)); }
+              }).catch(function () {});
+          }, 2000);
+        }
+        function triggerFetch() {
+          var f = getFilters(); if (!f.expiration) return;
+          setLoading(true);
+          fetch(base + '/fetch_max_pain', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': #{csrf} },
+            body: JSON.stringify({ symbol: sym, expiration: f.expiration, strikes: f.strikes, volume_oi: f.volume_oi })
+          })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (d.status === 'ready') { redirectWithFilters(f); }
+            else if (d.job_id) { pollJob(d.job_id, f); }
+            else { showError('請求失敗：' + (d.error || '未知錯誤')); }
+          }).catch(function () { showError('網路錯誤，請重試'); });
+        }
+        ['mp-exp-', 'mp-str-', 'mp-oi-'].forEach(function (p) {
+          var s = document.getElementById(p + sym);
+          if (s) s.addEventListener('change', triggerFetch);
+        });
+      })();
+    JS
+  end
+
+
 end

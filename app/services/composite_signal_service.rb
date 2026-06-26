@@ -10,16 +10,20 @@ class CompositeSignalService
     watching: "觀察中"
   }.freeze
 
-  def initialize(symbol, date: Date.today)
-    @symbol = symbol.upcase
-    @today  = date
+  def initialize(symbol, date: Date.today, mp_expiration: nil, mp_strikes: nil, mp_vol_oi: nil)
+    @symbol        = symbol.upcase
+    @today         = date
+    @mp_expiration = mp_expiration
+    @mp_strikes    = mp_strikes
+    @mp_vol_oi     = mp_vol_oi
   end
 
   def call
     tech = TechnicalAnalysis.find_by(symbol: @symbol, snapshot_date: @today)
     fund = Fundamental.find_by(symbol: @symbol, snapshot_date: @today)
     flow = OptionsFlow.find_by(symbol: @symbol, snapshot_date: @today)
-    mp   = MaxPainSnapshot.find_by(symbol: @symbol, snapshot_date: @today)
+    mp        = max_pain_snapshot
+    mp_contract = MaxPainContractSnapshot.find_by(symbol: @symbol, snapshot_date: @today)
     trade_stats = load_trade_stats(@symbol, @today)
 
     ts = technical_score(tech)
@@ -32,7 +36,7 @@ class CompositeSignalService
       fundamental:  fs,
       options_flow: os,
       divergences:  compute_divergences(ts, fs, os, fund),
-      max_pain:     max_pain_data(mp),
+      max_pain:     max_pain_data(mp, mp_contract),
       fetched_at:   [ tech&.fetched_at, fund&.fetched_at, flow&.fetched_at, mp&.fetched_at ].compact.max
     }
   end
@@ -436,21 +440,34 @@ class CompositeSignalService
     (a == :bullish) != (b == :bullish)
   end
 
-  def max_pain_data(mp)
+  def max_pain_data(mp, mp_contract = nil)
     return nil unless mp
 
     {
-      expiration:         mp.expiration,
-      dte:                mp.dte,
-      last_price:         mp.last_price&.to_f,
-      max_pain_strike:    mp.max_pain_strike&.to_f,
-      strikes:            mp.strikes,
-      call_pain:          mp.call_pain,
-      put_pain:           mp.put_pain,
-      call_oi:            mp.call_oi,
-      put_oi:             mp.put_oi,
-      iv_combined:        mp.iv_combined,
-      max_pain_by_expiry: mp.max_pain_by_expiry
+      expiration:            mp.expiration,
+      strikes_filter:        mp.strikes_filter,
+      volume_oi_filter:      mp.volume_oi_filter,
+      dte:                   mp.dte,
+      last_price:            mp.last_price&.to_f,
+      max_pain_strike:       mp.max_pain_strike&.to_f,
+      strikes:               mp.strikes,
+      call_pain:             mp.call_pain,
+      put_pain:              mp.put_pain,
+      call_oi:               mp.call_oi,
+      put_oi:                mp.put_oi,
+      iv_combined:           mp.iv_combined,
+      max_pain_by_expiry:    mp_contract&.max_pain_by_expiry || [],
+      available_expirations: mp_contract&.available_expirations || []
     }
+  end
+
+  def max_pain_snapshot
+    scope = MaxPainSnapshot.where(symbol: @symbol, snapshot_date: @today)
+    if @mp_expiration.present?
+      scope = scope.where(expiration: @mp_expiration)
+      scope = scope.where(strikes_filter: @mp_strikes)     if @mp_strikes.present?
+      scope = scope.where(volume_oi_filter: @mp_vol_oi)    if @mp_vol_oi.present?
+    end
+    scope.order(fetched_at: :desc).first
   end
 end

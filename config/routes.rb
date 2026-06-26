@@ -115,7 +115,8 @@ Rails.application.routes.draw do
   # Technical / Fundamental / Options Flow Dashboard
   get  "technical_dashboard",         to: "technical_dashboards#index",   as: :technical_dashboard
   post "technical_dashboard/analyze", to: "technical_dashboards#analyze", as: :technical_dashboard_analyze
-  get  "technical_dashboard/status",  to: "technical_dashboards#status",  as: :technical_dashboard_status
+  get  "technical_dashboard/status",       to: "technical_dashboards#status",       as: :technical_dashboard_status
+  post "technical_dashboard/fetch_max_pain", to: "technical_dashboards#fetch_max_pain", as: :technical_dashboard_fetch_max_pain
 
 # IV Skew Watchlist
 resources :iv_watchlists, only: [ :index, :create, :destroy ] do

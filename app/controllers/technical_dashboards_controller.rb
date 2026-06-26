@@ -21,7 +21,16 @@ class TechnicalDashboardsController < ApplicationController
 
     if @symbol.present?
       if fresh_data_exists?(@symbol, @date)
-        @result        = CompositeSignalService.new(@symbol, date: @date).call
+        @mp_expiration = params[:mp_expiration].presence
+      @mp_strikes    = params[:mp_strikes].presence
+      @mp_vol_oi     = params[:mp_vol_oi].presence
+      @result        = CompositeSignalService.new(
+                         @symbol,
+                         date:          @date,
+                         mp_expiration: @mp_expiration,
+                         mp_strikes:    @mp_strikes,
+                         mp_vol_oi:     @mp_vol_oi
+                       ).call
         @scrape_status = :cached
 
         # Surface job errors from the last analyze call (e.g. session expired)
@@ -74,6 +83,29 @@ class TechnicalDashboardsController < ApplicationController
     render json: { job_id: job_id, symbol: symbol, date: date.to_s }
   end
 
+  def fetch_max_pain
+    symbol     = params[:symbol]&.upcase&.strip&.gsub(/[^A-Z0-9.\-]/, "")
+    expiration = params[:expiration].presence
+    strikes    = params[:strikes].presence    || "show_all"
+    vol_oi     = params[:volume_oi].presence  || "open_interest"
+
+    return render json: { error: "symbol required" }, status: :unprocessable_entity if symbol.blank?
+    return render json: { error: "expiration required" }, status: :unprocessable_entity if expiration.blank?
+
+    if MaxPainSnapshot.where(
+         symbol: symbol, snapshot_date: Date.today,
+         expiration: expiration, strikes_filter: strikes, volume_oi_filter: vol_oi
+       ).exists?
+      return render json: { status: "ready" }
+    end
+
+    job_id = SecureRandom.hex(8)
+    Rails.cache.write("td_job_#{job_id}", { status: "pending" }, expires_in: 5.minutes)
+    TechnicalDashboardMaxPainFetchJob.perform_later(symbol, expiration, strikes, vol_oi, job_id)
+
+    render json: { job_id: job_id, symbol: symbol, expiration: expiration }
+  end
+
   def status
     job_id = params[:job_id].to_s.gsub(/[^a-f0-9]/, "")
     return render json: { status: "error", error: "missing job_id" }, status: :unprocessable_entity if job_id.blank?
@@ -85,10 +117,13 @@ class TechnicalDashboardsController < ApplicationController
   private
 
   def fresh_data_exists?(symbol, date)
-    FetchLog.where(symbol: symbol, status: "success")
-            .where("fetched_at > ?", FRESH_WINDOW.ago)
-            .where("DATE(fetched_at) = ?", date)
-            .exists?
+    scope = FetchLog.where(symbol: symbol, status: "success")
+                    .where("DATE(fetched_at) = ?", date)
+    if date == Date.today
+      scope.where("fetched_at > ?", FRESH_WINDOW.ago).exists?
+    else
+      scope.exists?
+    end
   end
 
   def fetch_stock_quote(symbol)

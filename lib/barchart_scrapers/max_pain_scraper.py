@@ -146,6 +146,9 @@ EXTRACT_JS = """
     expiration_raw:  expSel?.value   || null,
     strikes_raw:     moneySel?.value || null,
     volume_oi_raw:   oiSel?.value    || null,
+    expiration_options: Array.from(expSel?.options || [])
+      .map(o => o.value)
+      .filter(v => v && v !== ''),
   };
 })()
 """
@@ -213,6 +216,7 @@ def build_output(symbol, raw):
         "put_oi":           [abs(put_oi_map.get(s, 0)) for s in strikes],
         "iv_combined":      [iv_map.get(s) for s in strikes],
         "max_pain_by_expiry": raw.get("max_pain_by_expiry", []),
+        "available_expirations": [v.replace("string:", "").strip() for v in raw.get("expiration_options", [])],
         "status": "success",
     }
 

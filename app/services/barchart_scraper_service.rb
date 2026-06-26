@@ -179,15 +179,16 @@ class BarchartScraperService
     # Table 2: filter-independent (chart 4), unique on symbol+date
     MaxPainContractSnapshot.upsert(
       {
-        symbol:             @symbol,
-        snapshot_date:      @today,
-        fetched_at:         now,
-        max_pain_by_expiry: data["max_pain_by_expiry"],
-        created_at:         now,
-        updated_at:         now
+        symbol:               @symbol,
+        snapshot_date:        @today,
+        fetched_at:           now,
+        max_pain_by_expiry:   data["max_pain_by_expiry"],
+        available_expirations: data["available_expirations"] || [],
+        created_at:           now,
+        updated_at:           now
       },
       unique_by: [:symbol, :snapshot_date],
-      update_only: [:fetched_at, :max_pain_by_expiry]
+      update_only: [:fetched_at, :max_pain_by_expiry, :available_expirations]
     )
   end
 
