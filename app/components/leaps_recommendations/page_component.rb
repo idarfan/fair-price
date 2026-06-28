@@ -131,7 +131,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     style = LIQUIDITY_STYLE[tier] || LIQUIDITY_STYLE["普通"]
     warn  = row[:no_recent_volume_warning]
 
-    tr(class: "border-t border-gray-100 hover:bg-purple-100 #{i.odd? ? 'bg-purple-50/60' : ''}") do
+    tr(class: "border-t border-gray-100 hover:bg-purple-200 #{i.odd? ? 'bg-gray-50' : ''}") do
       td(class: "px-3 py-2 font-mono whitespace-nowrap") { plain row[:expiration_date].to_s }
       td(class: "px-3 py-2 text-right")                  { plain row[:dte].to_s }
       td(class: "px-3 py-2 text-right font-semibold")    { plain fmt_price(row[:strike]) }
