@@ -334,6 +334,10 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
                 window.location.href = '/leaps?symbol=' + symbol;
                 return;
               }
+              if (data.status === 'cdp_offline') {
+                window.location.href = '/leaps?symbol=' + symbol + '&job_status=error';
+                return;
+              }
               var jobId = data.job_id;
               if (!jobId) {
                 window.location.href = '/leaps?symbol=' + symbol + '&job_status=error';

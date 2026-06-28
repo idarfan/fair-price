@@ -60,6 +60,10 @@ class LeapsRecommendationsController < ApplicationController
       return render json: { status: "ready", symbol: symbol }
     end
 
+    unless cdp_online?
+      return render json: { status: "cdp_offline" }
+    end
+
     job_id = SecureRandom.hex(8)
     Rails.cache.write("leaps_job_#{job_id}", { status: "pending" }, expires_in: 5.minutes)
     ScrapeLeapsJob.perform_later(symbol, job_id)
@@ -83,5 +87,16 @@ class LeapsRecommendationsController < ApplicationController
 
   def cached_errors(symbol)
     Array(Rails.cache.read("leaps_last_errors_#{symbol}"))
+  end
+
+  def cdp_online?
+    require "net/http"
+    uri  = URI("http://localhost:9222/json/version")
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.open_timeout = 2
+    http.read_timeout = 2
+    http.get(uri.path).is_a?(Net::HTTPSuccess)
+  rescue
+    false
   end
 end
