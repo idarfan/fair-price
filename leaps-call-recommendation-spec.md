@@ -214,6 +214,20 @@ Trade, Size, Side, Premium, Volume, "Open Int", IV, Delta, Code, *, Time
   2. 當天 Options Flow 面板（獨立區塊）
 - 表格可加履約價/到期日的欄位排序（點欄位標頭切換排序鍵），方便使用者自己依 DTE 或 OI 重新排
 
+### 錯誤訊息必須分情況顯示，不能三種失敗共用同一句空話（實測發現的缺漏，補上）
+
+實際畫面測試發現：抓取失敗時，畫面只顯示固定字串「抓取過程發生錯誤，部分資料可能不完整」，不管後端 `result[:status]`／`result[:errors]` 實際內容是什麼都顯示同一句，使用者看不出是哪種失敗、不知道下一步該做什麼。這違反第5節「不靜默回傳看起來完整但實際殘缺的表格」的精神——錯誤要講清楚到使用者知道接下來該做什麼，不只是「顯示有錯誤」。
+
+前端必須讀取後端實際回傳的 `result[:status]`，至少分三種情況顯示不同訊息，不能共用同一句：
+
+| `result[:status]` | 畫面應顯示 |
+|---|---|
+| 未登入 Barchart（登入偵測失敗） | 明確提示「請先登入 Barchart 後重試」，不是通用錯誤句 |
+| `partial_error`（session 中途過期） | 顯示 `result[:errors]` 裡實際的 `expired_at_expiration` 內容，例如「Session 在抓取到 {到期日} 時過期，已抓到的部分可能不完整，請重新查詢」——**這個到期日字串必須是後端實際回傳的值，不能是前端寫死的固定句子** |
+| 其他例外（CDP 連線失敗、程式錯誤等） | 跟前兩種區分開，至少要讓使用者看得出這跟「忘記登入」或「抓到一半斷線」是不同情況 |
+
+驗收時要實際觸發這三種情況各看一次畫面，不是只看 code 有沒有寫對應分支。
+
 ### 配色：直接沿用三維度儀表板（Technical/Fundamental/Options Flow）既有樣式，不要另外設計新色票
 
 **這點很重要，請先讀檔再寫樣式，不要憑印象或重新設計一套配色：**
@@ -250,7 +264,7 @@ Trade, Size, Side, Premium, Volume, "Open Int", IV, Delta, Code, *, Time
   - ✅ `aggregate` 原封不動轉交 `OptionsFlowClassifierService.aggregate`（只做 AR→hash 格式配接，無語義轉換）——符合「不重新發明分類邏輯」原則。
   - ✅ `highlighted_trades`／不影響排行排序（non-ranking guarantee 有測試覆蓋）——符合規格。
   - ❌ **需修正**：原規格這節被誤寫成「大單（`large_premium: true`，固定 $50萬門檎，數量不定）」，跟使用者最初提出的「前20大」（固定 20 筆，依 premium 降序）是兩個不同概念——**這是規格撰寫階段的錯誤改寫，不是 Phase D 實作偏離規格**，Phase D 當時完全照規格字面做是對的。已確認改回原始需求：`large_orders` 邏輯需從「filter by `large_premium` flag」換成「sort by premium desc, take 20」。`large_premium` 門檻可以保留做標記/icon 用，但不能用來決定面板抓取的資料範圍。**這個改動是局部的，不影響已驗收的 `aggregate`、`highlighted_trades`、non-ranking guarantee。**
-- **階段 E**：✅ 已完成。路由（flat，與 technical_dashboard 同層）、LeapsRecommendationsController（index/analyze/status）、ScrapeLeapsJob、LeapsRecommendations::PageComponent（15 欄排行表 + Options Flow 面板 + polling JS）、AppSwitcher 導覽連結。配色沿用 DIV_META（confirm_bull/caution/warning），標題「情緒參考，非排序依據」。263 examples, 0 failures。
+- **階段 E**：第 8 節路由與前端整合，UI 標題文字沿用 Phase D 確認的「情緒參考，非排序依據」 → 確認
 
 每一步都要以實際讀到的 DOM／資料為準，不要假設或猜測欄位名稱與資料格式。
 
@@ -269,11 +283,12 @@ Trade, Size, Side, Premium, Volume, "Open Int", IV, Delta, Code, *, Time
 - [ ] 流動性判斷（充足／普通／偏低）是程式依本次查詢候選的 OI 相對排名動態算出，不是寫死一個固定 OI 數字套用在所有標的上。
 - [ ] 「近期無成交」警示用 Barchart 算好的 `vol_oi_ratio` 判斷，沒有沿用舊版規格的 `volume<=3` 門檻（尺度不同，不能直接搬）。
 - [ ] OI／Volume 欄位同時顯示 Barchart 原始數值與程式算出的流動性判斷結果，兩者都看得到。
-- [x] 結果以表格呈現，不是逐筆寫長段推薦理由文字。
-- [x] Options Flow 面板直接複用既有 `OptionsFlowTrade` model，獨立顯示，標題清楚標示「情緒參考，非排序依據」。
-- [x] 面板顯示的是**真正的前 20 大**：依 `premium` 降序排序取前 20 筆，固定數量（可少於20筆但不會更多），**不是**用 `large_premium` 固定金額門檻篩出來的不定數量清單；有單元測試覆蓋「當天 large_premium=true 的交易數超過20筆」與「當天 0 筆 large_premium=true」這兩種邊界情況，驗證兩種情況下都還是回傳依 premium 排序的前 20 筆（或不足20筆時的全部），不會因為金額門檻而漏掉或多顯示。
-- [x] 同一 symbol 5 分鐘內重複查詢會讀快取，不重複打 Barchart。
-- [x] 表格下方有「僅供策略篩選參考，非投資建議」提示文字。
-- [x] 配色（卡片底色、邊框、綠/橘黃/紅語義色、hover 效果）直接讀取並複用三維度儀表板既有的 CSS/變數，沒有另外設計一套新色票；流動性分級與 Options Flow 看多/看空判斷的顏色語義跟 `divergence_flag` 的 confirm/warning/caution 對應一致。
-- [x] 新路由跟既有三維度儀表板/IV Skew 相關路由放在同一 namespace／層級下，不是憑空另開一個不相關的頂層路由。
-- [x] 導覽列/選單裡有連結可以直接點進 LEAPS 頁面，不需要手動輸入網址。
+- [ ] 結果以表格呈現，不是逐筆寫長段推薦理由文字。
+- [ ] Options Flow 面板直接複用既有 `OptionsFlowTrade` model，獨立顯示，標題清楚標示「情緒參考，非排序依據」。
+- [ ] 面板顯示的是**真正的前 20 大**：依 `premium` 降序排序取前 20 筆，固定數量（可少於20筆但不會更多），**不是**用 `large_premium` 固定金額門檻篩出來的不定數量清單；有單元測試覆蓋「當天 large_premium=true 的交易數超過20筆」與「當天 0 筆 large_premium=true」這兩種邊界情況，驗證兩種情況下都還是回傳依 premium 排序的前 20 筆（或不足20筆時的全部），不會因為金額門檻而漏掉或多顯示。
+- [ ] 同一 symbol 5 分鐘內重複查詢會讀快取，不重複打 Barchart。
+- [ ] 表格下方有「僅供策略篩選參考，非投資建議」提示文字。
+- [ ] 抓取失敗時的畫面訊息依 `result[:status]` 分情況顯示（未登入／partial_error 帶出實際斷點到期日／其他例外），不是三種情況共用同一句固定字串；驗收時實際觸發過這三種情況各看一次畫面。
+- [ ] 配色（卡片底色、邊框、綠/橘黃/紅語義色、hover 效果）直接讀取並複用三維度儀表板既有的 CSS/變數，沒有另外設計一套新色票；流動性分級與 Options Flow 看多/看空判斷的顏色語義跟 `divergence_flag` 的 confirm/warning/caution 對應一致。
+- [ ] 新路由跟既有三維度儀表板/IV Skew 相關路由放在同一 namespace／層級下，不是憑空另開一個不相關的頂層路由。
+- [ ] 導覽列/選單裡有連結可以直接點進 LEAPS 頁面，不需要手動輸入網址。
