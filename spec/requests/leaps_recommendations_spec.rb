@@ -141,7 +141,7 @@ RSpec.describe "GET /leaps", type: :request do
         .and_return(false)
       allow(Rails.cache).to receive(:read)
         .with("leaps_last_errors_#{symbol}")
-        .and_return([ "Session expired mid-loop at 2027-01-17; table may be incomplete" ])
+        .and_return([ "Session 在抓取到 2027-01-17 的 Options Prices 時過期，已抓到的部分可能不完整，請重新查詢" ])
     end
 
     it "returns 200 and includes the expired_at date in the message" do
@@ -167,7 +167,64 @@ RSpec.describe "GET /leaps", type: :request do
     it "returns 200 and shows CDP error message" do
       get "/leaps", params: { symbol: symbol, job_status: "error" }
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("CDP 連線或程式錯誤")
+      expect(response.body).to include("CDP 未連線")
     end
   end
+  # ── 7. POST /leaps/analyze — CDP 離線時直接擋下不送 job ─────────────────────
+
+  describe "POST /leaps/analyze" do
+    let(:symbol) { "NOK" }
+
+    context "when CDP is offline" do
+      before do
+        allow(LeapsOptionChainSnapshot)
+          .to receive_message_chain(:for_symbol, :fresh, :exists?)
+          .and_return(false)
+        allow_any_instance_of(LeapsRecommendationsController)
+          .to receive(:cdp_online?).and_return(false)
+      end
+
+      it "returns cdp_offline status without enqueueing a job" do
+        expect(ScrapeLeapsJob).not_to receive(:perform_later)
+        post "/leaps/analyze", params: { symbol: symbol }
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)["status"]).to eq("cdp_offline")
+      end
+    end
+
+    context "when CDP is online and fresh data exists" do
+      before do
+        allow(LeapsOptionChainSnapshot)
+          .to receive_message_chain(:for_symbol, :fresh, :exists?)
+          .and_return(true)
+      end
+
+      it "returns ready without enqueueing a job" do
+        expect(ScrapeLeapsJob).not_to receive(:perform_later)
+        post "/leaps/analyze", params: { symbol: symbol }
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)["status"]).to eq("ready")
+      end
+    end
+
+    context "when CDP is online and no fresh data" do
+      before do
+        allow(LeapsOptionChainSnapshot)
+          .to receive_message_chain(:for_symbol, :fresh, :exists?)
+          .and_return(false)
+        allow_any_instance_of(LeapsRecommendationsController)
+          .to receive(:cdp_online?).and_return(true)
+        allow(ScrapeLeapsJob).to receive(:perform_later)
+      end
+
+      it "enqueues ScrapeLeapsJob and returns a job_id" do
+        post "/leaps/analyze", params: { symbol: symbol }
+        expect(response).to have_http_status(:ok)
+        body = JSON.parse(response.body)
+        expect(body["job_id"]).to be_present
+        expect(ScrapeLeapsJob).to have_received(:perform_later)
+      end
+    end
+  end
+
 end

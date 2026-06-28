@@ -78,16 +78,11 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       render_alert("bg-orange-50 border border-orange-300 text-orange-800",
         "⚠️ 請先登入 Barchart 後重試。（Barchart 登入 Session 已過期）")
     when :partial_error
-      expired_at = @scrape_errors.first&.match(/at (\S+);/)&.[](1)
-      msg = if expired_at
-        "⚠️ Session 在抓取到 #{expired_at} 時過期，已存入的部分資料可能不完整。請重新登入 Barchart 後再查詢一次。"
-      else
-        "⚠️ 抓取中途 Session 過期，部分資料可能不完整。請重新登入 Barchart 後重試。"
-      end
-      render_alert("bg-yellow-50 border border-yellow-300 text-yellow-800", msg)
+      msg = @scrape_errors.first || "抓取中途 Session 過期，部分資料可能不完整。請重新登入 Barchart 後重試。"
+      render_alert("bg-yellow-50 border border-yellow-300 text-yellow-800", "⚠️ #{msg}")
     when :error
       render_alert("bg-red-50 border border-red-300 text-red-800",
-        "❌ CDP 連線或程式錯誤，請確認 Chrome 已開啟並重試。")
+        "❌ CDP 未連線，請確認 Windows 端 Chrome 已以 --remote-debugging-port=9222 啟動；可在瀏覽器開啟 http://localhost:9222/json/version 確認是否連線。")
     when :ready_to_fetch
       render_alert("bg-blue-50 border border-blue-300 text-blue-800",
         "ℹ️ 尚未取得 #{@symbol} 的 LEAPS 資料，請點「查詢」開始抓取。")
@@ -179,7 +174,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     style = LIQUIDITY_STYLE[tier] || LIQUIDITY_STYLE["普通"]
     warn  = row[:no_recent_volume_warning]
 
-    tr(class: "border-t border-gray-100 hover:bg-purple-200 #{i.odd? ? 'bg-gray-50' : ''}") do
+    tr(class: "border-t border-gray-100 hover:bg-purple-200 #{i.odd? ? 'bg-gray-50/50' : ''}") do
       td(class: "px-3 py-2 font-mono whitespace-nowrap") { plain row[:expiration_date].to_s }
       td(class: "px-3 py-2 text-right")                  { plain row[:dte].to_s }
       td(class: "px-3 py-2 text-right font-semibold")    { plain fmt_price(row[:strike]) }

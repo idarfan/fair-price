@@ -95,10 +95,12 @@ class BarchartScraperService
       result[:status] = "success"
     when "partial"
       persist_leaps(fetch_result[:data])
-      expired_at = fetch_result[:data]["expired_at_expiration"]
-      log_fetch("leaps", "partial_error", "expired_at=#{expired_at}")
+      expired_at    = fetch_result[:data]["expired_at_expiration"]
+      expired_layer = fetch_result[:data]["expired_layer"]
+      layer_label   = expired_layer == "volatility_greeks" ? "Volatility & Greeks" : "Options Prices"
+      log_fetch("leaps", "partial_error", "expired_at=#{expired_at} layer=#{expired_layer}")
       result[:status] = "partial_error"
-      result[:errors] << "Session expired mid-loop at #{expired_at}; table may be incomplete"
+      result[:errors] << "Session 在抓取到 #{expired_at} 的 #{layer_label} 時過期，已抓到的部分可能不完整，請重新查詢"
     else
       log_fetch("leaps", "error", fetch_result[:error])
       result[:status] = "error"

@@ -193,6 +193,7 @@ async def main(symbol):
                 "status":                "partial",
                 "rows":                  all_rows,
                 "expired_at_expiration": exp_date,
+                "expired_layer":         "options_prices",
             }))
             return
 
@@ -218,6 +219,7 @@ async def main(symbol):
                 "status":                "partial",
                 "rows":                  all_rows,
                 "expired_at_expiration": exp_date,
+                "expired_layer":         "volatility_greeks",
             }))
             return
 
