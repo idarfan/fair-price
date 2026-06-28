@@ -10,6 +10,18 @@
 
 這個專案的 Chrome CDP 是在 WSL2 mirrored 網路模式下、Windows 端開啟 Chrome 並指定 `--remote-debugging-port=9222`，WSL2 這邊透過 `localhost:9222` 連線。預檢方式：對 `http://localhost:9222/json/version` 發請求，能連上且回傳版本資訊代表 CDP 可用。
 
+### 已知根因：電腦 sleep/wake 後 `/mnt/c/` 掛載失效
+
+實測抓到的真實根因：電腦睡眠/喚醒之後，WSL2 的 `/mnt/c/` 掛載點會出現 `Input/output error`，導致任何嘗試執行 `/mnt/c/.../chrome.exe` 的腳本（包括 `chrome-cdp-keeper`）每次重試都打在一條死路上，**跟 Chrome 程序本身或 keeper 的重試邏輯無關，重啟 keeper（`pm2 restart`）完全沒用**。mirrored 網路的 `localhost` 轉發失效很可能是同一次 sleep/wake 崩潰的另一個症狀，不是分開的兩個問題。
+
+**正確解法是 `wsl --shutdown`**（在 Windows PowerShell 執行），讓 WSL2 完整重啟，重新掛載 `/mnt/c/` 並恢復 mirrored 網路。
+
+**這個問題不適合從 Rails/Ruby 內部自動修復**：`wsl --shutdown` 的本質是重啟整個 WSL2 環境，Rails process 本身就跑在這個環境裡面，沒辦法從裡面叫外面的 Windows PowerShell 去關掉自己所在的環境。CDP 預檢偵測到離線時，**只負責老實回報，不嘗試自動修復**。
+
+**錯誤訊息文字**（這句 sleep/wake 提示是通用建議，不是「確診後才顯示」——controller 端沒辦法判斷這次離線是不是真的因為 `/mnt/c/` I/O error，除非額外 shell 出去檢查掛載狀態，這樣會把「OS 層級問題不適合從 Rails 內部處理」這個原則越界擴大，所以不管這次離線的真正原因是什麼，這句提示都固定顯示）：
+
+> CDP 未連線，請確認 Windows 端 Chrome 已以 `--remote-debugging-port=9222` 啟動。若電腦曾經睡眠/喚醒，這通常是 WSL2 的 `/mnt/c/` 掛載失效造成的，請在 Windows PowerShell 執行 `wsl --shutdown` 後等待 WSL2 重新啟動，再重試一次。
+
 ## 實作方式：抽成共用機制，不要每個 controller 各自重寫
 
 **不要**讓每個新 controller 自己寫一段一樣的檢查邏輯——這正是之前反覆出包的原因：規則存在，但要靠每次有人手動記得套用，漏一次就出包一次。
