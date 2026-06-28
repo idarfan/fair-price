@@ -30,6 +30,8 @@ class LeapsRankingService
 
   private
 
+  MIN_DTE = 364
+
   def fetch_candidates
     latest_at = LeapsOptionChainSnapshot.for_symbol(@symbol).calls.maximum(:scraped_at)
     return [] unless latest_at
@@ -38,6 +40,7 @@ class LeapsRankingService
       .for_symbol(@symbol)
       .calls
       .where(scraped_at: latest_at)
+      .where("dte >= ?", MIN_DTE)
       .where(delta: @delta_min..@delta_max)
       .to_a
   end

@@ -138,7 +138,7 @@ RSpec.describe LeapsRankingService do
   describe "sort order" do
     before do
       make(delta: 0.80, open_interest: 30_000, dte: 730)
-      make(delta: 0.80, open_interest: 80_000, dte: 180)
+      make(delta: 0.80, open_interest: 80_000, dte: 400)  # was 180 (< 364, now excluded)
       make(delta: 0.80, open_interest: 80_000, dte: 540)
     end
 
@@ -146,7 +146,7 @@ RSpec.describe LeapsRankingService do
       results = described_class.new("NOK").call
       expect(results.map { |e| [ e[:open_interest], e[:dte] ] }).to eq([
         [ 80_000, 540 ],
-        [ 80_000, 180 ],
+        [ 80_000, 400 ],
         [ 30_000, 730 ]
       ])
     end
@@ -182,5 +182,40 @@ RSpec.describe LeapsRankingService do
   it "returns [] when no rows match the delta filter" do
     make(delta: 0.50)
     expect(described_class.new("NOK").call).to eq([])
+  end
+
+  # ── DTE >= 364 hard floor ─────────────────────────────────────────────────────
+  #
+  # 實測 NOK 時抓到 DTE=5/13/20 的近期合約混進排行（2026-06-28 教訓）。
+  # 這組測試確認 DTE<364 的候選真的被排除，DTE>=364 的才進來。
+
+  describe "DTE >= 364 filter" do
+    before do
+      # Near-term — mirrors the NOK 5/13/20-day garbage data seen in production
+      make(delta: 0.82, dte: 5,   expiration_date: Date.today + 5)
+      make(delta: 0.82, dte: 13,  expiration_date: Date.today + 13)
+      make(delta: 0.82, dte: 20,  expiration_date: Date.today + 20)
+      # Boundary: exactly 363 days — still excluded
+      make(delta: 0.82, dte: 363, expiration_date: Date.today + 363)
+      # Boundary: exactly 364 days — included
+      make(delta: 0.82, dte: 364, expiration_date: Date.today + 364)
+      # Normal LEAPS DTE — included
+      make(delta: 0.82, dte: 400, expiration_date: Date.today + 400)
+    end
+
+    it "excludes candidates with DTE < 364" do
+      dtes = described_class.new("NOK").call.map { |e| e[:dte] }
+      expect(dtes).to all(be >= 364)
+    end
+
+    it "includes candidates with DTE >= 364" do
+      results = described_class.new("NOK").call
+      expect(results.size).to eq(2)   # 364 + 400
+    end
+
+    it "explicitly excludes DTE=20 (the NOK near-term case)" do
+      results = described_class.new("NOK").call
+      expect(results.map { |e| e[:dte] }).not_to include(20)
+    end
   end
 end

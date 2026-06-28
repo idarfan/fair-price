@@ -3,8 +3,8 @@ FactoryBot.define do
 
   factory :leaps_option_chain_snapshot do
     symbol           { "NOK" }
-    expiration_date  { Date.today + 202 }
-    dte              { 202 }
+    expiration_date  { Date.today + 400 }
+    dte              { 400 }
     strike           { generate(:leaps_strike) }
     option_type      { "Call" }
     bid              { 3.10 }
