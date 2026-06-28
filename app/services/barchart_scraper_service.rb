@@ -11,6 +11,10 @@ require "open3"
 #   result = BarchartScraperService.new("RKLB").fetch_max_pain(
 #     expiration: "2026-08-21 (m)", strikes: "near_money", volume_oi: "volume"
 #   )
+#
+#   # LEAPS chain fetch (all expirations, Options Prices + V&G merged):
+#   result = BarchartScraperService.new("NOK").fetch_leaps
+#   result[:status]  # => "success" | "cached" | "partial_error" | "barchart_session_expired" | "error"
 class BarchartScraperService
   CDP_URL    = "http://127.0.0.1:9222"
   SCRIPT_DIR = Rails.root.join("lib", "barchart_scrapers")
@@ -58,6 +62,49 @@ class BarchartScraperService
     end
 
     result[:status] = result[:errors].empty? ? "success" : "partial_error"
+    result
+  end
+
+  # User-triggered LEAPS chain fetch: Options Prices + V&G for all expirations.
+  # Returns :cached if the symbol was already scraped within the last 5 minutes.
+  def fetch_leaps
+    result = { symbol: @symbol, status: nil, errors: [] }
+
+    unless cdp_available?
+      result[:status] = "error"
+      result[:errors] << "Chrome CDP not reachable at #{CDP_URL}"
+      log_fetch("leaps", "error", "CDP unavailable")
+      return result
+    end
+
+    if LeapsOptionChainSnapshot.for_symbol(@symbol).fresh.exists?
+      result[:status] = "cached"
+      log_fetch("leaps", "cached", nil)
+      return result
+    end
+
+    fetch_result = run_scraper("leaps")
+
+    case fetch_result[:status]
+    when "barchart_session_expired"
+      log_fetch("leaps", "barchart_session_expired", nil)
+      result[:status] = "barchart_session_expired"
+    when "success"
+      persist_leaps(fetch_result[:data])
+      log_fetch("leaps", "success", "rows=#{fetch_result[:data]["rows"]&.length}")
+      result[:status] = "success"
+    when "partial"
+      persist_leaps(fetch_result[:data])
+      expired_at = fetch_result[:data]["expired_at_expiration"]
+      log_fetch("leaps", "partial_error", "expired_at=#{expired_at}")
+      result[:status] = "partial_error"
+      result[:errors] << "Session expired mid-loop at #{expired_at}; table may be incomplete"
+    else
+      log_fetch("leaps", "error", fetch_result[:error])
+      result[:status] = "error"
+      result[:errors] << fetch_result[:error].to_s
+    end
+
     result
   end
 
@@ -115,8 +162,11 @@ class BarchartScraperService
 
     if status.success?
       data = JSON.parse(stdout)
-      if data["status"] == "barchart_session_expired"
+      case data["status"]
+      when "barchart_session_expired"
         { status: "barchart_session_expired" }
+      when "partial"
+        { status: "partial", data: data }
       else
         { status: "success", data: data }
       end
@@ -190,6 +240,39 @@ class BarchartScraperService
       unique_by: [:symbol, :snapshot_date],
       update_only: [:fetched_at, :max_pain_by_expiry, :available_expirations]
     )
+  end
+
+  def persist_leaps(data)
+    rows = data["rows"]
+    return if rows.blank?
+
+    now = Time.current
+    records = rows.map do |r|
+      {
+        symbol:           @symbol,
+        expiration_date:  r["expiration_date"],
+        dte:              r["dte"],
+        strike:           r["strike"],
+        option_type:      r["option_type"],
+        bid:              r["bid"],
+        ask:              r["ask"],
+        last_price:       r["last_price"],
+        underlying_price: r["underlying_price"],
+        volume:           r["volume"],
+        open_interest:    r["open_interest"],
+        delta:            r["delta"],
+        iv:               r["iv"],
+        itm_probability:  r["itm_probability"],
+        vol_oi_ratio:     r["vol_oi_ratio"],
+        scraped_at:       now,
+        created_at:       now,
+        updated_at:       now
+      }
+    end
+
+    # Full replacement: delete existing rows for this symbol then bulk-insert
+    LeapsOptionChainSnapshot.where(symbol: @symbol).delete_all
+    LeapsOptionChainSnapshot.insert_all(records)
   end
 
   def persist_trades(trades)

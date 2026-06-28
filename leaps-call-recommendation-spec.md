@@ -15,7 +15,7 @@
 1. **登入機制**：Barchart 用 Google OAuth 登入。系統**只負責偵測**目前 Chrome CDP session 是否已登入（導航後檢查是否出現登入彈窗），**絕對不嘗試任何形式的自動登入**（不填帳密、不點 "Continue with Google"、不處理 OAuth 流程）。偵測到未登入 → 立即中止，回報「請手動登入 Barchart 後重試」，不做任何補救嘗試。
 2. **禁止呼叫內部 API**：所有資料一律透過 Playwright 讀取頁面實際渲染的 DOM，或使用頁面本身提供的合法「匯出/下載」功能（沿用 Options Flow CSV 下載的既有模式）。**禁止**用 XHR 攔截、攔截 session cookie、或直接呼叫 Barchart 內部 API 端點（例如 `/proxies/core-api/...`），即使技術上抓得到也不可以。
 3. **三維度獨立原則延伸**：這個功能產出的「LEAPS 排行表」，**只能由 Delta 區間篩選 + OI/DTE 排序組成**，**不可把 Options Flow 情緒訊號混進排序或拿來篩選候選**。Options Flow 資料以獨立面板呈現（見第 7 節），作為「這個排行跟今天的市場情緒方向是否一致」的參考，由使用者自行判斷，不自動加減分、不自動排除候選。
-4. **不假設 DOM／資料格式**：三個頁面目前都還沒有做過完整 DOM 探查，Claude Code **必須先完成 Phase A（第 4 節）拿到真實欄位**，才能進入後續資料庫設計與抓取邏輯，不可憑猜測或本文件的範例欄位名稱直接寫死 selector。
+4. **不假設 DOM／資料格式**：Phase A 已確認 Options Prices 頁面含 Delta/IV，Volatility & Greeks 頁面只額外抓 Vega 一欄（方案 A + Vega，見第 4 節）；其他未探查欄位仍需以實際 DOM 為準，不可憑猜測或本文件範例欄位名稱直接寫死 selector。
 5. **分階段執行**：嚴格按照第 10 節的階段順序進行，每階段做完跟使用者確認後才能進下一階段。
 
 ---
@@ -28,8 +28,8 @@
 系統檢查 Chrome CDP 連線 + Barchart 登入狀態
         ↓ 未登入                    ↓ 已登入
 回報「請先登入 Barchart」      依序抓取三個頁面：
-（不繼續往下）                  1. Options Prices（所有可用到期日的報價）
-                                2. Volatility & Greeks（同上頁面的 Delta/IV）
+（不繼續往下）                  1. Options Prices（所有可用到期日的報價，含 Delta/IV）
+                                2. Volatility & Greeks（取 Vega／itmProbability／volumeOpenInterestRatio）
                                 3. Options Flow（今天的成交流量）
                                        ↓
                                 存進 PostgreSQL
@@ -44,24 +44,35 @@
 
 ---
 
-## Phase A：三個頁面的 DOM 探查（先做這步，不要跳過、不要假設）
+## Phase A：頁面 DOM 探查（已確認結果如下）
 
-### A.1 Options Prices
+### A.1 Options Prices（主要資料來源）
 參考 URL 形式：`https://www.barchart.com/stocks/quotes/{TICKER}/options?expiration={DATE}`
+
+**Phase A 確認結果：Delta 與 IV 這頁本身就有。** Strike、Bid、Ask、Last、Volume、Open Interest、Delta、IV 都從這一頁取得。
 
 需要實際確認：
 - 到期日清單從哪裡讀（通常頁面上有 expiration 的 `<select>` 或 tab 清單，**用這個清單拿到全部可用到期日，不要自己猜日期格式**，要包含遠期 LEAPS 到期日，不是只有近期週選）
-- 表格實際欄位有哪些（推測會有 Strike、Bid、Ask、Last、Volume、Open Interest，但要以實際讀到的 column header 為準）
+- 表格實際欄位有哪些（已確認包含 Strike、Bid、Ask、Last、Volume、Open Interest、Delta、IV，以實際讀到的 column header 為準）
 - Call / Put 是左右並排兩個表格，還是分頁切換，需確認 DOM 結構
 - 頁面是否也有合法的 CSV/Export 下載功能（如果有，優先用下載，不用解析 DOM 表格，沿用 Options Flow 的既有模式）
 
-### A.2 Volatility & Greeks
+### A.2 Volatility & Greeks（方案 A + Vega + itmProbability + volumeOpenInterestRatio）
 參考 URL 形式：`https://www.barchart.com/stocks/quotes/{TICKER}/volatility-greeks?expiration={DATE}`
 
-需要實際確認：
-- 表格欄位是否包含 Delta、Gamma、Theta、Vega、IV（推測會有，但要實際確認欄位名稱與單位，例如 IV 是百分比還是小數）
-- 這個頁面的 Strike 清單跟 A.1 的 Strike 清單是否完全對得上（用來做 merge by strike+expiration 的 key）
-- 是否也有合法匯出功能
+**Phase A 最終確認：這頁額外抓 3 欄，其餘略過。**
+
+| 欄位 | 抓不抓 | 理由 |
+|---|---|---|
+| `vega` | 抓 | 量化「IV 偏高、未來 IV 回落侵蝕權利金」的風險提示 |
+| `itmProbability` | 抓 | 同頁面零額外成本，且跟手動選 LEAPS 時用的「被指派機率」邏輯一致 |
+| `volumeOpenInterestRatio` | 抓 | Barchart 已算好，直接取代規格內自行用 `volume<=3` 門檻判斷「近期無成交」的粗略邏輯（見第 6 節） |
+| `gamma` / `theta` / `rho` | 不抓 | 深度價內 LEAPS 場景下參考價值低，目前沒有任何邏輯會用到 |
+| `theoretical` | 不抓 | 回答的是「定價是否合理」，目前功能沒有任何邏輯需要這個問題的答案 |
+
+**Merge key（Phase A 確認）**：`(strikePrice, expirationDate)`，兩頁完全對得上，不需要額外的容錯比對邏輯。
+
+> 跳過的部分：Gamma/Theta/Rho/Theoretical 不抓、不存。多抓的部分：Vega/itmProbability/volumeOpenInterestRatio 三欄，merge key 確認乾淨對得上，沒有額外風險。
 
 ### A.3 Options Flow
 參考 URL：`https://www.barchart.com/stocks/quotes/{TICKER}/options-flow`
@@ -71,15 +82,28 @@
 Symbol, Price~, Type, Strike, Expires, DTE, "Bid x Size", "Ask x Size",
 Trade, Size, Side, Premium, Volume, "Open Int", IV, Delta, Code, *, Time
 ```
-沿用既有 `csv_files/options_flow/{SYMBOL}_{YYYY-MM-DD}.csv` 下載與命名規則即可，**這頁不需要重新 DOM 探查**，除非既有抓取流程還沒接到這個新功能上，需確認既有 service/job 能不能直接複用（見第 9 節）。
+沿用既有 `csv_files/options_flow/{SYMBOL}_{YYYY-MM-DD}.csv` 下載與命名規則即可，**這頁不需要重新 DOM 探查**。
 
-> Phase A 做完，請把三個頁面實際拿到的欄位/selector/URL 規則回報給使用者確認，再進 Phase B。
+**Phase A 確認結果：既有爬蟲已完整，`OptionsFlowTrade` model 已存在，直接複用，不需要新寫抓取邏輯。**
+
+> Phase A 全部確認完畢，進 Phase B。
 
 ---
 
-## 資料庫設計（暫定，Phase A 確認欄位後可能要調整）
+## 資料庫設計
 
-新增一張選擇權報價快照表（暫名 `option_chain_snapshots`），最低需要欄位：
+### 為什麼需要新表，不是擴充 `option_snapshots`（Phase A 確認）
+
+| | `option_snapshots`（既有） | LEAPS 需求 |
+|---|---|---|
+| 識別方式 | `tracked_ticker_id`（FK 到 `tracked_tickers`，需預先登記） | 任意 ticker 字串，使用者輸入即查，不需預先登記 |
+| `delta` 欄位 | 無 | 核心篩選欄位，必須有 |
+| 主 key 結構 | `tracked_ticker_id` + `contract_symbol` | `(symbol, expiration_date, strike, option_type, scraped_at)` |
+| 用途／粒度 | 追蹤特定合約的價格歷史（每 symbol 一筆彙總快取） | 每次查詢的全標的快照，篩完即用（per-contract） |
+
+兩者 grain 完全不同，不是「順手擴充舊表」能解決的差異，新建表是必要的，不是為了偷懶繞過既有結構。
+
+### `option_chain_snapshots` 欄位
 
 | 欄位 | 說明 |
 |---|---|
@@ -89,14 +113,23 @@ Trade, Size, Side, Premium, Volume, "Open Int", IV, Delta, Code, *, Time
 | `strike` | 履約價 |
 | `option_type` | call / put（這個功能只需要 call，但表結構保留兩者以備未來 PMCC 功能共用） |
 | `bid`, `ask`, `last` | 報價 |
-| `volume`, `open_interest` | 流動性 |
-| `delta`, `iv` | 來自 Volatility & Greeks 頁面，merge by (ticker, expiration_date, strike) |
+| `volume`, `open_interest` | 流動性（原始值） |
+| `delta`, `iv` | 來自 Options Prices 頁面 |
+| `vega` | 來自 Volatility & Greeks 頁面 |
+| `itm_probability` | 來自 Volatility & Greeks 頁面，被指派機率參考 |
+| `volume_open_interest_ratio` | 來自 Volatility & Greeks 頁面，Barchart 已算好的流動性比率，取代自行用 `volume<=3` 判斷「近期無成交」的粗略邏輯 |
 | `underlying_price` | 抓取當下的標的股價（用於算 time value %） |
 | `scraped_at` | 抓取時間 |
 
-如果專案裡已經有類似的選擇權報價表（之前三維度儀表板規格裡有沒有做過這塊請先確認 `app/models` 與既有 migration），**優先擴充既有表，不要重複建表**。
+**Merge key（Phase A 確認）**：`(strike_price, expiration_date)`，Options Prices 與 Volatility & Greeks 兩頁完全對得上，不需要額外容錯比對。
 
-Options Flow 資料如果之前的三維度儀表板專案已經有對應 model/table，直接複用；如果只做到 CSV 下載沒接資料庫，這次順便把既有 CSV 解析存進 DB（沿用既有的 Code 分類邏輯，不重新設計）。
+**主 key**：`(symbol, expiration_date, strike, option_type, scraped_at)`。
+
+**不新增 gamma/theta/rho/theoretical 欄位**：理由見第 4 節 A.2。
+
+`vega`、`itm_probability`、`volume_open_interest_ratio` 在排行表上都是**獨立顯示欄位**，跟其他流動性/Greeks 欄位一樣不參與排序或篩選公式。
+
+> ⚠️ 第 6 節「近期無成交」警示規則需同步更新：原規則是用自行設的 `volume<=3` 門檻判斷，現在改用 Barchart 算好的 `volume_open_interest_ratio`（見第 6 節更新後內容），門檻數值需要重新依這個比率的實際分布設定，不能直接沿用舊的 `<=3` 那個是針對原始 volume 設計的數字。
 
 ---
 
@@ -119,7 +152,7 @@ Options Flow 資料如果之前的三維度儀表板專案已經有對應 model/
    - 該標的本次候選 OI 前 1/3 → `流動性：充足`
    - 中間 1/3 → `流動性：普通`
    - 後 1/3 → `流動性：偏低`
-3. 額外規則：若候選的 `volume` 為 0 或極低（例如連續多日無成交，需依 Phase A 實際資料判斷怎麼偵測「近期無成交」），即使 OI 排名落在前 1/3，仍額外標註「⚠ 近期無成交」警示，因為 OI 高但近期沒人交易，代表是舊倉位掛著，不代表現在進出容易。
+3. **額外規則（已更新，改用 Barchart 自算比率，不再自行設 `volume<=3` 門檻）**：若候選的 `volume_open_interest_ratio` 偏低（代表近期成交量相對 OI 過小，即使 OI 排名落在前 1/3，現在進出也未必容易），標註「⚠ 近期無成交」警示。**這個比率的合理門檻需要 Phase B 實際抓到的資料分布來定，不能直接套用舊版規格的 `volume<=3`**——那個數字是針對原始 volume 設計的，跟 Barchart 算出來的比率不是同一個尺度，照搬會錨錯。建議做法：抓到實際資料後，看這個比率本身的分布（例如百分位或 Barchart 官方對這個欄位的判讀建議，若頁面上有圖示/顏色標示可直接借用對應邏輯），不要憑感覺設一個新數字。
 
 這個分級邏輯是**程式自動算好直接顯示在表格裡**，不是文字描述，使用者一眼就能在表格上看到每個候選的流動性等級，不用自己再去比較數字。
 
@@ -147,8 +180,8 @@ Options Flow 資料如果之前的三維度儀表板專案已經有對應 model/
 
 直接列出表格，欄位：
 
-| 到期日 | DTE | 履約價 | Delta | OI | Volume | 流動性判斷 | Bid | Ask | Mid | Spread% | Time Value% | IV |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 到期日 | DTE | 履約價 | Delta | OI | Volume | 流動性判斷 | Bid | Ask | Mid | Spread% | Time Value% | IV | Vega | 被指派機率 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 - 表格本身就是排行（OI 高到低，同 OI 依 DTE 大到小），不額外寫每一列的推薦理由段落，但「流動性判斷」欄是程式算好的結論，不是原始數字。
 - 表格上方加一行固定提示：「依 OI 由高到低排序；流動性判斷依本次查詢候選的 OI 相對排名計算，非固定門檻，不同標的會自動調整基準。」
@@ -159,6 +192,8 @@ Options Flow 資料如果之前的三維度儀表板專案已經有對應 model/
 ## 決策當天的 Options Flow 顯示（獨立面板，不併入排序）
 
 在排行表格下方，另開一個獨立區塊顯示**抓取當天**該股票的 Options Flow：
+
+**Phase A 確認結果：既有爬蟲已完整，`OptionsFlowTrade` model 已存在，這個面板直接複用既有資料來源/model，不需要新寫抓取邏輯，只需要新寫「依排行表前幾名的到期日/履約價篩出相關列＋算出看多/看空判斷」這層顯示邏輯。**
 
 - 沿用既有 Code／Side／`*` 分類邏輯（多腿代碼標記不可信、標準單腿代碼可信）
 - 顯示當天 Call 與 Put 的總 Premium 量、大單（依既有 Block/Sweep/Floor 等 Flags 或 Code 分類)清單
@@ -198,8 +233,14 @@ Options Flow 資料如果之前的三維度儀表板專案已經有對應 model/
 
 ## 執行方式（請務必分階段進行，每階段做完跟使用者確認再繼續）
 
-- **階段 A**：完成第 4 節三個頁面的 DOM 探查，回報實際欄位/selector/URL 規則 → 確認
-- **階段 B**：依階段 A 結果，確認/調整第 5 節資料庫設計，寫好抓取與存儲邏輯（含登入偵測、CSV 下載或 DOM 解析） → 確認
+- **階段 A**：✅ 已完成（第 4 節）。確認結果：方案 A + Vega + itmProbability + volumeOpenInterestRatio，Options Prices 為主要來源，Volatility & Greeks 頁面額外取上述 3 欄（merge key `(strike_price, expiration_date)` 兩頁完全對得上），Gamma/Theta/Rho/Theoretical 不抓；Options Flow 既有 `OptionsFlowTrade` model 直接複用，不需新寫抓取邏輯。
+- **階段 B**：建立資料層，依下列順序進行 → 確認
+  1. 新建 `option_chain_snapshots` migration（已確認跟既有 `option_snapshots` grain 不同、FK 結構不同，需要新表，不是擴充舊表）
+  2. 新寫 `leaps_options_scraper.py`（Options Prices，遍歷所有到期日）
+  3. 新寫 `leaps_greeks_scraper.py`（V&G，merge by `(strike_price, expiration_date)`，只抓 Vega/itmProbability/volumeOpenInterestRatio 三欄）
+  4. 擴充 `BarchartScraperService` 加入 `fetch_leaps` 方法
+  - **登入狀態檢查**：一次性在 `fetch_leaps` 進入點檢查，不在個別 per-expiration scraper 裡重複檢查。
+  - **中途 session 過期處理**：Python scraper 偵測到登入彈窗（例如讀到資料容器為 null）時回傳明確的過期狀態，Ruby 層收到後立即中止整個迴圈，回傳「已抓到幾個到期日＋在哪個到期日斷掉」，**不靜默回傳殘缺表格**（使用者必須清楚知道資料不完整，不能讓表格看起來像是完整抓完）。
 - **階段 C**：實作第 6 節排行表計算邏輯（Delta 篩選 + OI/DTE 排序，這部分本身不依賴階段 A，可以先用假資料寫好單元測試） → 確認
 - **階段 D**：實作第 7 節 Options Flow 獨立面板（檢查既有 Options Flow 抓取/分類邏輯是否能直接複用） → 確認
 - **階段 E**：第 8 節路由與前端整合 → 確認
@@ -211,12 +252,16 @@ Options Flow 資料如果之前的三維度儀表板專案已經有對應 model/
 ## 驗收標準 Checklist
 
 - [ ] 未登入 Barchart 時，系統正確中止並提示手動登入，沒有任何自動登入嘗試。
-- [ ] 三個頁面的資料抓取全部走 DOM 解析或合法匯出，沒有呼叫任何內部 API 端點。
+- [ ] 三個頁面（Options Prices、Volatility & Greeks、Options Flow）的資料抓取全部走 DOM 解析或合法匯出，沒有呼叫任何內部 API 端點。
+- [ ] Volatility & Greeks 頁面的抓取範圍只限 Vega／itmProbability／volumeOpenInterestRatio 三欄，沒有額外抓 Gamma/Theta/Rho/Theoretical 或多餘欄位。
+- [ ] 登入狀態檢查只在 `fetch_leaps` 進入點做一次，沒有在個別 per-expiration scraper 裡重複檢查。
+- [ ] 中途 session 過期時，系統回傳「已抓到幾個到期日＋斷在哪個到期日」並明確告知資料不完整，沒有靜默回傳看起來完整但實際殘缺的表格。
 - [ ] 排行表格的排序只用 OI（主）+ DTE（次），沒有把 Options Flow 數字混進排序，也沒有額外設定 `min_dte` 之類的天數隱藏門檻把候選排除在表格外。
 - [ ] 流動性判斷（充足／普通／偏低）是程式依本次查詢候選的 OI 相對排名動態算出，不是寫死一個固定 OI 數字套用在所有標的上。
+- [ ] 「近期無成交」警示用 Barchart 算好的 `volume_open_interest_ratio` 判斷，沒有沿用舊版規格的 `volume<=3` 門檻（尺度不同，不能直接搬）。
 - [ ] OI／Volume 欄位同時顯示 Barchart 原始數值與程式算出的流動性判斷結果，兩者都看得到。
 - [ ] 結果以表格呈現，不是逐筆寫長段推薦理由文字。
-- [ ] Options Flow 面板獨立顯示，標題清楚標示「情緒參考，非排序依據」。
+- [ ] Options Flow 面板直接複用既有 `OptionsFlowTrade` model，獨立顯示，標題清楚標示「情緒參考，非排序依據」。
 - [ ] 同一 symbol 5 分鐘內重複查詢會讀快取，不重複打 Barchart。
 - [ ] 表格下方有「僅供策略篩選參考，非投資建議」提示文字。
 - [ ] 配色（卡片底色、邊框、綠/橘黃/紅語義色、hover 效果）直接讀取並複用三維度儀表板既有的 CSS/變數，沒有另外設計一套新色票；流動性分級與 Options Flow 看多/看空判斷的顏色語義跟 `divergence_flag` 的 confirm/warning/caution 對應一致。

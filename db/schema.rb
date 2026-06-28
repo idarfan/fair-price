@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_25_142001) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_27_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -110,6 +110,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_142001) do
     t.datetime "updated_at", null: false
     t.index ["group_tag"], name: "index_iv_watchlists_on_group_tag"
     t.index ["symbol"], name: "index_iv_watchlists_on_symbol", unique: true
+  end
+
+  create_table "leaps_option_chain_snapshots", force: :cascade do |t|
+    t.decimal "ask", precision: 10, scale: 4
+    t.decimal "bid", precision: 10, scale: 4
+    t.datetime "created_at", null: false
+    t.decimal "delta", precision: 8, scale: 6
+    t.integer "dte"
+    t.date "expiration_date", null: false
+    t.decimal "itm_probability", precision: 8, scale: 6
+    t.decimal "iv", precision: 8, scale: 6
+    t.decimal "last_price", precision: 10, scale: 4
+    t.integer "open_interest"
+    t.string "option_type", null: false
+    t.datetime "scraped_at", null: false
+    t.decimal "strike", precision: 10, scale: 4, null: false
+    t.string "symbol", null: false
+    t.decimal "underlying_price", precision: 10, scale: 4
+    t.datetime "updated_at", null: false
+    t.decimal "vol_oi_ratio", precision: 8, scale: 4
+    t.integer "volume"
+    t.index ["symbol", "expiration_date", "strike", "option_type"], name: "idx_leaps_chain_unique", unique: true
+    t.index ["symbol", "scraped_at"], name: "idx_leaps_chain_symbol_scraped"
   end
 
   create_table "margin_positions", force: :cascade do |t|
