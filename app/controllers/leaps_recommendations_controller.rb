@@ -11,7 +11,7 @@ class LeapsRecommendationsController < ApplicationController
     if @symbol.present?
       if fresh_data_exists?(@symbol)
         @candidates = LeapsRankingService.new(@symbol).call
-        @flow_panel = LeapsOptionsFlowPanelService.new(@symbol).call
+        @flow_panel = LeapsOptionsFlowPanelService.new(@symbol, @candidates).call
 
         @scrape_status = :cached
 

@@ -681,3 +681,13 @@ end
 ```
 
 **規則：** 任何抓取美股 IV/價格/財報資料的排程 rake task，**第一步必須加週末 guard**（用 ET 時區判斷 wday 0=日、6=六）。
+
+---
+
+### 錯誤 17：Controller 呼叫 Service 漏傳參數（2026-06-28）
+
+**現象：** `/leaps?symbol=NOK&job_status=error` 出現 `wrong number of arguments (given 1, expected 2)`，`LeapsOptionsFlowPanelService.new(@symbol)` 少傳了 `ranked_candidates`。
+
+**根因：** RSpec 只跑了 service 層的單元測試，controller 層的 `new(...)` 呼叫完全沒有測試覆蓋。在視覺截圖時也只截了空白頁（symbol 未傳），沒有帶實際資料觸發 service 初始化路徑。
+
+**規則：** 新 controller 凡有呼叫 service 初始化，完成後**必須在瀏覽器實際帶參數走一次 end-to-end**（至少帶 `symbol=XXX` 讓 index 跑到 service 那行），不能光靠 unit spec 就宣告完成。
