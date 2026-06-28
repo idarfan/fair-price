@@ -118,6 +118,11 @@ Rails.application.routes.draw do
   get  "technical_dashboard/status",       to: "technical_dashboards#status",       as: :technical_dashboard_status
   post "technical_dashboard/fetch_max_pain", to: "technical_dashboards#fetch_max_pain", as: :technical_dashboard_fetch_max_pain
 
+  # LEAPS Call 候選排行
+  get  "leaps",         to: "leaps_recommendations#index",   as: :leaps_recommendations
+  post "leaps/analyze", to: "leaps_recommendations#analyze", as: :leaps_recommendations_analyze
+  get  "leaps/status",  to: "leaps_recommendations#status",  as: :leaps_recommendations_status
+
 # IV Skew Watchlist
 resources :iv_watchlists, only: [ :index, :create, :destroy ] do
   member do

@@ -74,6 +74,7 @@ class LeapsOptionsFlowPanelService
   end
 
   def trade_summary(trade)
+    classified = OptionsFlowClassifierService.classify(trade.attributes)
     {
       option_type:     trade.option_type,
       strike:          trade.strike,
@@ -87,7 +88,8 @@ class LeapsOptionsFlowPanelService
       large_premium:   trade.large_premium,
       delta:           trade.delta,
       dte:             trade.dte,
-      trade_time:      trade.trade_time
+      trade_time:      trade.trade_time,
+      direction:       classified['direction']
     }
   end
 end
