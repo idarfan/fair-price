@@ -4,6 +4,8 @@ class LeapsRankingService
   DEFAULT_DELTA_MIN = 0.75
   DEFAULT_DELTA_MAX = 0.90
 
+  MIN_CANDIDATES_FOR_VOL_OI_TIER = 4
+
   TIER_TOP    = "充足"
   TIER_MID    = "普通"
   TIER_BOTTOM = "偏低"
@@ -18,8 +20,8 @@ class LeapsRankingService
     candidates = fetch_candidates
     return [] if candidates.empty?
 
-    tiers         = liquidity_tiers(candidates)
-    vol_oi_floor  = vol_oi_threshold(candidates)
+    tiers        = liquidity_tiers(candidates)
+    vol_oi_floor = vol_oi_threshold(candidates)
 
     candidates
       .map { |row| enrich(row, tiers[row.id], vol_oi_floor) }
@@ -40,60 +42,65 @@ class LeapsRankingService
       .to_a
   end
 
-  # Rank-based: sort by OI desc, split into thirds by rank index.
-  # Different tickers have wildly different OI magnitudes; absolute
-  # thresholds would be either too tight or too loose across symbols.
+  # Value-based percentile: compute 33rd and 67th OI percentile values, then
+  # assign tier by comparing each row's OI against those thresholds.
+  # Same OI always gets the same tier, regardless of sort order.
   def liquidity_tiers(candidates)
-    sorted        = candidates.sort_by { |r| -(r.open_interest || 0) }
-    n             = sorted.size
-    top_boundary  = n / 3
-    bot_boundary  = (2 * n) / 3
+    ois = candidates.map { |r| r.open_interest || 0 }.sort
+    n   = ois.size
+    p33 = ois[(n / 3.0).floor]
+    p67 = ois[(2 * n / 3.0).floor]
 
-    sorted.each_with_index.with_object({}) do |(row, idx), hash|
-      hash[row.id] = if idx < top_boundary then TIER_TOP
-                     elsif idx < bot_boundary then TIER_MID
+    candidates.each_with_object({}) do |row, hash|
+      oi = row.open_interest || 0
+      hash[row.id] = if oi >= p67 then TIER_TOP
+                     elsif oi >= p33 then TIER_MID
                      else TIER_BOTTOM
                      end
     end
   end
 
-  # Bottom third of vol_oi_ratio in this result set is the "近期無成交" floor.
-  # Avoids hardcoding a number for a ratio whose scale differs by ticker.
+  # 33rd percentile boundary of vol_oi_ratio (highest value in the bottom third).
+  # Returns nil when there are too few candidates to make relative comparison
+  # meaningful — callers treat nil as "no warning" rather than flagging everything.
   def vol_oi_threshold(candidates)
+    return nil if candidates.size < MIN_CANDIDATES_FOR_VOL_OI_TIER
+
     ratios = candidates.filter_map { |r| r.vol_oi_ratio&.to_f }.sort
     return nil if ratios.empty?
 
-    cutoff_idx = [ (ratios.size / 3.0).ceil - 1, 0 ].max
-    ratios[cutoff_idx]
+    # Bottom-third count: floor(n/3), minimum 1 row.
+    cutoff_count = [ (ratios.size / 3.0).floor, 1 ].max
+    ratios[cutoff_count - 1]
   end
 
   def enrich(row, tier, vol_oi_floor)
-    mid         = row.mid_price
-    underlying  = row.underlying_price.to_f
-    strike      = row.strike.to_f
-    intrinsic   = [ underlying - strike, 0.0 ].max
-    time_value  = mid ? mid.to_f - intrinsic : nil
+    mid        = row.mid_price
+    underlying = row.underlying_price.to_f
+    strike     = row.strike.to_f
+    intrinsic  = [ underlying - strike, 0.0 ].max
+    time_value = mid ? mid.to_f - intrinsic : nil
 
     {
-      snapshot:               row,
-      expiration_date:        row.expiration_date,
-      dte:                    row.dte,
-      strike:                 row.strike,
-      delta:                  row.delta,
-      open_interest:          row.open_interest,
-      volume:                 row.volume,
-      bid:                    row.bid,
-      ask:                    row.ask,
-      mid:                    mid,
-      iv:                     row.iv,
-      vega:                   row.vega,
-      itm_probability:        row.itm_probability,
-      vol_oi_ratio:           row.vol_oi_ratio,
-      underlying_price:       row.underlying_price,
-      liquidity_tier:         tier,
+      snapshot:                 row,
+      expiration_date:          row.expiration_date,
+      dte:                      row.dte,
+      strike:                   row.strike,
+      delta:                    row.delta,
+      open_interest:            row.open_interest,
+      volume:                   row.volume,
+      bid:                      row.bid,
+      ask:                      row.ask,
+      mid:                      mid,
+      iv:                       row.iv,
+      vega:                     row.vega,
+      itm_probability:          row.itm_probability,
+      vol_oi_ratio:             row.vol_oi_ratio,
+      underlying_price:         row.underlying_price,
+      liquidity_tier:           tier,
       no_recent_volume_warning: low_vol_oi?(row.vol_oi_ratio, vol_oi_floor),
-      time_value_pct:         calc_time_value_pct(time_value, underlying),
-      bid_ask_spread_pct:     calc_spread_pct(row.bid, row.ask, mid)
+      time_value_pct:           calc_time_value_pct(time_value, underlying),
+      bid_ask_spread_pct:       calc_spread_pct(row.bid, row.ask, mid)
     }
   end
 
@@ -110,7 +117,7 @@ class LeapsRankingService
   end
 
   def low_vol_oi?(ratio, floor)
-    return true  if ratio.nil?
+    return true  if ratio.nil? && floor  # nil ratio is suspicious only when we have a floor
     return false if floor.nil?
 
     ratio.to_f <= floor

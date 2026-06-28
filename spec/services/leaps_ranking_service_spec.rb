@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe LeapsRankingService do
   include ActiveSupport::Testing::TimeHelpers
 
-  # All rows in a test share the same scraped_at so maximum() returns all of them.
+  # All rows in one example share the same scraped_at so maximum() returns them all.
   around { |ex| freeze_time { ex.run } }
 
   def make(attrs)
@@ -29,59 +29,106 @@ RSpec.describe LeapsRankingService do
     end
   end
 
-  # ── Liquidity tiers ──────────────────────────────────────────────────────────
+  # ── Liquidity tiers (value-based percentile) ──────────────────────────────────
 
   describe "liquidity_tiers" do
-    before do
-      make(delta: 0.80, open_interest: 90_000)
-      make(delta: 0.80, open_interest: 50_000)
-      make(delta: 0.80, open_interest: 10_000)
+    context "distinct OI values" do
+      before do
+        make(delta: 0.80, open_interest: 90_000)
+        make(delta: 0.80, open_interest: 50_000)
+        make(delta: 0.80, open_interest: 10_000)
+      end
+
+      it "assigns 充足 to the top-OI row" do
+        r = described_class.new("NOK").call.find { |e| e[:open_interest] == 90_000 }
+        expect(r[:liquidity_tier]).to eq("充足")
+      end
+
+      it "assigns 普通 to the middle row" do
+        r = described_class.new("NOK").call.find { |e| e[:open_interest] == 50_000 }
+        expect(r[:liquidity_tier]).to eq("普通")
+      end
+
+      it "assigns 偏低 to the bottom row" do
+        r = described_class.new("NOK").call.find { |e| e[:open_interest] == 10_000 }
+        expect(r[:liquidity_tier]).to eq("偏低")
+      end
     end
 
-    it "assigns 充足 to the top-OI third" do
-      result = described_class.new("NOK").call.find { |e| e[:open_interest] == 90_000 }
-      expect(result[:liquidity_tier]).to eq("充足")
-    end
+    context "two rows with identical OI (tie)" do
+      before do
+        make(delta: 0.80, open_interest: 80_000)
+        make(delta: 0.80, open_interest: 80_000)
+        make(delta: 0.80, open_interest: 30_000)
+      end
 
-    it "assigns 普通 to the middle third" do
-      result = described_class.new("NOK").call.find { |e| e[:open_interest] == 50_000 }
-      expect(result[:liquidity_tier]).to eq("普通")
-    end
-
-    it "assigns 偏低 to the bottom third" do
-      result = described_class.new("NOK").call.find { |e| e[:open_interest] == 10_000 }
-      expect(result[:liquidity_tier]).to eq("偏低")
+      it "gives tied-OI rows the same liquidity tier" do
+        results = described_class.new("NOK").call
+        tier_80k = results.select { |e| e[:open_interest] == 80_000 }.map { |e| e[:liquidity_tier] }
+        expect(tier_80k.uniq.size).to eq(1), "tied OI rows should share a single tier"
+      end
     end
   end
 
   # ── vol_oi_ratio warning ──────────────────────────────────────────────────────
 
   describe "no_recent_volume_warning" do
-    before do
-      # Three candidates; lowest vol_oi_ratio falls in bottom third → warning
-      make(delta: 0.80, open_interest: 90_000, vol_oi_ratio: 0.040)
-      make(delta: 0.80, open_interest: 50_000, vol_oi_ratio: 0.020)
-      make(delta: 0.80, open_interest: 10_000, vol_oi_ratio: 0.002)
+    context "with enough candidates (n >= 4)" do
+      before do
+        make(delta: 0.80, open_interest: 90_000, vol_oi_ratio: 0.040)
+        make(delta: 0.80, open_interest: 70_000, vol_oi_ratio: 0.030)
+        make(delta: 0.80, open_interest: 50_000, vol_oi_ratio: 0.020)
+        make(delta: 0.80, open_interest: 10_000, vol_oi_ratio: 0.002)
+      end
+
+      it "flags candidates at or below the 33rd-percentile vol_oi_ratio boundary" do
+        results = described_class.new("NOK").call
+        flagged = results.select { |e| e[:no_recent_volume_warning] }
+        expect(flagged.map { |e| e[:open_interest] }).to contain_exactly(10_000)
+      end
+
+      it "does not flag higher vol_oi_ratio candidates" do
+        results   = described_class.new("NOK").call
+        unflagged = results.reject { |e| e[:no_recent_volume_warning] }
+        expect(unflagged.size).to eq(3)
+      end
     end
 
-    it "flags the candidate with the lowest vol_oi_ratio (bottom third)" do
-      results  = described_class.new("NOK").call
-      flagged  = results.select { |e| e[:no_recent_volume_warning] }
-      expect(flagged.map { |e| e[:open_interest] }).to contain_exactly(10_000)
+    context "with too few candidates (n < 4) — relative threshold meaningless" do
+      before do
+        make(delta: 0.80, open_interest: 90_000, vol_oi_ratio: 0.001)  # tiny ratio
+        make(delta: 0.80, open_interest: 50_000, vol_oi_ratio: 0.002)
+        make(delta: 0.80, open_interest: 10_000, vol_oi_ratio: 0.003)
+      end
+
+      it "does not flag any candidate (threshold returns nil)" do
+        results = described_class.new("NOK").call
+        expect(results.none? { |e| e[:no_recent_volume_warning] }).to be true
+      end
     end
 
-    it "does not flag the higher vol_oi_ratio candidates" do
-      results   = described_class.new("NOK").call
-      unflagged = results.reject { |e| e[:no_recent_volume_warning] }
-      expect(unflagged.size).to eq(2)
-    end
+    context "when vol_oi_ratio is nil and threshold exists" do
+      before do
+        make(delta: 0.80, open_interest: 90_000, vol_oi_ratio: 0.040)
+        make(delta: 0.80, open_interest: 70_000, vol_oi_ratio: 0.030)
+        make(delta: 0.80, open_interest: 50_000, vol_oi_ratio: 0.020)
+        make(delta: 0.80, open_interest: 5_000,  vol_oi_ratio: nil)
+      end
 
-    context "when vol_oi_ratio is nil" do
-      before { make(delta: 0.80, open_interest: 5_000, vol_oi_ratio: nil) }
-
-      it "always flags nil vol_oi_ratio as no_recent_volume_warning" do
+      it "flags nil vol_oi_ratio when a valid threshold exists" do
         result = described_class.new("NOK").call.find { |e| e[:open_interest] == 5_000 }
         expect(result[:no_recent_volume_warning]).to be true
+      end
+    end
+
+    context "when vol_oi_ratio is nil and threshold is nil (n < 4)" do
+      before do
+        make(delta: 0.80, open_interest: 90_000, vol_oi_ratio: nil)
+      end
+
+      it "does not flag nil vol_oi_ratio when threshold is also nil" do
+        result = described_class.new("NOK").call.first
+        expect(result[:no_recent_volume_warning]).to be false
       end
     end
   end
@@ -108,7 +155,7 @@ RSpec.describe LeapsRankingService do
   # ── time_value_pct ───────────────────────────────────────────────────────────
 
   describe "time_value_pct" do
-    # underlying=13.08, strike=10, mid=(3.1+3.3)/2=3.2
+    # underlying=13.08, strike=10, mid=3.2
     # intrinsic=3.08, time_value=0.12, time_value_pct=0.12/13.08
     before { make(delta: 0.80, underlying_price: 13.08, strike: 10.0, bid: 3.1, ask: 3.3) }
 

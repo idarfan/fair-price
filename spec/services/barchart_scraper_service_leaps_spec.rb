@@ -129,4 +129,54 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
       service.fetch_leaps
     end
   end
+
+  # ── 4. Consecutive scrapes: second scrape replaces first entirely ─────────────
+  #
+  # persist_leaps runs delete_all + insert_all in one transaction, so only one
+  # batch (one scraped_at) should ever exist per symbol.  This test verifies
+  # that after two successive scrapes the old batch is fully gone.
+
+  describe "consecutive scrapes replace old batch" do
+    include ActiveSupport::Testing::TimeHelpers
+
+    let(:batch_row) do
+      ->(strike, scraped_at) do
+        {
+          "expiration_date" => "2027-01-15", "dte" => 202,
+          "strike" => strike, "option_type" => "Call",
+          "bid" => 3.1, "ask" => 3.3, "last_price" => 3.2,
+          "underlying_price" => 13.08, "volume" => 100, "open_interest" => 500,
+          "delta" => 0.78, "iv" => 0.76,
+          "itm_probability" => 0.82, "vol_oi_ratio" => 0.006, "vega" => 0.013
+        }
+      end
+    end
+
+    it "leaves only the most recent scrape's rows in the DB" do
+      # First scrape at T=0: one row with strike 10
+      travel_to(1.hour.ago) do
+        service.send(:persist_leaps, { "rows" => [ batch_row.call(10.0, Time.current) ] })
+      end
+
+      first_scraped_at = LeapsOptionChainSnapshot.where(symbol: "NOK").maximum(:scraped_at)
+      expect(LeapsOptionChainSnapshot.where(symbol: "NOK").count).to eq(1)
+
+      # Second scrape at T=1: one row with strike 12 (different strike → no uniqueness conflict)
+      travel_to(Time.current) do
+        service.send(:persist_leaps, { "rows" => [ batch_row.call(12.0, Time.current) ] })
+      end
+
+      second_scraped_at = LeapsOptionChainSnapshot.where(symbol: "NOK").maximum(:scraped_at)
+
+      # The second batch's scraped_at must be later than the first
+      expect(second_scraped_at).to be > first_scraped_at
+
+      # Only one row should remain — the second batch's row
+      expect(LeapsOptionChainSnapshot.where(symbol: "NOK").count).to eq(1)
+      expect(LeapsOptionChainSnapshot.where(symbol: "NOK").pluck(:strike).map(&:to_f)).to eq([12.0])
+
+      # No rows with the old scraped_at should exist
+      expect(LeapsOptionChainSnapshot.where(symbol: "NOK", scraped_at: first_scraped_at)).not_to exist
+    end
+  end
 end
