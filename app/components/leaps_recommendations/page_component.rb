@@ -74,10 +74,18 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     case @scrape_status
     when :session_expired
       render_alert("bg-orange-50 border border-orange-300 text-orange-800",
-        "⚠️ Barchart 登入已過期，請先在 Chrome 手動登入 Barchart 後重試。")
+        "⚠️ 請先登入 Barchart 後重試。（Barchart 登入 Session 已過期）")
+    when :partial_error
+      expired_at = @scrape_errors.first&.match(/at (\S+);/)&.[](1)
+      msg = if expired_at
+        "⚠️ Session 在抓取到 #{expired_at} 時過期，已存入的部分資料可能不完整。請重新登入 Barchart 後再查詢一次。"
+      else
+        "⚠️ 抓取中途 Session 過期，部分資料可能不完整。請重新登入 Barchart 後重試。"
+      end
+      render_alert("bg-yellow-50 border border-yellow-300 text-yellow-800", msg)
     when :error
-      msg = @scrape_errors.first || "抓取失敗，請確認 Barchart 連線後重試"
-      render_alert("bg-red-50 border border-red-300 text-red-800", "❌ #{msg}")
+      render_alert("bg-red-50 border border-red-300 text-red-800",
+        "❌ CDP 連線或程式錯誤，請確認 Chrome 已開啟並重試。")
     when :ready_to_fetch
       render_alert("bg-blue-50 border border-blue-300 text-blue-800",
         "ℹ️ 尚未取得 #{@symbol} 的 LEAPS 資料，請點「查詢」開始抓取。")
@@ -286,7 +294,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
               var attempts = 0;
               var pollInterval = setInterval(function () {
                 attempts++;
-                if (attempts > 80) {
+                if (attempts > 120) {
                   clearInterval(pollInterval);
                   window.location.href = '/leaps?symbol=' + symbol + '&job_status=error';
                   return;

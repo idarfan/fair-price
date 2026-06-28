@@ -128,7 +128,46 @@ RSpec.describe "GET /leaps", type: :request do
     it "returns 200 and includes the session-expired warning" do
       get "/leaps", params: { symbol: symbol, job_status: "session_expired" }
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Barchart 登入已過期")
+      expect(response.body).to include("請先登入 Barchart 後重試")
+    end
+  end
+
+  # ── 5. job_status=partial_error 帶回（抓取中途 Session 過期）──────────────
+
+  describe "job_status=partial_error without fresh data" do
+    before do
+      allow(LeapsOptionChainSnapshot)
+        .to receive_message_chain(:for_symbol, :fresh, :exists?)
+        .and_return(false)
+      allow(Rails.cache).to receive(:read)
+        .with("leaps_last_errors_#{symbol}")
+        .and_return([ "Session expired mid-loop at 2027-01-17; table may be incomplete" ])
+    end
+
+    it "returns 200 and includes the expired_at date in the message" do
+      get "/leaps", params: { symbol: symbol, job_status: "partial_error" }
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("2027-01-17")
+      expect(response.body).to include("Session 在抓取到")
+    end
+  end
+
+  # ── 6. job_status=error 帶回（CDP / 系統錯誤）─────────────────────────────
+
+  describe "job_status=error without fresh data" do
+    before do
+      allow(LeapsOptionChainSnapshot)
+        .to receive_message_chain(:for_symbol, :fresh, :exists?)
+        .and_return(false)
+      allow(Rails.cache).to receive(:read)
+        .with("leaps_last_errors_#{symbol}")
+        .and_return([])
+    end
+
+    it "returns 200 and shows CDP error message" do
+      get "/leaps", params: { symbol: symbol, job_status: "error" }
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("CDP 連線或程式錯誤")
     end
   end
 end

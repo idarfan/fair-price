@@ -16,17 +16,25 @@ class LeapsRecommendationsController < ApplicationController
         @scrape_status = :cached
 
         case params[:job_status]
-        when "session_expired" then @scrape_status = :session_expired
+        when "session_expired"
+          @scrape_status = :session_expired
+        when "partial_error"
+          @scrape_status = :partial_error
+          @scrape_errors = cached_errors(@symbol)
         when "error"
           @scrape_status = :error
-          @scrape_errors = [ "抓取過程發生錯誤，部分資料可能不完整" ]
+          @scrape_errors = cached_errors(@symbol)
         end
       elsif params[:job_status].present?
         case params[:job_status]
-        when "session_expired" then @scrape_status = :session_expired
+        when "session_expired"
+          @scrape_status = :session_expired
+        when "partial_error"
+          @scrape_status = :partial_error
+          @scrape_errors = cached_errors(@symbol)
         else
           @scrape_status = :error
-          @scrape_errors = [ "抓取失敗，請確認 Barchart 連線後重試" ]
+          @scrape_errors = cached_errors(@symbol)
         end
       else
         @scrape_status = :ready_to_fetch
@@ -69,5 +77,9 @@ class LeapsRecommendationsController < ApplicationController
 
   def fresh_data_exists?(symbol)
     LeapsOptionChainSnapshot.for_symbol(symbol).fresh.exists?
+  end
+
+  def cached_errors(symbol)
+    Array(Rails.cache.read("leaps_last_errors_#{symbol}"))
   end
 end
