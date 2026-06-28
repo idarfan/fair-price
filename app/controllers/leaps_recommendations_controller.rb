@@ -10,8 +10,9 @@ class LeapsRecommendationsController < ApplicationController
 
     if @symbol.present?
       if fresh_data_exists?(@symbol)
-        @candidates = LeapsRankingService.new(@symbol).call
-        @flow_panel = LeapsOptionsFlowPanelService.new(@symbol, @candidates).call
+        @candidates    = LeapsRankingService.new(@symbol).call
+        @recommendation = LeapsRecommendationService.new(@candidates).call
+        @flow_panel     = LeapsOptionsFlowPanelService.new(@symbol, @candidates).call
 
         @scrape_status = :cached
 
@@ -42,11 +43,12 @@ class LeapsRecommendationsController < ApplicationController
     end
 
     render LeapsRecommendations::PageComponent.new(
-      symbol:        @symbol,
-      candidates:    @candidates,
-      flow_panel:    @flow_panel,
-      scrape_status: @scrape_status,
-      scrape_errors: @scrape_errors
+      symbol:         @symbol,
+      candidates:     @candidates,
+      recommendation: @recommendation,
+      flow_panel:     @flow_panel,
+      scrape_status:  @scrape_status,
+      scrape_errors:  @scrape_errors
     )
   end
 

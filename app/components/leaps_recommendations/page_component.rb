@@ -20,12 +20,13 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
   FLOW_COLS = [ "類型", "履約價", "到期日", "DTE", "Delta", "Code", "Size", "Side", "Premium", "方向" ].freeze
 
-  def initialize(symbol: nil, candidates: [], flow_panel: nil, scrape_status: nil, scrape_errors: [])
-    @symbol        = symbol
-    @candidates    = Array(candidates)
-    @flow_panel    = flow_panel
-    @scrape_status = scrape_status
-    @scrape_errors = Array(scrape_errors)
+  def initialize(symbol: nil, candidates: [], recommendation: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [])
+    @symbol         = symbol
+    @candidates     = Array(candidates)
+    @recommendation = recommendation
+    @flow_panel     = flow_panel
+    @scrape_status  = scrape_status
+    @scrape_errors  = Array(scrape_errors)
   end
 
   def view_template
@@ -34,6 +35,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       render_search_form
       render_status_bar if @scrape_status
       if @candidates.any?
+        render_recommendation if @recommendation
         render_ranking_table
         render_flow_panel if @flow_panel
       end
@@ -94,6 +96,52 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
   def render_alert(class_str, msg)
     div(class: "px-4 py-3 rounded-lg text-sm #{class_str}") { plain msg }
+  end
+
+  def render_recommendation
+    near = @recommendation[:near_term]
+    far  = @recommendation[:far_term]
+
+    div(class: "bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden") do
+      div(class: "px-4 py-3 border-b border-gray-100 bg-gray-50") do
+        h2(class: "text-sm font-semibold text-gray-700") { plain "推薦分析 — #{@symbol}" }
+        p(class: "text-xs text-gray-400 mt-0.5") { plain "近天期 DTE 364–550 / 遠天期 DTE 550+，各自依流動性獨立挑選" }
+      end
+      div(class: "divide-y divide-gray-100") do
+        render_recommendation_group(near)
+        render_recommendation_group(far)
+      end
+    end
+  end
+
+  def render_recommendation_group(group)
+    div(class: "px-4 py-4") do
+      h3(class: "text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2") { plain group[:label] }
+      if group[:no_candidates]
+        div(class: "text-sm text-gray-400 italic") { plain "此天期區間目前沒有符合條件的候選。" }
+      else
+        pick = group[:pick]
+        div(class: "flex flex-wrap gap-3 mb-3") do
+          render_pick_badge(pick)
+          if (ru = group[:runner_up])
+            div(class: "text-xs text-gray-400 self-center") { plain "次選：#{sprintf('$%.2f', ru[:strike].to_f)} / #{ru[:expiration_date]}" }
+          end
+        end
+        div(class: "text-sm text-gray-700 whitespace-pre-line leading-relaxed") { plain group[:reason] }
+      end
+    end
+  end
+
+  def render_pick_badge(pick)
+    tier  = pick[:liquidity_tier].to_s
+    style = LIQUIDITY_STYLE[tier] || LIQUIDITY_STYLE["普通"]
+    div(class: "flex items-center gap-2 px-3 py-1.5 rounded-lg border #{style[:bg]} #{style[:border]}") do
+      div(class: "w-2 h-2 rounded-full #{style[:dot]}")
+      span(class: "text-xs font-semibold #{style[:text]}") do
+        plain "#{sprintf('$%.2f', pick[:strike].to_f)} / #{pick[:expiration_date]}"
+      end
+      span(class: "text-xs #{style[:text]} opacity-70") { plain "Delta #{sprintf("%.3f", pick[:delta].to_f)}" }
+    end
   end
 
   def render_ranking_table
