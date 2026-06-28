@@ -65,7 +65,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       ) { plain "查詢" }
       div(id: "leaps-loading", class: "hidden items-center gap-2 text-sm text-gray-500") do
         div(class: "w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin")
-        plain "抓取資料中，請稍候…（約 30–60 秒）"
+        plain "抓取資料中，請稍候…（約 3–5 分鐘）"
       end
     end
   end
@@ -294,7 +294,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
               var attempts = 0;
               var pollInterval = setInterval(function () {
                 attempts++;
-                if (attempts > 120) {
+                if (attempts > 240) {
                   clearInterval(pollInterval);
                   window.location.href = '/leaps?symbol=' + symbol + '&job_status=error';
                   return;
