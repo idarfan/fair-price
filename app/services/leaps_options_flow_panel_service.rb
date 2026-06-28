@@ -2,7 +2,7 @@
 
 # Prepares data for the Options Flow independent panel on the LEAPS page.
 #
-# Reads today's OptionsFlowTrade rows for the symbol, computes directional
+# Reads the most recent OptionsFlowTrade rows for the symbol, computes directional
 # premium summaries, surfaces large orders, and cross-references trades against
 # the top-N LEAPS candidates by (strike, expiration_date).
 #
@@ -19,7 +19,9 @@ class LeapsOptionsFlowPanelService
   end
 
   def call
-    date   = Date.current
+    date = latest_trade_date
+    return { status: :no_data, date: Date.current } if date.nil?
+
     trades = OptionsFlowTrade.for_symbol_date(@symbol, date).to_a
     return { status: :no_data, date: date } if trades.empty?
 
@@ -89,7 +91,12 @@ class LeapsOptionsFlowPanelService
       delta:           trade.delta,
       dte:             trade.dte,
       trade_time:      trade.trade_time,
-      direction:       classified['direction']
+      direction:       classified["direction"]
     }
+  end
+
+  def latest_trade_date
+    OptionsFlowTrade.where(symbol: @symbol)
+                    .maximum(:snapshot_date)
   end
 end
