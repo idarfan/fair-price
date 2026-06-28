@@ -26,7 +26,7 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
     end
 
     it "does not call persist_leaps at all" do
-      # Not 'called with blank data' — the method must never be entered.
+      # not_to receive is call-count enforcement, not a DB state check
       expect(service).not_to receive(:persist_leaps)
       service.fetch_leaps
     end
@@ -44,7 +44,7 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
     let!(:aapl_row) { create(:leaps_option_chain_snapshot, symbol: "AAPL") }
 
     let(:one_row) do
-      [ {
+      [{
         "expiration_date" => "2027-01-15", "dte" => 202,
         "strike" => 10.0, "option_type" => "Call",
         "bid" => 3.1, "ask" => 3.3, "last_price" => 3.2,
@@ -52,7 +52,7 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
         "volume" => 100, "open_interest" => 500,
         "delta" => 0.78, "iv" => 0.76,
         "itm_probability" => 0.82, "vol_oi_ratio" => 0.006, "vega" => 0.013
-      } ]
+      }]
     end
 
     it "deletes the original NOK row by id" do
@@ -71,13 +71,30 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
     end
   end
 
-  # ── 3. Session expiry mid-loop: partial_error with expired_at string ─────────
+  # ── 3. Session expiry mid-loop ───────────────────────────────────────────────
+  #
+  # Decision (Phase B spec): partial status → persist whatever rows already
+  # scraped, then surface partial_error to the caller.  The test must verify
+  # both the error surface AND that persist_leaps was actually invoked with
+  # the partial data (not silently skipped).
 
   describe "session expiry mid-loop" do
+    let(:partial_rows) do
+      [{
+        "expiration_date" => "2026-06-20", "dte" => 357,
+        "strike" => 8.0, "option_type" => "Call",
+        "bid" => 5.1, "ask" => 5.3, "last_price" => 5.2,
+        "underlying_price" => 13.08,
+        "volume" => 200, "open_interest" => 41_000,
+        "delta" => 0.85, "iv" => 0.70,
+        "itm_probability" => 0.88, "vol_oi_ratio" => 0.005, "vega" => 0.011
+      }]
+    end
+
     let(:partial_data) do
       {
         "status"                => "partial",
-        "rows"                  => [],
+        "rows"                  => partial_rows,
         "expired_at_expiration" => "2027-01-15"
       }
     end
@@ -85,7 +102,11 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
     before do
       stub_cache(hit: false)
       allow(service).to receive(:run_scraper).and_return({ status: "partial", data: partial_data })
-      allow(service).to receive(:persist_leaps)
+      # Use spy pattern so we can assert it WAS called
+      allow(service).to receive(:persist_leaps).and_call_original
+      # Prevent actual DB writes (persist_leaps hits the real DB in unit context)
+      allow(LeapsOptionChainSnapshot).to receive_message_chain(:where, :delete_all)
+      allow(LeapsOptionChainSnapshot).to receive(:insert_all)
     end
 
     it "returns status :partial_error" do
@@ -99,6 +120,13 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
 
     it "does not silently return :success" do
       expect(service.fetch_leaps[:status]).not_to eq("success")
+    end
+
+    it "still persists the already-scraped rows despite the mid-loop expiry" do
+      # persist_leaps must be called with the partial data so rows scraped
+      # before expiry are not lost.
+      expect(service).to receive(:persist_leaps).with(partial_data)
+      service.fetch_leaps
     end
   end
 end
