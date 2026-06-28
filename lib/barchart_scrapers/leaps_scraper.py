@@ -96,7 +96,7 @@ OPTIONS_GRID_JS = """
 })()
 """
 
-# Extract itmProbability + volumeOpenInterestRatio from V&G bc-data-grid.
+# Extract itmProbability, volumeOpenInterestRatio, and vega from V&G bc-data-grid.
 VG_GRID_JS = """
 (() => {
   const grid = document.querySelector('bc-data-grid');
@@ -105,21 +105,23 @@ VG_GRID_JS = """
     .map(r => r.raw || r)
     .filter(r => r.optionType === 'Call' || r.symbolType === 'Call')
     .map(r => ({
-      strike:     r.strikePrice,
-      itm_prob:   typeof r.itmProbability          === 'number' ? r.itmProbability          : null,
-      vol_oi:     typeof r.volumeOpenInterestRatio === 'number' ? r.volumeOpenInterestRatio : null,
+      strike:   r.strikePrice,
+      itm_prob: typeof r.itmProbability          === 'number' ? r.itmProbability          : null,
+      vol_oi:   typeof r.volumeOpenInterestRatio === 'number' ? r.volumeOpenInterestRatio : null,
+      vega:     typeof r.vega                    === 'number' ? r.vega                    : null,
     }));
 })()
 """
 
 
 def _merge_vg(options_rows, vg_rows):
-    """Merge V&G extra fields into options rows keyed by strike."""
+    """Merge V&G extra fields into options rows keyed by strikePrice."""
     vg_by_strike = {r["strike"]: r for r in (vg_rows or [])}
     return [
         {**row,
          "itm_probability": vg_by_strike.get(row["strike"], {}).get("itm_prob"),
-         "vol_oi_ratio":    vg_by_strike.get(row["strike"], {}).get("vol_oi")}
+         "vol_oi_ratio":    vg_by_strike.get(row["strike"], {}).get("vol_oi"),
+         "vega":            vg_by_strike.get(row["strike"], {}).get("vega")}
         for row in options_rows
     ]
 
@@ -142,6 +144,7 @@ def _finalize_rows(rows, exp_date, underlying_price):
             "iv":               r.get("iv"),
             "itm_probability":  r.get("itm_probability"),
             "vol_oi_ratio":     r.get("vol_oi_ratio"),
+            "vega":             r.get("vega"),
         }
         for r in rows
     ]
@@ -193,7 +196,7 @@ async def main(symbol):
             }))
             return
 
-        # Grab underlying_price once — use the first expiration that has grid data.
+        # Grab underlying_price once from the first expiration that has data.
         if underlying_price is None and opts_rows:
             underlying_price = await cdp_eval(ws_url, UNDERLYING_JS)
 
@@ -207,8 +210,8 @@ async def main(symbol):
 
         vg_rows = await cdp_eval(ws_url, VG_GRID_JS)
         if vg_rows is None:
-            # Session expired after opts_rows already fetched — include this expiration
-            # with whatever V&G data we have (empty), then abort.
+            # Session expired after opts_rows already fetched — include this
+            # expiration with empty V&G fields, then abort cleanly.
             merged = _merge_vg(opts_rows, [])
             all_rows.extend(_finalize_rows(merged, exp_date, underlying_price))
             print(json.dumps({

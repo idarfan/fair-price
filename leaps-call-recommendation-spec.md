@@ -103,33 +103,33 @@ Trade, Size, Side, Premium, Volume, "Open Int", IV, Delta, Code, *, Time
 
 兩者 grain 完全不同，不是「順手擴充舊表」能解決的差異，新建表是必要的，不是為了偷懶繞過既有結構。
 
-### `option_chain_snapshots` 欄位
+### `leaps_option_chain_snapshots` 欄位（Phase B 實際建表結果）
 
 | 欄位 | 說明 |
 |---|---|
-| `ticker` | 股票代號 |
+| `symbol` | 股票代號 |
 | `expiration_date` | 到期日 |
 | `dte` | 距到期天數（抓取當下計算） |
 | `strike` | 履約價 |
 | `option_type` | call / put（這個功能只需要 call，但表結構保留兩者以備未來 PMCC 功能共用） |
-| `bid`, `ask`, `last` | 報價 |
+| `bid`, `ask`, `last_price` | 報價 |
+| `underlying_price` | 抓取當下的標的股價（用於算 time value %） |
 | `volume`, `open_interest` | 流動性（原始值） |
 | `delta`, `iv` | 來自 Options Prices 頁面 |
-| `vega` | 來自 Volatility & Greeks 頁面 |
-| `itm_probability` | 來自 Volatility & Greeks 頁面，被指派機率參考 |
-| `volume_open_interest_ratio` | 來自 Volatility & Greeks 頁面，Barchart 已算好的流動性比率，取代自行用 `volume<=3` 判斷「近期無成交」的粗略邏輯 |
-| `underlying_price` | 抓取當下的標的股價（用於算 time value %） |
+| `itm_probability`, `vol_oi_ratio` | 來自 Volatility & Greeks 頁面 |
 | `scraped_at` | 抓取時間 |
 
 **Merge key（Phase A 確認）**：`(strike_price, expiration_date)`，Options Prices 與 Volatility & Greeks 兩頁完全對得上，不需要額外容錯比對。
 
 **主 key**：`(symbol, expiration_date, strike, option_type, scraped_at)`。
 
-**不新增 gamma/theta/rho/theoretical 欄位**：理由見第 4 節 A.2。
+**不新增 gamma/theta/rho/theoretical 欄位**：理由見第 4 節 A.2，本次 Phase B 補欄位也不重新討論這三個。
 
-`vega`、`itm_probability`、`volume_open_interest_ratio` 在排行表上都是**獨立顯示欄位**，跟其他流動性/Greeks 欄位一樣不參與排序或篩選公式。
+> ⚠️ **已知缺漏，待補**：Phase B migration 漏了 `vega`——這不是新提案，是「方案 A + Vega」當時就批准、Phase A 確認結果（第 4 節 A.2）也明確列了的欄位，純粹是建表時漏寫。**決議：補一個小 migration 加 `vega` 欄位即可，不需要整張表重建；gamma/theta/rho 維持不加，沒有新理由推翻原決定。**
 
-> ⚠️ 第 6 節「近期無成交」警示規則需同步更新：原規則是用自行設的 `volume<=3` 門檻判斷，現在改用 Barchart 算好的 `volume_open_interest_ratio`（見第 6 節更新後內容），門檻數值需要重新依這個比率的實際分布設定，不能直接沿用舊的 `<=3` 那個是針對原始 volume 設計的數字。
+`vega`、`itm_probability`、`vol_oi_ratio` 在排行表上都是**獨立顯示欄位**，跟其他流動性/Greeks 欄位一樣不參與排序或篩選公式。
+
+> ⚠️ 第 6 節「近期無成交」警示規則需同步更新：原規則是用自行設的 `volume<=3` 門檻判斷，現在改用 Barchart 算好的 `vol_oi_ratio`（見第 6 節更新後內容），門檻數值需要重新依這個比率的實際分布設定，不能直接沿用舊的 `<=3` 那個是針對原始 volume 設計的數字。
 
 ---
 
@@ -152,7 +152,7 @@ Trade, Size, Side, Premium, Volume, "Open Int", IV, Delta, Code, *, Time
    - 該標的本次候選 OI 前 1/3 → `流動性：充足`
    - 中間 1/3 → `流動性：普通`
    - 後 1/3 → `流動性：偏低`
-3. **額外規則（已更新，改用 Barchart 自算比率，不再自行設 `volume<=3` 門檻）**：若候選的 `volume_open_interest_ratio` 偏低（代表近期成交量相對 OI 過小，即使 OI 排名落在前 1/3，現在進出也未必容易），標註「⚠ 近期無成交」警示。**這個比率的合理門檻需要 Phase B 實際抓到的資料分布來定，不能直接套用舊版規格的 `volume<=3`**——那個數字是針對原始 volume 設計的，跟 Barchart 算出來的比率不是同一個尺度，照搬會錨錯。建議做法：抓到實際資料後，看這個比率本身的分布（例如百分位或 Barchart 官方對這個欄位的判讀建議，若頁面上有圖示/顏色標示可直接借用對應邏輯），不要憑感覺設一個新數字。
+3. **額外規則（已更新，改用 Barchart 自算比率，不再自行設 `volume<=3` 門檻）**：若候選的 `vol_oi_ratio` 偏低（代表近期成交量相對 OI 過小，即使 OI 排名落在前 1/3，現在進出也未必容易），標註「⚠ 近期無成交」警示。**這個比率的合理門檻需要 Phase B 實際抓到的資料分布來定，不能直接套用舊版規格的 `volume<=3`**——那個數字是針對原始 volume 設計的，跟 Barchart 算出來的比率不是同一個尺度，照搬會錨錯。建議做法：抓到實際資料後，看這個比率本身的分布（例如百分位或 Barchart 官方對這個欄位的判讀建議，若頁面上有圖示/顏色標示可直接借用對應邏輯），不要憑感覺設一個新數字。
 
 這個分級邏輯是**程式自動算好直接顯示在表格裡**，不是文字描述，使用者一眼就能在表格上看到每個候選的流動性等級，不用自己再去比較數字。
 
@@ -234,14 +234,15 @@ Trade, Size, Side, Premium, Volume, "Open Int", IV, Delta, Code, *, Time
 ## 執行方式（請務必分階段進行，每階段做完跟使用者確認再繼續）
 
 - **階段 A**：✅ 已完成（第 4 節）。確認結果：方案 A + Vega + itmProbability + volumeOpenInterestRatio，Options Prices 為主要來源，Volatility & Greeks 頁面額外取上述 3 欄（merge key `(strike_price, expiration_date)` 兩頁完全對得上），Gamma/Theta/Rho/Theoretical 不抓；Options Flow 既有 `OptionsFlowTrade` model 直接複用，不需新寫抓取邏輯。
-- **階段 B**：建立資料層，依下列順序進行 → 確認
-  1. 新建 `option_chain_snapshots` migration（已確認跟既有 `option_snapshots` grain 不同、FK 結構不同，需要新表，不是擴充舊表）
-  2. 新寫 `leaps_options_scraper.py`（Options Prices，遍歷所有到期日）
-  3. 新寫 `leaps_greeks_scraper.py`（V&G，merge by `(strike_price, expiration_date)`，只抓 Vega/itmProbability/volumeOpenInterestRatio 三欄）
-  4. 擴充 `BarchartScraperService` 加入 `fetch_leaps` 方法
-  - **登入狀態檢查**：一次性在 `fetch_leaps` 進入點檢查，不在個別 per-expiration scraper 裡重複檢查。
-  - **中途 session 過期處理**：Python scraper 偵測到登入彈窗（例如讀到資料容器為 null）時回傳明確的過期狀態，Ruby 層收到後立即中止整個迴圈，回傳「已抓到幾個到期日＋在哪個到期日斷掉」，**不靜默回傳殘缺表格**（使用者必須清楚知道資料不完整，不能讓表格看起來像是完整抓完）。
-- **階段 C**：實作第 6 節排行表計算邏輯（Delta 篩選 + OI/DTE 排序，這部分本身不依賴階段 A，可以先用假資料寫好單元測試） → 確認
+- **階段 B**：✅ 已完成。實際交付：
+  1. `db/migrate/..._create_leaps_option_chain_snapshots.rb` 建表（`leaps_option_chain_snapshots`，已確認跟既有 `option_snapshots` grain 不同、FK 結構不同，新表是必要的）
+  2. `app/models/leaps_option_chain_snapshot.rb`（含 `for_symbol` / `calls` / `fresh` scope）
+  3. `lib/barchart_scrapers/leaps_scraper.py`（Options Prices + V&G 合併抓取，session 過期中止並回傳 partial）
+  4. `BarchartScraperService` 新增 `fetch_leaps`（5 分鐘 cache：cache hit 直接 return，**`persist_leaps` 完全不執行**；cache miss 才呼叫 scraper）、`persist_leaps`（`where(symbol: @symbol).delete_all` 只刪當前 ticker 資料 + bulk insert）、`run_scraper` 支援 partial 狀態
+  - **登入狀態檢查**：一次性在 `fetch_leaps` 進入點檢查（CDP 連線），不在個別 scraper 裡重複檢查。
+  - **中途 session 過期處理**：Python scraper 回傳 `{"status": "partial", "rows": [...], "expired_at_expiration": "YYYY-MM-DD"}`；Ruby 層 `run_scraper` 包成 `{status: "partial", data: {...}}`，`fetch_leaps` 仍會 `persist_leaps` 已抓到的 rows，但 `result[:status]` 標為 `"partial_error"` 且 `result[:errors]` 明確寫出斷在哪個到期日，**不靜默回傳看起來完整的表格**。
+  - **已知缺漏（待補）**：migration 漏了 `vega` 欄位（第 5 節已批准但建表時漏寫），需要補一個小 migration 加這個欄位，不需重建整張表；gamma/theta/rho 維持不加。
+- **階段 C**：實作第 6 節排行表計算邏輯（Delta 篩選 + OI/DTE 排序，這部分本身不依賴階段 A/B 的 Barchart 資料，可以先用假資料寫好單元測試） → 確認
 - **階段 D**：實作第 7 節 Options Flow 獨立面板（檢查既有 Options Flow 抓取/分類邏輯是否能直接複用） → 確認
 - **階段 E**：第 8 節路由與前端整合 → 確認
 
@@ -254,11 +255,13 @@ Trade, Size, Side, Premium, Volume, "Open Int", IV, Delta, Code, *, Time
 - [ ] 未登入 Barchart 時，系統正確中止並提示手動登入，沒有任何自動登入嘗試。
 - [ ] 三個頁面（Options Prices、Volatility & Greeks、Options Flow）的資料抓取全部走 DOM 解析或合法匯出，沒有呼叫任何內部 API 端點。
 - [ ] Volatility & Greeks 頁面的抓取範圍只限 Vega／itmProbability／volumeOpenInterestRatio 三欄，沒有額外抓 Gamma/Theta/Rho/Theoretical 或多餘欄位。
+- [ ] `vega` 欄位已補進 `leaps_option_chain_snapshots`（不需重建整張表），且排行表能正確顯示這個值；gamma/theta/rho 仍維持不加。
+- [ ] 5 分鐘 cache hit 時 `persist_leaps` 完全不會被呼叫；只有 cache miss 並成功（或 partial）抓取後才會刪除該 ticker 舊資料並寫入新資料，不會誤刪其他 ticker。
 - [ ] 登入狀態檢查只在 `fetch_leaps` 進入點做一次，沒有在個別 per-expiration scraper 裡重複檢查。
-- [ ] 中途 session 過期時，系統回傳「已抓到幾個到期日＋斷在哪個到期日」並明確告知資料不完整，沒有靜默回傳看起來完整但實際殘缺的表格。
+- [ ] 中途 session 過期時，回傳結果包含已抓到的 rows、明確的 `expired_at_expiration`（斷在哪個到期日），且最終狀態標示為 partial/不完整，不會讓使用者誤以為表格是完整抓完的。
 - [ ] 排行表格的排序只用 OI（主）+ DTE（次），沒有把 Options Flow 數字混進排序，也沒有額外設定 `min_dte` 之類的天數隱藏門檻把候選排除在表格外。
 - [ ] 流動性判斷（充足／普通／偏低）是程式依本次查詢候選的 OI 相對排名動態算出，不是寫死一個固定 OI 數字套用在所有標的上。
-- [ ] 「近期無成交」警示用 Barchart 算好的 `volume_open_interest_ratio` 判斷，沒有沿用舊版規格的 `volume<=3` 門檻（尺度不同，不能直接搬）。
+- [ ] 「近期無成交」警示用 Barchart 算好的 `vol_oi_ratio` 判斷，沒有沿用舊版規格的 `volume<=3` 門檻（尺度不同，不能直接搬）。
 - [ ] OI／Volume 欄位同時顯示 Barchart 原始數值與程式算出的流動性判斷結果，兩者都看得到。
 - [ ] 結果以表格呈現，不是逐筆寫長段推薦理由文字。
 - [ ] Options Flow 面板直接複用既有 `OptionsFlowTrade` model，獨立顯示，標題清楚標示「情緒參考，非排序依據」。

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_27_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_28_091000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -129,6 +129,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_150000) do
     t.string "symbol", null: false
     t.decimal "underlying_price", precision: 10, scale: 4
     t.datetime "updated_at", null: false
+    t.decimal "vega", precision: 10, scale: 6
     t.decimal "vol_oi_ratio", precision: 8, scale: 4
     t.integer "volume"
     t.index ["symbol", "expiration_date", "strike", "option_type"], name: "idx_leaps_chain_unique", unique: true

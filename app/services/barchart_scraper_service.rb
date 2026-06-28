@@ -264,15 +264,19 @@ class BarchartScraperService
         iv:               r["iv"],
         itm_probability:  r["itm_probability"],
         vol_oi_ratio:     r["vol_oi_ratio"],
+        vega:             r["vega"],
         scraped_at:       now,
         created_at:       now,
         updated_at:       now
       }
     end
 
-    # Full replacement: delete existing rows for this symbol then bulk-insert
-    LeapsOptionChainSnapshot.where(symbol: @symbol).delete_all
-    LeapsOptionChainSnapshot.insert_all(records)
+    # Wrapped in a transaction: if insert_all fails, delete_all is rolled back
+    # so callers never see a state where the old data is gone but nothing replaced it.
+    ActiveRecord::Base.transaction do
+      LeapsOptionChainSnapshot.where(symbol: @symbol).delete_all
+      LeapsOptionChainSnapshot.insert_all(records)
+    end
   end
 
   def persist_trades(trades)
