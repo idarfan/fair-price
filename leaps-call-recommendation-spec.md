@@ -191,13 +191,16 @@ Trade, Size, Side, Premium, Volume, "Open Int", IV, Delta, Code, *, Time
 
 ## 決策當天的 Options Flow 顯示（獨立面板，不併入排序）
 
-在排行表格下方，另開一個獨立區塊顯示**抓取當天**該股票的 Options Flow：
+在排行表格下方，另開一個獨立區塊顯示**抓取當天**該股票的 Options Flow，**前 20 大成交單**（依 `premium` 降序排序取前 20 筆，固定數量，不是固定金額門檻）：
 
-**Phase A 確認結果：既有爬蟲已完整，`OptionsFlowTrade` model 已存在，這個面板直接複用既有資料來源/model，不需要新寫抓取邏輯，只需要新寫「依排行表前幾名的到期日/履約價篩出相關列＋算出看多/看空判斷」這層顯示邏輯。**
+**Phase A 確認結果：既有爬蟲已完整，`OptionsFlowTrade` model 已存在，這個面板直接複用既有資料來源/model，不需要新寫抓取邏輯，只需要新寫「取前20大＋依排行表前幾名的到期日/履約價篩出相關列＋算出看多/看空判斷」這層顯示邏輯。**
 
-- 沿用既有 Code／Side／`*` 分類邏輯（多腿代碼標記不可信、標準單腿代碼可信）
-- 顯示當天 Call 與 Put 的總 Premium 量、大單（依既有 Block/Sweep/Floor 等 Flags 或 Code 分類)清單
-- 若當天的成交剛好落在排行表前幾名的到期日／履約價附近，特別標出來（純顯示提示，例如「今天在排行第一的 $X 履約價附近有一筆大額買權買入」），但**不自動把這個訊號加進排行排序**，標題上明確寫「情緒參考，非排序依據」
+> ⚠️ **規格修正記錄**：這節原本被寫成「大單（依既有 Flags/Code 分類）清單」，採用 `large_premium: true`（固定 $50萬門檻，數量不定）取資料，這跟使用者最初提出的「前20大」（固定 20 筆，依 premium 排序）是兩個不同概念，是這份規格在撰寫時的錯誤改寫，不是 Phase D 實作偏離規格——Phase D 當時完全照規格字面做是對的。**確認結果：改回原始需求，固定取前 20 筆，依 premium 降序。**`large_premium` 那個固定門檻判斷（$50萬）保留用在分類/標記上沒問題（例如表格裡可以額外標一個「大單」icon），但**面板抓取的資料範圍**改成「premium 排序前 20 筆」，不是「premium ≥ $50萬 的全部」。
+
+- 顯示當天 Call 與 Put 的總 Premium 量
+- **前 20 大清單**：依 `premium` 降序取前 20 筆（不限 `large_premium` 門檻，數量固定為 20，可以少於 20 筆如果當天交易量不足，但不會用金額門檻篩掉本該進榜的交易）
+- 沿用既有 Code／Side／`*` 分類邏輯（多腿代碼標記不可信、標準單腿代碼可信），這 20 筆裡每一筆都標示分類結果與看多/看空判讀
+- 若這 20 筆裡有成交剛好落在排行表前幾名的到期日／履約價附近，特別標出來（純顯示提示，例如「今天在排行第一的 $X 履約價附近有一筆大額買權買入」），但**不自動把這個訊號加進排行排序**，標題上明確寫「情緒參考，非排序依據」
 
 ---
 
@@ -242,9 +245,12 @@ Trade, Size, Side, Premium, Volume, "Open Int", IV, Delta, Code, *, Time
   - **登入狀態檢查**：一次性在 `fetch_leaps` 進入點檢查（CDP 連線），不在個別 scraper 裡重複檢查。
   - **中途 session 過期處理**：Python scraper 回傳 `{"status": "partial", "rows": [...], "expired_at_expiration": "YYYY-MM-DD"}`；Ruby 層 `run_scraper` 包成 `{status: "partial", data: {...}}`，`fetch_leaps` 仍會 `persist_leaps` 已抓到的 rows，但 `result[:status]` 標為 `"partial_error"` 且 `result[:errors]` 明確寫出斷在哪個到期日，**不靜默回傳看起來完整的表格**。
   - **已知缺漏（待補）**：migration 漏了 `vega` 欄位（第 5 節已批准但建表時漏寫），需要補一個小 migration 加這個欄位，不需重建整張表；gamma/theta/rho 維持不加。
-- **階段 C**：實作第 6 節排行表計算邏輯（Delta 篩選 + OI/DTE 排序，這部分本身不依賴階段 A/B 的 Barchart 資料，可以先用假資料寫好單元測試） → 確認
-- **階段 D**：實作第 7 節 Options Flow 獨立面板（檢查既有 Options Flow 抓取/分類邏輯是否能直接複用） → 確認
-- **階段 E**：第 8 節路由與前端整合 → 確認
+- **階段 C**：✅ 已完成。`LeapsRankingService`：`fetch_candidates`（取最近一次 scrape 的 `scraped_at` exact match，篩 Delta 0.75–0.90 的 Call）、`liquidity_tiers`（value-based percentile，依 OI 數值本身的 p33/p67 分三級，OI 相同必同 tier）、`vol_oi_threshold`（`floor(n/3)` 筆為底三分之一，取該組最大值＋`<=`含邊界；**n<4 時回傳 nil，不觸發任何警示**，避免候選太少時被強制誤標）、`enrich`（time_value_pct／bid_ask_spread_pct）、排序 OI 降序→DTE 降序。25/25 測試通過，含「連續兩次 scrape 後舊 `scraped_at` 完全消失、不會與新批次混雜」的覆蓋。
+- **階段 D**：⚠️ 已交付，但有一處需要修正後才算完成。`LeapsOptionsFlowPanelService`：
+  - ✅ `aggregate` 原封不動轉交 `OptionsFlowClassifierService.aggregate`（只做 AR→hash 格式配接，無語義轉換）——符合「不重新發明分類邏輯」原則。
+  - ✅ `highlighted_trades`／不影響排行排序（non-ranking guarantee 有測試覆蓋）——符合規格。
+  - ❌ **需修正**：原規格這節被誤寫成「大單（`large_premium: true`，固定 $50萬門檎，數量不定）」，跟使用者最初提出的「前20大」（固定 20 筆，依 premium 降序）是兩個不同概念——**這是規格撰寫階段的錯誤改寫，不是 Phase D 實作偏離規格**，Phase D 當時完全照規格字面做是對的。已確認改回原始需求：`large_orders` 邏輯需從「filter by `large_premium` flag」換成「sort by premium desc, take 20」。`large_premium` 門檻可以保留做標記/icon 用，但不能用來決定面板抓取的資料範圍。**這個改動是局部的，不影響已驗收的 `aggregate`、`highlighted_trades`、non-ranking guarantee。**
+- **階段 E**：第 8 節路由與前端整合，UI 標題文字沿用 Phase D 確認的「情緒參考，非排序依據」 → 確認
 
 每一步都要以實際讀到的 DOM／資料為準，不要假設或猜測欄位名稱與資料格式。
 
@@ -265,6 +271,7 @@ Trade, Size, Side, Premium, Volume, "Open Int", IV, Delta, Code, *, Time
 - [ ] OI／Volume 欄位同時顯示 Barchart 原始數值與程式算出的流動性判斷結果，兩者都看得到。
 - [ ] 結果以表格呈現，不是逐筆寫長段推薦理由文字。
 - [ ] Options Flow 面板直接複用既有 `OptionsFlowTrade` model，獨立顯示，標題清楚標示「情緒參考，非排序依據」。
+- [ ] 面板顯示的是**真正的前 20 大**：依 `premium` 降序排序取前 20 筆，固定數量（可少於20筆但不會更多），**不是**用 `large_premium` 固定金額門檻篩出來的不定數量清單；有單元測試覆蓋「當天 large_premium=true 的交易數超過20筆」與「當天 0 筆 large_premium=true」這兩種邊界情況，驗證兩種情況下都還是回傳依 premium 排序的前 20 筆（或不足20筆時的全部），不會因為金額門檻而漏掉或多顯示。
 - [ ] 同一 symbol 5 分鐘內重複查詢會讀快取，不重複打 Barchart。
 - [ ] 表格下方有「僅供策略篩選參考，非投資建議」提示文字。
 - [ ] 配色（卡片底色、邊框、綠/橘黃/紅語義色、hover 效果）直接讀取並複用三維度儀表板既有的 CSS/變數，沒有另外設計一套新色票；流動性分級與 Options Flow 看多/看空判斷的顏色語義跟 `divergence_flag` 的 confirm/warning/caution 對應一致。

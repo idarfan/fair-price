@@ -9,7 +9,8 @@
 # This panel is purely informational — it NEVER modifies ranking order.
 # The UI must display its title as "情緒參考，非排序依據".
 class LeapsOptionsFlowPanelService
-  TOP_N_DEFAULT = 5
+  TOP_N_DEFAULT   = 5
+  LARGE_ORDER_TOP = 20
 
   def initialize(symbol, ranked_candidates, top_n: TOP_N_DEFAULT)
     @symbol            = symbol.upcase
@@ -44,8 +45,8 @@ class LeapsOptionsFlowPanelService
 
   def large_orders(trades)
     trades
-      .select(&:large_premium)
       .sort_by { |t| -t.premium.to_i }
+      .first(LARGE_ORDER_TOP)
       .map { |t| trade_summary(t) }
   end
 
