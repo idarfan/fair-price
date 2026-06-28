@@ -167,7 +167,7 @@ RSpec.describe "GET /leaps", type: :request do
     it "returns 200 and shows CDP error message" do
       get "/leaps", params: { symbol: symbol, job_status: "error" }
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("CDP 未連線")
+      expect(response.body).to include("wsl --shutdown")
     end
   end
   # ── 7. POST /leaps/analyze — CDP 離線時直接擋下不送 job ─────────────────────

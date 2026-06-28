@@ -82,7 +82,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       render_alert("bg-yellow-50 border border-yellow-300 text-yellow-800", "⚠️ #{msg}")
     when :error
       render_alert("bg-red-50 border border-red-300 text-red-800",
-        "❌ CDP 未連線，請確認 Windows 端 Chrome 已以 --remote-debugging-port=9222 啟動；可在瀏覽器開啟 http://localhost:9222/json/version 確認是否連線。")
+        "❌ CDP 未連線，請確認 Windows 端 Chrome 已以 --remote-debugging-port=9222 啟動；可在瀏覽器開啟 http://localhost:9222/json/version 確認是否連線。若電腦曾睡眠，請在 PowerShell 執行 wsl --shutdown 後重試。")
     when :ready_to_fetch
       render_alert("bg-blue-50 border border-blue-300 text-blue-800",
         "ℹ️ 尚未取得 #{@symbol} 的 LEAPS 資料，請點「查詢」開始抓取。")
