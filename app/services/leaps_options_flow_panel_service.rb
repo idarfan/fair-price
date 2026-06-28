@@ -12,7 +12,7 @@ class LeapsOptionsFlowPanelService
   TOP_N_DEFAULT   = 5
   LARGE_ORDER_TOP = 20
 
-  def initialize(symbol, ranked_candidates, top_n: TOP_N_DEFAULT)
+  def initialize(symbol, ranked_candidates = [], top_n: TOP_N_DEFAULT)
     @symbol            = symbol.upcase
     @ranked_candidates = ranked_candidates
     @top_n             = top_n
