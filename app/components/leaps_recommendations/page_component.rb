@@ -67,7 +67,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
         input(
           id: "leaps-strike-input", type: "number", name: "user_strike",
           value: @user_strike.to_s, placeholder: "自動",
-          min: "0.01", step: "0.5",
+          min: "0.01", step: "any",
           class: "w-24 px-3 py-2 rounded-lg border border-gray-300 text-sm " \
                  "focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
         )
