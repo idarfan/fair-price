@@ -9,8 +9,8 @@ Two-stage approach:
            • read expirations select (kept for V&G per-exp fallback)
            • read underlying price
   Stage 2  Per candidate strike:
-           • OPTIONS  ?view=stacked&strike=X  → all expirations at once
-           • V&G      ?view=stacked&strike=X  (probe: if first strike returns
+           * OPTIONS  ?view=stacked&strike=X  -> all expirations at once
+           * V&G      ?expiration={first_exp}&strike=X  -> all expirations for this strike
              empty → not supported, fall back to per-expiration V&G for the
              union of expiration dates found in Stage 2 Options data)
 
@@ -127,7 +127,7 @@ STACKED_OPTIONS_JS = """
 """
 
 # Stage 2: stacked V&G — one strike, all expirations (may not be supported)
-STACKED_VG_JS = """
+LOCK_STRIKE_VG_JS = """
 (() => {
   const grid = document.querySelector('bc-data-grid');
   if (!grid || !grid._data) return null;
@@ -146,21 +146,6 @@ STACKED_VG_JS = """
 """
 
 # V&G per-expiration fallback (no exp_date in row — caller supplies it)
-VG_PER_EXP_JS = """
-(() => {
-  const grid = document.querySelector('bc-data-grid');
-  if (!grid || !grid._data) return null;
-  return grid._data
-    .map(r => r.raw || r)
-    .filter(r => r.optionType === 'Call' || r.symbolType === 'Call')
-    .map(r => ({
-      strike:   r.strikePrice,
-      itm_prob: typeof r.itmProbability          === 'number' ? r.itmProbability          : null,
-      vol_oi:   typeof r.volumeOpenInterestRatio === 'number' ? r.volumeOpenInterestRatio : null,
-      vega:     typeof r.vega                    === 'number' ? r.vega                    : null,
-    }));
-})()
-"""
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -223,8 +208,8 @@ def _pick_candidates(near_money_rows, user_strike=None):
     return sorted(candidates)
 
 
-def _merge_stacked_vg(opts_rows, vg_rows):
-    """Join stacked V&G rows into options rows by (strike, expiration_date)."""
+def _merge_vg(opts_rows, vg_rows):
+    """Join V&G rows into options rows by (strike, expiration_date)."""
     vg_idx = {(r["strike"], r.get("expiration_date")): r for r in (vg_rows or [])}
     return [
         {**row,
@@ -234,23 +219,6 @@ def _merge_stacked_vg(opts_rows, vg_rows):
         for row in opts_rows
     ]
 
-
-def _merge_per_exp_vg(opts_rows, vg_by_exp):
-    """
-    Join per-expiration V&G into stacked-options rows.
-    vg_by_exp: {exp_date: [{strike, itm_prob, vol_oi, vega}, ...]}
-    """
-    vg_idx = {}
-    for exp_date, rows in vg_by_exp.items():
-        for r in rows:
-            vg_idx[(r["strike"], exp_date)] = r
-    return [
-        {**row,
-         "itm_probability": vg_idx.get((row["strike"], row.get("expiration_date")), {}).get("itm_prob"),
-         "vol_oi_ratio":    vg_idx.get((row["strike"], row.get("expiration_date")), {}).get("vol_oi"),
-         "vega":            vg_idx.get((row["strike"], row.get("expiration_date")), {}).get("vega")}
-        for row in opts_rows
-    ]
 
 
 def _finalize(rows, underlying_price):
@@ -302,6 +270,7 @@ async def main(symbol, user_strike=None):
     expirations = await cdp_eval(ws_url, EXPIRATIONS_JS) or []
     # Maps "2027-01-15" -> "2027-01-15-m" (the select option value)
     exp_value_map = {e["value"][:10]: e["value"] for e in expirations}
+    first_exp_value = next(iter(exp_value_map.values()), None)
 
     # ── Stage 1: pick candidate strikes ──────────────────────────────────────
     candidate_strikes = _pick_candidates(near_money_rows, user_strike)
@@ -311,12 +280,10 @@ async def main(symbol, user_strike=None):
         return
 
     # ── Stage 2: per candidate strike ────────────────────────────────────────
-    all_opts_rows = []    # accumulates Options stacked rows across all strikes
-    vg_stacked_rows = []  # accumulates V&G stacked rows when stacked is supported
-    # "stacked" | "per_exp" — determined by first strike probe
-    vg_mode = "stacked"
+    all_opts_rows = []
+    all_vg_rows   = []
 
-    for idx, strike in enumerate(candidate_strikes):
+    for strike in candidate_strikes:
 
         # ── Options Prices (stacked) ──────────────────────────────────────────
         opts_url = (
@@ -340,72 +307,31 @@ async def main(symbol, user_strike=None):
         all_opts_rows.extend(opts_rows)
 
         # ── Volatility & Greeks ───────────────────────────────────────────────
-        if vg_mode == "stacked":
+        # V&G lock-by-strike (confirmed: ?expiration=seed&strike=X)
+        if first_exp_value:
             vg_url = (
                 f"https://www.barchart.com/stocks/quotes/{symbol}/volatility-greeks"
-                f"?view=stacked&strike={strike}"
+                f"?expiration={first_exp_value}&strike={strike}"
             )
             await cdp_navigate(ws_url, vg_url, settle_ms=VG_SETTLE)
             await activate_target(target_id)
 
-            vg_rows = await cdp_eval(ws_url, STACKED_VG_JS)
+            vg_rows = await cdp_eval(ws_url, LOCK_STRIKE_VG_JS)
             if not vg_rows:
-                if idx == 0:
-                    # First-strike probe: stacked V&G not supported on this page.
-                    # Fall back to per-expiration V&G after the Options loop.
-                    vg_mode = "per_exp"
-                else:
-                    # Later strike: session expired mid-run.
-                    print(json.dumps({
-                        "status":            "partial",
-                        "rows":              _finalize(_merge_stacked_vg(all_opts_rows, vg_stacked_rows), underlying_price),
-                        "expired_at_strike": strike,
-                        "expired_layer":     "volatility_greeks",
-                    }))
-                    return
-            else:
-                _fill_exp_dates(vg_rows)
-                vg_stacked_rows.extend(vg_rows)
+                print(json.dumps({
+                    "status":            "partial",
+                    "rows":              _finalize(_merge_vg(all_opts_rows, all_vg_rows), underlying_price),
+                    "expired_at_strike": strike,
+                    "expired_layer":     "volatility_greeks",
+                }))
+                return
+            _fill_exp_dates(vg_rows)
+            all_vg_rows.extend(vg_rows)
 
         await asyncio.sleep(0.8)
 
-    # ── Merge V&G ─────────────────────────────────────────────────────────────
-    if vg_mode == "per_exp":
-        # V&G stacked not supported: fetch per expiration for the union of
-        # expiration dates found across all candidate strikes' Options data.
-        unique_exps = sorted({
-            r["expiration_date"] for r in all_opts_rows if r.get("expiration_date")
-        })
-        vg_by_exp = {}
 
-        for exp_date in unique_exps:
-            exp_value = exp_value_map.get(exp_date)
-            if not exp_value:
-                continue  # date not in select list — skip gracefully
-
-            vg_exp_url = (
-                f"https://www.barchart.com/stocks/quotes/{symbol}/volatility-greeks"
-                f"?expiration={exp_value}&moneyness=allRows"
-            )
-            await cdp_navigate(ws_url, vg_exp_url, settle_ms=VG_SETTLE)
-            await activate_target(target_id)
-
-            vg_exp_rows = await cdp_eval(ws_url, VG_PER_EXP_JS)
-            if not vg_exp_rows:
-                print(json.dumps({
-                    "status":                "partial",
-                    "rows":                  _finalize(_merge_per_exp_vg(all_opts_rows, vg_by_exp), underlying_price),
-                    "expired_at_expiration": exp_date,
-                    "expired_layer":         "volatility_greeks",
-                }))
-                return
-
-            vg_by_exp[exp_date] = vg_exp_rows
-            await asyncio.sleep(0.8)
-
-        merged = _merge_per_exp_vg(all_opts_rows, vg_by_exp)
-    else:
-        merged = _merge_stacked_vg(all_opts_rows, vg_stacked_rows)
+    merged = _merge_vg(all_opts_rows, all_vg_rows)
 
     print(json.dumps({
         "status":           "success",
