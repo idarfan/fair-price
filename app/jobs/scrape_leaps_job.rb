@@ -1,12 +1,13 @@
 # frozen_string_literal: true
 
 class ScrapeLeapsJob < ApplicationJob
-  def perform(symbol, job_id)
-    result = BarchartScraperService.new(symbol).fetch_leaps
+  def perform(symbol, job_id, user_strike: nil)
+    result = BarchartScraperService.new(symbol).fetch_leaps(user_strike: user_strike)
     errors = Array(result[:errors])
     result_status = case result[:status]
     when "barchart_session_expired" then "session_expired"
     when "partial_error"            then "partial_error"
+    when "no_candidates"            then "no_candidates"
     when "cached", "success"        then "success"
     else "error"
     end

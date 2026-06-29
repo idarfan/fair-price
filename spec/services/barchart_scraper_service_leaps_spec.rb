@@ -247,4 +247,148 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
       expect(LeapsOptionChainSnapshot.where(symbol: "NOK", scraped_at: first_scraped_at)).not_to exist
     end
   end
+
+  # ── 5. Phase G: user_strike parameter ─────────────────────────────────────
+  # Tests verify that:
+  #   a) user_strike is passed to run_scraper as CLI arg
+  #   b) no_candidates status is surfaced when Python returns it
+  #   c) expired_at_strike (new stacked partial) is surfaced correctly
+  #   d) Stage 1 auto-detection (no user_strike) still works
+
+  describe "fetch_leaps with user_strike" do
+    let(:scraper_success) do
+      {
+        "status" => "success",
+        "rows"   => [
+          {
+            "expiration_date" => "2027-01-15", "dte" => 202,
+            "strike" => 10.0, "option_type" => "Call",
+            "bid" => 3.5, "ask" => 3.7, "last_price" => 3.6,
+            "underlying_price" => 13.0, "volume" => 200, "open_interest" => 600,
+            "delta" => 0.82, "iv" => 0.75, "itm_probability" => 0.85,
+            "vol_oi_ratio" => 0.007, "vega" => 0.015
+          }
+        ]
+      }
+    end
+
+    before do
+      allow(LeapsOptionChainSnapshot).to receive_message_chain(:for_symbol, :fresh, :exists?).and_return(false)
+    end
+
+    it "passes user_strike as CLI extra arg when provided" do
+      expect(service).to receive(:run_scraper)
+        .with("leaps", extra_args: ["10.0"])
+        .and_return({ status: "success", data: scraper_success })
+      allow(service).to receive(:persist_leaps)
+
+      service.fetch_leaps(user_strike: 10.0)
+    end
+
+    it "omits extra_args when user_strike is nil (auto mode)" do
+      expect(service).to receive(:run_scraper)
+        .with("leaps", extra_args: [])
+        .and_return({ status: "success", data: scraper_success })
+      allow(service).to receive(:persist_leaps)
+
+      service.fetch_leaps(user_strike: nil)
+    end
+
+    it "returns status: no_candidates when Python returns no_candidates" do
+      allow(service).to receive(:run_scraper).and_return({ status: "no_candidates" })
+      result = service.fetch_leaps(user_strike: nil)
+      expect(result[:status]).to eq("no_candidates")
+    end
+
+    it "returns no_candidates even when user_strike is specified" do
+      allow(service).to receive(:run_scraper).and_return({ status: "no_candidates" })
+      result = service.fetch_leaps(user_strike: 10.0)
+      expect(result[:status]).to eq("no_candidates")
+    end
+  end
+
+  # ── 6. Phase G: expired_at_strike partial (stacked strategy) ─────────────
+  # The stacked scraper returns expired_at_strike when session expires while
+  # iterating over candidate strikes — distinct from expired_at_expiration.
+
+  describe "partial result with expired_at_strike (stacked strategy session expiry)" do
+    let(:partial_data) do
+      {
+        "status"            => "partial",
+        "rows"              => [
+          {
+            "expiration_date" => "2027-01-15", "dte" => 202,
+            "strike" => 10.0, "option_type" => "Call",
+            "bid" => 3.5, "ask" => 3.7, "last_price" => nil,
+            "underlying_price" => 13.0, "volume" => 100, "open_interest" => 400,
+            "delta" => 0.82, "iv" => 0.75,
+            "itm_probability" => nil, "vol_oi_ratio" => nil, "vega" => nil
+          }
+        ],
+        "expired_at_strike" => 11.0,
+        "expired_layer"     => "options_prices"
+      }
+    end
+
+    before do
+      allow(LeapsOptionChainSnapshot).to receive_message_chain(:for_symbol, :fresh, :exists?).and_return(false)
+      allow(service).to receive(:run_scraper).and_return({ status: "partial", data: partial_data })
+      allow(service).to receive(:persist_leaps)
+    end
+
+    it "returns partial_error status" do
+      expect(service.fetch_leaps[:status]).to eq("partial_error")
+    end
+
+    it "includes Strike reference (not expiration date) in error message" do
+      errors = service.fetch_leaps[:errors]
+      expect(errors.first).to include("Strike 11.0")
+    end
+
+    it "still persists the already-scraped rows" do
+      expect(service).to receive(:persist_leaps).with(partial_data)
+      service.fetch_leaps
+    end
+  end
+
+  # ── 7. Stage 1/Stage 2 Delta filter separation ────────────────────────────
+  # Delta 0.80 (Stage 1) and Delta 0.75-0.90 (Stage 2) are SEPARATE rules.
+  # A row with Delta 0.91 must NOT appear in final output because it fails Stage 2.
+  # This is enforced in Ruby (LeapsRankingService), not in the scraper.
+  # Test here confirms the scraper itself does NOT drop rows — ranking does.
+
+  describe "scraper does not apply Stage 2 filter (Ruby side handles it)" do
+    let(:wide_delta_data) do
+      {
+        "status" => "success",
+        "rows"   => [
+          { "expiration_date" => "2027-01-15", "dte" => 202, "strike" => 9.0,
+            "option_type" => "Call", "delta" => 0.91, "underlying_price" => 13.0,
+            "bid" => nil, "ask" => nil, "last_price" => nil, "volume" => nil,
+            "open_interest" => nil, "iv" => nil, "itm_probability" => nil,
+            "vol_oi_ratio" => nil, "vega" => nil },
+          { "expiration_date" => "2027-01-15", "dte" => 202, "strike" => 10.0,
+            "option_type" => "Call", "delta" => 0.82, "underlying_price" => 13.0,
+            "bid" => nil, "ask" => nil, "last_price" => nil, "volume" => nil,
+            "open_interest" => nil, "iv" => nil, "itm_probability" => nil,
+            "vol_oi_ratio" => nil, "vega" => nil }
+        ]
+      }
+    end
+
+    before do
+      allow(LeapsOptionChainSnapshot).to receive_message_chain(:for_symbol, :fresh, :exists?).and_return(false)
+      allow(service).to receive(:run_scraper).and_return({ status: "success", data: wide_delta_data })
+    end
+
+    it "persists ALL rows including Delta 0.91 (Stage 2 filter not applied here)" do
+      expect(service).to receive(:persist_leaps) do |data|
+        strikes = data["rows"].map { |r| r["delta"] }
+        expect(strikes).to include(0.91)
+        expect(strikes).to include(0.82)
+      end
+      service.fetch_leaps
+    end
+  end
+
 end

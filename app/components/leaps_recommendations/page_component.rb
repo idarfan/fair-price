@@ -20,13 +20,14 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
   FLOW_COLS = [ "類型", "履約價", "到期日", "DTE", "Delta", "Code", "Size", "Side", "Premium", "方向" ].freeze
 
-  def initialize(symbol: nil, candidates: [], recommendation: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [])
+  def initialize(symbol: nil, candidates: [], recommendation: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil)
     @symbol         = symbol
     @candidates     = Array(candidates)
     @recommendation = recommendation
     @flow_panel     = flow_panel
     @scrape_status  = scrape_status
     @scrape_errors  = Array(scrape_errors)
+    @user_strike    = user_strike
   end
 
   def view_template
@@ -53,14 +54,24 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   end
 
   def render_search_form
-    form(id: "leaps-form", action: "/leaps", method: "get", class: "flex items-center gap-3") do
+    form(id: "leaps-form", action: "/leaps", method: "get", class: "flex items-center gap-3 flex-wrap") do
       input(
         id: "leaps-symbol-input", type: "text", name: "symbol",
-        value: @symbol.to_s, placeholder: "輸入股票代號，例如 NOK",
+        value: @symbol.to_s, placeholder: "股票代號，例如 NOK",
         maxlength: "10",
-        class: "w-48 px-4 py-2 rounded-lg border border-gray-300 text-sm font-mono uppercase " \
+        class: "w-40 px-4 py-2 rounded-lg border border-gray-300 text-sm font-mono uppercase " \
                "focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
       )
+      div(class: "flex items-center gap-1.5") do
+        label(for: "leaps-strike-input", class: "text-xs text-gray-500 whitespace-nowrap") { plain "履約價（選填）" }
+        input(
+          id: "leaps-strike-input", type: "number", name: "user_strike",
+          value: @user_strike.to_s, placeholder: "自動",
+          min: "0.01", step: "0.5",
+          class: "w-24 px-3 py-2 rounded-lg border border-gray-300 text-sm " \
+                 "focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+        )
+      end
       button(
         id: "leaps-submit-btn", type: "submit",
         class: "px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
@@ -83,6 +94,11 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     when :error
       render_alert("bg-red-50 border border-red-300 text-red-800",
         "❌ CDP 未連線，請確認 Windows 端 Chrome 已以 --remote-debugging-port=9222 啟動。若電腦曾經睡眠/喚醒，這通常是 WSL2 的 /mnt/c/ 掛載失效造成的，請在 Windows PowerShell 執行 wsl --shutdown 後等待 WSL2 重新啟動，再重試一次。")
+    when :no_candidates
+      msg = @user_strike.present? ?
+        "這個履約價 #{@user_strike}（含緩衝檔）在所有到期日都沒有符合 Delta 0.75–0.90 的候選。請嘗試其他履約價，或留空讓系統自動偵測。" :
+        "Near the Money 頁面中沒有 Delta ≥ 0.80 的候選履約價，無法自動選擇切入點。請手動輸入履約價後重試。"
+      render_alert("bg-orange-50 border border-orange-300 text-orange-800", "⚠️ #{msg}")
     when :ready_to_fetch
       render_alert("bg-blue-50 border border-blue-300 text-blue-800",
         "ℹ️ 尚未取得 #{@symbol} 的 LEAPS 資料，請點「查詢」開始抓取。")
@@ -309,6 +325,9 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             var symbol = inp ? inp.value.trim().toUpperCase() : '';
             if (!symbol) return;
 
+            var strikeInp = document.getElementById('leaps-strike-input');
+            var userStrike = strikeInp ? strikeInp.value.trim() : '';
+
             btn.disabled = true;
             btn.textContent = '查詢中…';
             btn.classList.add('opacity-50', 'cursor-not-allowed');
@@ -318,24 +337,29 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             var csrfToken = document.querySelector('meta[name="csrf-token"]');
             var token = csrfToken ? csrfToken.content : '#{csrf}';
 
+            var strikeSuffix = userStrike ? '&user_strike=' + encodeURIComponent(userStrike) : '';
+
+            var body = { symbol: symbol };
+            if (userStrike) body.user_strike = userStrike;
+
             fetch('/leaps/analyze', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
-              body: JSON.stringify({ symbol: symbol })
+              body: JSON.stringify(body)
             })
             .then(function (r) { return r.json(); })
             .then(function (data) {
               if (data.status === 'ready') {
-                window.location.href = '/leaps?symbol=' + symbol;
+                window.location.href = '/leaps?symbol=' + symbol + strikeSuffix;
                 return;
               }
               if (data.status === 'cdp_offline') {
-                window.location.href = '/leaps?symbol=' + symbol + '&job_status=error';
+                window.location.href = '/leaps?symbol=' + symbol + '&job_status=error' + strikeSuffix;
                 return;
               }
               var jobId = data.job_id;
               if (!jobId) {
-                window.location.href = '/leaps?symbol=' + symbol + '&job_status=error';
+                window.location.href = '/leaps?symbol=' + symbol + '&job_status=error' + strikeSuffix;
                 return;
               }
               var attempts = 0;
@@ -343,7 +367,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
                 attempts++;
                 if (attempts > 240) {
                   clearInterval(pollInterval);
-                  window.location.href = '/leaps?symbol=' + symbol + '&job_status=error';
+                  window.location.href = '/leaps?symbol=' + symbol + '&job_status=error' + strikeSuffix;
                   return;
                 }
                 fetch('/leaps/status?job_id=' + jobId)
@@ -351,11 +375,11 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
                   .then(function (s) {
                     if (s.status === 'pending' || s.status === 'not_found') return;
                     clearInterval(pollInterval);
-                    window.location.href = '/leaps?symbol=' + symbol + '&job_status=' + s.status;
+                    window.location.href = '/leaps?symbol=' + symbol + '&job_status=' + s.status + strikeSuffix;
                   }).catch(function () {});
               }, 2500);
             }).catch(function () {
-              window.location.href = '/leaps?symbol=' + symbol + '&job_status=error';
+              window.location.href = '/leaps?symbol=' + symbol + '&job_status=error' + strikeSuffix;
             });
           });
         })();

@@ -67,7 +67,7 @@ class BarchartScraperService
 
   # User-triggered LEAPS chain fetch: Options Prices + V&G for all expirations.
   # Returns :cached if the symbol was already scraped within the last 5 minutes.
-  def fetch_leaps
+  def fetch_leaps(user_strike: nil)
     result = { symbol: @symbol, status: nil, errors: [] }
 
     unless cdp_available?
@@ -83,24 +83,28 @@ class BarchartScraperService
       return result
     end
 
-    fetch_result = run_scraper("leaps")
+    fetch_result = run_scraper("leaps", extra_args: user_strike ? [user_strike.to_s] : [])
 
     case fetch_result[:status]
     when "barchart_session_expired"
       log_fetch("leaps", "barchart_session_expired", nil)
       result[:status] = "barchart_session_expired"
+    when "no_candidates"
+      log_fetch("leaps", "no_candidates", "user_strike=#{user_strike}")
+      result[:status] = "no_candidates"
     when "success"
       persist_leaps(fetch_result[:data])
       log_fetch("leaps", "success", "rows=#{fetch_result[:data]["rows"]&.length}")
       result[:status] = "success"
     when "partial"
       persist_leaps(fetch_result[:data])
-      expired_at    = fetch_result[:data]["expired_at_expiration"]
+      expired_at    = fetch_result[:data]["expired_at_strike"] || fetch_result[:data]["expired_at_expiration"]
       expired_layer = fetch_result[:data]["expired_layer"]
       layer_label   = expired_layer == "volatility_greeks" ? "Volatility & Greeks" : "Options Prices"
+      location_label = fetch_result[:data]["expired_at_strike"] ? "Strike #{expired_at}" : expired_at
       log_fetch("leaps", "partial_error", "expired_at=#{expired_at} layer=#{expired_layer}")
       result[:status] = "partial_error"
-      result[:errors] << "Session 在抓取到 #{expired_at} 的 #{layer_label} 時過期，已抓到的部分可能不完整，請重新查詢"
+      result[:errors] << "Session 在抓取 #{location_label} 的 #{layer_label} 時過期，已抓到的部分可能不完整，請重新查詢"
     else
       log_fetch("leaps", "error", fetch_result[:error])
       result[:status] = "error"
@@ -167,6 +171,8 @@ class BarchartScraperService
       case data["status"]
       when "barchart_session_expired"
         { status: "barchart_session_expired" }
+      when "no_candidates"
+        { status: "no_candidates" }
       when "partial"
         { status: "partial", data: data }
       else
