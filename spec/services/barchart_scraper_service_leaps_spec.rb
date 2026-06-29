@@ -130,6 +130,66 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
     end
   end
 
+  # ── 3b. V&G-only session expiry ─────────────────────────────────────────────
+  #
+  # Options Prices fetched cleanly; V&G session expires on a later expiration.
+  # The Ruby service must propagate partial_error AND name "Volatility & Greeks"
+  # in the error — NOT "Options Prices" — so the caller can tell the two apart.
+  # C.5: old code silently swallowed V&G expiry as null fields; fix propagates
+  # it as partial_error with the correct layer label.
+
+  describe "V&G-only session expiry (Options Prices fetched cleanly)" do
+    let(:vg_partial_rows) do
+      [{
+        "expiration_date" => "2027-01-15", "dte" => 365,
+        "strike" => 10.0, "option_type" => "Call",
+        "bid" => 3.1, "ask" => 3.3, "last_price" => 3.2,
+        "underlying_price" => 13.08,
+        "volume" => 100, "open_interest" => 41_000,
+        "delta" => 0.82, "iv" => 0.74,
+        "itm_probability" => nil, "vol_oi_ratio" => nil, "vega" => nil
+      }]
+    end
+
+    let(:vg_partial_data) do
+      {
+        "status"                => "partial",
+        "rows"                  => vg_partial_rows,
+        "expired_at_expiration" => "2027-06-20",
+        "expired_layer"         => "volatility_greeks"
+      }
+    end
+
+    before do
+      stub_cache(hit: false)
+      allow(service).to receive(:run_scraper)
+        .and_return({ status: "partial", data: vg_partial_data })
+      allow(service).to receive(:persist_leaps).and_call_original
+      allow(LeapsOptionChainSnapshot).to receive_message_chain(:where, :delete_all)
+      allow(LeapsOptionChainSnapshot).to receive(:insert_all)
+    end
+
+    it "returns :partial_error, not :success" do
+      expect(service.fetch_leaps[:status]).to eq("partial_error")
+    end
+
+    it "names Volatility and Greeks in the error, not Options Prices" do
+      errors = service.fetch_leaps[:errors]
+      expect(errors.first).to include("Volatility & Greeks")
+      expect(errors.first).not_to include("Options Prices")
+    end
+
+    it "includes the expired expiration date in the error" do
+      errors = service.fetch_leaps[:errors]
+      expect(errors.first).to include("2027-06-20")
+    end
+
+    it "still persists the already-scraped rows including this expiration with nil V&G fields" do
+      expect(service).to receive(:persist_leaps).with(vg_partial_data)
+      service.fetch_leaps
+    end
+  end
+
   # ── 4. Consecutive scrapes: second scrape replaces first entirely ─────────────
   #
   # persist_leaps runs delete_all + insert_all in one transaction, so only one
