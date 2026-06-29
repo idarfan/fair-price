@@ -16,10 +16,10 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
   }.freeze
 
   DIV_META = {
-    warning:      { bg: "bg-orange-50", border: "border-orange-300", icon: "⚠️", text: "text-orange-800" },
-    caution:      { bg: "bg-yellow-50", border: "border-yellow-300", icon: "💡", text: "text-yellow-800" },
-    confirm_bull: { bg: "bg-green-50",  border: "border-green-300",  icon: "✅", text: "text-green-800" },
-    confirm_bear: { bg: "bg-red-50",    border: "border-red-300",    icon: "🔴", text: "text-red-800" }
+    warning:      SIGNAL_COLORS[:warning].merge(icon: "⚠️").freeze,
+    caution:      SIGNAL_COLORS[:caution].merge(icon: "💡").freeze,
+    confirm_bull: SIGNAL_COLORS[:confirm_bull].merge(icon: "✅").freeze,
+    confirm_bear: SIGNAL_COLORS[:confirm_bear].merge(icon: "🔴").freeze
   }.freeze
 
   STRIKES_OPTIONS = [

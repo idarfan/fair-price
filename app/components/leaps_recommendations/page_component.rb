@@ -2,15 +2,15 @@
 
 class LeapsRecommendations::PageComponent < ApplicationComponent
   LIQUIDITY_STYLE = {
-    "充足" => { bg: "bg-green-50",  border: "border-green-300",  text: "text-green-800",  dot: "bg-green-400" },
-    "普通" => { bg: "bg-yellow-50", border: "border-yellow-300", text: "text-yellow-800", dot: "bg-yellow-400" },
-    "偏低" => { bg: "bg-orange-50", border: "border-orange-300", text: "text-orange-800", dot: "bg-orange-400" }
+    "充足" => SIGNAL_COLORS[:confirm_bull],
+    "普通" => SIGNAL_COLORS[:caution],
+    "偏低" => SIGNAL_COLORS[:warning]
   }.freeze
 
   DIR_STYLE = {
-    "bullish" => { dot: "bg-green-400", text: "text-green-700",  label: "偏多" },
-    "bearish" => { dot: "bg-red-400",   text: "text-red-700",    label: "偏空" },
-    "neutral" => { dot: "bg-gray-400",  text: "text-gray-600",   label: "中性" }
+    "bullish" => SIGNAL_COLORS[:confirm_bull].merge(label: "偏多").freeze,
+    "bearish" => SIGNAL_COLORS[:confirm_bear].merge(label: "偏空").freeze,
+    "neutral" => SIGNAL_COLORS[:neutral].merge(label: "中性").freeze
   }.freeze
 
   TABLE_COLS = [

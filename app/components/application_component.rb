@@ -4,6 +4,16 @@ class ApplicationComponent < Phlex::HTML
   include Rails.application.routes.url_helpers
   include ActionView::Helpers::NumberHelper
 
+  # Shared semantic color palette.  Subcomponents reference these constants
+  # and add their own keys (icon:, label:) via .merge — no copy-pasting.
+  SIGNAL_COLORS = {
+    confirm_bull: { bg: "bg-green-50",  border: "border-green-300", text: "text-green-800", dot: "bg-green-400" }.freeze,
+    caution:      { bg: "bg-yellow-50", border: "border-yellow-300", text: "text-yellow-800", dot: "bg-yellow-400" }.freeze,
+    warning:      { bg: "bg-orange-50", border: "border-orange-300", text: "text-orange-800", dot: "bg-orange-400" }.freeze,
+    confirm_bear: { bg: "bg-red-50",    border: "border-red-300",    text: "text-red-800",   dot: "bg-red-400"   }.freeze,
+    neutral:      { bg: "bg-gray-50",   border: "border-gray-300",   text: "text-gray-600",  dot: "bg-gray-400"  }.freeze
+  }.freeze
+
   private
 
   def fmt_currency(value, currency: "USD", decimals: 2)
