@@ -278,17 +278,17 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
           end
         end
         tbody do
-          orders.each { |t| render_flow_row(t) }
+          orders.each_with_index { |t, i| render_flow_row(t, i) }
         end
       end
     end
   end
 
-  def render_flow_row(t)
+  def render_flow_row(t, i = 0)
     dir   = (t[:direction] || "neutral").to_s
     ds    = DIR_STYLE[dir] || DIR_STYLE["neutral"]
     is_call = t[:option_type].to_s == "Call"
-    tr(class: "border-t border-gray-100 hover:bg-gray-50") do
+    tr(class: "border-t border-gray-100 hover:bg-purple-200 #{i.odd? ? 'bg-gray-50/50' : ''}") do
       td(class: "px-3 py-2 font-medium #{is_call ? 'text-green-700' : 'text-red-700'}") { plain t[:option_type].to_s }
       td(class: "px-3 py-2 text-right font-mono")  { plain fmt_price(t[:strike]) }
       td(class: "px-3 py-2 font-mono text-xs")     { plain t[:expires_at].to_s }
