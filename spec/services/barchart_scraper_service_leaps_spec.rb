@@ -135,8 +135,16 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
   # Options Prices fetched cleanly; V&G session expires on a later expiration.
   # The Ruby service must propagate partial_error AND name "Volatility & Greeks"
   # in the error — NOT "Options Prices" — so the caller can tell the two apart.
-  # C.5: old code silently swallowed V&G expiry as null fields; fix propagates
-  # it as partial_error with the correct layer label.
+  #
+  # Root cause confirmed: when Barchart session expires on the V&G page, the page
+  # does NOT navigate away — bc-data-grid._data returns [] (empty array), not null.
+  # JavaScript: ![] === false, so the guard (if !grid._data) never fires → returns []
+  # Python: [] is None → False → the old "if vg_rows is None" check never triggered
+  # → _merge_vg(opts_rows, []) ran silently → null V&G fields → loop continued → success
+  #
+  # Fix in leaps_scraper.py: "if not vg_rows" catches both None and [].
+  # This Ruby test mocks at the run_scraper level (tests Ruby service behaviour);
+  # the Python-level [] vs None distinction is covered by the scraper fix above.
 
   describe "V&G-only session expiry (Options Prices fetched cleanly)" do
     let(:vg_partial_rows) do

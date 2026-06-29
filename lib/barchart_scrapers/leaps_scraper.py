@@ -188,7 +188,7 @@ async def main(symbol):
         await activate_target(target_id)
 
         opts_rows = await cdp_eval(ws_url, OPTIONS_GRID_JS)
-        if opts_rows is None:
+        if not opts_rows:
             print(json.dumps({
                 "status":                "partial",
                 "rows":                  all_rows,
@@ -210,7 +210,7 @@ async def main(symbol):
         await activate_target(target_id)
 
         vg_rows = await cdp_eval(ws_url, VG_GRID_JS)
-        if vg_rows is None:
+        if not vg_rows:
             # Session expired after opts_rows already fetched — include this
             # expiration with empty V&G fields, then abort cleanly.
             merged = _merge_vg(opts_rows, [])
