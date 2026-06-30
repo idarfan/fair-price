@@ -91,9 +91,12 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     when :partial_error
       msg = @scrape_errors.first || "抓取中途 Session 過期，部分資料可能不完整。請重新登入 Barchart 後重試。"
       render_alert("bg-yellow-50 border border-yellow-300 text-yellow-800", "⚠️ #{msg}")
-    when :error
+    when :cdp_offline
       render_alert("bg-red-50 border border-red-300 text-red-800",
         "❌ CDP 未連線，請確認 Windows 端 Chrome 已以 --remote-debugging-port=9222 啟動。若電腦曾經睡眠/喚醒，這通常是 WSL2 的 /mnt/c/ 掛載失效造成的，請在 Windows PowerShell 執行 wsl --shutdown 後等待 WSL2 重新啟動，再重試一次。")
+    when :error
+      msg = @scrape_errors.first.presence || "抓取時發生未知錯誤，請稍後重試。"
+      render_alert("bg-red-50 border border-red-300 text-red-800", "❌ #{msg}")
     when :no_candidates
       msg = @user_strike.present? ?
         "這個履約價 #{@user_strike}（含緩衝檔）在所有到期日都沒有符合 Delta 0.75–0.90 的候選。請嘗試其他履約價，或留空讓系統自動偵測。" :
@@ -354,7 +357,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
                 return;
               }
               if (data.status === 'cdp_offline') {
-                window.location.href = '/leaps?symbol=' + symbol + '&job_status=error' + strikeSuffix;
+                window.location.href = '/leaps?symbol=' + symbol + '&job_status=cdp_offline' + strikeSuffix;
                 return;
               }
               var jobId = data.job_id;

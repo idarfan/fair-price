@@ -152,7 +152,21 @@ RSpec.describe "GET /leaps", type: :request do
     end
   end
 
-  # ── 6. job_status=error 帶回（CDP / 系統錯誤）─────────────────────────────
+  # ── 6. job_status=cdp_offline / error 帶回 ─────────────────────────────────
+
+  describe "job_status=cdp_offline without fresh data" do
+    before do
+      allow(LeapsOptionChainSnapshot)
+        .to receive_message_chain(:for_symbol, :fresh, :exists?)
+        .and_return(false)
+    end
+
+    it "returns 200 and shows CDP error message" do
+      get "/leaps", params: { symbol: symbol, job_status: "cdp_offline" }
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("wsl --shutdown")
+    end
+  end
 
   describe "job_status=error without fresh data" do
     before do
@@ -161,13 +175,14 @@ RSpec.describe "GET /leaps", type: :request do
         .and_return(false)
       allow(Rails.cache).to receive(:read)
         .with("leaps_last_errors_#{symbol}")
-        .and_return([])
+        .and_return(["抓取時發生系統錯誤"])
     end
 
-    it "returns 200 and shows CDP error message" do
+    it "returns 200 and shows generic error from scrape_errors" do
       get "/leaps", params: { symbol: symbol, job_status: "error" }
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("wsl --shutdown")
+      expect(response.body).to include("抓取時發生系統錯誤")
+      expect(response.body).not_to include("wsl --shutdown")
     end
   end
   # ── 7. POST /leaps/analyze — CDP 離線時直接擋下不送 job ─────────────────────

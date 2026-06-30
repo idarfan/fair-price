@@ -21,6 +21,8 @@ class LeapsRecommendationsController < ApplicationController
         case params[:job_status]
         when "session_expired"
           @scrape_status = :session_expired
+        when "cdp_offline"
+          @scrape_status = :cdp_offline
         when "partial_error"
           @scrape_status = :partial_error
           @scrape_errors = cached_errors(@symbol)
@@ -34,6 +36,8 @@ class LeapsRecommendationsController < ApplicationController
         case params[:job_status]
         when "session_expired"
           @scrape_status = :session_expired
+        when "cdp_offline"
+          @scrape_status = :cdp_offline
         when "no_candidates"
           @scrape_status = :no_candidates
         when "partial_error"
