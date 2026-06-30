@@ -95,7 +95,8 @@
 | `bg-gray-50/50` 奇數列透明度 | ✅ **2026-06-30 親眼確認**：JS 驗證 computed `rgba(249, 250, 251, 0.5)`；hover 截圖可見整列變 `bg-purple-200` 紫色。但 **tailwind/application.css 缺少靜態宣告**導致 CSS 沒生成，已補上後重建 tailwindcss:build 完成。 |
 | Checklist 文件內 `[ ]`/`[x]` 同步 | ❌ **尚未進行**，故意留到最後一次性更新，不要分批改 |
 | CDP 連線異常（NVTS查詢） | ⚠️ **根因已找到（cdp-relay 死亡），cdp-relay 已重啟**。殘留：SIGINT 來源未知（觀察項）、C.5b「1-2秒回應」驗收未做——等工具可用後做一次實際 NVTS 查詢時一起確認，見第4節。 |
-| 錯誤訊息分四種情況顯示（第8節） | ✅ **2026-06-30 全部修完，22/22 spec 通過**。新修重點：`ScrapeLeapsJob` rescue block 補寫 `leaps_last_errors_\#{symbol}` cache；新增 `spec/jobs/scrape_leaps_job_spec.rb`。 |
+| 錯誤訊息分四種情況顯示（第8節） | ✅ **2026-06-30 全部修完，23/23 spec 通過**。新修重點：`ScrapeLeapsJob` rescue block 補寫 `leaps_last_errors_\#{symbol}` cache；新增 `spec/jobs/scrape_leaps_job_spec.rb`。partial_error fallback 文字改中性（不再暗示一定是 session 問題）。 |
+| `FetchLog`/`log_fetch` bug（leaps 分支） | ✅ **2026-06-30 修完**。`FetchLog::FETCH_TYPES` 缺 `"leaps"`、`STATUSES` 缺 `no_candidates/partial_error/cached`，導致 `log_fetch` 從 `fetch_leaps` 任何分支呼叫都 throw `RecordInvalid`，原始 AR 錯誤漏到使用者畫面。已補常數 + `log_fetch` 加 rescue（logging 失敗不砸主流程）+ `persist_leaps` 加防護性欄位驗證。 |
 
 ### 4. 接下來順序
 
