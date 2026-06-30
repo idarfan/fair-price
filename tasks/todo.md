@@ -80,3 +80,53 @@ render_divergences    ← 背離分析 badge
 - Barchart 用 Google OAuth 登入，**禁止自動填入帳密、自動點 Google 登入**
 - Session 過期 → 立刻 abort，回傳 `barchart_session_expired`
 - **禁止呼叫任何 `/proxies/` 或未核准內部 endpoint**
+
+---
+
+## 2026-06-30 session 進度（重開 session 後從這裡繼續）
+
+### 這個 session 做了什麼
+
+1. **讀了 `playwright-verification-global-rule.md`，逐項對照驗收清單**
+   - Hook `post-edit-scraper-playwright-verify.sh` 已存在且已在 settings.json 登錄 ✅
+   - MEMORY.md 有提醒 ✅
+   - 規則 0（session 開始確認工具可用）**缺少強制機制** ❌
+
+2. **查清楚 hook 框架**：`SessionStart` 事件存在，已有兩個 hook 掛在上面
+
+3. **建立了新 hook 腳本**（已寫入磁碟，**尚未註冊進 settings.json**）：
+   - 路徑：`/home/idarfan/.claude/hooks/session-start-playwright-check.sh`
+   - 功能：fairprice 專案 session 啟動時，shell 層跑 `claude mcp list` 偵測 playwright-chrome 狀態，同時注入 LLM 強制指令（工具不可用時禁止繞路）
+
+4. **修了眼前的 CDP 問題**：
+   - 根因：`cdp-relay`（pm2 id 14）被 KeyboardInterrupt 殺掉，處於 stopped 狀態
+   - 修法：`pm2 restart cdp-relay`
+   - 結果：`localhost:9222` 現在有回應（Chrome/149），WebSocket URL 可取得
+
+5. **playwright-chrome MCP 在本 session 仍未連上**：session 啟動時連線失敗的 server 不會自動重連，需重開 session 才能生效
+
+### 重開 session 後必做（依序）
+
+- [ ] **Step A**：確認 playwright-chrome MCP 已連線
+  - `claude mcp list` 看 playwright-chrome 狀態
+  - 若 ✔ Connected → 用 `browser_navigate` 實際呼叫確認
+  - 若仍 ✘ → 先查 `pm2 logs cdp-relay --lines 10 --nostream` 確認 relay 還活著
+
+- [ ] **Step B**：把 `session-start-playwright-check.sh` 註冊進 settings.json
+  - 在 `SessionStart` 陣列末尾加入：
+    ```json
+    {
+      "hooks": [{
+        "type": "command",
+        "command": "/home/idarfan/.claude/hooks/session-start-playwright-check.sh",
+        "timeout": 20
+      }]
+    }
+    ```
+  - 用 python3 讀取 settings.json → 插入 → 寫回（避免手動 JSON 格式錯誤）
+
+- [ ] **Step C**：處理 playwright-chrome scope 衝突警告（可選，不影響功能）
+  - `claude mcp list` 顯示 user scope 和 project scope 都定義了同一個 server
+  - 擇一移除：`claude mcp remove playwright-chrome -s user`
+
+- [ ] **Step D**：繼續原本任務（Max Pain & Vol Skew 圖表，見上方「進行中」章節）
