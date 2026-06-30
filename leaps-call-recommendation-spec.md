@@ -80,7 +80,7 @@
 | Phase A–F、C.5、C.5b、E 配色共用 | ✅ 已驗證完成（多輪截圖+測試核對過，可信） |
 | Phase G（Stacked 抓取策略） | ✅ 已驗證完成 |
 | 履約價輸入框 step bug | ✅ 已關閉（三項證據齊全：DOM HTML 截圖、操作截圖、Rails log 含 `user_strike` 參數），這條是真的修好了 |
-| `mcp__playwright-chrome__*` 工具連線 | ⚠️ **cdp-relay 已重啟（online），但 `mcp__playwright-chrome__*` 工具本身尚未在本 session 實際呼叫過，不能假設它已正常工作**——下一步要實際呼叫一次確認，見第4節。 |
+| `mcp__playwright-chrome__*` 工具連線 | ✅ **2026-06-30 本 session 已實際呼叫確認**：`browser_navigate` 導航 `localhost:3003` 成功回應，頁面標題正確，速度正常，無逾時。 |
 | `bg-gray-50/50` 奇數列透明度 | ⚠️ **未關閉**——代碼據稱已改（主排行表+Flow表都改了，給了行號），但因為 CDP/工具故障，**從沒有人實際在瀏覽器看到過這個視覺效果**，不能標記完成 |
 | Checklist 文件內 `[ ]`/`[x]` 同步 | ❌ **尚未進行**，故意留到最後一次性更新，不要分批改 |
 | CDP 連線異常（NVTS查詢） | ⚠️ **根因已找到（cdp-relay 死亡），cdp-relay 已重啟**。殘留：SIGINT 來源未知（觀察項）、C.5b「1-2秒回應」驗收未做——等工具可用後做一次實際 NVTS 查詢時一起確認，見第4節。 |
