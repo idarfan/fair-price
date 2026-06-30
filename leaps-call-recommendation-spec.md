@@ -70,8 +70,14 @@
 - **已重啟**：`pm2 restart cdp-relay` → online。
 
 **仍未確認**：
-- Rails precheck 的「1-2秒內回應」（C.5b 驗收項）——cdp-relay 重啟後還沒實際測過 NVTS 查詢，這條等工具確認可用後一起驗。
+- Rails precheck 的「1-2秒內回應」（C.5b 驗收項）——這條標準是 CDP 預檢**失敗**時的快速回報，2026-06-30 實測 NVTS 時 CDP 健在、跑的是正常抓取流程，無法用同一個標準計時；需要另外觸發一次「CDP 離線 → 按查詢」場景才能驗，目前尚未驗。
 - cdp-relay 的 SIGINT 根因（見第0.1節觀察項）。
+
+**2026-06-30 新發現（NVTS 實測）**：
+- **UI bug（兩面）**：
+  1. Barchart session 過期且 `rows:[]` 時（第一輪 Barchart 登入前），頁面顯示空白，完全沒有任何提示——使用者不知道 session 過期。
+  2. session 中途過期但已有部分資料寫入（第二輪登入後成功抓到48筆），`job_status=error` 導致前端顯示「CDP 未連線」紅色 banner，**但 CDP 本身完全正常**——錯誤訊息跟實際失敗原因（Barchart session partial）不對應，使用者看到的是錯的診斷方向。兩種情況本質上是同一個問題：`status=error`/`partial_error` 對應的前端文字沒有依實際失敗類型分開顯示，一律套用 CDP 那條錯誤訊息。**已記錄，待修。**
+- **快取命中邏輯確認**：快取 `fresh` 判斷以 `scraped_at` 為準（>= 5分鐘前），session 過期導致 `rows:[]`、未寫入新資料，下次查詢仍當快取 miss 重新排 job，行為正確但對使用者不透明。
 
 ### 3. 各待辦項目目前真實狀態（不是 checklist 的 `[ ]`/`[x]`，是實際驗證狀態）
 
@@ -81,15 +87,18 @@
 | Phase G（Stacked 抓取策略） | ✅ 已驗證完成 |
 | 履約價輸入框 step bug | ✅ 已關閉（三項證據齊全：DOM HTML 截圖、操作截圖、Rails log 含 `user_strike` 參數），這條是真的修好了 |
 | `mcp__playwright-chrome__*` 工具連線 | ✅ **2026-06-30 本 session 已實際呼叫確認**：`browser_navigate` 導航 `localhost:3003` 成功回應，頁面標題正確，速度正常，無逾時。 |
-| `bg-gray-50/50` 奇數列透明度 | ⚠️ **未關閉**——代碼據稱已改（主排行表+Flow表都改了，給了行號），但因為 CDP/工具故障，**從沒有人實際在瀏覽器看到過這個視覺效果**，不能標記完成 |
+| `bg-gray-50/50` 奇數列透明度 | ✅ **2026-06-30 親眼確認**：JS 驗證 computed `rgba(249, 250, 251, 0.5)`；hover 截圖可見整列變 `bg-purple-200` 紫色。但 **tailwind/application.css 缺少靜態宣告**導致 CSS 沒生成，已補上後重建 tailwindcss:build 完成。 |
 | Checklist 文件內 `[ ]`/`[x]` 同步 | ❌ **尚未進行**，故意留到最後一次性更新，不要分批改 |
 | CDP 連線異常（NVTS查詢） | ⚠️ **根因已找到（cdp-relay 死亡），cdp-relay 已重啟**。殘留：SIGINT 來源未知（觀察項）、C.5b「1-2秒回應」驗收未做——等工具可用後做一次實際 NVTS 查詢時一起確認，見第4節。 |
 
 ### 4. 接下來順序
 
-1. **實際呼叫一次 `mcp__playwright-chrome__browser_navigate`**——cdp-relay 已重啟、預期應能連上，但不能假設，要真的呼叫才算確認。
-2. 工具確認可用後，做一次實際 NVTS 查詢，同時確認：(a) 查詢能跑完、(b) C.5b「1-2秒回應」是否達標、(c) 奇數列灰底（`bg-gray-50/50`）＋hover紫色能親眼看到。
-3. 以上全部確認後，一次性把 checklist 的 `[ ]` 改成 `[x]`，不要分批做。
+✅ 所有前置確認已完成（2026-06-30）：工具可用、NVTS 查詢能跑完（登入後成功抓 48 筆）、`bg-gray-50/50` 奇數列與 hover 紫色親眼確認。
+
+**接下來待處理（按優先順序）**：
+1. **UI bug 修正**：`job_status=error`/`partial_error` 時顯示的錯誤文字要分情況：CDP 離線顯示 CDP 訊息、Barchart session 過期顯示「請重新登入 Barchart」、partial 顯示抓到哪個到期日斷掉，不能全部套同一句 CDP 訊息。
+2. **C.5b「1-2秒回應」計時驗收**：需另外觸發「CDP 離線 → 按查詢」場景，這次跑的是正常抓取流程，C.5b 不適用同一個標準，尚未驗。
+3. 以上完成後，一次性把 checklist 的 `[ ]` 改成 `[x]`，不要分批做。
 
 ---
 

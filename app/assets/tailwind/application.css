@@ -57,6 +57,9 @@
 .bg-gray-500\/10   { background-color: color-mix(in srgb, oklch(55.1% .027 264.364) 10%, transparent); }
 .bg-yellow-500\/10 { background-color: color-mix(in srgb, oklch(79.5% .184 86.047)  10%, transparent); }
 
+/* LEAPS table — odd row background (bypasses Tailwind v4 scanner) */
+.bg-gray-50\/50 { background-color: color-mix(in srgb, oklch(98.5% .002 247.839) 50%, transparent); }
+
 /* ── Data tooltip (pure CSS, no JS) ─────────────────────────────────────── */
 [data-tooltip] {
   position: relative;
