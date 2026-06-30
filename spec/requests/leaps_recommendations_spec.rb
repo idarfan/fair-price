@@ -152,6 +152,23 @@ RSpec.describe "GET /leaps", type: :request do
     end
   end
 
+  describe "job_status=partial_error without fresh data — cache empty (fallback text)" do
+    before do
+      allow(LeapsOptionChainSnapshot)
+        .to receive_message_chain(:for_symbol, :fresh, :exists?)
+        .and_return(false)
+      # no cache stub → cached_errors returns []
+    end
+
+    it "returns 200 and shows neutral fallback (not session-specific wording)" do
+      get "/leaps", params: { symbol: symbol, job_status: "partial_error" }
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("抓取中途發生未預期錯誤")
+      expect(response.body).not_to include("請重新登入 Barchart")
+      expect(response.body).not_to include("wsl --shutdown")
+    end
+  end
+
   # ── 6. job_status=cdp_offline / error 帶回 ─────────────────────────────────
 
   describe "job_status=cdp_offline without fresh data" do

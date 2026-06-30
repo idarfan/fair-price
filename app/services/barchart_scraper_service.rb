@@ -279,6 +279,13 @@ class BarchartScraperService
       }
     end
 
+    # 防護性驗證：insert_all 不觸發 model validation，在此手動檢查必要欄位，
+    # 讓呼叫端（ScrapeLeapsJob rescue block）可以把人話訊息寫進 leaps_last_errors。
+    incomplete = records.count { |r| r[:expiration_date].blank? || r[:strike].blank? || r[:option_type].blank? }
+    if incomplete > 0
+      raise "LEAPS 資料不完整（#{incomplete}/#{records.size} 筆缺少到期日、履約價或選擇權類型），請重新查詢"
+    end
+
     # Wrapped in a transaction: if insert_all fails, delete_all is rolled back
     # so callers never see a state where the old data is gone but nothing replaced it.
     ActiveRecord::Base.transaction do
@@ -340,5 +347,7 @@ class BarchartScraperService
       error_detail: detail,
       fetched_at:   Time.current
     )
+  rescue => e
+    Rails.logger.warn("[BarchartScraperService] log_fetch failed (type=#{type} status=#{status}): #{e.message}")
   end
 end

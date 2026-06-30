@@ -89,7 +89,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       render_alert("bg-orange-50 border border-orange-300 text-orange-800",
         "⚠️ 請先登入 Barchart 後重試。（Barchart 登入 Session 已過期）")
     when :partial_error
-      msg = @scrape_errors.first || "抓取中途 Session 過期，部分資料可能不完整。請重新登入 Barchart 後重試。"
+      msg = @scrape_errors.first || "抓取中途發生未預期錯誤，部分資料可能不完整，請重新查詢。"
       render_alert("bg-yellow-50 border border-yellow-300 text-yellow-800", "⚠️ #{msg}")
     when :cdp_offline
       render_alert("bg-red-50 border border-red-300 text-red-800",
