@@ -76,7 +76,7 @@
 **2026-06-30 新發現（NVTS 實測）**：
 - **UI bug（兩面）**：
   1. Barchart session 過期且 `rows:[]` 時（第一輪 Barchart 登入前），頁面顯示空白，完全沒有任何提示——使用者不知道 session 過期。
-  2. session 中途過期但已有部分資料寫入（第二輪登入後成功抓到48筆），`job_status=error` 導致前端顯示「CDP 未連線」紅色 banner，**但 CDP 本身完全正常**——錯誤訊息跟實際失敗原因（Barchart session partial）不對應，使用者看到的是錯的診斷方向。兩種情況本質上是同一個問題：`status=error`/`partial_error` 對應的前端文字沒有依實際失敗類型分開顯示，一律套用 CDP 那條錯誤訊息。**已記錄，待修。**
+  2. session 中途過期但已有部分資料寫入（第二輪登入後成功抓到48筆），`job_status=error` 導致前端顯示「CDP 未連線」紅色 banner，**但 CDP 本身完全正常**——錯誤訊息跟實際失敗原因（Barchart session partial）不對應，使用者看到的是錯的診斷方向。兩種情況本質上是同一個問題：`status=error`/`partial_error` 對應的前端文字沒有依實際失敗類型分開顯示，一律套用 CDP 那條錯誤訊息。**✅ 已修復（commit fix: LEAPS 錯誤訊息依實際失敗原因分情況顯示）**：`cdp_offline` 和 `error` 現在走不同路徑，15/15 spec 通過。
 - **快取命中邏輯確認**：快取 `fresh` 判斷以 `scraped_at` 為準（>= 5分鐘前），session 過期導致 `rows:[]`、未寫入新資料，下次查詢仍當快取 miss 重新排 job，行為正確但對使用者不透明。
 
 ### 3. 各待辦項目目前真實狀態（不是 checklist 的 `[ ]`/`[x]`，是實際驗證狀態）
