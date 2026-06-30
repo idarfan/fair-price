@@ -1,0 +1,18 @@
+{
+  "grid": true,
+  "len": 20,
+  "sample": [
+    {
+      "strike": 8.5,
+      "delta": 0.966849
+    },
+    {
+      "strike": 9,
+      "delta": 0.951416
+    },
+    {
+      "strike": 9.5,
+      "delta": 0.874818
+    }
+  ]
+}
