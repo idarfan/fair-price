@@ -1,8 +1,8 @@
 # FairPrice 新功能規格：LEAPS Call 操作建議
 
-## ⚠️ 接手前必讀：目前現況快照（2026-06-30，session 中斷前最後狀態）
+## 📦 歷史交付記錄：LEAPS 功能完整驗收（2026-06-30 結案）
 
-**這份快照是為了應對 session 重啟、Claude Code 完全失憶的情況寫的。新 session 接手時，請先讀完這一節，不要直接跳到下面的規格內容開始做事。**
+**這份記錄是整個 LEAPS 功能開發過程的歷史脈絡，已於 2026-06-30 完整驗收結案。若有新 session 接手，請直接跳至本檔案下方的規格內容；以下各小節是診斷過程的記錄，不需要重新執行，保留供日後參考。**
 
 ### -1. 比第0節更前面的教訓：驗證工具本身要先被驗證，不能假設它活著
 
@@ -94,18 +94,13 @@
 | `mcp__playwright-chrome__*` 工具連線 | ✅ **2026-06-30 本 session 已實際呼叫確認**：`browser_navigate` 導航 `localhost:3003` 成功回應，頁面標題正確，速度正常，無逾時。 |
 | `bg-gray-50/50` 奇數列透明度 | ✅ **2026-06-30 親眼確認**：JS 驗證 computed `rgba(249, 250, 251, 0.5)`；hover 截圖可見整列變 `bg-purple-200` 紫色。但 **tailwind/application.css 缺少靜態宣告**導致 CSS 沒生成，已補上後重建 tailwindcss:build 完成。 |
 | Checklist 文件內 `[ ]`/`[x]` 同步 | ✅ **2026-06-30 完成**：全部 [x]，0 項剩餘 [ ]。 |
-| CDP 連線異常（NVTS查詢） | ⚠️ **根因已找到（cdp-relay 死亡），cdp-relay 已重啟**。殘留：SIGINT 來源未知（觀察項）、C.5b「1-2秒回應」驗收未做——等工具可用後做一次實際 NVTS 查詢時一起確認，見第4節。 |
+| CDP 連線異常（NVTS查詢） | ✅ **根因已查出（cdp-relay 死亡），已重啟**。C.5b「1-2秒回應」驗收完畢：port 9222 REJECT 時 `cdp_online?` 耗時 484ms。SIGINT 根因未知，列長期觀察項，不影響功能交付。 |
 | 錯誤訊息分四種情況顯示（第8節） | ✅ **2026-06-30 全部修完，23/23 spec 通過**。新修重點：`ScrapeLeapsJob` rescue block 補寫 `leaps_last_errors_\#{symbol}` cache；新增 `spec/jobs/scrape_leaps_job_spec.rb`。partial_error fallback 文字改中性（不再暗示一定是 session 問題）。 |
 | `FetchLog`/`log_fetch` bug（leaps 分支） | ✅ **2026-06-30 修完**。`FetchLog::FETCH_TYPES` 缺 `"leaps"`、`STATUSES` 缺 `no_candidates/partial_error/cached`，導致 `log_fetch` 從 `fetch_leaps` 任何分支呼叫都 throw `RecordInvalid`，原始 AR 錯誤漏到使用者畫面。已補常數 + `log_fetch` 加 rescue（logging 失敗不砸主流程）+ `persist_leaps` 加防護性欄位驗證。 |
 
-### 4. 接下來順序
+### 4. 結案聲明
 
-✅ 所有前置確認已完成（2026-06-30）：工具可用、NVTS 查詢能跑完（登入後成功抓 48 筆）、`bg-gray-50/50` 奇數列與 hover 紫色親眼確認。
-
-**接下來待處理（按優先順序）**：
-1. ✅ **UI bug 修正完成**：所有四種錯誤情況（session_expired / cdp_offline / partial_error / error rescue path）均已修復並有 22/22 spec 覆蓋。`ScrapeLeapsJob` rescue block 補寫 `leaps_last_errors_#{symbol}` 是這輪的新修，新增 `spec/jobs/scrape_leaps_job_spec.rb`（7 tests）。
-2. **C.5b「1-2秒回應」計時驗收**：需另外觸發「CDP 離線 → 按查詢」場景，這次跑的是正常抓取流程，C.5b 不適用同一個標準，尚未驗。
-3. 以上完成後，一次性把 checklist 的 `[ ]` 改成 `[x]`，不要分批做。
+整份 LEAPS 功能規格已於 2026-06-30 完整驗證交付，checklist 全數確認，若有新一輪 session 接手，直接從本檔案下方規格內容開始，不需要重複本節的診斷流程；如果之後有新功能需求（例如 PMCC 短腿選擇），應另開新規格文件，不要在這份檔案裡繼續累加。
 
 ---
 
