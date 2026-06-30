@@ -43,10 +43,14 @@
 
 **這代表上一輪的 `npx@latest` 修復是必要但不充分的**：那次修復解決的是「MCP server process 本身啟動太慢」，但這次發現的是更下游一層——MCP server 啟動之後，要連的 `cdp-relay` 中間層本身掛了，是兩個獨立的故障點疊在一起，不是同一個根因的不同症狀。
 
-**待辦（這次重啟前要先查清楚，不要重啟完就結案）**：
-1. `pm2` 重啟 5 次後「放棄」的判斷邏輯是什麼（`max_restarts` 之類的設定值），這代表 `cdp-relay` 在過去某段時間已經反覆死過很多次，不是這次第一次——值得查 pm2 的重啟歷史時間軸，看 SIGINT 是固定間隔（代表有東西在主動發訊號，例如誤判的健康檢查或 cron）還是隨機（比較像資源不足或外部環境問題）。
-2. 這次 SIGINT 發生的時間點，跟「之前 NVTS 那次 CDP 異常」或「這次重開 Claude Code session 的時刻」有沒有重疊——如果時間點對得上重開 session，可能是新 session 啟動過程裡某個初始化動作誤殺了這個 process。
-3. 如果查完上述兩點還是查不出明確原因，先 `pm2 restart cdp-relay` 讓功能恢復，**但這個「根因未知的 SIGINT」要記錄成已知但未解決的風險，不能因為這次重啟成功就視為問題已解決**——如果之後又反覆死亡，下次不能再滿足於「重啟一次看看」，要認真排查訊號來源。
+**2026-06-30 診斷結果（已完成兩項調查後執行重啟）**：
+
+1. **pm2 `max_restarts` 設定**：`pm2 show cdp-relay` 顯示**沒有 `max_restarts` 欄位**（pm2 預設值是 15），「5 次就 stopped」不是 pm2 上限被觸發。推測：歷次重啟中某一次 pm2 操作（`pm2 stop`/`pm2 restart`）本身發出 SIGINT 讓它正常停下，之後就沒再被啟動——`unstable restarts: 0` 支持這個推測（每次都活超過 1 秒才掛，符合 pm2 操作訊號行為，不像資源崩潰）。
+2. **SIGINT 時間點**：兩個 log（stdout + stderr）都**沒有時間戳**，無法從 log 確認 SIGINT 是否跟 session 重開或 NVTS 查詢時間點重疊。這條查不到，列為未解。
+
+**已執行**：`pm2 restart cdp-relay` → online（pid 47377，uptime 穩定）。
+
+⚠️ **觀察項（根因未知，不視為問題已解決）**：若 cdp-relay 再次無預警死亡，下次不能再滿足於「重啟一次看看」——應立即查 `pm2 logs cdp-relay --lines 5 --nostream`，確認是否又出現 `KeyboardInterrupt`，並記錄當下是否有 Claude Code session 開啟/關閉動作同步發生，比對時間點。
 
 
 
@@ -56,15 +60,18 @@
 - V&G merge bug 根因診斷（判定是 session 過期，不是 key 比對問題）
 - V&G 頁面支援 stacked-by-strike 模式的確認（`?expiration=X&strike=Y`，不含 `view=stacked`）
 
-### 2. 目前阻擋一切的問題：CDP 連線異常，根因未定
+### 2. CDP 連線異常：根因已查出（cdp-relay 死亡），已重啟，殘留觀察項
 
-最新一次查詢（NVTS）又跳出「CDP 未連線」錯誤，但使用者堅稱**服務一直在跑、沒有中斷過**——如果這個說法屬實，跟已知根因（WSL2 sleep/wake 後 `/mnt/c/` 掛載失效）不符，代表可能存在**第二種**會導致這個錯誤畫面出現的原因，目前還沒查到。已要求但**尚未收到回報**的四項診斷：
-1. `pm2 status` 實際輸出（chrome-cdp-keeper 的 uptime、重啟次數）
-2. 當下立即執行 `curl http://localhost:9222/json/version` 的實際回應
-3. 這次 NVTS 請求的 Rails log，從 request 到回傳錢誤經過幾秒（順便驗證 C.5b「1-2秒內回應」是否真的做到）
-4. `ls /mnt/c/` 當下是否健康
+**2026-06-30 診斷完成**。NVTS「CDP 未連線」錯誤的實際根因不是 WSL2 sleep/wake，也不是 Rails precheck bug：
 
-**如果第2步現在執行起來是成功的、但 Rails precheck 卻判定失敗，代表 precheck 判斷邏輯本身有 bug，是全新的問題，不是 WSL2 sleep/wake 那個已知根因，不能套用 `wsl --shutdown` 這個現成答案。**
+- ✅ Chrome CDP（port 9222）：`curl http://localhost:9222/json/version` 健康，有 3 個目標分頁。
+- ✅ `/mnt/c/` 掛載：9222 能正常回應，基本排除掛載失效問題。
+- ❌ **根因：`cdp-relay`（port 9223）在 pm2 裡是 stopped 狀態**，`playwright-mcp` 連的是這一層（不是直接連 9222），中間層死了所以每次逾時。
+- **已重啟**：`pm2 restart cdp-relay` → online。
+
+**仍未確認**：
+- Rails precheck 的「1-2秒內回應」（C.5b 驗收項）——cdp-relay 重啟後還沒實際測過 NVTS 查詢，這條等工具確認可用後一起驗。
+- cdp-relay 的 SIGINT 根因（見第0.1節觀察項）。
 
 ### 3. 各待辦項目目前真實狀態（不是 checklist 的 `[ ]`/`[x]`，是實際驗證狀態）
 
@@ -73,18 +80,16 @@
 | Phase A–F、C.5、C.5b、E 配色共用 | ✅ 已驗證完成（多輪截圖+測試核對過，可信） |
 | Phase G（Stacked 抓取策略） | ✅ 已驗證完成 |
 | 履約價輸入框 step bug | ✅ 已關閉（三項證據齊全：DOM HTML 截圖、操作截圖、Rails log 含 `user_strike` 參數），這條是真的修好了 |
-| `mcp__playwright-chrome__*` 工具連線 | ⚠️ **`npx@latest`修復已驗證有效，但發現第二層問題：`cdp-relay` process（pm2管理，port9223）死亡，根因未明（SIGINT來源不明）**，見第0.1節 |
+| `mcp__playwright-chrome__*` 工具連線 | ⚠️ **cdp-relay 已重啟（online），但 `mcp__playwright-chrome__*` 工具本身尚未在本 session 實際呼叫過，不能假設它已正常工作**——下一步要實際呼叫一次確認，見第4節。 |
 | `bg-gray-50/50` 奇數列透明度 | ⚠️ **未關閉**——代碼據稱已改（主排行表+Flow表都改了，給了行號），但因為 CDP/工具故障，**從沒有人實際在瀏覽器看到過這個視覺效果**，不能標記完成 |
 | Checklist 文件內 `[ ]`/`[x]` 同步 | ❌ **尚未進行**，故意留到最後一次性更新，不要分批改 |
-| CDP 連線異常（NVTS查詢） | ❌ **四項診斷尚未回報**，見第2節。**注意：這個問題首次出現的時間點，跟 playwright-chrome MCP 工具失效的時間點重疊，不確定是否同一根因的不同症狀（例如 raw WebSocket 繞路操作本身可能干擾了 CDP 連線狀態）——新 session 工具確認可用後，建議優先重新測一次 CDP 連線問題是否還存在，再決定要不要繼續四項診斷，不要假設兩個問題互不相關。** |
+| CDP 連線異常（NVTS查詢） | ⚠️ **根因已找到（cdp-relay 死亡），cdp-relay 已重啟**。殘留：SIGINT 來源未知（觀察項）、C.5b「1-2秒回應」驗收未做——等工具可用後做一次實際 NVTS 查詢時一起確認，見第4節。 |
 
 ### 4. 接下來順序
 
-1. 確認 `mcp__playwright-chrome__*` 工具這次真的連上了（第0節，含啟動速度是否正常）
-2. 工具確認可用後，**先重新測一次 CDP 連線問題是否還存在**——可能跟工具問題同源，不要直接假設它還在、跳去做四項診斷；如果這次 CDP 連線正常，第2節那四項診斷可以省略，直接記錄「問題隨MCP修復一併消失」
-3. 如果 CDP 問題依然存在，才進行第2節四項診斷
-4. CDP 恢復後，實際查一次 NOK 或 NVTS，**親眼確認**奇數列灰底＋hover紫色，`bg-gray-50/50` 才能關閉
-5. 全部解決後，一次性把 checklist 的 `[ ]` 改成 `[x]`，不要分批做
+1. **實際呼叫一次 `mcp__playwright-chrome__browser_navigate`**——cdp-relay 已重啟、預期應能連上，但不能假設，要真的呼叫才算確認。
+2. 工具確認可用後，做一次實際 NVTS 查詢，同時確認：(a) 查詢能跑完、(b) C.5b「1-2秒回應」是否達標、(c) 奇數列灰底（`bg-gray-50/50`）＋hover紫色能親眼看到。
+3. 以上全部確認後，一次性把 checklist 的 `[ ]` 改成 `[x]`，不要分批做。
 
 ---
 
