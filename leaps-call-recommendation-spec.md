@@ -76,7 +76,12 @@
 **2026-06-30 新發現（NVTS 實測）**：
 - **UI bug（兩面）**：
   1. Barchart session 過期且 `rows:[]` 時（第一輪 Barchart 登入前），頁面顯示空白，完全沒有任何提示——使用者不知道 session 過期。
-  2. session 中途過期但已有部分資料寫入（第二輪登入後成功抓到48筆），`job_status=error` 導致前端顯示「CDP 未連線」紅色 banner，**但 CDP 本身完全正常**——錯誤訊息跟實際失敗原因（Barchart session partial）不對應，使用者看到的是錯的診斷方向。兩種情況本質上是同一個問題：`status=error`/`partial_error` 對應的前端文字沒有依實際失敗類型分開顯示，一律套用 CDP 那條錯誤訊息。**✅ 已修復（commit fix: LEAPS 錯誤訊息依實際失敗原因分情況顯示）**：`cdp_offline` 和 `error` 現在走不同路徑，15/15 spec 通過。
+  2. session 中途過期但已有部分資料寫入（第二輪登入後成功抓到48筆），`job_status=error` 導致前端顯示「CDP 未連線」紅色 banner，**但 CDP 本身完全正常**——錯誤訊息跟實際失敗原因（Barchart session partial）不對應，使用者看到的是錯的診斷方向。兩種情況本質上是同一個問題：`status=error`/`partial_error` 對應的前端文字沒有依實際失敗類型分開顯示，一律套用 CDP 那條錯誤訊息。**✅ 全部四種情況已修復並驗測**：
+     - `:session_expired` → 橙色 banner「請先登入 Barchart 後重試」
+     - `:cdp_offline` → 紅色 banner 含 `wsl --shutdown` 提示（已確認：JS 路由 cdp_offline 走獨立分支，不混入 error）
+     - `:partial_error` → 黃色 banner 顯示 `@scrape_errors.first`（後端已確保含到期日 + 斷線層級）
+     - `:error` → 紅色 banner 顯示 `@scrape_errors.first`（**新修：`ScrapeLeapsJob` rescue block 原先漏寫 `leaps_last_errors_\#{symbol}` cache，導致 `cached_errors()` 永遠回 `[]`、controller 只看到通用字串；已補上寫入。**）
+     - 新增 `spec/jobs/scrape_leaps_job_spec.rb`（7 個測試），連同 request spec 共 22/22 通過。
 - **快取命中邏輯確認**：快取 `fresh` 判斷以 `scraped_at` 為準（>= 5分鐘前），session 過期導致 `rows:[]`、未寫入新資料，下次查詢仍當快取 miss 重新排 job，行為正確但對使用者不透明。
 
 ### 3. 各待辦項目目前真實狀態（不是 checklist 的 `[ ]`/`[x]`，是實際驗證狀態）
@@ -90,13 +95,14 @@
 | `bg-gray-50/50` 奇數列透明度 | ✅ **2026-06-30 親眼確認**：JS 驗證 computed `rgba(249, 250, 251, 0.5)`；hover 截圖可見整列變 `bg-purple-200` 紫色。但 **tailwind/application.css 缺少靜態宣告**導致 CSS 沒生成，已補上後重建 tailwindcss:build 完成。 |
 | Checklist 文件內 `[ ]`/`[x]` 同步 | ❌ **尚未進行**，故意留到最後一次性更新，不要分批改 |
 | CDP 連線異常（NVTS查詢） | ⚠️ **根因已找到（cdp-relay 死亡），cdp-relay 已重啟**。殘留：SIGINT 來源未知（觀察項）、C.5b「1-2秒回應」驗收未做——等工具可用後做一次實際 NVTS 查詢時一起確認，見第4節。 |
+| 錯誤訊息分四種情況顯示（第8節） | ✅ **2026-06-30 全部修完，22/22 spec 通過**。新修重點：`ScrapeLeapsJob` rescue block 補寫 `leaps_last_errors_\#{symbol}` cache；新增 `spec/jobs/scrape_leaps_job_spec.rb`。 |
 
 ### 4. 接下來順序
 
 ✅ 所有前置確認已完成（2026-06-30）：工具可用、NVTS 查詢能跑完（登入後成功抓 48 筆）、`bg-gray-50/50` 奇數列與 hover 紫色親眼確認。
 
 **接下來待處理（按優先順序）**：
-1. **UI bug 修正**：`job_status=error`/`partial_error` 時顯示的錯誤文字要分情況：CDP 離線顯示 CDP 訊息、Barchart session 過期顯示「請重新登入 Barchart」、partial 顯示抓到哪個到期日斷掉，不能全部套同一句 CDP 訊息。
+1. ✅ **UI bug 修正完成**：所有四種錯誤情況（session_expired / cdp_offline / partial_error / error rescue path）均已修復並有 22/22 spec 覆蓋。`ScrapeLeapsJob` rescue block 補寫 `leaps_last_errors_#{symbol}` 是這輪的新修，新增 `spec/jobs/scrape_leaps_job_spec.rb`（7 tests）。
 2. **C.5b「1-2秒回應」計時驗收**：需另外觸發「CDP 離線 → 按查詢」場景，這次跑的是正常抓取流程，C.5b 不適用同一個標準，尚未驗。
 3. 以上完成後，一次性把 checklist 的 `[ ]` 改成 `[x]`，不要分批做。
 
