@@ -102,6 +102,8 @@
 
 整份 LEAPS 功能規格已於 2026-06-30 完整驗證交付，checklist 全數確認，若有新一輪 session 接手，直接從本檔案下方規格內容開始，不需要重複本節的診斷流程；如果之後有新功能需求（例如 PMCC 短腿選擇），應另開新規格文件，不要在這份檔案裡繼續累加。
 
+**補充驗證記錄（2026-06-30）**：NOK 不帶履約價的 Stage 1 自動偵測路徑已於此時驗證通過。同日修復了 `cdp_helper.py` `prepare_page` 的 skip-navigation bug（Chrome 停在任意 `/options` URL 時會跳過導航），修復後 `leaps_scraper.py` 強制導航至 `?moneyness=10` Near the Money SBS view。實測輸出：Stage 1 自動偵測找到 20 筆近價行權價資料、候選行包括 strikes 8.5–10.5；Stage 2 在 strike=10 取得 DTE 535/570/717/899 的 LEAPS 資料（delta 0.780–0.796，落在 0.75–0.90 篩選範圍內）。`persist_leaps` 在 `when "partial"` 分支同樣執行，已抓到的資料會入庫，不因 strike 11 的 partial 而遺失。
+
 ---
 
 ## 背景與目標

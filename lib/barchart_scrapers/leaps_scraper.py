@@ -251,12 +251,18 @@ def _finalize(rows, underlying_price):
 async def main(symbol, user_strike=None):
     symbol = symbol.upper()
 
-    # Navigate to base options page (Near the Money default view).
-    # Serves as login check + Stage 1 data source.
-    target_id, ws_url = await prepare_page(symbol, TARGET_PATH, settle_ms=OPTIONS_SETTLE)
+    # prepare_page finds the tab but skips navigation when Chrome is already on
+    # any /options URL (e.g. ?view=stacked&strike=12 from a previous query).
+    # Force-navigate to Near the Money SBS view so Stage 1 always reads
+    # multi-strike data, not whatever filtered view Chrome last showed.
+    target_id, ws_url = await prepare_page(symbol, TARGET_PATH, settle_ms=500)
     if not target_id:
         print(json.dumps({"status": "error", "error": "No Chrome CDP page found"}))
         return
+
+    ntm_url = f"https://www.barchart.com/stocks/quotes/{symbol}/options?moneyness=10"
+    await cdp_navigate(ws_url, ntm_url, settle_ms=OPTIONS_SETTLE)
+    await activate_target(target_id)
 
     # Login check: null grid data means session expired before even starting.
     near_money_rows = await cdp_eval(ws_url, NEAR_MONEY_JS)
