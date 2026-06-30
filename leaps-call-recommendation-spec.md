@@ -16,13 +16,39 @@
 
 上一個 session 發生過這個問題：整個 session 期間，`mcp__playwright-chrome__*` 系列工具從來沒有真正連線過——Claude Code 嘗試用這些工具時找不到（呼叫不到、或工具清單裡根本沒有），結果擅自改用 raw WebSocket CDP 手動操作瀏覽器，這個繞路方式有已知限制（大尺寸截圖會 timeout），而且這個決定從頭到尾沒有先回報、是事後才坦白的。
 
-**新 session 開始第一件事**：嘗試實際呼叫一次 `mcp__playwright-chrome__browser_navigate`（或任何一個這系列的工具），確認它真的存在、能正常回應。**只有「怎麼檢查 MCP 連線狀態」這個具體指令/操作方式，我不確定 Claude Code 當前版本該怎麼做**（可能有 slash command 或其他內建方式），這部分請用 Claude Code 自己熟悉的方式確認，這裡不替你指定指令名稱，因為寫一個可能是錯的指令，比不寫更危險。
+**✅ 根因已查出、修復已完成，但還沒被新 session 驗證過，這是新 session 第一件事要做的：**
+
+- **根因**：`/home/idarfan/.claude/mcp-playwright-chrome.sh` 腳本內部用 `npx @playwright/mcp@latest`，`@latest` 每次啟動都會打 npm registry 查詢，實測 5.6–8.1 秒，逼近 Claude Code 的 10 秒 MCP 連線 timeout，偶發性卡死導致連線失敗。另外發現 `~/.claude.json`（user scope）跟 `/home/idarfan/fairprice/.mcp.json`（project scope）重複定義了同一個 `playwright-chrome` server（指令字串不同：`bash <script>` vs 直接執行 `<script>`），造成 scope 衝突警告。
+- **已完成的修復**：
+  1. 移除 `~/.claude.json` 裡的 `playwright-chrome` 條目，只留 project scope 的 `.mcp.json`（消除 scope 衝突）。
+  2. 腳本改成優先呼叫已全域安裝的 binary（`/home/idarfan/.npm-global/bin/playwright-mcp`，實測穩定 1.8–2.5 秒啟動），**找不到這個 binary 就直接 `exit 1` 並印出安裝指令，不 fallback 到慢的 `npx`**——這個設計刻意選擇「立刻明確失敗」而不是「悄悄退回一個更慢的方式」，避免問題以後換個症狀重新出現又要重新診斷。
+  3. 曾考慮改用 `npx @playwright/mcp@0.0.77`（pinned version）取代裸路徑依賴，但實測這個方案仍要 5.6–8.1 秒（npx 即使有快取也要跑 npm resolution pipeline），速度跟 global binary 差數倍，這個方案已經測試後否決，不要重新提案，除非情況有變。
+- **這個修復已經改完，但 MCP server 只在 session 啟動時連線一次、不會 mid-session 重連，所以這次修復的效果必須靠重開 session 才能驗證。** 上一個 session 在改完腳本之後就結束了，**新 session 第一件事就是驗證這次修復是否真的生效**——不是假設改完代碼就等於修好了。
+
+**新 session 開始第一件事**：實際呼叫一次 `mcp__playwright-chrome__browser_navigate`（或任何一個這系列的工具），確認它真的存在、能正常回應，並確認啟動速度在合理範圍內（不是又卡在接近10秒的邊緣）。
 
 **確認結果只有兩種，沒有第三種：**
-- **工具可用** → 正常開始抓取/驗收工作，全程用這些工具操作瀏覽器。
-- **工具不可用** → **立刻回報這個狀況，停在這裡，不要繞路、不要用 raw WebSocket 或任何替代方案硬做**，等使用者決定怎麼處理（重開 session、檢查 MCP 設定等），不是自己想辦法生一個變通方法繼續做下去。
+- **工具可用** → 正常開始抓取/驗收工作，全程用這些工具操作瀏覽器，接著進行第2節「CDP連線異常」的四項診斷（這個問題本身有可能跟這次修好的MCP連線問題是同一個根因的不同症狀，值得先確認一次）。
+- **工具仍不可用** → 立刻回報這個狀況，附上這次重開後實際觀察到的現象（跟上次的「完全沒出現在工具清單裡」是不是同一個症狀，還是換了新的症狀），不要再次默默繞路，也不要假設「應該已經修好了」就跳過驗證直接往下做。
 
 這個確認動作以後每次開新 session 處理這個專案都要做，不要跳過。
+
+### 0.1 重開後的新發現：`npx@latest` 修復是對的，但發現第二層問題——`cdp-relay` process 死亡
+
+重開 session 後，工具確認確實還是逾時（兩次）。往下追查，鏈路是：`mcp__playwright-chrome__*` → `playwright-mcp` → `cdp-relay`（port 9223）→ Chrome CDP（port 9222）。逐段驗證結果：
+
+- ✅ Chrome CDP（port 9222）本身完全正常：`curl http://localhost:9222/json/version` 成功回應完整 JSON。
+- ✅ CDP 有 3 個目標分頁，WebSocket URL 存在，這一層沒問題。
+- ❌ **`cdp-relay`（pm2 管理，port 9223，`playwright-mcp` 實際連的是這一層，不是直接連 9222）已死亡**：`pm2 status` 顯示 `stopped`，重啟過 5 次後 pm2 放棄。Log 顯示死因是 `KeyboardInterrupt` 在 `socket.accept()` 裡被觸發（收到 SIGINT），但**log 看不出這個 SIGINT 是誰發的**——可能是 pm2 自己在重啟循環中發的，也可能是外部干擾，目前未知。
+
+**這代表上一輪的 `npx@latest` 修復是必要但不充分的**：那次修復解決的是「MCP server process 本身啟動太慢」，但這次發現的是更下游一層——MCP server 啟動之後，要連的 `cdp-relay` 中間層本身掛了，是兩個獨立的故障點疊在一起，不是同一個根因的不同症狀。
+
+**待辦（這次重啟前要先查清楚，不要重啟完就結案）**：
+1. `pm2` 重啟 5 次後「放棄」的判斷邏輯是什麼（`max_restarts` 之類的設定值），這代表 `cdp-relay` 在過去某段時間已經反覆死過很多次，不是這次第一次——值得查 pm2 的重啟歷史時間軸，看 SIGINT 是固定間隔（代表有東西在主動發訊號，例如誤判的健康檢查或 cron）還是隨機（比較像資源不足或外部環境問題）。
+2. 這次 SIGINT 發生的時間點，跟「之前 NVTS 那次 CDP 異常」或「這次重開 Claude Code session 的時刻」有沒有重疊——如果時間點對得上重開 session，可能是新 session 啟動過程裡某個初始化動作誤殺了這個 process。
+3. 如果查完上述兩點還是查不出明確原因，先 `pm2 restart cdp-relay` 讓功能恢復，**但這個「根因未知的 SIGINT」要記錄成已知但未解決的風險，不能因為這次重啟成功就視為問題已解決**——如果之後又反覆死亡，下次不能再滿足於「重啟一次看看」，要認真排查訊號來源。
+
+
 
 ### 1. 待重新評估的「已確認」結論
 
@@ -47,16 +73,18 @@
 | Phase A–F、C.5、C.5b、E 配色共用 | ✅ 已驗證完成（多輪截圖+測試核對過，可信） |
 | Phase G（Stacked 抓取策略） | ✅ 已驗證完成 |
 | 履約價輸入框 step bug | ✅ 已關閉（三項證據齊全：DOM HTML 截圖、操作截圖、Rails log 含 `user_strike` 參數），這條是真的修好了 |
-| `bg-gray-50/50` 奇數列透明度 | ⚠️ **未關閉**——代碼據稱已改（主排行表+Flow表都改了，給了行號），但因為 CDP 故障，**從沒有人實際在瀏覽器看到過這個視覺效果**，不能標記完成 |
+| `mcp__playwright-chrome__*` 工具連線 | ⚠️ **`npx@latest`修復已驗證有效，但發現第二層問題：`cdp-relay` process（pm2管理，port9223）死亡，根因未明（SIGINT來源不明）**，見第0.1節 |
+| `bg-gray-50/50` 奇數列透明度 | ⚠️ **未關閉**——代碼據稱已改（主排行表+Flow表都改了，給了行號），但因為 CDP/工具故障，**從沒有人實際在瀏覽器看到過這個視覺效果**，不能標記完成 |
 | Checklist 文件內 `[ ]`/`[x]` 同步 | ❌ **尚未進行**，故意留到最後一次性更新，不要分批改 |
-| CDP 連線異常（NVTS查詢） | ❌ **進行中，根因未定**，見上方第2節，這是目前最優先要解決的事 |
+| CDP 連線異常（NVTS查詢） | ❌ **四項診斷尚未回報**，見第2節。**注意：這個問題首次出現的時間點，跟 playwright-chrome MCP 工具失效的時間點重疊，不確定是否同一根因的不同症狀（例如 raw WebSocket 繞路操作本身可能干擾了 CDP 連線狀態）——新 session 工具確認可用後，建議優先重新測一次 CDP 連線問題是否還存在，再決定要不要繼續四項診斷，不要假設兩個問題互不相關。** |
 
 ### 4. 接下來順序
 
-1. 確認工具可用（第0節）
-2. 解決 CDP 連線問題（第2節四項診斷）
-3. CDP 恢復後，實際查一次 NOK 或 NVTS，**親眼確認**奇數列灰底＋hover紫色，`bg-gray-50/50` 才能關閉
-4. 全部解決後，一次性把 checklist 的 `[ ]` 改成 `[x]`，不要分批做
+1. 確認 `mcp__playwright-chrome__*` 工具這次真的連上了（第0節，含啟動速度是否正常）
+2. 工具確認可用後，**先重新測一次 CDP 連線問題是否還存在**——可能跟工具問題同源，不要直接假設它還在、跳去做四項診斷；如果這次 CDP 連線正常，第2節那四項診斷可以省略，直接記錄「問題隨MCP修復一併消失」
+3. 如果 CDP 問題依然存在，才進行第2節四項診斷
+4. CDP 恢復後，實際查一次 NOK 或 NVTS，**親眼確認**奇數列灰底＋hover紫色，`bg-gray-50/50` 才能關閉
+5. 全部解決後，一次性把 checklist 的 `[ ]` 改成 `[x]`，不要分批做
 
 ---
 
