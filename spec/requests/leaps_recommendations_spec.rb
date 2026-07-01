@@ -169,6 +169,75 @@ RSpec.describe "GET /leaps", type: :request do
     end
   end
 
+  # ── 5b. job_status=partial_error WITH fresh data（重疊 UX 邏輯）──────────────
+
+  let(:stub_candidate) do
+    {
+      expiration_date: Date.new(2027, 12, 17), dte: 535,
+      strike: 7.0, delta: 0.875,
+      open_interest: 1304, volume: 1, bid: 7.40, ask: 7.75, mid: 7.58,
+      iv: 0.765, vega: 0.0311, itm_probability: 0.755, vol_oi_ratio: 0.001,
+      underlying_price: 4.70, liquidity_tier: "普通",
+      no_recent_volume_warning: false,
+      time_value_pct: 0.098, bid_ask_spread_pct: 0.046
+    }
+  end
+
+  let(:stub_recommendation) do
+    pick = stub_candidate
+    {
+      near_term: { label: "近天期 LEAPS（DTE 364–550）", no_candidates: false,
+                   pick: pick, runner_up: nil, reason: "建議到期日：2027-12-17" },
+      far_term:  { label: "遠天期 LEAPS（DTE 550+）",    no_candidates: false,
+                   pick: pick.merge(expiration_date: Date.new(2028, 1, 21), dte: 570), runner_up: nil, reason: "建議到期日：2028-01-21" }
+    }
+  end
+
+  def stub_fresh_with_recommendation(recommendation)
+    allow(LeapsOptionChainSnapshot)
+      .to receive_message_chain(:for_symbol, :fresh, :exists?).and_return(true)
+    allow(LeapsRankingService).to receive_message_chain(:new, :call).and_return([ stub_candidate ])
+    allow(LeapsRecommendationService).to receive_message_chain(:new, :call).and_return(recommendation)
+    allow(LeapsOptionsFlowPanelService).to receive_message_chain(:new, :call).and_return({ status: :no_data })
+  end
+
+  describe "job_status=partial_error WITH fresh data, expired strike does NOT overlap recommendation" do
+    before do
+      stub_fresh_with_recommendation(stub_recommendation)
+      allow(Rails.cache).to receive(:read)
+        .with("leaps_last_errors_#{symbol}")
+        .and_return([ "Session 在抓取 Strike 9 的 Volatility & Greeks 時過期，已抓到的部分可能不完整，請重新查詢" ])
+    end
+
+    it "shows non-overlap banner with specific strike message" do
+      get "/leaps", params: { symbol: symbol, job_status: "partial_error" }
+      expect(response).to have_http_status(:ok)
+      # HTML encodes & as &amp;, so check non-ambiguous fragments
+      expect(response.body).to include("Strike 9")
+      expect(response.body).to include("資料不完整，但不影響本次推薦")
+      expect(response.body).to include("Strike 7")
+      expect(response.body).not_to include("此推薦的 Vega/被指派機率資料可能不完整")
+    end
+  end
+
+  describe "job_status=partial_error WITH fresh data, expired strike OVERLAPS recommendation" do
+    before do
+      stub_fresh_with_recommendation(stub_recommendation)
+      allow(Rails.cache).to receive(:read)
+        .with("leaps_last_errors_#{symbol}")
+        .and_return([ "Session 在抓取 Strike 7 的 Volatility & Greeks 時過期，已抓到的部分可能不完整，請重新查詢" ])
+    end
+
+    it "shows original error banner and inline warning on recommendation card" do
+      get "/leaps", params: { symbol: symbol, job_status: "partial_error" }
+      expect(response).to have_http_status(:ok)
+      # & is HTML-encoded as &amp; in body; match non-ambiguous fragments
+      expect(response.body).to include("Session 在抓取 Strike 7")
+      expect(response.body).to include("Greeks 時過期")
+      expect(response.body).to include("此推薦的 Vega/被指派機率資料可能不完整")
+    end
+  end
+
   # ── 6. job_status=cdp_offline / error 帶回 ─────────────────────────────────
 
   describe "job_status=cdp_offline without fresh data" do
