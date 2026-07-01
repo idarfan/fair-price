@@ -352,7 +352,7 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
   end
 
   # ── 7. Stage 1/Stage 2 Delta filter separation ────────────────────────────
-  # Delta 0.80 (Stage 1) and Delta 0.75-0.90 (Stage 2) are SEPARATE rules.
+  # Delta 0.60 (Stage 1) and Delta 0.60-0.90 (Stage 2) are SEPARATE rules.
   # A row with Delta 0.91 must NOT appear in final output because it fails Stage 2.
   # This is enforced in Ruby (LeapsRankingService), not in the scraper.
   # Test here confirms the scraper itself does NOT drop rows — ranking does.

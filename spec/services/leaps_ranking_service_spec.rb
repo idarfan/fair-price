@@ -14,17 +14,17 @@ RSpec.describe LeapsRankingService do
 
   describe "delta filter" do
     before do
-      make(delta: 0.74)   # just below min — excluded
-      make(delta: 0.75)   # boundary — included
+      make(delta: 0.59)   # just below min — excluded
+      make(delta: 0.60)   # boundary — included
       make(delta: 0.82)   # mid-range — included
       make(delta: 0.90)   # boundary — included
       make(delta: 0.91)   # just above max — excluded
     end
 
-    it "includes only rows with delta in [0.75, 0.90]" do
+    it "includes only rows with delta in [0.60, 0.90]" do
       results = described_class.new("NOK").call
       deltas  = results.map { |e| e[:delta].to_f }
-      expect(deltas).to all(be_between(0.75, 0.90))
+      expect(deltas).to all(be_between(0.60, 0.90))
       expect(results.size).to eq(3)
     end
   end

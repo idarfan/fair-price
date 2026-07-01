@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class LeapsRankingService
-  DEFAULT_DELTA_MIN = 0.75
+  DEFAULT_DELTA_MIN = 0.60
   DEFAULT_DELTA_MAX = 0.90
 
   MIN_CANDIDATES_FOR_VOL_OI_TIER = 4

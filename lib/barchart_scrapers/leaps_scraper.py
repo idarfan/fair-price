@@ -4,7 +4,7 @@ Barchart LEAPS option chain scraper — Stacked view strategy (Phase G).
 Two-stage approach:
   Stage 1  Load Near the Money view:
            • read all visible strikes + Deltas
-           • determine candidate strikes (Delta>=0.80, or user-supplied center)
+           • determine candidate strikes (Delta>=0.60, or user-supplied center)
            • add ±1 buffer strike on each side
            • read expirations select (kept for V&G per-exp fallback)
            • read underlying price
@@ -25,7 +25,7 @@ Output JSON (stdout):
   success       → {"status":"success","rows":[...],"underlying_price":N}
   partial       → {"status":"partial","rows":[...],"expired_at_strike":N,"expired_layer":"..."}
               OR {"status":"partial","rows":[...],"expired_at_expiration":"YYYY-MM-DD","expired_layer":"volatility_greeks"}
-  no_candidates → {"status":"no_candidates"}   # auto mode: no Delta>=0.80 in near-money
+  no_candidates → {"status":"no_candidates"}   # auto mode: no Delta>=0.60 in near-money
   expired       → {"status":"barchart_session_expired"}
   error         → {"status":"error","error":"..."}
 """
@@ -168,15 +168,15 @@ def _pick_candidates(near_money_rows, user_strike=None):
     Stage 1: determine which strikes to query in Stage 2.
 
     Returns sorted list of strike prices.
-    Empty list means auto mode found no Delta>=0.80 in near-money view.
+    Empty list means auto mode found no Delta>=0.60 in near-money view.
 
     Buffer rule: always add one strike below the lowest center and one
     above the highest center (from the visible near-money list), so that
     Delta drift across expiration dates is covered.
 
-    Key invariant: 0.80 here is a Stage 1 filter only.  The caller
+    Key invariant: 0.60 here is a Stage 1 filter only.  The caller
     (BarchartScraperService / LeapsRankingService) still applies the
-    final 0.75-0.90 filter in Stage 2 / Ruby — this is a SEPARATE rule.
+    final 0.60-0.90 filter in Stage 2 / Ruby — this is a SEPARATE rule.
     """
     all_strikes = sorted({r["strike"] for r in near_money_rows if r.get("strike") is not None})
 
@@ -184,10 +184,10 @@ def _pick_candidates(near_money_rows, user_strike=None):
         # Manual mode: user-specified center, skip Delta filter
         center_strikes = [float(user_strike)]
     else:
-        # Auto mode: Delta >= 0.80 from Near the Money view
+        # Auto mode: Delta >= 0.60 from Near the Money view
         center_strikes = sorted({
             r["strike"] for r in near_money_rows
-            if r.get("delta") is not None and r["delta"] >= 0.80
+            if r.get("delta") is not None and r["delta"] >= 0.60
         })
         if not center_strikes:
             return []
@@ -281,7 +281,7 @@ async def main(symbol, user_strike=None):
     # ── Stage 1: pick candidate strikes ──────────────────────────────────────
     candidate_strikes = _pick_candidates(near_money_rows, user_strike)
     if not candidate_strikes:
-        # Auto mode: no Delta>=0.80 strikes visible in near-money view
+        # Auto mode: no Delta>=0.60 strikes visible in near-money view
         print(json.dumps({"status": "no_candidates"}))
         return
 
