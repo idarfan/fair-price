@@ -89,8 +89,16 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       render_alert("bg-orange-50 border border-orange-300 text-orange-800",
         "⚠️ 請先登入 Barchart 後重試。（Barchart 登入 Session 已過期）")
     when :partial_error
-      msg = @scrape_errors.first || "抓取中途發生未預期錯誤，部分資料可能不完整，請重新查詢。"
-      render_alert("bg-yellow-50 border border-yellow-300 text-yellow-800", "⚠️ #{msg}")
+      expired_s  = partial_error_strike
+      rec_strikes = recommendation_strikes
+      if expired_s && rec_strikes.any? && !rec_strikes.any? { |s| s.to_f == expired_s }
+        rec_list = rec_strikes.map { |s| "Strike #{fmt_strike_short(s)}" }.join("、")
+        render_alert("bg-yellow-50 border border-yellow-300 text-yellow-800",
+          "⚠️ Strike #{fmt_strike_short(expired_s)} 的 V&G 資料不完整，但不影響本次推薦（推薦候選為 #{rec_list}）")
+      else
+        msg = @scrape_errors.first || "抓取中途發生未預期錯誤，部分資料可能不完整，請重新查詢。"
+        render_alert("bg-yellow-50 border border-yellow-300 text-yellow-800", "⚠️ #{msg}")
+      end
     when :cdp_offline
       render_alert("bg-red-50 border border-red-300 text-red-800",
         "❌ CDP 未連線，請確認 Windows 端 Chrome 已以 --remote-debugging-port=9222 啟動。若電腦曾經睡眠/喚醒，這通常是 WSL2 的 /mnt/c/ 掛載失效造成的，請在 Windows PowerShell 執行 wsl --shutdown 後等待 WSL2 重新啟動，再重試一次。")
@@ -135,8 +143,13 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
         div(class: "text-sm text-gray-400 italic") { plain "此天期區間目前沒有符合條件的候選。" }
       else
         pick = group[:pick]
+        expired_s = partial_error_strike
+        pick_incomplete = expired_s && pick[:strike].to_f == expired_s
         div(class: "flex flex-wrap gap-3 mb-3") do
           render_pick_badge(pick)
+          if pick_incomplete
+            span(class: "text-xs text-orange-600 self-center font-medium") { plain "⚠️ 此推薦的 Vega/被指派機率資料可能不完整" }
+          end
           if (ru = group[:runner_up])
             div(class: "text-xs text-gray-400 self-center") { plain "次選：#{sprintf('$%.2f', ru[:strike].to_f)} / #{ru[:expiration_date]}" }
           end
@@ -388,6 +401,31 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
         })();
       JS
     end
+  end
+
+  # ── Partial error helpers ──────────────────────────────────────────────────
+
+  def partial_error_strike
+    return @_partial_error_strike if defined?(@_partial_error_strike)
+    @_partial_error_strike = begin
+      return nil unless @scrape_status == :partial_error
+      msg = @scrape_errors.first.to_s
+      m = msg.match(/Strike\s+(\d+(?:\.\d+)?)/)
+      m ? m[1].to_f : nil
+    end
+  end
+
+  def recommendation_strikes
+    return [] unless @recommendation
+    [
+      @recommendation.dig(:near_term, :pick, :strike),
+      @recommendation.dig(:far_term, :pick, :strike)
+    ].compact
+  end
+
+  def fmt_strike_short(val)
+    f = val.to_f
+    f == f.to_i ? f.to_i.to_s : f.to_s
   end
 
   # ── Formatters ──────────────────────────────────────────────────────────────

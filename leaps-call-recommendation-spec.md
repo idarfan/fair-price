@@ -104,10 +104,29 @@
 
 **補充驗證記錄（2026-06-30）**：NOK 不帶履約價的 Stage 1 自動偵測路徑已於此時驗證通過。同日修復了 `cdp_helper.py` `prepare_page` 的 skip-navigation bug（Chrome 停在任意 `/options` URL 時會跳過導航），修復後 `leaps_scraper.py` 強制導航至 `?moneyness=10` Near the Money SBS view。實測輸出：Stage 1 自動偵測找到 20 筆近價行權價資料、候選行包括 strikes 8.5–10.5；Stage 2 在 strike=10 取得 DTE 535/570/717/899 的 LEAPS 資料（delta 0.780–0.796，落在 0.75–0.90 篩選範圍內）。`persist_leaps` 在 `when "partial"` 分支同樣執行，已抓到的資料會入庫，不因 strike 11 的 partial 而遺失。
 
-⚠️ **結案後仍有兩個未解決問題，重開後需要繼續追蹤：**
+⚠️ **結案後仍有三個未解決問題，重開後需要繼續追蹤：**
 
-1. **`asyncio/base_events` traceback 根因未知**：上一個 session 在跑 NOK 測試時，曾出現一個被截斷的 `asyncio.run` → `runners.py` → `base_events.py` 例外，完整訊息從未被取得。Claude Code 在回答這個根因時，session 本身直接崩掉（回答被截斷在「上一個 session 失敗的 NOK 跑（DB 裡截斷在 asyncio/bas）是獨」），所以這個例外的完整內容跟根因至今不明。**重開後第一件事：取得那個完整 traceback（從暫存檔 `/tmp/nok_stderr.txt` 或重現那個錯誤），確認是不是已被 `prepare_page` 的 skip-navigation bug 修復所連帶解決，還是獨立問題**。
+1. **`asyncio/base_events` traceback 根因未知**：上一個 session 在跑 NOK 測試時，曾出現一個被截斷的 `asyncio.run` → `runners.py` → `base_events.py` 例外，完整訊息從未被取得。Claude Code 在回答這個根因時，session 本身直接崩掉（回答被截斷在「上一個 session 失敗的 NOK 跑（DB 裡截斷在 asyncio/bas）是獨」），所以這個例外的完整內容跟根因至今不明。**重開後第一件事：先去找 `/tmp/nok_stderr.txt`，把完整內容貼出來確認根因。如果檔案不存在，告知後再討論怎麼重現。確認是不是已被 `prepare_page` 的 skip-navigation bug 修復所連帶解決，還是獨立問題。**
+
+   📋 **2026-07-01 調查結果**：`/tmp/nok_stderr.txt` 不存在（系統重開後 `/tmp` 已清除）。這個 traceback 無法從暫存檔取回，需要重新觸發 NOK 無履約價查詢才能重現。在重現之前，這條根因仍屬未知。
+
 2. **`prepare_page` skip-navigation bug 影響範圍未評估**：這個 bug（Chrome 停在任意 `/options` URL 時 `prepare_page` 跳過導航）在這次 NOK 無履約價測試才被發現。之前所有帶 `user_strike` 的測試（包括 NVTS 那次），如果當時 Chrome 剛好停在某個舊 URL，Stage 1 或 Stage 2 可能也讀到了錯誤頁面的資料，只是剛好沒觸發明顯的失敗症狀。這個 bug 的影響範圍需要評估：之前那些「成功」的測試，有沒有可能其實是在錯誤的頁面狀態下跑的，只是剛好 Chrome 停在正確的 URL 所以沒出事。
+
+   ✅ **2026-07-01 評估完成，影響範圍確認為：無**。根因是 `leaps_scraper.py` 在 `prepare_page` 之後立刻強制導航（`L263–264`：`cdp_navigate(ntm_url, settle_ms=OPTIONS_SETTLE)`），Stage 2 每個 strike 同樣各自有 `cdp_navigate`（Options L299、V&G L322）。所有資料讀取都發生在各自的強制導航之後，`prepare_page` 的 skip-navigation 步驟只是「找到 tab + 等 500ms」，即使跳過，後續的強制導航仍會把頁面帶到正確 URL。因此 NVTS 等帶 `user_strike` 的歷次測試資料可信度不受這個 bug 影響，可關閉此疑慮。
+
+3. **`partial_error` 警示與推薦分析同時顯示的 UX 問題**：截圖現象：「Session 在抓取 Strike 12 的 V&G 時過期」黃色 banner 跟下方推薦分析（推薦 Strike 10）同時出現，使用者看不出這個警示是否影響推薦結果的可信度。修法：判斷 `expired_at_strike` 是否跟推薦候選 strike 重疊：
+   - **不重疊**（本次：strike 12 過期，但推薦是 strike 10）→ 改顯示「Strike 12 的 V&G 資料不完整，但不影響本次推薦（推薦候選為 Strike 10）」
+   - **重疊**（過期的 strike 剛好是推薦候選）→ 在推薦卡片上直接標示「⚠️ 此推薦的 Vega/被指派機率資料可能不完整」
+
+   `partial_error` 時推薦分析仍顯示這件事本身是對的，不要因為有一個 strike 缺 V&G 就整頁空白，但要讓使用者看得出哪些資料是完整的、哪些是缺的。
+
+   ✅ **2026-07-01 修復完成**。`page_component.rb` 新增：
+   - `partial_error_strike`：從 `@scrape_errors.first` 用 regex 解出 `Strike N` 數值（memoized）
+   - `recommendation_strikes`：取近/遠天期推薦的 strike 清單
+   - `fmt_strike_short`：整數顯示整數（10），小數保留小數（10.5）
+   - `:partial_error` banner：不重疊時顯示「Strike N 的 V&G 資料不完整，但不影響本次推薦（推薦候選為 Strike M）」；重疊或無法解析時沿用原始錯誤訊息
+   - `render_recommendation_group`：重疊時在推薦 badge 旁加「⚠️ 此推薦的 Vega/被指派機率資料可能不完整」
+   - 23/23 spec 通過
 
 ---
 
