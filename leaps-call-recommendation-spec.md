@@ -104,6 +104,11 @@
 
 **補充驗證記錄（2026-06-30）**：NOK 不帶履約價的 Stage 1 自動偵測路徑已於此時驗證通過。同日修復了 `cdp_helper.py` `prepare_page` 的 skip-navigation bug（Chrome 停在任意 `/options` URL 時會跳過導航），修復後 `leaps_scraper.py` 強制導航至 `?moneyness=10` Near the Money SBS view。實測輸出：Stage 1 自動偵測找到 20 筆近價行權價資料、候選行包括 strikes 8.5–10.5；Stage 2 在 strike=10 取得 DTE 535/570/717/899 的 LEAPS 資料（delta 0.780–0.796，落在 0.75–0.90 篩選範圍內）。`persist_leaps` 在 `when "partial"` 分支同樣執行，已抓到的資料會入庫，不因 strike 11 的 partial 而遺失。
 
+⚠️ **結案後仍有兩個未解決問題，重開後需要繼續追蹤：**
+
+1. **`asyncio/base_events` traceback 根因未知**：上一個 session 在跑 NOK 測試時，曾出現一個被截斷的 `asyncio.run` → `runners.py` → `base_events.py` 例外，完整訊息從未被取得。Claude Code 在回答這個根因時，session 本身直接崩掉（回答被截斷在「上一個 session 失敗的 NOK 跑（DB 裡截斷在 asyncio/bas）是獨」），所以這個例外的完整內容跟根因至今不明。**重開後第一件事：取得那個完整 traceback（從暫存檔 `/tmp/nok_stderr.txt` 或重現那個錯誤），確認是不是已被 `prepare_page` 的 skip-navigation bug 修復所連帶解決，還是獨立問題**。
+2. **`prepare_page` skip-navigation bug 影響範圍未評估**：這個 bug（Chrome 停在任意 `/options` URL 時 `prepare_page` 跳過導航）在這次 NOK 無履約價測試才被發現。之前所有帶 `user_strike` 的測試（包括 NVTS 那次），如果當時 Chrome 剛好停在某個舊 URL，Stage 1 或 Stage 2 可能也讀到了錯誤頁面的資料，只是剛好沒觸發明顯的失敗症狀。這個 bug 的影響範圍需要評估：之前那些「成功」的測試，有沒有可能其實是在錯誤的頁面狀態下跑的，只是剛好 Chrome 停在正確的 URL 所以沒出事。
+
 ---
 
 ## 背景與目標
