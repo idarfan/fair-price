@@ -328,4 +328,65 @@ RSpec.describe "GET /leaps", type: :request do
     end
   end
 
+
+
+  # ── 8. fresh data 存在但 candidates 為空時的 fallback 邏輯 ─────────────────
+  #
+  # 情境：analyze 回傳 "ready"（fresh data 存在），JS 導回 /leaps?symbol=X（無 job_status）。
+  # 若 candidates 為空，controller 從 cache 判斷上次狀態，不應顯示空白頁。
+
+  describe "fresh data + empty candidates + partial_error in cache (path B fallback)" do
+    before do
+      allow(LeapsOptionChainSnapshot)
+        .to receive_message_chain(:for_symbol, :fresh, :exists?)
+        .and_return(true)
+      allow(LeapsRankingService).to receive(:new).and_return(
+        instance_double(LeapsRankingService, call: [])
+      )
+      allow(LeapsRecommendationService).to receive(:new).and_return(
+        instance_double(LeapsRecommendationService, call: nil)
+      )
+      allow(LeapsOptionsFlowPanelService).to receive(:new).and_return(
+        instance_double(LeapsOptionsFlowPanelService, call: { status: :no_data })
+      )
+      allow(Rails.cache).to receive(:read)
+        .with("leaps_last_errors_#{symbol}")
+        .and_return(["Session 在抓取 Strike 255 的 Options Prices 時過期，已抓到的部分資料可能不完整，請重新登入 Barchart 後點查詢重試"])
+    end
+
+    it "shows partial_error banner with Barchart login hint, not blank page" do
+      get "/leaps", params: { symbol: symbol }
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Session 在抓取 Strike 255")
+      expect(response.body).to include("請重新登入 Barchart 後點查詢重試")
+      expect(response.body).not_to include("LEAPS 候選排行")
+    end
+  end
+
+  describe "fresh data + empty candidates + no cached errors (path B fallback)" do
+    before do
+      allow(LeapsOptionChainSnapshot)
+        .to receive_message_chain(:for_symbol, :fresh, :exists?)
+        .and_return(true)
+      allow(LeapsRankingService).to receive(:new).and_return(
+        instance_double(LeapsRankingService, call: [])
+      )
+      allow(LeapsRecommendationService).to receive(:new).and_return(
+        instance_double(LeapsRecommendationService, call: nil)
+      )
+      allow(LeapsOptionsFlowPanelService).to receive(:new).and_return(
+        instance_double(LeapsOptionsFlowPanelService, call: { status: :no_data })
+      )
+      # no cache stub → cached_errors returns []
+    end
+
+    it "shows no_candidates banner, not blank page" do
+      get "/leaps", params: { symbol: symbol }
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("沒有符合篩選條件的候選")
+      expect(response.body).to include("Delta 範圍")
+      expect(response.body).not_to include("LEAPS 候選排行")
+    end
+  end
+
 end
