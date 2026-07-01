@@ -104,7 +104,7 @@ class BarchartScraperService
       location_label = fetch_result[:data]["expired_at_strike"] ? "Strike #{expired_at}" : expired_at
       log_fetch("leaps", "partial_error", "expired_at=#{expired_at} layer=#{expired_layer}")
       result[:status] = "partial_error"
-      result[:errors] << "Session 在抓取 #{location_label} 的 #{layer_label} 時過期，已抓到的部分可能不完整，請重新查詢"
+      result[:errors] << "Session 在抓取 #{location_label} 的 #{layer_label} 時過期，已抓到的部分資料可能不完整，請重新登入 Barchart 後點查詢重試"
     else
       log_fetch("leaps", "error", fetch_result[:error])
       result[:status] = "error"

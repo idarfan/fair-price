@@ -108,7 +108,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     when :no_candidates
       msg = @user_strike.present? ?
         "這個履約價 #{@user_strike}（含緩衝檔）在所有到期日都沒有符合 Delta 0.75–0.90 的候選。請嘗試其他履約價，或留空讓系統自動偵測。" :
-        "Near the Money 頁面中沒有 Delta ≥ 0.80 的候選履約價，無法自動選擇切入點。請手動輸入履約價後重試。"
+        "目前沒有符合篩選條件的候選，請嘗試調整 Delta 範圍或手動輸入履約價後重試。"
       render_alert("bg-orange-50 border border-orange-300 text-orange-800", "⚠️ #{msg}")
     when :ready_to_fetch
       render_alert("bg-blue-50 border border-blue-300 text-blue-800",

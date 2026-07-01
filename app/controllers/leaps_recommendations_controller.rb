@@ -16,7 +16,7 @@ class LeapsRecommendationsController < ApplicationController
         @recommendation = LeapsRecommendationService.new(@candidates).call
         @flow_panel     = LeapsOptionsFlowPanelService.new(@symbol, @candidates).call
 
-        @scrape_status = @candidates.empty? ? :no_candidates : :cached
+        @scrape_status = :cached
 
         case params[:job_status]
         when "session_expired"
@@ -31,6 +31,18 @@ class LeapsRecommendationsController < ApplicationController
           @scrape_errors = cached_errors(@symbol)
         when "no_candidates"
           @scrape_status = :no_candidates
+        end
+
+        # When analyze returned "ready" (no job_status forwarded) but candidates
+        # are empty, determine the correct status from the last cached error state.
+        if @candidates.empty? && @scrape_status == :cached
+          last_errors = cached_errors(@symbol)
+          if last_errors.any?
+            @scrape_status = :partial_error
+            @scrape_errors = last_errors
+          else
+            @scrape_status = :no_candidates
+          end
         end
       elsif params[:job_status].present?
         case params[:job_status]
