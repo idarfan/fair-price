@@ -16,7 +16,7 @@ class LeapsRecommendationsController < ApplicationController
         @recommendation = LeapsRecommendationService.new(@candidates).call
         @flow_panel     = LeapsOptionsFlowPanelService.new(@symbol, @candidates).call
 
-        @scrape_status = :cached
+        @scrape_status = @candidates.empty? ? :no_candidates : :cached
 
         case params[:job_status]
         when "session_expired"
