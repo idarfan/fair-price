@@ -4,47 +4,19 @@ _最後更新：2026-07-02_
 
 ---
 
-## 背景（本 session 已完成的前置工作）
+## LEAPS Delta 修正 — 已結案 ✅
+
+### 完成清單
 
 - ✅ `page_component.rb` 副標題修正：「Delta 0.75–0.90」→「Delta 0.60–0.90」（含無候選時的錯誤訊息）
-- ✅ `@playwright/mcp@0.0.77` 安裝為 local devDependency（`fairprice/node_modules/.bin/playwright-mcp`）
+- ✅ `@playwright/mcp@0.0.77` 安裝為 local devDependency
 - ✅ `mcp-playwright-chrome.sh` 更新：優先用 local binary，fallback 才用 global
-- ⚠️ 上述腳本修改需要重啟 Claude Code session 才生效（MCP server 在 session 啟動時載入）
+- ✅ Playwright MCP 重啟後確認正常（CDP 連線、/mnt/c/ 掛載正常）
+- ✅ Step 2：NOK 頁面截圖確認副標題「Delta 0.60–0.90 深度價內 Call」
+- ✅ Step 3：KLAC `job_status=partial_error` 截圖確認黃色 ⚠️ banner 正確顯示
+- ✅ `leaps-call-recommendation-spec.md` 第3節 3 個 ⚠️ 改為 ✅，結案標記恢復
 
----
+### 結案截圖
 
-## 待辦清單
-
-### Step 1：重啟 Claude Code session 後確認 Playwright MCP 正常（強制）
-
-```bash
-# 三行診斷
-curl -s http://localhost:9222/json/version | head -3
-pm2 status cdp-relay
-ls /mnt/c/ 2>&1 | head -3
-```
-
-再呼叫 `mcp__playwright-chrome__browser_navigate` 確認無逾時。
-
----
-
-### Step 2：截圖驗收副標題「Delta 0.60–0.90」
-
-- 導航到 `http://localhost:3003/leaps?symbol=NOK`
-- `browser_take_screenshot` 截圖
-- **截圖必須清楚顯示「Delta 0.60–0.90 深度價內 Call」文字**
-- 截圖貼出來，不接受「改完了」三個字
-
----
-
-### Step 3：KLAC partial_error banner 補截圖
-
-- 模擬 fresh data + partial_error（用 Rails runner 更新 scraped_at + 寫快取）
-- 導航到 `http://localhost:3003/leaps?symbol=KLAC&job_status=partial_error`
-- `browser_take_screenshot` 截圖確認：banner 是黃色 ⚠️，文字不是「CDP 未連線」
-
----
-
-## 結案條件
-
-Step 2 + Step 3 截圖都附上 → commit → 更新 leaps-call-recommendation-spec.md → 結案。
+- `leaps-nok-delta-verify.png` — NOK 副標題 Delta 0.60–0.90
+- `leaps-klac-partial-error.png` — KLAC partial_error 黃色 banner
