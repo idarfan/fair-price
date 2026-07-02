@@ -128,6 +128,10 @@
    - `render_recommendation_group`：重疊時在推薦 badge 旁加「⚠️ 此推薦的 Vega/被指派機率資料可能不完整」
    - 23/23 spec 通過
 
+**補充驗證記錄（2026-07-01）— Delta 篩選範圍放寬**：Stage 1 候選門檻由 `Delta>=0.80` 放寬至 `Delta>=0.60`，Stage 2 最終篩選由 `0.75–0.90` 放寬至 `0.60–0.90`。涉及 `leaps_scraper.py`（`_pick_candidates` 條件 + 相關 comment）、`LeapsRankingService`（`DEFAULT_DELTA_MIN 0.75 → 0.60`）、`leaps_ranking_service_spec`（邊界測試 `0.74/0.75 → 0.59/0.60`、`be_between(0.60, 0.90)`）。全部 60 examples 通過，Stage 1/Stage 2 分離規則測試隨新數值一起更新，邏輯不變。⚠️ CDP 修改當日離線，NOK 實際抓取驗證（確認 0.60–0.75 段候選有正確出現）待 Chrome 連線後補跑。
+
+**補充驗證記錄（2026-07-01）— `partial_error` + fresh data 空白頁修復**：當 Barchart 未登入時 scraper 回傳 `partial`（非 `session_expired`），`persist_leaps` 仍將資料寫入 DB（5 分鐘 fresh window 有效）。首次點擊 `?job_status=partial_error` 顯示 banner 正常，但後續點擊（5 分鐘內）controller 走 `fresh_data_exists? = true` → `LeapsRankingService` 因 delta/DTE 條件回傳 `[]` → `@scrape_status = :cached` → 空白頁無任何提示。修復：`LeapsRecommendationsController#index` 在 `fresh_data_exists? && @candidates.empty? && @scrape_status == :cached` 時讀 `Rails.cache.read("leaps_last_errors_#{@symbol}")`：有 errors → 設 `:partial_error`（復用現有 banner 邏輯）；無 errors → 設 `:no_candidates`。同步更新 `barchart_scraper_service.rb` partial_error 訊息末尾加「請重新登入 Barchart 後點查詢重試」。補兩個 RSpec request spec 驗證 fallback 路徑，60/60 examples 通過。
+
 ---
 
 ## 背景與目標
