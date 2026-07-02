@@ -120,10 +120,10 @@ ls /mnt/c/ 2>&1 | head -3
 | Phase A–F、C.5、C.5b、E 配色共用 | ✅ 已驗證完成 |
 | Phase G（Stacked 抓取策略） | ✅ 已驗證完成 |
 | 履約價輸入框 step bug | ✅ 已關閉（三項證據齊全） |
-| `mcp__playwright-chrome__*` 工具連線 | ✅ 2026-06-30 實際呼叫確認可用；⚠️ **已知反覆發生問題**：多個 session 的 `playwright-mcp` process 殘留會互相搶 CDP 連線導致逾時，解法是 `pkill -f playwright-mcp` 清掉殘留，Claude Code 會自動啟動乾淨的新 process；詳見第0.2節第五種情況 |
+| `mcp__playwright-chrome__*` 工具連線 | ✅ 2026-06-30 實際呼叫確認可用；⚠️ **已知反覆發生問題**：多個 session 的 `playwright-mcp` process 殘留會互相搶 CDP 連線導致逾時，解法是 `pkill -f playwright-mcp` 清掉殘留，Claude Code 會自動啟動乾淨的新 process；詳見第0.2節第五種情況；✅ **2026-07-02 已自動化**：`~/.claude/hooks/stop-playwright-cleanup.sh` 加入全域 Stop hook |
 | `bg-gray-50/50` 奇數列透明度 | ✅ 2026-06-30 親眼確認 |
 | Checklist 同步 | ✅ 2026-06-30 完成 |
-| CDP 連線異常 | ✅ 根因查出（cdp-relay 死亡），已重啟，C.5b 484ms 達標 |
+| CDP 連線異常 | ✅ 根因查出（cdp-relay 死亡），已重啟，C.5b 484ms 達標；⚠️ **2026-07-02 二度發生**：cdp-relay 再次停止（SIGINT 根因未明）＋ 3 個 playwright-mcp 殘留 process 搶 CDP 連線，`browser_navigate` 逾時 30 秒；已 pm2 restart cdp-relay + kill -9 殘留 process，工具恢復正常 ✅ |
 | 錯誤訊息分四種情況顯示 | ✅ 2026-06-30 修完，23/23 spec 通過 |
 | `FetchLog`/`log_fetch` bug | ✅ 2026-06-30 修完 |
 | partial_error UX（expire strike vs 推薦 strike 重疊判斷） | ✅ 2026-07-01 修完，23/23 spec 通過 |
@@ -137,7 +137,7 @@ ls /mnt/c/ 2>&1 | head -3
 
 **結案標記已撤回**，以下項目待確認後才能真正收尾：
 
-1. **先解決 CDP 連線問題**（見第0.2節診斷流程），連線後才能做後面兩項。
+~~1. **先解決 CDP 連線問題**~~ ✅ **2026-07-02 完成**：cdp-relay 重啟 + playwright-mcp 殘留清理 + Stop hook 自動化，CDP 已正常。
 2. **NOK 不帶履約價完整查詢**：確認 Delta 0.60–0.75 段候選有正確出現在排行表，附截圖。
 3. **KLAC 空白頁截圖驗收**：模擬 partial_error + fresh data 情境，截圖確認 banner 文字正確（不是「CDP未連線」）。
 4. 以上三項都完成後，才能把這段改回「結案」標記。
