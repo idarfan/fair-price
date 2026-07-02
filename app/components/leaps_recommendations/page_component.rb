@@ -18,6 +18,11 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     "Bid", "Ask", "Mid", "Spread%", "Time Value%", "IV", "Vega", "被指派機率"
   ].freeze
 
+  TABLE_RIGHT_ALIGN_COLS = (
+    %w[DTE Delta OI Volume Bid Ask Mid IV Vega] +
+    ["履約價", "Spread%", "Time Value%", "被指派機率"]
+  ).freeze
+
   FLOW_COLS = [ "類型", "履約價", "到期日", "DTE", "Delta", "Code", "Size", "Side", "Premium", "方向" ].freeze
 
   def initialize(symbol: nil, candidates: [], recommendation: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil)
@@ -184,7 +189,8 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
           thead(class: "bg-gray-50 text-gray-500 text-xs") do
             tr do
               TABLE_COLS.each do |col|
-                th(class: "px-3 py-2 text-left font-medium whitespace-nowrap") { plain col }
+                align = TABLE_RIGHT_ALIGN_COLS.include?(col) ? "text-right" : "text-left"
+                th(class: "px-3 py-2 #{align} font-medium whitespace-nowrap") { plain col }
               end
             end
           end
@@ -214,7 +220,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       td(class: "px-3 py-2 text-right font-semibold")    { plain fmt_int(row[:open_interest]) }
       td(class: "px-3 py-2 text-right")                  { plain fmt_int(row[:volume]) }
       td(class: "px-3 py-2") do
-        div(class: "flex flex-col gap-0.5") do
+        div(class: "flex flex-col items-start gap-0.5") do
           span(class: "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs " \
                        "#{style[:bg]} #{style[:text]} border #{style[:border]}") do
             div(class: "w-1.5 h-1.5 rounded-full flex-shrink-0 #{style[:dot]}")
@@ -240,7 +246,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     return unless @flow_panel&.dig(:status) == :ok
 
     div(class: "bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden") do
-      div(class: "px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between") do
+      div(class: "px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-baseline justify-between") do
         div do
           h2(class: "text-sm font-semibold text-gray-700") { plain "Options Flow — 情緒參考，非排序依據" }
           p(class: "text-xs text-gray-400 mt-0.5") do
