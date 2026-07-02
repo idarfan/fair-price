@@ -6,39 +6,45 @@ _最後更新：2026-07-02_
 
 ## 背景（本 session 已完成的前置工作）
 
-- ✅ cdp-relay 二度死亡 → pm2 restart cdp-relay
-- ✅ playwright-mcp 殘留 3 個 process → kill -9 清除，browser_navigate 確認恢復
-- ✅ Stop hook 自動化：~/.claude/hooks/stop-playwright-cleanup.sh 加入全域 Stop hook
-- ✅ mcp-playwright-chrome.sh 改成重啟迴圈（exec → while true），Chrome 重啟或 crash 後自動以新 WS_URL 重啟；CDP 連不上改印錯誤而非靜默 fallback 無頭模式
+- ✅ `page_component.rb` 副標題修正：「Delta 0.75–0.90」→「Delta 0.60–0.90」（含無候選時的錯誤訊息）
+- ✅ `@playwright/mcp@0.0.77` 安裝為 local devDependency（`fairprice/node_modules/.bin/playwright-mcp`）
+- ✅ `mcp-playwright-chrome.sh` 更新：優先用 local binary，fallback 才用 global
+- ⚠️ 上述腳本修改需要重啟 Claude Code session 才生效（MCP server 在 session 啟動時載入）
 
 ---
 
-## 待辦清單（依序執行）
+## 待辦清單
 
-### ✅ Step 1：session 重啟後確認 CDP 工具正常
+### Step 1：重啟 Claude Code session 後確認 Playwright MCP 正常（強制）
 
-- CDP 三行診斷通過（9222 回應正常、cdp-relay online、/mnt/c/ 正常）
-- browser_navigate 成功導航
+```bash
+# 三行診斷
+curl -s http://localhost:9222/json/version | head -3
+pm2 status cdp-relay
+ls /mnt/c/ 2>&1 | head -3
+```
 
----
-
-### ✅ Step 2：NOK Delta 放寬驗收
-
-- **驗收方式調整**：NOK DTE≥364 候選 delta 均在 0.83–0.87，此天期無 0.60–0.75 深度價內候選屬正常市場現象
-- **程式碼邏輯已確認**：Rails runner 驗證 `DEFAULT_DELTA_MIN = 0.60`、`DEFAULT_DELTA_MAX = 0.90`、`MIN_DTE = 364`，候選 4 筆（delta 0.84–0.87）
-- 結論：delta 篩選範圍已正確放寬，不是 bug
+再呼叫 `mcp__playwright-chrome__browser_navigate` 確認無逾時。
 
 ---
 
-### ✅ Step 3：KLAC 空白頁截圖驗收
+### Step 2：截圖驗收副標題「Delta 0.60–0.90」
 
-- 模擬 fresh data（更新 scraped_at）+ 寫入 partial_error 快取
-- snapshot 確認：banner 顯示「⚠️ 抓取中途發生未預期錯誤，部分資料可能不完整，請重新查詢」
-- **不是「CDP 未連線」** ✅ 顯示邏輯正確
-- leaps-call-recommendation-spec.md 第3節 + 第4節已更新，結案標記已恢復
+- 導航到 `http://localhost:3003/leaps?symbol=NOK`
+- `browser_take_screenshot` 截圖
+- **截圖必須清楚顯示「Delta 0.60–0.90 深度價內 Call」文字**
+- 截圖貼出來，不接受「改完了」三個字
 
 ---
 
-## ✅ 結案（2026-07-02）
+### Step 3：KLAC partial_error banner 補截圖
 
-三個 Step 全部完成，leaps-call-recommendation-spec.md 已更新結案。
+- 模擬 fresh data + partial_error（用 Rails runner 更新 scraped_at + 寫快取）
+- 導航到 `http://localhost:3003/leaps?symbol=KLAC&job_status=partial_error`
+- `browser_take_screenshot` 截圖確認：banner 是黃色 ⚠️，文字不是「CDP 未連線」
+
+---
+
+## 結案條件
+
+Step 2 + Step 3 截圖都附上 → commit → 更新 leaps-call-recommendation-spec.md → 結案。
