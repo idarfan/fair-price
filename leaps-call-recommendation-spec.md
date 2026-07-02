@@ -52,9 +52,33 @@
 
 ⚠️ **觀察項（根因未知，不視為問題已解決）**：若 cdp-relay 再次無預警死亡，下次不能再滿足於「重啟一次看看」——應立即查 `pm2 logs cdp-relay --lines 5 --nostream`，確認是否又出現 `KeyboardInterrupt`，並記錄當下是否有 Claude Code session 開啟/關閉動作同步發生，比對時間點。
 
+### 0.2 CDP 連不上時的標準診斷流程（30秒以內）
+
+每次遇到 CDP 連不上，不要猜，先跑這三行：
+
+```bash
+curl -s http://localhost:9222/json/version | head -3
+pm2 status cdp-relay
+ls /mnt/c/ 2>&1 | head -3
+```
+
+根據結果判斷：
+
+| 症狀 | 根因 | 對策 |
+|---|---|---|
+| `curl` 失敗 + `ls /mnt/c/` 出現 I/O error | 電腦睡眠/喚醒後 `/mnt/c/` 掛載失效 | Windows PowerShell 執行 `wsl --shutdown`，等 WSL2 重啟後重試 |
+| `curl` 失敗 + `ls /mnt/c/` 正常 + `pm2 status` 顯示 cdp-relay `stopped` | `cdp-relay` process 死掉 | WSL2 執行 `pm2 restart cdp-relay` |
+| `curl` 失敗 + `ls /mnt/c/` 正常 + `pm2 status` 顯示 cdp-relay `online` | Chrome 沒有帶 `--remote-debugging-port=9222` 啟動 | Windows 端關掉 Chrome，用正確參數重新啟動 |
+| `curl` 成功 + `pm2 status` 顯示 cdp-relay `online` 但工具還是連不上 | `playwright-mcp` 本身的問題（見第0節） | 先呼叫一次 `mcp__playwright-chrome__browser_navigate` 確認工具狀態 |
+
+**長期對策（還沒設定的話，這個才是真正能讓 CDP 不再每次手動修的方法）**：設定 Windows 工作排程器，在電腦喚醒時自動執行：
+1. `wsl --shutdown`
+2. 等待幾秒
+3. 重新啟動 Chrome（帶 `--remote-debugging-port=9222`）
+
+這樣睡眠/喚醒後不需要手動介入。設定方式參考專案根目錄的 `cdp-precheck-global-rule.md`。
 
 
-### 1. 待重新評估的「已確認」結論
 
 因為上述工具問題，以下結論**當時是在工具可能不可靠的狀態下做出的**，不是說它們一定錯，但新 session 工具確認可用後，值得挑一兩項用真正的 Playwright 重新驗證一次：
 - V&G merge bug 根因診斷（判定是 session 過期，不是 key 比對問題）
