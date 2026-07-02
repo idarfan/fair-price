@@ -49,7 +49,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   def render_header
     div do
       h1(class: "text-xl font-bold text-gray-900") { plain "LEAPS Call 候選排行" }
-      p(class: "text-sm text-gray-500 mt-0.5") { plain "Delta 0.75–0.90 深度價內 Call · 依 OI 由高到低排序" }
+      p(class: "text-sm text-gray-500 mt-0.5") { plain "Delta 0.60–0.90 深度價內 Call · 依 OI 由高到低排序" }
     end
   end
 
@@ -107,7 +107,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       render_alert("bg-red-50 border border-red-300 text-red-800", "❌ #{msg}")
     when :no_candidates
       msg = @user_strike.present? ?
-        "這個履約價 #{@user_strike}（含緩衝檔）在所有到期日都沒有符合 Delta 0.75–0.90 的候選。請嘗試其他履約價，或留空讓系統自動偵測。" :
+        "這個履約價 #{@user_strike}（含緩衝檔）在所有到期日都沒有符合 Delta 0.60–0.90 的候選。請嘗試其他履約價，或留空讓系統自動偵測。" :
         "目前沒有符合篩選條件的候選，請嘗試調整 Delta 範圍或手動輸入履約價後重試。"
       render_alert("bg-orange-50 border border-orange-300 text-orange-800", "⚠️ #{msg}")
     when :ready_to_fetch
