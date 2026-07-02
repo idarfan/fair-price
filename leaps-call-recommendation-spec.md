@@ -1,5 +1,7 @@
 # FairPrice 新功能規格：LEAPS Call 操作建議
 
+> **新 session 開始前，請先完整重讀本檔案 `leaps-call-recommendation-spec.md`，特別是最前面這段「接手前必讀」，不要跳過直接開始做事。**
+
 ## ⚠️ 接手前必讀：開發進行中，尚有未解問題
 
 **這份規格記錄了 LEAPS 功能從 Phase A 到目前的完整開發脈絡。2026-06-30 曾一度標記「結案」，但後續發現多個新問題，結案標記已撤回。目前狀態：核心功能已實作並大致驗收，但仍有幾個待確認項目尚未完全收尾（見第3、4節）。新 session 接手時，請先讀完本節再開始動作。**
@@ -70,6 +72,9 @@ ls /mnt/c/ 2>&1 | head -3
 | `curl` 失敗 + `ls /mnt/c/` 正常 + `pm2 status` 顯示 cdp-relay `stopped` | `cdp-relay` process 死掉 | WSL2 執行 `pm2 restart cdp-relay` |
 | `curl` 失敗 + `ls /mnt/c/` 正常 + `pm2 status` 顯示 cdp-relay `online` | Chrome 沒有帶 `--remote-debugging-port=9222` 啟動 | Windows 端關掉 Chrome，用正確參數重新啟動 |
 | `curl` 成功 + `pm2 status` 顯示 cdp-relay `online` 但工具還是連不上 | `playwright-mcp` 本身的問題（見第0節） | 先呼叫一次 `mcp__playwright-chrome__browser_navigate` 確認工具狀態 |
+| `browser_navigate` 逾時 30 秒以上，`curl` 跟 `cdp-relay` 都正常 | 多個 session 的 `playwright-mcp` process 殘留，搶同一條 Chrome CDP 連線互相干擾（session crash 或強制中斷時 cleanup 沒有正確執行） | 先查：`ps aux \| grep playwright-mcp \| grep -v grep`，如果超過一行代表有殘留，執行 `pkill -f playwright-mcp` 全部清掉，讓 Claude Code 自動啟動乾淨的新 process |
+
+> **2026-07-02 已自動化**：`~/.claude/hooks/stop-playwright-cleanup.sh` 已加入全域 Stop hook，每次任何 Claude Code session 結束時自動執行 `pkill -f playwright-mcp`，清掉殘留 process，不再需要手動介入。注意：這是全域 hook，不限 FairPrice 專案；若同時開兩個 Claude Code session，其中一個結束時會連帶清掉另一個 session 正在用的 playwright-mcp process。
 
 **長期對策（還沒設定的話，這個才是真正能讓 CDP 不再每次手動修的方法）**：設定 Windows 工作排程器，在電腦喚醒時自動執行：
 1. `wsl --shutdown`
@@ -115,7 +120,7 @@ ls /mnt/c/ 2>&1 | head -3
 | Phase A–F、C.5、C.5b、E 配色共用 | ✅ 已驗證完成 |
 | Phase G（Stacked 抓取策略） | ✅ 已驗證完成 |
 | 履約價輸入框 step bug | ✅ 已關閉（三項證據齊全） |
-| `mcp__playwright-chrome__*` 工具連線 | ✅ 2026-06-30 實際呼叫確認可用 |
+| `mcp__playwright-chrome__*` 工具連線 | ✅ 2026-06-30 實際呼叫確認可用；⚠️ **已知反覆發生問題**：多個 session 的 `playwright-mcp` process 殘留會互相搶 CDP 連線導致逾時，解法是 `pkill -f playwright-mcp` 清掉殘留，Claude Code 會自動啟動乾淨的新 process；詳見第0.2節第五種情況 |
 | `bg-gray-50/50` 奇數列透明度 | ✅ 2026-06-30 親眼確認 |
 | Checklist 同步 | ✅ 2026-06-30 完成 |
 | CDP 連線異常 | ✅ 根因查出（cdp-relay 死亡），已重啟，C.5b 484ms 達標 |
