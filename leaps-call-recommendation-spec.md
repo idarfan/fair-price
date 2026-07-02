@@ -1,8 +1,8 @@
 # FairPrice 新功能規格：LEAPS Call 操作建議
 
-## 📦 歷史交付記錄：LEAPS 功能完整驗收（2026-06-30 結案）
+## ⚠️ 接手前必讀：開發進行中，尚有未解問題
 
-**這份記錄是整個 LEAPS 功能開發過程的歷史脈絡，已於 2026-06-30 完整驗收結案。若有新 session 接手，請直接跳至本檔案下方的規格內容；以下各小節是診斷過程的記錄，不需要重新執行，保留供日後參考。**
+**這份規格記錄了 LEAPS 功能從 Phase A 到目前的完整開發脈絡。2026-06-30 曾一度標記「結案」，但後續發現多個新問題，結案標記已撤回。目前狀態：核心功能已實作並大致驗收，但仍有幾個待確認項目尚未完全收尾（見第3、4節）。新 session 接手時，請先讀完本節再開始動作。**
 
 ### -1. 比第0節更前面的教訓：驗證工具本身要先被驗證，不能假設它活著
 
@@ -112,19 +112,34 @@ ls /mnt/c/ 2>&1 | head -3
 
 | 項目 | 狀態 |
 |---|---|
-| Phase A–F、C.5、C.5b、E 配色共用 | ✅ 已驗證完成（多輪截圖+測試核對過，可信） |
+| Phase A–F、C.5、C.5b、E 配色共用 | ✅ 已驗證完成 |
 | Phase G（Stacked 抓取策略） | ✅ 已驗證完成 |
-| 履約價輸入框 step bug | ✅ 已關閉（三項證據齊全：DOM HTML 截圖、操作截圖、Rails log 含 `user_strike` 參數），這條是真的修好了 |
-| `mcp__playwright-chrome__*` 工具連線 | ✅ **2026-06-30 本 session 已實際呼叫確認**：`browser_navigate` 導航 `localhost:3003` 成功回應，頁面標題正確，速度正常，無逾時。 |
-| `bg-gray-50/50` 奇數列透明度 | ✅ **2026-06-30 親眼確認**：JS 驗證 computed `rgba(249, 250, 251, 0.5)`；hover 截圖可見整列變 `bg-purple-200` 紫色。但 **tailwind/application.css 缺少靜態宣告**導致 CSS 沒生成，已補上後重建 tailwindcss:build 完成。 |
-| Checklist 文件內 `[ ]`/`[x]` 同步 | ✅ **2026-06-30 完成**：全部 [x]，0 項剩餘 [ ]。 |
-| CDP 連線異常（NVTS查詢） | ✅ **根因已查出（cdp-relay 死亡），已重啟**。C.5b「1-2秒回應」驗收完畢：port 9222 REJECT 時 `cdp_online?` 耗時 484ms。SIGINT 根因未知，列長期觀察項，不影響功能交付。 |
-| 錯誤訊息分四種情況顯示（第8節） | ✅ **2026-06-30 全部修完，23/23 spec 通過**。新修重點：`ScrapeLeapsJob` rescue block 補寫 `leaps_last_errors_\#{symbol}` cache；新增 `spec/jobs/scrape_leaps_job_spec.rb`。partial_error fallback 文字改中性（不再暗示一定是 session 問題）。 |
-| `FetchLog`/`log_fetch` bug（leaps 分支） | ✅ **2026-06-30 修完**。`FetchLog::FETCH_TYPES` 缺 `"leaps"`、`STATUSES` 缺 `no_candidates/partial_error/cached`，導致 `log_fetch` 從 `fetch_leaps` 任何分支呼叫都 throw `RecordInvalid`，原始 AR 錯誤漏到使用者畫面。已補常數 + `log_fetch` 加 rescue（logging 失敗不砸主流程）+ `persist_leaps` 加防護性欄位驗證。 |
+| 履約價輸入框 step bug | ✅ 已關閉（三項證據齊全） |
+| `mcp__playwright-chrome__*` 工具連線 | ✅ 2026-06-30 實際呼叫確認可用 |
+| `bg-gray-50/50` 奇數列透明度 | ✅ 2026-06-30 親眼確認 |
+| Checklist 同步 | ✅ 2026-06-30 完成 |
+| CDP 連線異常 | ✅ 根因查出（cdp-relay 死亡），已重啟，C.5b 484ms 達標 |
+| 錯誤訊息分四種情況顯示 | ✅ 2026-06-30 修完，23/23 spec 通過 |
+| `FetchLog`/`log_fetch` bug | ✅ 2026-06-30 修完 |
+| partial_error UX（expire strike vs 推薦 strike 重疊判斷） | ✅ 2026-07-01 修完，23/23 spec 通過 |
+| partial_error + fresh data 空白頁 | ✅ 2026-07-01 修完，60/60 spec 通過 |
+| Delta 篩選範圍放寬（0.75–0.90 → 0.60–0.90） | ✅ 程式碼+測試完成（60 通過）；⚠️ **NOK 實際抓取待驗證**（CDP 離線當日無法跑，連線後補） |
+| KLAC 空白頁（partial + fresh data）截圖驗收 | ⚠️ **未完成**：修復已做，但還沒有截圖證明 banner 在瀏覽器裡正確顯示 |
+| NOK 0.60–0.75 段候選實際出現在排行表 | ⚠️ **未完成**：需要 CDP 連線後跑一次完整查詢確認 |
+| asyncio traceback 根因 | ⚠️ **未知**：`/tmp/nok_stderr.txt` 已被清除，需重現才能查 |
 
-### 4. 結案聲明
+### 4. 目前進行中——未完成項目與接手順序
 
-整份 LEAPS 功能規格已於 2026-06-30 完整驗證交付，checklist 全數確認，若有新一輪 session 接手，直接從本檔案下方規格內容開始，不需要重複本節的診斷流程；如果之後有新功能需求（例如 PMCC 短腿選擇），應另開新規格文件，不要在這份檔案裡繼續累加。
+**結案標記已撤回**，以下項目待確認後才能真正收尾：
+
+1. **先解決 CDP 連線問題**（見第0.2節診斷流程），連線後才能做後面兩項。
+2. **NOK 不帶履約價完整查詢**：確認 Delta 0.60–0.75 段候選有正確出現在排行表，附截圖。
+3. **KLAC 空白頁截圖驗收**：模擬 partial_error + fresh data 情境，截圖確認 banner 文字正確（不是「CDP未連線」）。
+4. 以上三項都完成後，才能把這段改回「結案」標記。
+
+如果之後有新功能需求（例如 PMCC 短腿選擇），應另開新規格文件，不要在這份繼續累加。
+
+
 
 **補充驗證記錄（2026-06-30）**：NOK 不帶履約價的 Stage 1 自動偵測路徑已於此時驗證通過。同日修復了 `cdp_helper.py` `prepare_page` 的 skip-navigation bug（Chrome 停在任意 `/options` URL 時會跳過導航），修復後 `leaps_scraper.py` 強制導航至 `?moneyness=10` Near the Money SBS view。實測輸出：Stage 1 自動偵測找到 20 筆近價行權價資料、候選行包括 strikes 8.5–10.5；Stage 2 在 strike=10 取得 DTE 535/570/717/899 的 LEAPS 資料（delta 0.780–0.796，落在 0.60–0.90 篩選範圍內）。`persist_leaps` 在 `when "partial"` 分支同樣執行，已抓到的資料會入庫，不因 strike 11 的 partial 而遺失。
 
