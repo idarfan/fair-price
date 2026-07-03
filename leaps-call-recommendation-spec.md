@@ -2,7 +2,7 @@
 
 > **新 session 開始前，請先完整重讀本檔案 `leaps-call-recommendation-spec.md`，特別是最前面這段「接手前必讀」，不要跳過直接開始做事。**
 
-## ✅ 接手前必讀：功能已結案（2026-07-02）
+## ✅ 接手前必讀：功能已結案（2026-07-02）。⚙️ **2026-07-03 補充修復**：`leaps_scraper.py` 抓取誤判 bug（固定 sleep 導致 `bc-data-grid._data` 未載入即誤判 session 過期）已修復，見第3節與第4節補充記錄。
 
 **這份規格記錄了 LEAPS 功能從 Phase A 到目前的完整開發脈絡。2026-06-30 曾一度標記「結案」，後續發現多個新問題，結案標記一度撤回。✅ **2026-07-02 全部未解問題已確認並結案**（見第3、4節）。新 session 若有新功能需求，請另開新規格文件。**
 
@@ -132,6 +132,7 @@ ls /mnt/c/ 2>&1 | head -3
 | KLAC 空白頁（partial + fresh data）截圖驗收 | ✅ **2026-07-02 snapshot 驗證**：模擬 partial_error + fresh data，banner 顯示「⚠️ 抓取中途發生未預期錯誤，部分資料可能不完整，請重新查詢」，非「CDP 未連線」，顯示邏輯正確 |
 | NOK 0.60–0.75 段候選實際出現在排行表 | ✅ **2026-07-02 確認**：市場資料特性，NOK DTE≥364 選擇權 delta 均在 0.83–0.87，此天期無 0.60–0.75 深度價內候選屬正常現象；程式碼邏輯（DEFAULT_DELTA_MIN=0.60）確認正確，不是 bug |
 | asyncio traceback 根因 | ⚠️ **未知**：`/tmp/nok_stderr.txt` 已被清除，需重現才能查 |
+| `bc-data-grid._data` 未載入即誤判 session 過期（固定 sleep 問題） | ✅ **2026-07-03 修復**：`_wait_for_grid()` 輪詢取代固定 sleep，Stage 1 NTM 頁同步改輪詢；三分類（None/[]/data）+ `_confirm_empty()` 穩定性確認；`reason` 字段區分 `session_expired` vs `page_load_timeout`；17/17 unit tests 通過；E2E 無 user_strike NOK 完整跑完（104 rows）；commit `4012075` |
 
 ### 4. 目前進行中——未完成項目與接手順序
 
@@ -154,6 +155,8 @@ ls /mnt/c/ 2>&1 | head -3
 
    📋 **2026-07-01 調查結果**：`/tmp/nok_stderr.txt` 不存在（系統重開後 `/tmp` 已清除）。這個 traceback 無法從暫存檔取回，需要重新觸發 NOK 無履約價查詢才能重現。在重現之前，這條根因仍屬未知。
 
+   📋 **2026-07-03 後續推斷**：最可能的根因是 `bc-data-grid._data` 在固定 sleep 結束後仍為 null，scraper 誤判為 session 過期後以異常路徑退出，asyncio event loop 在不乾淨的狀態下被強制終止，產生 traceback。2026-07-03 改用 `_wait_for_grid()` 輪詢後，Stage 1 和 Stage 2 的 None 路徑都改走正常 `json.dumps()` → `return` 退出，不再觸發 event loop 的邊緣情況。**NOK 無 user_strike E2E 實測（104 rows，全程無 exception）支持此推斷。視為連帶解決，不需要再重現。**
+
 2. **`prepare_page` skip-navigation bug 影響範圍未評估**：這個 bug（Chrome 停在任意 `/options` URL 時 `prepare_page` 跳過導航）在這次 NOK 無履約價測試才被發現。之前所有帶 `user_strike` 的測試（包括 NVTS 那次），如果當時 Chrome 剛好停在某個舊 URL，Stage 1 或 Stage 2 可能也讀到了錯誤頁面的資料，只是剛好沒觸發明顯的失敗症狀。這個 bug 的影響範圍需要評估：之前那些「成功」的測試，有沒有可能其實是在錯誤的頁面狀態下跑的，只是剛好 Chrome 停在正確的 URL 所以沒出事。
 
    ✅ **2026-07-01 評估完成，影響範圍確認為：無**。根因是 `leaps_scraper.py` 在 `prepare_page` 之後立刻強制導航（`L263–264`：`cdp_navigate(ntm_url, settle_ms=OPTIONS_SETTLE)`），Stage 2 每個 strike 同樣各自有 `cdp_navigate`（Options L299、V&G L322）。所有資料讀取都發生在各自的強制導航之後，`prepare_page` 的 skip-navigation 步驟只是「找到 tab + 等 500ms」，即使跳過，後續的強制導航仍會把頁面帶到正確 URL。因此 NVTS 等帶 `user_strike` 的歷次測試資料可信度不受這個 bug 影響，可關閉此疑慮。
@@ -175,6 +178,11 @@ ls /mnt/c/ 2>&1 | head -3
 **補充驗證記錄（2026-07-01）— Delta 篩選範圍放寬**：Stage 1 候選門檻由 `Delta>=0.80` 放寬至 `Delta>=0.60`，Stage 2 最終篩選由 `0.75–0.90` 放寬至 `0.60–0.90`。涉及 `leaps_scraper.py`（`_pick_candidates` 條件 + 相關 comment）、`LeapsRankingService`（`DEFAULT_DELTA_MIN 0.75 → 0.60`）、`leaps_ranking_service_spec`（邊界測試 `0.74/0.75 → 0.59/0.60`、`be_between(0.60, 0.90)`）。全部 60 examples 通過，Stage 1/Stage 2 分離規則測試隨新數值一起更新，邏輯不變。⚠️ CDP 修改當日離線，NOK 實際抓取驗證（確認 0.60–0.75 段候選有正確出現）待 Chrome 連線後補跑。
 
 **補充驗證記錄（2026-07-01）— `partial_error` + fresh data 空白頁修復**：當 Barchart 未登入時 scraper 回傳 `partial`（非 `session_expired`），`persist_leaps` 仍將資料寫入 DB（5 分鐘 fresh window 有效）。首次點擊 `?job_status=partial_error` 顯示 banner 正常，但後續點擊（5 分鐘內）controller 走 `fresh_data_exists? = true` → `LeapsRankingService` 因 delta/DTE 條件回傳 `[]` → `@scrape_status = :cached` → 空白頁無任何提示。修復：`LeapsRecommendationsController#index` 在 `fresh_data_exists? && @candidates.empty? && @scrape_status == :cached` 時讀 `Rails.cache.read("leaps_last_errors_#{@symbol}")`：有 errors → 設 `:partial_error`（復用現有 banner 邏輯）；無 errors → 設 `:no_candidates`。同步更新 `barchart_scraper_service.rb` partial_error 訊息末尾加「請重新登入 Barchart 後點查詢重試」。補兩個 RSpec request spec 驗證 fallback 路徑，60/60 examples 通過。
+
+**補充驗證記錄（2026-07-03）— `bc-data-grid._data` 誤判修復（輪詢取代固定 sleep）**：
+問題：Stage 2（Options Prices / V&G）和 Stage 1（NTM 頁）的 `cdp_navigate` 後固定 sleep，`bc-data-grid._data` 從其他 URL 切換過來時不一定能在 sleep 結束前載入，導致 null 被誤判為 session 過期，`status=barchart_session_expired` 提前中止。實測：NOK user_strike=7 CLI 跑通但 E2E（無 user_strike）固定失敗，根因鎖定在 Stage 1 NTM 頁 STAGE1_SETTLE=5000ms 不夠。
+修復：(1) `_wait_for_grid(ws_url, js, max_wait_s=30, poll_s=0.5)` — 每 500ms 輪詢，第一個非 None 立即返回，取代所有固定 sleep；(2) `_confirm_empty(ws_url, js, delay_s=1.5)` — `[]` 結果 1.5s 二次確認；(3) Stage 1 NTM 改用 `_wait_for_grid`（原先 `STAGE1_SETTLE=5000ms` 固定 sleep）；(4) `SESSION_EXPIRED_JS` 在 None 路徑提供真正的 session 過期偵測；(5) `reason` 字段區分 `session_expired` vs `page_load_timeout`；(6) `skipped_strikes` 字段記錄跳過的 strike/layer。
+驗收：17/17 unit tests（三分類 + SESSION_EXPIRED_JS false-positive）；CLI `python3 leaps_scraper.py NOK 7` itm_probability/vega/delta 全有值；E2E 無 user_strike NOK 104 rows 入庫，推薦分析正常顯示；commit `4012075`，push `8092340`。
 
 ---
 
