@@ -220,14 +220,14 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       td(class: "px-3 py-2 text-right font-semibold")    { plain fmt_int(row[:open_interest]) }
       td(class: "px-3 py-2 text-right")                  { plain fmt_int(row[:volume]) }
       td(class: "px-3 py-2") do
-        div(class: "flex flex-col items-start gap-0.5") do
+        div(class: "flex flex-row items-center gap-1.5") do
           span(class: "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs " \
                        "#{style[:bg]} #{style[:text]} border #{style[:border]}") do
             div(class: "w-1.5 h-1.5 rounded-full flex-shrink-0 #{style[:dot]}")
             plain tier
           end
           if warn
-            span(class: "text-orange-600 text-xs") { plain "⚠ 近期無成交" }
+            span(class: "text-orange-600 text-xs whitespace-nowrap") { plain "⚠ 近期無成交" }
           end
         end
       end
@@ -246,7 +246,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     return unless @flow_panel&.dig(:status) == :ok
 
     div(class: "bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden") do
-      div(class: "px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-baseline justify-between") do
+      div(class: "px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between") do
         div do
           h2(class: "text-sm font-semibold text-gray-700") { plain "Options Flow — 情緒參考，非排序依據" }
           p(class: "text-xs text-gray-400 mt-0.5") do
