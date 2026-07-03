@@ -1,71 +1,74 @@
-# FairPrice 新功能規格：LEAPS 查詢 user_strike 合理性驗證（快速失敗）
+# FairPrice 新功能規格：LEAPS 查詢 user_strike 合理性驗證（履約價鏈快照比對）
 
 > 依主規格慣例：新 session 接手前先跑 CDP 三行預檢 + 確認 `mcp__playwright-chrome__*` 工具可用（見 `leaps-call-recommendation-spec.md` 第 0、0.2 節），工具不可用就停下回報，不繞路。
 
 ## 起因（2026-07-03 實際事故）
 
-使用者查完 NOK（user_strike=7）後把 symbol 換成 KLAC，**履約價欄位還留著 7**。KLAC 現價一百多美元，strike 7 極度偏離，Barchart 的 stacked 頁面渲染不出對應格線 → 白等 30 秒輪詢 timeout → `partial_error`「頁面 30 秒內未完成載入」。
+使用者查完 NOK（user_strike=7）後把 symbol 換成 KLAC，履約價欄位還留著 7。KLAC 現價一百多美元，strike 7 極度偏離，Barchart stacked 頁渲染不出格線 → 白等 30 秒輪詢 timeout → `partial_error`。錯誤訊息是準的（前次修復生效），但這種輸入根本不該走到爬蟲那一步。
 
-錯誤訊息本身是準的（上一輪修復生效），但問題在更上游：**這種明顯不合理的輸入，應該在送出查詢的瞬間就被擋下，而不是排 job、開瀏覽器、等 30 秒之後才用 timeout 的形式告訴使用者**。
+## 核心設計原則（使用者定調，不要改成別的方案）
 
-## 目標
+**驗證依據是「該 symbol 實際存在的履約價陣列」，不是現價比例區間之類的啟發式猜測。**
 
-`user_strike` 明顯偏離該 symbol 現價時，**毫秒到一兩秒內**回饋「請輸入合理履約價（建議區間 $A–$B）」，完全不進入爬蟲流程。
+流程：先查股價現價 → 把該 symbol 的履約價讀入陣列 → user_strike 不在陣列覆蓋範圍內就立即排除。履約價陣列的來源是**資料庫儲存的歷史查詢記錄**（每次 Stage 1 抓取結果落地），**只有完全沒有歷史紀錄時才需要讀 Barchart**——而「讀 Barchart」就是這次查詢本身的 Stage 1，不是額外的抓取動作。
 
-## 三層防線（由快到慢，各自獨立生效）
+## 資料庫：履約價鏈快照
 
-### 第 1 層：前端表單即時檢查（毫秒級）
+- 每個 symbol 儲存一份履約價鏈快照：`strikes` 陣列（Stage 1 Near-the-Money 實際抓到的所有 strike）、當時的現價 `spot_price`（**從 Stage 1 導航的 Barchart 頁面 DOM 直接擷取**——選擇權頁面本身就顯示標的現價，抓 strikes 時順手一併抓，零額外請求）、`scraped_at`。
+- **每次 Stage 1 成功抓取後 upsert 更新**（同一 symbol 覆蓋舊快照）——這是既有抓取流程的副產品，零額外 Barchart 請求。
+- 實作前先看既有 schema：如果現有的 LEAPS rows 表已能推導出等價資訊（該 symbol 最近一次抓取的全部 strike），優先用查詢推導；推導成本高或語意不乾淨才建新表（例如 `strike_chain_snapshots`）。**選了哪條路、為什麼，寫回本節。**
+- 快照過舊不作廢：履約價鏈的間距與範圍變動緩慢，舊快照仍可用於排除「明顯不合理」的輸入（KLAC 配 strike 7 這種），而每次成功查詢都會刷新快照。不設「太舊就當沒有」的邏輯，避免不必要的 Barchart 依賴。
 
-- 頁面渲染時，把該 symbol 的**最近已知現價**（來源見「現價來源」一節）嵌入頁面（data attribute 或 JS 變數）。
-- 使用者點「查詢」時，前端先檢查：`user_strike` 是否落在 `現價 × [下限%, 上限%]` 區間內（門檻見下方常數定義）。
-- 超出區間 → **不送出**，在履約價欄位旁顯示紅字：「Strike {N} 偏離 {SYMBOL} 現價 ${P} 過遠，深度價內 Call 建議輸入 ${A}–${B} 之間」。
-- 現價嵌不到（DB 沒有該 symbol 的快取價）→ 前端不擋，放行到第 2 層（**驗證功能自身失效時不能反過來讓正常查詢不能用**）。
+## 驗證流程
 
-### 第 2 層：Controller 入列前檢查（權威判定，~1 秒內）
+### Controller 入列前（權威判定）
 
-- `LeapsRecommendationsController` 在 enqueue job **之前**做同一套區間檢查（前端檢查可被繞過，後端才是權威）。
-- 現價來源：優先讀 FairPrice 既有的價格快取；快取太舊（門檻可設，例如 > 1 個交易日）或不存在時，走既有的快速報價管道補一次（不准為此新增對 Barchart 的抓取）。
-- 超出區間 → 不入列，直接以新狀態 `invalid_strike` 回應，前端顯示同一句建議區間訊息。**不是 partial_error，不共用任何既有錯誤文案。**
-- 快速報價也拿不到 → 放行照舊執行（同第 1 層原則），並在 log 記一筆「strike 驗證跳過：無現價可用」。
+1. 讀該 symbol 的履約價鏈快照（`strikes` 陣列 + `spot_price` 一次讀出）。**現價就用快照裡 Barchart 來源的 `spot_price`，不打 Finnhub、不打 yfinance、不新增任何外部報價依賴**——使用者是 Barchart 付費會員，Barchart 頁面資料就是本專案的價格權威來源。快照的 spot_price 可能是上次查詢時的值，用於排除明顯不合理輸入綽綽有餘（判定主依據本來就是 strikes 範圍，現價只是訊息顯示用）。
+2. **有快照** → 檢查 `user_strike` 是否落在 `[min(strikes) − 容差, max(strikes) + 容差]`（容差 = 一個 strike 間距，容納快照後新增的邊緣 strike）：
+   - 範圍外 → **不入列**，回新狀態 `invalid_strike`，訊息帶實據：「Strike {N} 不在 {SYMBOL} 的履約價範圍（實際範圍 ${min}–${max}，現價 ${P}），請重新輸入」。不是 `partial_error`，不共用任何既有錯誤文案。
+   - 範圍內 → 照常入列。
+3. **無快照**（該 symbol 第一次查）→ 照常入列，由下面的 Stage 1 後檢查兜底；本次 Stage 1 結果落地後，下次查詢就有快照可用。
 
-### 第 3 層：Scraper 內 Stage 1 後檢查（兜底）
+### Scraper 內 Stage 1 後檢查（無快照時的兜底）
 
-- Stage 1（Near-the-Money）抓回的 strikes 清單本身就是「這個 symbol 當前合理履約價」的實據。`_pick_candidates` 拿到 `user_strike` 後，若 `user_strike` 偏離 Stage 1 清單的最近 strike 超過門檻（例如超過清單價距的 N 倍，常數可調），**立即中止並回報**，不要去導航 stacked 頁然後等 30 秒 timeout。
-- 回報訊息帶實據：「Strike {N} 不在 {SYMBOL} 的近價履約價範圍（Stage 1 實際範圍 ${min}–${max}），請重新輸入」。
-- 這層的狀態同樣是 `invalid_strike` 類別，不是 `partial`。
+- Stage 1 抓完，`_pick_candidates` 拿到 `user_strike` 時，若 `user_strike` 落在 Stage 1 清單範圍外（同一套容差規則），**立即中止回報**，不導航 stacked 頁去撞 30 秒 timeout。
+- 回報訊息同樣帶實據（Stage 1 實際範圍），狀態歸 `invalid_strike` 類別，不是 `partial`。
+- Stage 1 導航到 Barchart 頁面時，**從頁面 DOM 一併擷取標的現價**，跟 strikes 一起寫入快照的 `spot_price`。
+- **不論中止與否，Stage 1 抓到的 strikes 與現價都要落地成快照**——中止的這次查詢也要留下紀錄，下次同 symbol 的驗證就能在 controller 層毫秒擋下。
 
-## 常數定義（集中一處，不要散在三層各寫一份）
+### 前端表單即時檢查（毫秒級，體驗層）
 
-- `STRIKE_LOWER_RATIO = 0.30`、`STRIKE_UPPER_RATIO = 1.30`（現價的 30%–130%，初始值，可調）。
-- 建議區間顯示值 `$A–$B` 用同一組常數算，三層訊息一致。
-- 定義位置：Ruby 端一處（controller 與前端嵌入共用），Python 端 Stage 1 門檻另一個常數（因為依據不同：一個是現價比例、一個是 Stage 1 實際清單）。
+- 頁面渲染時嵌入該 symbol 的快照範圍（min/max）與現價；使用者點「查詢」時前端先比對，範圍外直接紅字擋下不送出，訊息與後端同一句。
+- 無快照或嵌入失敗 → 前端不擋，放行給 controller。**驗證功能自身失效時，不能反過來讓正常查詢不能用**——三層任何一層拿不到資料都是放行，不是阻擋。
 
-## 附帶 UX 修正（同一起事故的直接成因）
+## 附帶 UX 修正（本次事故的直接成因）
 
-- **切換 symbol 時清空 `user_strike` 欄位**（或至少在欄位旁顯示灰字提示「已切換標的，請確認履約價」）。這次事故的直接成因就是換股後舊 strike 殘留。實作擇一即可，但要在本規格記錄選了哪個、為什麼。
+- **切換 symbol 時清空 `user_strike` 欄位**（或欄位旁灰字提示「已切換標的，請確認履約價」）。實作擇一，選了哪個寫回本節。
 
 ## 路由與前端入口（主動聲明）
 
-- 本功能**不新增路由**，全部掛在既有 `/leaps` 流程內（controller 檢查 + 既有頁面內的前端行為），不另開頂層路由。
+- 不新增頂層路由，全部掛在既有 `/leaps` 流程內。
 - 不新增導覽列項目（無新頁面）。
-- 若第 2 層需要輕量報價端點（前端即時取價用），必須掛在既有 namespace 下（例如既有 quotes/API 結構內），並在本節補上實際路徑。
+- 若前端取快照/現價需要輕量端點，掛在既有 namespace 結構下，實際路徑補回本節。
 
 ## 交付與驗收
 
-1. **Request spec（跟單元測試同等級的必交付）**：覆蓋 `LeapsRecommendationsController` 的完整 HTTP 路徑——
-   - `user_strike` 超出區間 → 回 `invalid_strike`，job **沒有**入列（斷言 enqueue 次數為 0）
-   - `user_strike` 合理 → 照常入列
-   - 無現價可用 → 放行入列 + log 留痕
-2. Python 端單元測試：Stage 1 後檢查的中止路徑 + 訊息內容含實際範圍值。
-3. **端到端驗收（Playwright 截圖三件套，缺一不算完成）**：
-   - 場景 A（本次事故重現）：KLAC + strike 7 → 送出後**兩秒內**看到 invalid_strike 訊息與建議區間，截圖；確認 Rails log 中該次請求**沒有** enqueue job。
+1. **Request spec（必交付，跟單元測試同級）**：覆蓋 controller 完整 HTTP 路徑——
+   - 有快照 + `user_strike` 範圍外 → 回 `invalid_strike`，**斷言 job enqueue 次數為 0**
+   - 有快照 + 範圍內 → 照常入列
+   - 無快照 → 放行入列
+2. Python 端單元測試：Stage 1 後檢查的中止路徑、訊息含實際範圍值、**中止時快照仍落地**。
+3. 快照 upsert 的測試：Stage 1 成功後快照更新（strikes、spot_price、scraped_at 皆刷新），且 spot_price 的值來自 Barchart 頁面 DOM 擷取（測試斷言擷取路徑，不是來自其他報價服務）。
+4. **端到端驗收（Playwright 截圖三件套，缺一不算完成）**：
+   - 場景 A（事故重現）：先查一次 KLAC（建立快照），再輸入 KLAC + strike 7 → **兩秒內**看到 `invalid_strike` 訊息含實際範圍，截圖；Rails log 確認該次請求沒有 enqueue job。
    - 場景 B（核心基本情境，必跑）：合理 symbol **不帶 user_strike** 的最基本查詢 → 完整跑通出結果，截圖。
-   - 場景 C：合理 symbol + 合理 user_strike → 照常出結果，截圖。
+   - 場景 C：首查 symbol（無快照）+ 明顯不合理 strike → Stage 1 後快速中止並顯示範圍訊息（不是等 30 秒 timeout），且快照已落地（查 DB 佐證），截圖。
+   - 場景 D：合理 symbol + 合理 user_strike → 照常出結果，截圖。
    - 每張截圖附實際導航 URL 與關鍵 DOM 值，不接受只有文字說「修好了」。
-4. 驗收全過後更新 `leaps-call-recommendation-spec.md` 的相關章節（partial_error 訊息表加上 `invalid_strike` 不屬於 partial 的註記），並在本檔記錄 commit hash。
+5. 驗收全過後更新 `leaps-call-recommendation-spec.md`（錯誤狀態表加 `invalid_strike`，註明不屬於 partial），本檔記錄 commit hash。
 
 ## 邊界規則（沿用主規格）
 
-- 禁止為取現價而呼叫 Barchart 內部 API；報價一律走 FairPrice 既有管道（DB 快取 / yfinance sidecar）。
+- 現價來源就是 Barchart 頁面 DOM（Stage 1 抓取時一併擷取），**不引入 Finnhub、yfinance 或其他外部報價服務作為本功能的依賴**。禁止呼叫 Barchart 內部 API——擷取現價一樣只准讀頁面實際渲染的 DOM，這跟 strikes 的抓取邊界是同一條規則。
 - 所有瀏覽器驗收操作走 `mcp__playwright-chrome__*`，禁止 raw WebSocket CDP。
 - 實作決策若偏離本規格，先更新本檔再動手。
