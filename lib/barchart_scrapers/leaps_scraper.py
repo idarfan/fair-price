@@ -39,8 +39,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 from cdp_helper import prepare_page, cdp_eval, cdp_navigate, activate_target
 
 TARGET_PATH    = "options"
-OPTIONS_SETTLE = 5000
-VG_SETTLE      = 4000
+STAGE1_SETTLE  = 5000   # Stage 1 (NTM) fixed sleep — no polling, must be long enough
+OPTIONS_SETTLE = 1500   # Stage 2 opts initial settle; _wait_for_grid polls up to 30 s
+VG_SETTLE      = 1500   # Stage 2 V&G initial settle; _wait_for_grid polls up to 25 s
 
 # ── Stage 1: Near the Money view — all Call strikes + Deltas ─────────────────
 NEAR_MONEY_JS = """
@@ -145,6 +146,19 @@ LOCK_STRIKE_VG_JS = """
 })()
 """
 
+
+# Session-expiry positive detection — same modal logic as technical-analysis page
+# bc-overlay-modal-wrapper always exists; login keywords appear only when session expires
+SESSION_EXPIRED_JS = """
+(() => {
+  const modal = document.querySelector('div.bc-overlay-modal-wrapper');
+  if (!modal) return false;
+  const text = modal.innerText.trim().toLowerCase();
+  return text.includes('sign in') || text.includes('log in') ||
+         text.includes('welcome to barchart') || text.includes('continue with google');
+})()
+"""
+
 # V&G per-expiration fallback (no exp_date in row — caller supplies it)
 
 
@@ -246,6 +260,37 @@ def _finalize(rows, underlying_price):
     return result
 
 
+
+async def _wait_for_grid(ws_url, js_expr, max_wait_s=30, poll_s=0.5):
+    """
+    Poll for bc-data-grid._data to be non-null after navigation.
+
+    Returns:
+      list (possibly [])  — grid mounted, _data assigned (may be empty)
+      None                — timed out; caller must check session expiry
+    """
+    deadline = asyncio.get_event_loop().time() + max_wait_s
+    while asyncio.get_event_loop().time() < deadline:
+        result = await cdp_eval(ws_url, js_expr)
+        if result is not None:
+            return result
+        await asyncio.sleep(poll_s)
+    return None
+
+
+async def _confirm_empty(ws_url, js_expr, delay_s=1.5):
+    """
+    Stability check: re-evaluate after delay_s to confirm [] is real, not mid-load.
+
+    Returns the second evaluation result:
+      list with rows  — data appeared; use it
+      []              — confirmed empty
+      None            — grid unmounted (treat as timeout)
+    """
+    await asyncio.sleep(delay_s)
+    return await cdp_eval(ws_url, js_expr)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 async def main(symbol, user_strike=None):
@@ -261,11 +306,11 @@ async def main(symbol, user_strike=None):
         return
 
     ntm_url = f"https://www.barchart.com/stocks/quotes/{symbol}/options?moneyness=10"
-    await cdp_navigate(ws_url, ntm_url, settle_ms=OPTIONS_SETTLE)
+    await cdp_navigate(ws_url, ntm_url, settle_ms=2000)  # brief settle; poll does the rest
     await activate_target(target_id)
 
-    # Login check: null grid data means session expired before even starting.
-    near_money_rows = await cdp_eval(ws_url, NEAR_MONEY_JS)
+    # Poll up to 30 s for the NTM grid to populate (page may take longer than fixed sleep)
+    near_money_rows = await _wait_for_grid(ws_url, NEAR_MONEY_JS, max_wait_s=30)
     if near_money_rows is None:
         print(json.dumps({"status": "barchart_session_expired"}))
         return
@@ -286,8 +331,9 @@ async def main(symbol, user_strike=None):
         return
 
     # ── Stage 2: per candidate strike ────────────────────────────────────────
-    all_opts_rows = []
-    all_vg_rows   = []
+    all_opts_rows   = []
+    all_vg_rows     = []
+    skipped_strikes = []   # strikes skipped due to confirmed-empty grid
 
     for strike in candidate_strikes:
 
@@ -299,15 +345,48 @@ async def main(symbol, user_strike=None):
         await cdp_navigate(ws_url, opts_url, settle_ms=OPTIONS_SETTLE)
         await activate_target(target_id)
 
-        opts_rows = await cdp_eval(ws_url, STACKED_OPTIONS_JS)
-        if not opts_rows:
+        opts_rows = await _wait_for_grid(ws_url, STACKED_OPTIONS_JS, max_wait_s=30)
+
+        if opts_rows is None:
+            # Grid not mounted after 30 s — classify: session expired vs page timeout
+            is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
             print(json.dumps({
                 "status":            "partial",
                 "rows":              _finalize(all_opts_rows, underlying_price),
                 "expired_at_strike": strike,
                 "expired_layer":     "options_prices",
+                "reason":            "session_expired" if is_expired else "page_load_timeout",
+                "skipped_strikes":   skipped_strikes,
             }))
             return
+
+        if not opts_rows:
+            # Grid mounted but zero Call rows — stability check before skipping
+            confirmed = await _confirm_empty(ws_url, STACKED_OPTIONS_JS)
+            if confirmed:
+                opts_rows = confirmed          # data appeared after 1.5 s, use it
+            elif confirmed is None:
+                # Grid unmounted during stability check — treat as timeout
+                is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
+                print(json.dumps({
+                    "status":            "partial",
+                    "rows":              _finalize(all_opts_rows, underlying_price),
+                    "expired_at_strike": strike,
+                    "expired_layer":     "options_prices",
+                    "reason":            "session_expired" if is_expired else "page_load_timeout",
+                    "skipped_strikes":   skipped_strikes,
+                }))
+                return
+            else:
+                # Still [] after stability check — genuinely no Call rows, skip with log
+                import sys as _sys
+                _sys.stderr.write(
+                    f"[leaps] strike={strike} options_prices: confirmed empty after stability "
+                    f"check, skipping (not a session issue)\n"
+                )
+                skipped_strikes.append({"strike": strike, "layer": "options_prices"})
+                await asyncio.sleep(0.8)
+                continue
 
         _fill_exp_dates(opts_rows)
         all_opts_rows.extend(opts_rows)
@@ -322,15 +401,47 @@ async def main(symbol, user_strike=None):
             await cdp_navigate(ws_url, vg_url, settle_ms=VG_SETTLE)
             await activate_target(target_id)
 
-            vg_rows = await cdp_eval(ws_url, LOCK_STRIKE_VG_JS)
-            if not vg_rows:
+            vg_rows = await _wait_for_grid(ws_url, LOCK_STRIKE_VG_JS, max_wait_s=25)
+
+            if vg_rows is None:
+                is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
                 print(json.dumps({
                     "status":            "partial",
                     "rows":              _finalize(_merge_vg(all_opts_rows, all_vg_rows), underlying_price),
                     "expired_at_strike": strike,
                     "expired_layer":     "volatility_greeks",
+                    "reason":            "session_expired" if is_expired else "page_load_timeout",
+                    "skipped_strikes":   skipped_strikes,
                 }))
                 return
+
+            if not vg_rows:
+                # Stability check for V&G empty
+                confirmed_vg = await _confirm_empty(ws_url, LOCK_STRIKE_VG_JS)
+                if confirmed_vg:
+                    vg_rows = confirmed_vg
+                elif confirmed_vg is None:
+                    is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
+                    print(json.dumps({
+                        "status":            "partial",
+                        "rows":              _finalize(_merge_vg(all_opts_rows, all_vg_rows), underlying_price),
+                        "expired_at_strike": strike,
+                        "expired_layer":     "volatility_greeks",
+                        "reason":            "session_expired" if is_expired else "page_load_timeout",
+                        "skipped_strikes":   skipped_strikes,
+                    }))
+                    return
+                else:
+                    # V&G confirmed empty — not fatal (V&G optional), skip with log
+                    import sys as _sys
+                    _sys.stderr.write(
+                        f"[leaps] strike={strike} volatility_greeks: confirmed empty after "
+                        f"stability check, skipping V&G for this strike\n"
+                    )
+                    skipped_strikes.append({"strike": strike, "layer": "volatility_greeks"})
+                    await asyncio.sleep(0.8)
+                    continue
+
             _fill_exp_dates(vg_rows)
             all_vg_rows.extend(vg_rows)
 
@@ -343,6 +454,7 @@ async def main(symbol, user_strike=None):
         "status":           "success",
         "rows":             _finalize(merged, underlying_price),
         "underlying_price": underlying_price,
+        "skipped_strikes":  skipped_strikes,
     }))
 
 

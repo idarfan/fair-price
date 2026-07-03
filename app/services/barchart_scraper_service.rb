@@ -98,13 +98,27 @@ class BarchartScraperService
       result[:status] = "success"
     when "partial"
       persist_leaps(fetch_result[:data])
-      expired_at    = fetch_result[:data]["expired_at_strike"] || fetch_result[:data]["expired_at_expiration"]
-      expired_layer = fetch_result[:data]["expired_layer"]
+      data          = fetch_result[:data]
+      expired_at    = data["expired_at_strike"] || data["expired_at_expiration"]
+      expired_layer = data["expired_layer"]
+      reason        = data["reason"] || "unknown"
+      skipped       = Array(data["skipped_strikes"])
       layer_label   = expired_layer == "volatility_greeks" ? "Volatility & Greeks" : "Options Prices"
-      location_label = fetch_result[:data]["expired_at_strike"] ? "Strike #{expired_at}" : expired_at
-      log_fetch("leaps", "partial_error", "expired_at=#{expired_at} layer=#{expired_layer}")
+      location_label = data["expired_at_strike"] ? "Strike #{expired_at}" : expired_at.to_s
+      log_fetch("leaps", "partial_error",
+                "expired_at=#{expired_at} layer=#{expired_layer} reason=#{reason} skipped=#{skipped.map { |s| "#{s["strike"]}/#{s["layer"]}" }.join(",")}")
+      skipped.each do |s|
+        Rails.logger.warn("[leaps] skipped strike=#{s["strike"]} layer=#{s["layer"]} (empty after stability check)")
+      end
       result[:status] = "partial_error"
-      result[:errors] << "Session 在抓取 #{location_label} 的 #{layer_label} 時過期，已抓到的部分資料可能不完整，請重新登入 Barchart 後點查詢重試"
+      result[:errors] << case reason
+                         when "session_expired"
+                           "Session 已過期（抓取 #{location_label} 的 #{layer_label} 時格線出現登入提示），請重新登入 Barchart 後重試"
+                         when "page_load_timeout"
+                           "抓取 #{location_label} 的 #{layer_label} 時頁面 30 秒內未完成載入（非 Session 問題），請稍後重試"
+                         else
+                           "抓取 #{location_label} 的 #{layer_label} 時格線無回應，請確認 Barchart 仍在登入狀態後重試"
+                         end
     else
       log_fetch("leaps", "error", fetch_result[:error])
       result[:status] = "error"

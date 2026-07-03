@@ -691,3 +691,28 @@ end
 **根因：** RSpec 只跑了 service 層的單元測試，controller 層的 `new(...)` 呼叫完全沒有測試覆蓋。在視覺截圖時也只截了空白頁（symbol 未傳），沒有帶實際資料觸發 service 初始化路徑。
 
 **規則：** 新 controller 凡有呼叫 service 初始化，完成後**必須在瀏覽器實際帶參數走一次 end-to-end**（至少帶 `symbol=XXX` 讓 index 跑到 service 那行），不能光靠 unit spec 就宣告完成。
+
+---
+
+## 2026-07-03 — LEAPS 抓取誤判修復（輪詢取代固定 sleep）
+
+**現象：** `leaps_scraper.py` 抓取 NOK strike=7.0 的 Options Prices 時，Stage 2 的 `cdp_navigate` + 固定 sleep（5000ms）後仍讀到 null。scraper 因 `null` 誤判為 session 過期，提前中止。
+
+**根因：**
+1. `bc-data-grid._data` 從 null → populated 的時間不固定，固定 sleep 不保證夠。
+2. Stage 1（NTM 頁）也用固定 sleep，從其他頁切換過來時同樣可能不夠。
+3. `barchart_session_expired` 作為唯一錯誤碼，掩蓋了「根本沒等夠」的真正原因。
+
+**修復：**
+- `_wait_for_grid(ws_url, js, max_wait_s, poll_s)` — 每 500ms 輪詢 cdp_eval，最多等 30s，第一個非 None 結果立即返回。
+- `_confirm_empty(ws_url, js, delay_s=1.5)` — `[]` 結果等 1.5s 二次確認，排除瞬間空值。
+- Stage 1（NTM）也改用 `_wait_for_grid`（原先 STAGE1_SETTLE=5000ms 固定 sleep）。
+- 三分類：None（超時→partial）/ []（確認空→skip log）/ data（正常繼續）。
+- `skipped_strikes` 字段記錄跳過的 strike/layer，方便診斷。
+- `reason` 字段區分 `session_expired` vs `page_load_timeout`，避免誤導使用者。
+
+**規則：**
+1. **凡 Angular grid 取資料，必須輪詢，不能固定 sleep。** `_data` 過渡時間不穩定。
+2. **Stage 1 也受影響。** 從不同 URL 切換到 NTM 頁，同樣需要輪詢等待。
+3. **Unit tests 的 wait_side mock 必須按 JS 內容路由：** `"itmProbability" in js` → VG；`"bidPrice" in js` → Stage 2 opts；其餘 → Stage 1 NEAR_MONEY。不能按呼叫順序路由（Stage 1 改用 polling 後順序改變）。
+4. **測試 fixture 的 key 名稱必須用 JS 映射後的名稱**（`strike`/`dte`/`bid` 等），不能用 Barchart 原始欄位名（`strikePrice`/`daysToExpiration` 等）。
