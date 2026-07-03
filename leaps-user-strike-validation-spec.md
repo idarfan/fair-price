@@ -16,7 +16,14 @@
 
 - 每個 symbol 儲存一份履約價鏈快照：`strikes` 陣列（Stage 1 Near-the-Money 實際抓到的所有 strike）、當時的現價 `spot_price`（**從 Stage 1 導航的 Barchart 頁面 DOM 直接擷取**——選擇權頁面本身就顯示標的現價，抓 strikes 時順手一併抓，零額外請求）、`scraped_at`。
 - **每次 Stage 1 成功抓取後 upsert 更新**（同一 symbol 覆蓋舊快照）——這是既有抓取流程的副產品，零額外 Barchart 請求。
-- 實作前先看既有 schema：如果現有的 LEAPS rows 表已能推導出等價資訊（該 symbol 最近一次抓取的全部 strike），優先用查詢推導；推導成本高或語意不乾淨才建新表（例如 `strike_chain_snapshots`）。**選了哪條路、為什麼，寫回本節。**
+- **推導 vs 建新表的決策程序（第一步就做，回報確認後才開工）**：先查既有 schema（貼出表名、關鍵欄位、現有 persist 路徑的程式碼位置），然後逐條回答以下四個判準，據此選擇並把選擇與理由寫回本節：
+
+  1. **現有表存的是 Stage 1 全清單，還是 Delta 0.60–0.90 篩選後的候選？** 若是篩選後的結果，推導出的範圍會偏窄——正常存在、只是 Delta 不在區間內的履約價會被誤判成 `invalid_strike`，驗證功能自己製造 false positive。此情況推導方案直接出局；若要補存 Stage 1 原始清單，那就等於建新表。
+  2. **`spot_price` 目前有沒有任何地方存？** 快照必須含 Barchart 頁面擷取的現價。現有表若無此欄位，推導方案一樣要動 schema 加欄位，「不建新表比較省事」的優勢消失，兩案成本拉平時選語意乾淨的新表。
+  3. **中止路徑能不能落地？** 本規格要求 Stage 1 後檢查中止時快照**仍要**落地，但已知 `persist_leaps` 在 `rows.blank?` 時直接 return（主規格第 255 行）——中止情境下候選 rows 很可能是空的，快照卻必須照寫。推導方案若綁在現有 persist 流程上，中止時寫不進去，驗收場景 C 的 DB 佐證直接過不了。快照的寫入路徑必須獨立於候選 rows 的 persist，不受 `rows.blank?` 短路影響。
+  4. **覆蓋語意合不合？** 快照是「每 symbol 一份、upsert 覆蓋」；現有 rows 表若是 append 或整批 replace 語意，硬塞會讓「該 symbol 最近一次的 strikes」查詢依賴隱含假設（例如靠 scraped_at 取最新批次），語意不乾淨就別省這張表。
+
+  預判：判準 2、3 大概率會把答案推向新表（例如 `strike_chain_snapshots`：`symbol`（unique index）、`strikes` jsonb、`spot_price` decimal、`scraped_at`），但以實際查到的 schema 為準。**回報格式：schema 實況 + 四判準逐條回答 + 選擇與理由，經使用者確認後才開工。**
 - 快照過舊不作廢：履約價鏈的間距與範圍變動緩慢，舊快照仍可用於排除「明顯不合理」的輸入（KLAC 配 strike 7 這種），而每次成功查詢都會刷新快照。不設「太舊就當沒有」的邏輯，避免不必要的 Barchart 依賴。
 
 ## 驗證流程
