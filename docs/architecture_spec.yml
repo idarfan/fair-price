@@ -56,9 +56,9 @@ layers:
     - ''
   - - IvAnalysisController
     - ''
-  - - MarginController
+  - - IvWatchlistsController
     - ''
-  - - OptionPriceTrackerController
+  - - LeapsRecommendationsController
     - ''
 - id: services
   type: band
@@ -68,6 +68,10 @@ layers:
   item_fill: '#fde047'
   item_stroke: '#a16207'
   items:
+  - - BarchartScraperService
+    - ''
+  - - CompositeSignalService
+    - ''
   - - ExchangeRateService
     - ''
   - - FinnhubService
@@ -78,11 +82,7 @@ layers:
     - ''
   - - IvStatsService
     - ''
-  - - MarginInterestReminderService
-    - ''
-  - - MarginInterestService
-    - ''
-  - - MomentumReportService
+  - - LeapsOptionsFlowPanelService
     - ''
 - id: models
   type: band
@@ -116,13 +116,17 @@ layers:
   item_fill: '#fde047'
   item_stroke: '#a16207'
   items:
-  - - iv_sidecar.py
+  - - cdp_helper.py
     - ''
-  - - fairprice.py
+  - - fundamental_scraper.py
     - ''
-  - - options_collector.py
+  - - leaps_scraper.py
     - ''
-  - - options_ocr.py
+  - - max_pain_scraper.py
+    - ''
+  - - options_flow_scraper.py
+    - ''
+  - - technical_scraper.py
     - ''
 arrows:
 - - browser
