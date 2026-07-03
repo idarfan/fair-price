@@ -189,8 +189,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
           thead(class: "bg-gray-50 text-gray-500 text-xs") do
             tr do
               TABLE_COLS.each do |col|
-                align = TABLE_RIGHT_ALIGN_COLS.include?(col) ? "text-right" : "text-left"
-                th(class: "px-3 py-2 #{align} font-medium whitespace-nowrap") { plain col }
+                th(class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain col }
               end
             end
           end
@@ -213,14 +212,14 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     warn  = row[:no_recent_volume_warning]
 
     tr(class: "border-t border-gray-100 hover:bg-purple-200 #{i.odd? ? 'bg-gray-50/50' : ''}") do
-      td(class: "px-3 py-2 font-mono whitespace-nowrap") { plain row[:expiration_date].to_s }
-      td(class: "px-3 py-2 text-right")                  { plain row[:dte].to_s }
-      td(class: "px-3 py-2 text-right font-semibold")    { plain fmt_price(row[:strike]) }
-      td(class: "px-3 py-2 text-right")                  { plain fmt_decimal(row[:delta], 4) }
-      td(class: "px-3 py-2 text-right font-semibold")    { plain fmt_int(row[:open_interest]) }
-      td(class: "px-3 py-2 text-right")                  { plain fmt_int(row[:volume]) }
-      td(class: "px-3 py-2") do
-        div(class: "flex flex-row items-center gap-1.5") do
+      td(class: "px-3 py-2 text-center font-mono whitespace-nowrap") { plain row[:expiration_date].to_s }
+      td(class: "px-3 py-2 text-center")                             { plain row[:dte].to_s }
+      td(class: "px-3 py-2 text-center font-semibold")               { plain fmt_price(row[:strike]) }
+      td(class: "px-3 py-2 text-center")                             { plain fmt_decimal(row[:delta], 4) }
+      td(class: "px-3 py-2 text-center font-semibold")               { plain fmt_int(row[:open_interest]) }
+      td(class: "px-3 py-2 text-center")                             { plain fmt_int(row[:volume]) }
+      td(class: "px-3 py-2 text-center") do
+        div(class: "inline-flex flex-row items-center gap-1.5") do
           span(class: "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs " \
                        "#{style[:bg]} #{style[:text]} border #{style[:border]}") do
             div(class: "w-1.5 h-1.5 rounded-full flex-shrink-0 #{style[:dot]}")
@@ -231,14 +230,14 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
           end
         end
       end
-      td(class: "px-3 py-2 text-right") { plain fmt_price(row[:bid]) }
-      td(class: "px-3 py-2 text-right") { plain fmt_price(row[:ask]) }
-      td(class: "px-3 py-2 text-right") { plain fmt_price(row[:mid]) }
-      td(class: "px-3 py-2 text-right") { plain fmt_pct(row[:bid_ask_spread_pct]) }
-      td(class: "px-3 py-2 text-right") { plain fmt_pct(row[:time_value_pct]) }
-      td(class: "px-3 py-2 text-right") { plain fmt_pct(row[:iv]) }
-      td(class: "px-3 py-2 text-right") { plain fmt_decimal(row[:vega], 4) }
-      td(class: "px-3 py-2 text-right") { plain fmt_pct(row[:itm_probability]) }
+      td(class: "px-3 py-2 text-center") { plain fmt_price(row[:bid]) }
+      td(class: "px-3 py-2 text-center") { plain fmt_price(row[:ask]) }
+      td(class: "px-3 py-2 text-center") { plain fmt_price(row[:mid]) }
+      td(class: "px-3 py-2 text-center") { plain fmt_pct(row[:bid_ask_spread_pct]) }
+      td(class: "px-3 py-2 text-center") { plain fmt_pct(row[:time_value_pct]) }
+      td(class: "px-3 py-2 text-center") { plain fmt_pct(row[:iv]) }
+      td(class: "px-3 py-2 text-center") { plain fmt_decimal(row[:vega], 4) }
+      td(class: "px-3 py-2 text-center") { plain fmt_pct(row[:itm_probability]) }
     end
   end
 
@@ -246,18 +245,17 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     return unless @flow_panel&.dig(:status) == :ok
 
     div(class: "bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden") do
-      div(class: "px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-start") do
+      div(class: "px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center") do
         div do
-          h2(class: "text-sm font-semibold text-gray-700") { plain "Options Flow — 情緒參考，非排序依據" }
-          p(class: "text-xs text-gray-400 mt-0.5") do
+          h2(class: "text-base font-semibold text-gray-700") { plain "Options Flow — 情緒參考，非排序依據" }
+          p(class: "text-xs text-gray-500 mt-0.5") do
             plain "#{@flow_panel[:date]} · 前 20 大成交（依 Premium 降序）"
           end
         end
-        div(class: "text-xs shrink-0 pt-0.5 flex gap-3 items-baseline") do
-          span(class: "text-gray-400") { plain "Call" }
-          span(class: "font-semibold text-green-700") { plain fmt_premium(@flow_panel[:call_premium_total]) }
-          span(class: "text-gray-400 ml-1") { plain "Put" }
-          span(class: "font-semibold text-red-700") { plain fmt_premium(@flow_panel[:put_premium_total]) }
+        div(class: "text-sm font-medium whitespace-nowrap pl-4") do
+          span(class: "text-green-600") { plain "Call #{fmt_premium(@flow_panel[:call_premium_total])}" }
+          span(class: "text-gray-400 mx-1") { plain "·" }
+          span(class: "text-red-500") { plain "Put #{fmt_premium(@flow_panel[:put_premium_total])}" }
         end
       end
 
@@ -287,7 +285,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
         thead(class: "bg-gray-50 text-gray-500 text-xs") do
           tr do
             FLOW_COLS.each do |col|
-              th(class: "px-3 py-2 text-left font-medium whitespace-nowrap") { plain col }
+              th(class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain col }
             end
           end
         end
@@ -303,17 +301,17 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     ds    = DIR_STYLE[dir] || DIR_STYLE["neutral"]
     is_call = t[:option_type].to_s == "Call"
     tr(class: "border-t border-gray-100 hover:bg-purple-200 #{i.odd? ? 'bg-gray-50/50' : ''}") do
-      td(class: "px-3 py-2 font-medium #{is_call ? 'text-green-700' : 'text-red-700'}") { plain t[:option_type].to_s }
-      td(class: "px-3 py-2 text-right font-mono")  { plain fmt_price(t[:strike]) }
-      td(class: "px-3 py-2 font-mono text-xs")     { plain t[:expires_at].to_s }
-      td(class: "px-3 py-2 text-right")            { plain t[:dte].to_s }
-      td(class: "px-3 py-2 text-right")            { plain fmt_decimal(t[:delta], 3) }
-      td(class: "px-3 py-2 text-gray-500")         { plain t[:trade_condition].to_s }
-      td(class: "px-3 py-2 text-right")            { plain fmt_int(t[:size]) }
-      td(class: "px-3 py-2")                       { plain t[:side].to_s }
-      td(class: "px-3 py-2 text-right font-semibold") { plain fmt_premium(t[:premium]) }
-      td(class: "px-3 py-2") do
-        div(class: "flex items-center gap-1") do
+      td(class: "px-3 py-2 text-center font-medium #{is_call ? 'text-green-700' : 'text-red-700'}") { plain t[:option_type].to_s }
+      td(class: "px-3 py-2 text-center font-mono")              { plain fmt_price(t[:strike]) }
+      td(class: "px-3 py-2 text-center font-mono text-xs")      { plain t[:expires_at].to_s }
+      td(class: "px-3 py-2 text-center")                        { plain t[:dte].to_s }
+      td(class: "px-3 py-2 text-center")                        { plain fmt_decimal(t[:delta], 3) }
+      td(class: "px-3 py-2 text-center text-gray-500")          { plain t[:trade_condition].to_s }
+      td(class: "px-3 py-2 text-center")                        { plain fmt_int(t[:size]) }
+      td(class: "px-3 py-2 text-center")                        { plain t[:side].to_s }
+      td(class: "px-3 py-2 text-center font-semibold")          { plain fmt_premium(t[:premium]) }
+      td(class: "px-3 py-2 text-center") do
+        div(class: "inline-flex items-center gap-1") do
           div(class: "w-1.5 h-1.5 rounded-full flex-shrink-0 #{ds[:dot]}")
           span(class: "#{ds[:text]}") { plain ds[:label] }
         end
