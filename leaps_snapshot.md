@@ -1,0 +1,13 @@
+- generic [active] [ref=f4e1]:
+  - navigation [ref=f4e2]:
+    - generic [ref=f4e3]:
+      - generic [ref=f4e4]
+      - link "Lookbook" [ref=f4e22] [cursor=pointer]:
+        - /url: /lookbook
+  - main [ref=f4e23]:
+    - generic [ref=f4e25]:
+      - generic [ref=f4e26]
+      - generic [ref=f4e29]
+      - generic [ref=f4e35]: ℹ️ 尚未取得 NOK 的 LEAPS 資料，請點「查詢」開始抓取。
+  - contentinfo [ref=f4e36]:
+    - paragraph [ref=f4e37]: FairPrice — 數據來源 Finnhub ｜ 僅供參考，不構成投資建議 v20260420

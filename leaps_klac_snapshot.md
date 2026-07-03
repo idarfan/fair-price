@@ -1,0 +1,13 @@
+- generic [active] [ref=f5e1]:
+  - navigation [ref=f5e2]:
+    - generic [ref=f5e3]:
+      - generic [ref=f5e4]
+      - link "Lookbook" [ref=f5e22] [cursor=pointer]:
+        - /url: /lookbook
+  - main [ref=f5e23]:
+    - generic [ref=f5e25]:
+      - generic [ref=f5e26]
+      - generic [ref=f5e29]
+      - generic [ref=f5e35]: ℹ️ 尚未取得 KLAC 的 LEAPS 資料，請點「查詢」開始抓取。
+  - contentinfo [ref=f5e36]:
+    - paragraph [ref=f5e37]: FairPrice — 數據來源 Finnhub ｜ 僅供參考，不構成投資建議 v20260420

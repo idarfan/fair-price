@@ -1,0 +1,35 @@
+- generic [active] [ref=f7e1]:
+  - navigation [ref=f7e2]:
+    - generic [ref=f7e3]:
+      - generic [ref=f7e4]:
+        - link "📊 FairPrice" [ref=f7e5] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f7e6]: 📊
+          - generic [ref=f7e7]: FairPrice
+        - button "⚡ 切換工具 ▼" [ref=f7e10]:
+          - generic [ref=f7e11]: ⚡
+          - generic [ref=f7e12]: 切換工具
+          - generic [ref=f7e13]: ▼
+        - generic [ref=f7e15]:
+          - generic [ref=f7e16]: 字體調整
+          - button "A" [ref=f7e17]
+          - button "A" [ref=f7e18]
+          - button "A" [ref=f7e19]
+          - button "A" [ref=f7e20]
+          - button "A" [ref=f7e21]
+      - link "Lookbook" [ref=f7e22] [cursor=pointer]:
+        - /url: /lookbook
+  - main [ref=f7e23]:
+    - generic [ref=f7e25]:
+      - generic [ref=f7e26]:
+        - heading "LEAPS Call 候選排行" [level=1] [ref=f7e27]
+        - paragraph [ref=f7e28]: Delta 0.60–0.90 深度價內 Call · 依 OI 由高到低排序
+      - generic [ref=f7e29]:
+        - textbox "股票代號，例如 NOK" [ref=f7e30]: KLAC
+        - generic [ref=f7e31]:
+          - generic [ref=f7e32]: 履約價（選填）
+          - spinbutton "履約價（選填）" [ref=f7e33]
+        - button "查詢" [ref=f7e34]
+      - generic [ref=f7e35]: ⚠️ Session 在抓取 Strike 226 的 Options Prices 時過期，已抓到的部分資料可能不完整，請重新登入 Barchart 後點查詢重試
+  - contentinfo [ref=f7e36]:
+    - paragraph [ref=f7e37]: FairPrice — 數據來源 Finnhub ｜ 僅供參考，不構成投資建議 v20260420
