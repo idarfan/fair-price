@@ -246,31 +246,23 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     return unless @flow_panel&.dig(:status) == :ok
 
     div(class: "bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden") do
-      div(class: "px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between") do
+      div(class: "px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-start") do
         div do
           h2(class: "text-sm font-semibold text-gray-700") { plain "Options Flow — 情緒參考，非排序依據" }
           p(class: "text-xs text-gray-400 mt-0.5") do
             plain "#{@flow_panel[:date]} · 前 20 大成交（依 Premium 降序）"
           end
         end
-        render_premium_totals
+        div(class: "text-xs shrink-0 pt-0.5 flex gap-3 items-baseline") do
+          span(class: "text-gray-400") { plain "Call" }
+          span(class: "font-semibold text-green-700") { plain fmt_premium(@flow_panel[:call_premium_total]) }
+          span(class: "text-gray-400 ml-1") { plain "Put" }
+          span(class: "font-semibold text-red-700") { plain fmt_premium(@flow_panel[:put_premium_total]) }
+        end
       end
 
       render_highlighted if @flow_panel[:highlighted_trades]&.any?
       render_large_orders
-    end
-  end
-
-  def render_premium_totals
-    div(class: "flex gap-4 text-xs shrink-0") do
-      div do
-        span(class: "text-gray-400") { plain "Call " }
-        span(class: "font-semibold text-green-700") { plain fmt_premium(@flow_panel[:call_premium_total]) }
-      end
-      div do
-        span(class: "text-gray-400") { plain "Put " }
-        span(class: "font-semibold text-red-700") { plain fmt_premium(@flow_panel[:put_premium_total]) }
-      end
     end
   end
 
