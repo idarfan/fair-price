@@ -716,3 +716,14 @@ end
 2. **Stage 1 也受影響。** 從不同 URL 切換到 NTM 頁，同樣需要輪詢等待。
 3. **Unit tests 的 wait_side mock 必須按 JS 內容路由：** `"itmProbability" in js` → VG；`"bidPrice" in js` → Stage 2 opts；其餘 → Stage 1 NEAR_MONEY。不能按呼叫順序路由（Stage 1 改用 polling 後順序改變）。
 4. **測試 fixture 的 key 名稱必須用 JS 映射後的名稱**（`strike`/`dte`/`bid` 等），不能用 Barchart 原始欄位名（`strikePrice`/`daysToExpiration` 等）。
+
+## 2026-07-04：migration 後必須重啟 dev server 再跑 E2E
+
+pm2 上長駐的 Rails process 在 migration 前啟動，ActiveRecord schema cache 沒有新欄位，
+`insert_all` 帶新欄位 key 直接 raise → transaction ROLLBACK。dev 模式的 code reload
+不會刷新 connection 的 schema cache。
+
+**規則**：跑完 `rails db:migrate` 之後、跑任何走 server 的 E2E 之前，先徵求同意重啟
+`pm2 restart fairprice-rails`（注意 process 名稱是 `fairprice-rails`，不是 `fairprice`）。
+症狀特徵：測試環境全過但 server E2E 失敗 + log 有 ROLLBACK 無明顯錯誤（錯誤被 job rescue
+吞進 memory cache，跨 process 讀不到）。
