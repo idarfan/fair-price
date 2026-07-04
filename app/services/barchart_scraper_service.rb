@@ -197,6 +197,8 @@ class BarchartScraperService
         { status: "no_candidates" }
       when "partial"
         { status: "partial", data: data }
+      when "invalid_strike"
+        { status: "invalid_strike", data: data }
       else
         { status: "success", data: data }
       end

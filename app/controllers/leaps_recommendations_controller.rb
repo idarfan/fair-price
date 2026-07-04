@@ -140,8 +140,8 @@ class LeapsRecommendationsController < ApplicationController
     require "net/http"
     uri  = URI("http://localhost:9222/json/version")
     http = Net::HTTP.new(uri.host, uri.port)
-    http.open_timeout = 2
-    http.read_timeout = 2
+    http.open_timeout = 5
+    http.read_timeout = 5
     http.get(uri.path).is_a?(Net::HTTPSuccess)
   rescue
     false
