@@ -218,4 +218,50 @@ RSpec.describe LeapsRankingService do
       expect(results.map { |e| e[:dte] }).not_to include(20)
     end
   end
+
+  # ── Phase H：intrinsic/extrinsic 讀 DB 欄位，排行層不重算 ────────────────────
+  describe "Phase H derived columns" do
+    describe "reads stored DB values (single formula source)" do
+      # 故意存入跟公式算不一樣的值：enrich 若重算會回傳 3.08/0.12，
+      # 讀 DB 則回傳 9.99/0.88 —— 用這個差異證明排行層沒有第二份公式。
+      before do
+        make(delta: 0.80, underlying_price: 13.08, strike: 10.0, bid: 3.1, ask: 3.3,
+             intrinsic_value: 9.99, extrinsic_value: 0.88)
+      end
+
+      it "returns the stored values, not recomputed ones" do
+        result = described_class.new("NOK").call.first
+        expect(result[:intrinsic_value].to_f).to eq(9.99)
+        expect(result[:extrinsic_value].to_f).to eq(0.88)
+      end
+
+      it "time_value_pct uses the stored extrinsic_value" do
+        result = described_class.new("NOK").call.first
+        expect(result[:time_value_pct]).to be_within(0.0001).of(0.88 / 13.08)
+      end
+    end
+
+    describe "extrinsic_pct (display layer, denominator = mid)" do
+      before { make(delta: 0.80, underlying_price: 13.08, strike: 10.0, bid: 3.1, ask: 3.3) }
+
+      it "= extrinsic_value / mid" do
+        result = described_class.new("NOK").call.first
+        # factory 依公式補值：mid 3.2, intrinsic 3.08, extrinsic 0.12
+        expect(result[:extrinsic_pct]).to be_within(0.0001).of(0.12 / 3.2)
+      end
+    end
+
+    describe "extrinsic_pct when bid/ask missing" do
+      before do
+        make(delta: 0.80, underlying_price: 13.08, strike: 10.0, bid: nil, ask: nil)
+      end
+
+      it "is nil (rendered as —), not 0% or NaN" do
+        result = described_class.new("NOK").call.first
+        expect(result[:extrinsic_pct]).to be_nil
+        expect(result[:intrinsic_value]).to be_nil
+        expect(result[:extrinsic_value]).to be_nil
+      end
+    end
+  end
 end

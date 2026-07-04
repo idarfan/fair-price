@@ -19,5 +19,22 @@ FactoryBot.define do
     vol_oi_ratio     { 0.006 }
     vega             { 0.0134 }
     scraped_at       { Time.current }
+
+    # Phase H：模擬 persist_leaps 的真實寫入狀態——production 每筆 row 都帶
+    # 內在/外在價值（同一公式 derived_values，不是第二份公式）。
+    # 測試若明確指定這兩欄（例如驗證排行層讀 DB 不重算），以指定值為準。
+    after(:build) do |snap, _evaluator|
+      if snap.intrinsic_value.nil? && snap.extrinsic_value.nil?
+        d = LeapsOptionChainSnapshot.derived_values(
+          option_type:      snap.option_type,
+          strike:           snap.strike,
+          underlying_price: snap.underlying_price,
+          bid:              snap.bid,
+          ask:              snap.ask
+        )
+        snap.intrinsic_value = d[:intrinsic_value]
+        snap.extrinsic_value = d[:extrinsic_value]
+      end
+    end
   end
 end

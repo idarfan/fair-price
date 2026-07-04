@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_03_105300) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_04_151000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -119,6 +119,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_105300) do
     t.decimal "delta", precision: 8, scale: 6
     t.integer "dte"
     t.date "expiration_date", null: false
+    t.decimal "extrinsic_value", precision: 10, scale: 4
+    t.decimal "intrinsic_value", precision: 10, scale: 4
     t.decimal "itm_probability", precision: 8, scale: 6
     t.decimal "iv", precision: 8, scale: 6
     t.decimal "last_price", precision: 10, scale: 4

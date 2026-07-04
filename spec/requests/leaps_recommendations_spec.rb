@@ -509,4 +509,48 @@ RSpec.describe "GET /leaps", type: :request do
       end
     end
   end
+  # ── 10. Phase H：內在/外在價值欄位走完整 HTTP 路徑（真實 DB rows）──────────────
+  # 規格明文：「兩個 service 單元測試全過、controller 串接處從未被 request 過、
+  # 使用者一按就炸」的前例，request spec 必交付。
+  describe "GET /leaps — Phase H derived columns (real DB)" do
+    let(:symbol) { "PHREQ" }
+
+    before do
+      create(:leaps_option_chain_snapshot,
+             symbol: symbol, dte: 400, delta: 0.80,
+             strike: 10.0, bid: 3.1, ask: 3.3, underlying_price: 13.08,
+             scraped_at: Time.current)
+    end
+
+    after { LeapsOptionChainSnapshot.where(symbol: symbol).delete_all }
+
+    it "renders the three new columns with correct values" do
+      get "/leaps", params: { symbol: symbol }
+      expect(response).to have_http_status(:ok)
+      body = response.body
+
+      expect(body).to include("內在價值")
+      expect(body).to include("外在價值")
+      expect(body).to include("外在佔比")
+
+      # factory 依唯一公式補值：mid 3.2、內在 3.08、外在 0.12、佔比 0.12/3.2 = 3.8%
+      expect(body).to include("3.08")
+      expect(body).to include("0.12")
+      expect(body).to include("3.8%")
+    end
+
+    it "renders — for extrinsic_pct when bid/ask missing" do
+      LeapsOptionChainSnapshot.where(symbol: symbol).delete_all
+      create(:leaps_option_chain_snapshot,
+             symbol: symbol, dte: 400, delta: 0.80,
+             strike: 10.0, bid: nil, ask: nil, underlying_price: 13.08,
+             scraped_at: Time.current)
+
+      get "/leaps", params: { symbol: symbol }
+      expect(response).to have_http_status(:ok)
+      # 內在/外在/佔比三欄皆缺值 → 顯示 —（fmt helpers 的 nil 行為）
+      expect(response.body).to include("—")
+      expect(response.body).not_to include("NaN")
+    end
+  end
 end

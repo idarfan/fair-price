@@ -280,6 +280,13 @@ class BarchartScraperService
 
     now = Time.current
     records = rows.map do |r|
+      derived = LeapsOptionChainSnapshot.derived_values(
+        option_type:      r["option_type"],
+        strike:           r["strike"],
+        underlying_price: r["underlying_price"],
+        bid:              r["bid"],
+        ask:              r["ask"]
+      )
       {
         symbol:           @symbol,
         expiration_date:  r["expiration_date"],
@@ -288,6 +295,8 @@ class BarchartScraperService
         option_type:      r["option_type"],
         bid:              r["bid"],
         ask:              r["ask"],
+        intrinsic_value:  derived[:intrinsic_value],
+        extrinsic_value:  derived[:extrinsic_value],
         last_price:       r["last_price"],
         underlying_price: r["underlying_price"],
         volume:           r["volume"],

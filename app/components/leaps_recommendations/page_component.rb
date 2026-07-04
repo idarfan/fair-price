@@ -15,12 +15,12 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
   TABLE_COLS = [
     "到期日", "DTE", "履約價", "Delta", "OI", "Volume", "流動性判斷",
-    "Bid", "Ask", "Mid", "Spread%", "Time Value%", "IV", "Vega", "被指派機率"
+    "Bid", "Ask", "Mid", "Spread%", "內在價值", "外在價值", "外在佔比", "Time Value%", "IV", "Vega", "被指派機率"
   ].freeze
 
   TABLE_RIGHT_ALIGN_COLS = (
     %w[DTE Delta OI Volume Bid Ask Mid IV Vega] +
-    ["履約價", "Spread%", "Time Value%", "被指派機率"]
+    ["履約價", "Spread%", "內在價值", "外在價值", "外在佔比", "Time Value%", "被指派機率"]
   ).freeze
 
   FLOW_COLS = [ "類型", "履約價", "到期日", "DTE", "Delta", "Code", "Size", "Side", "Premium", "方向" ].freeze
@@ -239,6 +239,9 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       td(class: "px-3 py-2 text-center") { plain fmt_price(row[:ask]) }
       td(class: "px-3 py-2 text-center") { plain fmt_price(row[:mid]) }
       td(class: "px-3 py-2 text-center") { plain fmt_pct(row[:bid_ask_spread_pct]) }
+      td(class: "px-3 py-2 text-center") { plain fmt_price(row[:intrinsic_value]) }
+      td(class: "px-3 py-2 text-center") { plain fmt_price(row[:extrinsic_value]) }
+      td(class: "px-3 py-2 text-center font-semibold") { plain fmt_pct(row[:extrinsic_pct]) }
       td(class: "px-3 py-2 text-center") { plain fmt_pct(row[:time_value_pct]) }
       td(class: "px-3 py-2 text-center") { plain fmt_pct(row[:iv]) }
       td(class: "px-3 py-2 text-center") { plain fmt_decimal(row[:vega], 4) }

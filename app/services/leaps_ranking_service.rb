@@ -80,9 +80,9 @@ class LeapsRankingService
   def enrich(row, tier, vol_oi_floor)
     mid        = row.mid_price
     underlying = row.underlying_price.to_f
-    strike     = row.strike.to_f
-    intrinsic  = [ underlying - strike, 0.0 ].max
-    time_value = mid ? mid.to_f - intrinsic : nil
+    # Phase H：內在/外在價值直接讀 persist 層算好的 DB 欄位，排行層不重算
+    # （公式唯一定義在 LeapsOptionChainSnapshot.derived_values）。
+    time_value = row.extrinsic_value&.to_f
 
     {
       snapshot:                 row,
@@ -102,9 +102,22 @@ class LeapsRankingService
       underlying_price:         row.underlying_price,
       liquidity_tier:           tier,
       no_recent_volume_warning: low_vol_oi?(row.vol_oi_ratio, vol_oi_floor),
+      intrinsic_value:          row.intrinsic_value,
+      extrinsic_value:          row.extrinsic_value,
+      extrinsic_pct:            calc_extrinsic_pct(row.extrinsic_value, mid),
       time_value_pct:           calc_time_value_pct(time_value, underlying),
       bid_ask_spread_pct:       calc_spread_pct(row.bid, row.ask, mid)
     }
+  end
+
+  # 外在佔比 = extrinsic_value / mid（display 層計算，不落地）。
+  # 分母是權利金 Mid（「這口權利金裡有多少比例是保險費」），跟 time_value_pct
+  # 的分母 underlying_price（「相對持股多付幾 % 溢價」）是兩個不同指標。
+  # mid <= 0 或任一缺值 → nil（畫面顯示「—」，不是 0% 或 NaN）。
+  def calc_extrinsic_pct(extrinsic, mid)
+    return nil if extrinsic.nil? || mid.nil? || mid.to_f <= 0
+
+    extrinsic.to_f / mid.to_f
   end
 
   def calc_time_value_pct(time_value, underlying)
