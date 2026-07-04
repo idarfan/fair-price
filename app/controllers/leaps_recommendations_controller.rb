@@ -31,6 +31,9 @@ class LeapsRecommendationsController < ApplicationController
           @scrape_errors = cached_errors(@symbol)
         when "no_candidates"
           @scrape_status = :no_candidates
+        when "invalid_strike"
+          @scrape_status = :invalid_strike
+          @scrape_errors = cached_errors(@symbol)
         end
 
         # When analyze returned "ready" (no job_status forwarded) but candidates
@@ -86,6 +89,17 @@ class LeapsRecommendationsController < ApplicationController
         user_strike = raw.to_f
       else
         return render json: { error: "user_strike 必須是正數（最多兩位小數）" }, status: :unprocessable_entity
+      end
+    end
+
+    # Controller-layer snapshot validation (fast path — no scrape needed)
+    if user_strike
+      snap = StrikeChainSnapshot.find_by(symbol: symbol)
+      if snap && !snap.valid_strike?(user_strike)
+        return render json: {
+          status:  "invalid_strike",
+          message: snap.invalid_message(symbol, user_strike)
+        }
       end
     end
 

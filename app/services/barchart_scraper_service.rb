@@ -93,10 +93,12 @@ class BarchartScraperService
       log_fetch("leaps", "no_candidates", "user_strike=#{user_strike}")
       result[:status] = "no_candidates"
     when "success"
+      persist_chain_snapshot(fetch_result[:data])
       persist_leaps(fetch_result[:data])
       log_fetch("leaps", "success", "rows=#{fetch_result[:data]["rows"]&.length}")
       result[:status] = "success"
     when "partial"
+      persist_chain_snapshot(fetch_result[:data])
       persist_leaps(fetch_result[:data])
       data          = fetch_result[:data]
       expired_at    = data["expired_at_strike"] || data["expired_at_expiration"]
@@ -119,6 +121,12 @@ class BarchartScraperService
                          else
                            "抓取 #{location_label} 的 #{layer_label} 時格線無回應，請確認 Barchart 仍在登入狀態後重試"
                          end
+    when "invalid_strike"
+      data = fetch_result[:data]
+      persist_chain_snapshot(data)
+      log_fetch("leaps", "invalid_strike", "user_strike=#{user_strike} symbol=#{@symbol}")
+      result[:status] = "invalid_strike"
+      result[:errors] << data["message"].to_s
     else
       log_fetch("leaps", "error", fetch_result[:error])
       result[:status] = "error"
@@ -306,6 +314,23 @@ class BarchartScraperService
       LeapsOptionChainSnapshot.where(symbol: @symbol).delete_all
       LeapsOptionChainSnapshot.insert_all(records)
     end
+  end
+
+  def persist_chain_snapshot(data)
+    snap = data["chain_snapshot"]
+    return unless snap.is_a?(Hash)
+
+    strikes  = Array(snap["strikes"]).map(&:to_f)
+    spot     = snap["spot_price"]&.to_f
+    return if strikes.empty?
+
+    StrikeChainSnapshot.upsert(
+      { symbol: @symbol, strikes: strikes, spot_price: spot, scraped_at: Time.current },
+      unique_by: :symbol,
+      update_only: %i[strikes spot_price scraped_at]
+    )
+  rescue => e
+    Rails.logger.error("[leaps] persist_chain_snapshot failed: #{e.message}")
   end
 
   def persist_trades(trades)

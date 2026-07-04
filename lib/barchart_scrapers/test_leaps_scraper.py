@@ -331,5 +331,49 @@ class TestHappyPath(unittest.TestCase):
         self.assertEqual(result.get("skipped_strikes", []), [])
 
 
+
+# ---------------------------------------------------------------------------
+# invalid_strike path (Stage 1 post-check)
+# ---------------------------------------------------------------------------
+class TestInvalidStrike(unittest.TestCase):
+
+    def test_strike_out_of_range_emits_invalid_strike(self):
+        """user_strike=2.0 is outside NOK range [6.5, 7.5] → invalid_strike status."""
+        async def wait_s(ws, js, max_wait_s=30, **kw):
+            return GOOD_NEAR_MONEY   # Stage 1 always succeeds (no Stage 2 reached)
+
+        buf = io.StringIO()
+        with (
+            patch("leaps_scraper.prepare_page", new=AsyncMock(return_value=("tid", "ws://fake"))),
+            patch("leaps_scraper.cdp_navigate", new=AsyncMock()),
+            patch("leaps_scraper.activate_target", new=AsyncMock()),
+            patch("leaps_scraper.cdp_eval", new=_stage1_eval()),
+            patch("leaps_scraper._wait_for_grid", new=AsyncMock(side_effect=wait_s)),
+            patch("sys.stdout", buf),
+        ):
+            _run(scraper.main("NOK", user_strike=2.0))
+
+        result = json.loads(buf.getvalue().strip())
+        self.assertEqual(result["status"], "invalid_strike")
+        self.assertIn("chain_snapshot", result)
+        self.assertIn("strikes", result["chain_snapshot"])
+        self.assertIn("spot_price", result["chain_snapshot"])
+        self.assertIn("message", result)
+        self.assertIn("2.0", result["message"])
+
+    def test_strike_in_range_does_not_abort(self):
+        """user_strike=7.0 within [6.5, 7.5] → proceeds past validation (not invalid_strike)."""
+        async def wait_s(ws, js, max_wait_s=30, **kw):
+            if "itmProbability" in js:
+                return GOOD_VG
+            if "bidPrice" in js:
+                return GOOD_OPTS
+            return GOOD_NEAR_MONEY
+
+        result = _capture_main(_stage1_eval(), wait_mock=AsyncMock(side_effect=wait_s))
+        self.assertIsNotNone(result)
+        self.assertNotEqual(result.get("status"), "invalid_strike")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

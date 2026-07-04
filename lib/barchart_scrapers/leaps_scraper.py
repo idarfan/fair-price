@@ -323,11 +323,42 @@ async def main(symbol, user_strike=None):
     exp_value_map = {e["value"][:10]: e["value"] for e in expirations}
     first_exp_value = next(iter(exp_value_map.values()), None)
 
+    # ── Build chain_snapshot (Stage 1 full strike list + spot_price) ─────────
+    all_strikes = sorted({
+        r.get("strike") or r.get("strikePrice")
+        for r in near_money_rows
+        if (r.get("strike") or r.get("strikePrice")) is not None
+    })
+    chain_snapshot = {"strikes": all_strikes, "spot_price": underlying_price}
+
+    # ── Stage 1 post-check: validate user_strike against actual chain ─────────
+    if user_strike is not None and all_strikes:
+        min_s = min(all_strikes)
+        max_s = max(all_strikes)
+        # Tolerance = average spacing between strikes (or 10% of min if only one strike)
+        if len(all_strikes) > 1:
+            spacings = [b - a for a, b in zip(all_strikes, all_strikes[1:])]
+            tol = sum(spacings) / len(spacings)
+        else:
+            tol = min_s * 0.10
+        if user_strike < (min_s - tol) or user_strike > (max_s + tol):
+            spot_str = f"${underlying_price:.2f}" if underlying_price else "不明"
+            print(json.dumps({
+                "status":         "invalid_strike",
+                "message":        (
+                    f"Strike {user_strike} 不在 {symbol} 的履約價範圍"
+                    f"（實際範圍 ${min_s:.2f}–${max_s:.2f}，現價 {spot_str}），請重新輸入"
+                ),
+                "chain_snapshot": chain_snapshot,
+                "rows":           [],
+            }))
+            return
+
     # ── Stage 1: pick candidate strikes ──────────────────────────────────────
     candidate_strikes = _pick_candidates(near_money_rows, user_strike)
     if not candidate_strikes:
         # Auto mode: no Delta>=0.60 strikes visible in near-money view
-        print(json.dumps({"status": "no_candidates"}))
+        print(json.dumps({"status": "no_candidates", "chain_snapshot": chain_snapshot}))
         return
 
     # ── Stage 2: per candidate strike ────────────────────────────────────────
@@ -357,6 +388,7 @@ async def main(symbol, user_strike=None):
                 "expired_layer":     "options_prices",
                 "reason":            "session_expired" if is_expired else "page_load_timeout",
                 "skipped_strikes":   skipped_strikes,
+                "chain_snapshot":    chain_snapshot,
             }))
             return
 
@@ -375,6 +407,7 @@ async def main(symbol, user_strike=None):
                     "expired_layer":     "options_prices",
                     "reason":            "session_expired" if is_expired else "page_load_timeout",
                     "skipped_strikes":   skipped_strikes,
+                    "chain_snapshot":    chain_snapshot,
                 }))
                 return
             else:
@@ -412,6 +445,7 @@ async def main(symbol, user_strike=None):
                     "expired_layer":     "volatility_greeks",
                     "reason":            "session_expired" if is_expired else "page_load_timeout",
                     "skipped_strikes":   skipped_strikes,
+                    "chain_snapshot":    chain_snapshot,
                 }))
                 return
 
@@ -429,6 +463,7 @@ async def main(symbol, user_strike=None):
                         "expired_layer":     "volatility_greeks",
                         "reason":            "session_expired" if is_expired else "page_load_timeout",
                         "skipped_strikes":   skipped_strikes,
+                        "chain_snapshot":    chain_snapshot,
                     }))
                     return
                 else:
@@ -455,6 +490,7 @@ async def main(symbol, user_strike=None):
         "rows":             _finalize(merged, underlying_price),
         "underlying_price": underlying_price,
         "skipped_strikes":  skipped_strikes,
+        "chain_snapshot":   chain_snapshot,
     }))
 
 

@@ -8,6 +8,7 @@ class ScrapeLeapsJob < ApplicationJob
     when "barchart_session_expired" then "session_expired"
     when "partial_error"            then "partial_error"
     when "no_candidates"            then "no_candidates"
+    when "invalid_strike"           then "invalid_strike"
     when "cached", "success"        then "success"
     else "error"
     end

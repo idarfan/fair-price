@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_28_091000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_03_105300) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -362,6 +362,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_091000) do
     t.datetime "updated_at", null: false
     t.index ["snapshot_time"], name: "index_skew_rank_intradays_on_snapshot_time"
     t.index ["ticker", "snapshot_time"], name: "index_skew_rank_intradays_on_ticker_and_snapshot_time", unique: true
+  end
+
+  create_table "strike_chain_snapshots", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "scraped_at", null: false
+    t.decimal "spot_price", precision: 10, scale: 4
+    t.jsonb "strikes", default: [], null: false
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.index ["symbol"], name: "index_strike_chain_snapshots_on_symbol", unique: true
   end
 
   create_table "technical_analyses", force: :cascade do |t|

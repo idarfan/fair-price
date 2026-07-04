@@ -86,6 +86,8 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
         plain "抓取資料中，請稍候…（約 3–5 分鐘）"
       end
     end
+    div(id: "leaps-strike-error",
+        class: "hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-1")
   end
 
   def render_status_bar
@@ -115,6 +117,9 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
         "這個履約價 #{@user_strike}（含緩衝檔）在所有到期日都沒有符合 Delta 0.60–0.90 的候選。請嘗試其他履約價，或留空讓系統自動偵測。" :
         "目前沒有符合篩選條件的候選，請嘗試調整 Delta 範圍或手動輸入履約價後重試。"
       render_alert("bg-orange-50 border border-orange-300 text-orange-800", "⚠️ #{msg}")
+    when :invalid_strike
+      msg = @scrape_errors.first.presence || "履約價不在有效範圍，請重新輸入。"
+      render_alert("bg-red-50 border border-red-300 text-red-800", "❌ #{msg}")
     when :ready_to_fetch
       render_alert("bg-blue-50 border border-blue-300 text-blue-800",
         "ℹ️ 尚未取得 #{@symbol} 的 LEAPS 資料，請點「查詢」開始抓取。")
@@ -330,14 +335,24 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
           if (!form || !btn || !loading) return;
 
           var inp = document.getElementById('leaps-symbol-input');
-          if (inp) inp.addEventListener('input', function () { this.value = this.value.toUpperCase(); });
+          var strikeInp = document.getElementById('leaps-strike-input');
+          var strikeErr = document.getElementById('leaps-strike-error');
+
+          if (inp) {
+            inp.addEventListener('input', function () {
+              this.value = this.value.toUpperCase();
+              // Clear strike and error when symbol changes (snapshot no longer valid)
+              if (strikeInp) strikeInp.value = '';
+              if (strikeErr) { strikeErr.classList.add('hidden'); strikeErr.textContent = ''; }
+            });
+          }
 
           form.addEventListener('submit', function (e) {
             e.preventDefault();
             var symbol = inp ? inp.value.trim().toUpperCase() : '';
             if (!symbol) return;
 
-            var strikeInp = document.getElementById('leaps-strike-input');
+            if (strikeErr) { strikeErr.classList.add('hidden'); strikeErr.textContent = ''; }
             var userStrike = strikeInp ? strikeInp.value.trim() : '';
 
             btn.disabled = true;
@@ -367,6 +382,19 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
               }
               if (data.status === 'cdp_offline') {
                 window.location.href = '/leaps?symbol=' + symbol + '&job_status=cdp_offline' + strikeSuffix;
+                return;
+              }
+              if (data.status === 'invalid_strike') {
+                // Show inline error, re-enable form
+                if (strikeErr) {
+                  strikeErr.textContent = data.message || '履約價不在有效範圍，請重新輸入。';
+                  strikeErr.classList.remove('hidden');
+                }
+                btn.disabled = false;
+                btn.textContent = '查詢';
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                loading.classList.add('hidden');
+                loading.classList.remove('flex');
                 return;
               }
               var jobId = data.job_id;

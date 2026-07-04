@@ -389,4 +389,75 @@ RSpec.describe "GET /leaps", type: :request do
     end
   end
 
+
+  # ── 9. invalid_strike — snapshot 驗證三條路徑 ─────────────────────────────────
+  describe "POST /leaps/analyze — snapshot validation" do
+    let(:symbol) { "KLAC" }
+
+    before do
+      # Stub fresh-data check: no fresh data → would proceed to CDP check
+      allow(LeapsOptionChainSnapshot)
+        .to receive_message_chain(:for_symbol, :fresh, :exists?)
+        .and_return(false)
+      allow_any_instance_of(LeapsRecommendationsController)
+        .to receive(:cdp_online?).and_return(true)
+      allow(ScrapeLeapsJob).to receive(:perform_later)
+    end
+
+    context "snapshot exists + user_strike out of range" do
+      before do
+        StrikeChainSnapshot.upsert(
+          { symbol: symbol, strikes: [500.0, 520.0, 540.0], spot_price: 510.0, scraped_at: Time.current },
+          unique_by: :symbol
+        )
+      end
+
+      after { StrikeChainSnapshot.where(symbol: symbol).delete_all }
+
+      it "returns invalid_strike without enqueueing a job" do
+        expect(ScrapeLeapsJob).not_to receive(:perform_later)
+        post "/leaps/analyze", params: { symbol: symbol, user_strike: "7" },
+                               as: :json
+        expect(response).to have_http_status(:ok)
+        body = JSON.parse(response.body)
+        expect(body["status"]).to eq("invalid_strike")
+        expect(body["message"]).to include("7")
+        expect(body["message"]).to include("500")
+      end
+    end
+
+    context "snapshot exists + user_strike in range" do
+      before do
+        StrikeChainSnapshot.upsert(
+          { symbol: symbol, strikes: [500.0, 520.0, 540.0], spot_price: 510.0, scraped_at: Time.current },
+          unique_by: :symbol
+        )
+      end
+
+      after { StrikeChainSnapshot.where(symbol: symbol).delete_all }
+
+      it "enqueues job (strike valid)" do
+        post "/leaps/analyze", params: { symbol: symbol, user_strike: "520" },
+                               as: :json
+        expect(response).to have_http_status(:ok)
+        body = JSON.parse(response.body)
+        expect(body["status"]).not_to eq("invalid_strike")
+        expect(ScrapeLeapsJob).to have_received(:perform_later)
+      end
+    end
+
+    context "no snapshot for symbol" do
+      before { StrikeChainSnapshot.where(symbol: symbol).delete_all }
+
+      it "enqueues job even if user_strike seems wrong (no snapshot to validate against)" do
+        post "/leaps/analyze", params: { symbol: symbol, user_strike: "7" },
+                               as: :json
+        expect(response).to have_http_status(:ok)
+        body = JSON.parse(response.body)
+        expect(body["status"]).not_to eq("invalid_strike")
+        expect(ScrapeLeapsJob).to have_received(:perform_later)
+      end
+    end
+  end
+
 end
