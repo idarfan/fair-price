@@ -87,3 +87,50 @@
 - 現價來源就是 Barchart 頁面 DOM（Stage 1 抓取時一併擷取），**不引入 Finnhub、yfinance 或其他外部報價服務作為本功能的依賴**。禁止呼叫 Barchart 內部 API——擷取現價一樣只准讀頁面實際渲染的 DOM，這跟 strikes 的抓取邊界是同一條規則。
 - 所有瀏覽器驗收操作走 `mcp__playwright-chrome__*`，禁止 raw WebSocket CDP。
 - 實作決策若偏離本規格，先更新本檔再動手。
+
+## 驗收結果（2026-07-04）
+
+### 實作 commit
+- `14cb8ee` feat: user_strike 三層防護 — strike_chain_snapshots + 即時驗證
+- `132b714` fix: run_scraper 補上 invalid_strike case + cdp_online? timeout 調至 5s
+
+### 修正紀錄
+**Root cause（`run_scraper` missing case）**: Python 正確回傳 `{status: "invalid_strike"}` 但 Ruby 的 `run_scraper` 沒有 `when "invalid_strike"` case，落入 `else → {status: "success"}`，導致 Stage 1 中止邏輯完全失效。修正：在 `run_scraper` 加上 `when "invalid_strike" then { status: "invalid_strike", data: data }`。
+
+**`cdp_online?` timeout**: 從 2s 調至 5s，符合 WSL2 mirrored 模式實際延遲。
+
+### 測試覆蓋
+- 單元測試：`spec/models/strike_chain_snapshot_spec.rb`（9 examples）
+- Request spec：`spec/requests/leaps_recommendations_spec.rb`（加入 3 contexts）
+- Python 測試：`test_leaps_scraper.py TestInvalidStrike`（2 examples）
+- 全套 RSpec：**332 examples, 0 failures**
+
+### 端到端場景驗收
+
+**場景 A**（Controller fast-path，snapshot 已存在）  
+Symbol: KLAC，user_strike: 7，DB snapshot strikes=[195..225]，spot=$235.55  
+URL: `http://localhost:3003/leaps?symbol=KLAC&job_status=invalid_strike&user_strike=7` (from analyze action)  
+結果：Strike 7.0 不在 KLAC 的履約價範圍（$195.00–$225.00，現價 $235.55），請重新輸入  
+Rails log：`StrikeChainSnapshot Load` only，**NO `Enqueued ScrapeLeapsJob`**，完成於 1489ms  
+✅ Controller 快速路徑驗證通過
+
+**場景 B**（基本查詢，無 user_strike）  
+Symbol: NOK，user_strike: 無  
+URL: `http://localhost:3003/leaps?symbol=NOK&job_status=success`  
+結果：推薦分析頁面正常顯示（近天期 $12.00/2027-12-17 Delta 0.679，遠天期 $12.00/2028-01-21 Delta 0.683）  
+✅ 基本查詢路徑未被 chain_snapshot 改動破壞
+
+**場景 C**（首查 symbol + 明顯不合理 strike → Stage 1 abort + 快照落地）  
+Symbol: MSFT（無 snapshot），user_strike: 1  
+URL: `http://localhost:3003/leaps?symbol=MSFT&job_status=invalid_strike&user_strike=1`  
+結果：Strike 1.0 不在 MSFT 的履約價範圍（實際範圍 $367.50–$415.00，現價 $390.49），請重新輸入  
+完成時間：~3 秒（Stage 1 抓完立即中止，無 Stage 2）  
+DB 驗證：`SELECT symbol, strikes, spot_price, scraped_at FROM strike_chain_snapshots WHERE symbol='MSFT'`  
+→ strikes=[367.5..415.0]，spot_price=390.49，scraped_at=2026-07-04 07:36:38 UTC，option rows=0  
+✅ Stage 1 post-check 攔截 + chain_snapshot 落地
+
+**場景 D**（合理 symbol + 合理 user_strike → 完整出結果）  
+Symbol: MSFT，user_strike: 390（在 [367.5..415.0] 範圍內）  
+URL: `http://localhost:3003/leaps?symbol=MSFT&job_status=success&user_strike=390`  
+結果：推薦分析頁面正常顯示（近天期 $390.00/2027-09-17 Delta 0.611，遠天期 $390.00/2028-01-21 Delta 0.624）  
+✅ 有效 user_strike 正常完整查詢
