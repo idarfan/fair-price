@@ -460,4 +460,53 @@ RSpec.describe "GET /leaps", type: :request do
     end
   end
 
+  # ── 9. fresh window 邊界（真實 DB rows，不 stub fresh scope）────────────────
+  # spec「fresh window 5 → 30 分鐘」節要求的 travel_to 邊界測試：
+  # 窗內 → cache hit 不排 job；窗外 → cache miss 排 job。
+  # 邊界用 FRESH_WINDOW ± 1.minute 表達，不寫死分鐘數。
+  describe "POST /leaps/analyze — fresh window boundary (real DB)" do
+    let(:symbol) { "FWREQ" }
+    let(:base_attrs) do
+      {
+        symbol: symbol, expiration_date: Date.new(2028, 1, 21),
+        strike: 10.0, option_type: "Call"
+      }
+    end
+
+    before do
+      allow_any_instance_of(LeapsRecommendationsController)
+        .to receive(:cdp_online?).and_return(true)
+      allow(ScrapeLeapsJob).to receive(:perform_later)
+    end
+
+    after { LeapsOptionChainSnapshot.where(symbol: symbol).delete_all }
+
+    context "snapshot scraped just inside FRESH_WINDOW" do
+      it "returns ready and does NOT enqueue a job (cache hit)" do
+        travel_to Time.current do
+          LeapsOptionChainSnapshot.create!(
+            base_attrs.merge(scraped_at: (LeapsOptionChainSnapshot::FRESH_WINDOW - 1.minute).ago)
+          )
+          post "/leaps/analyze", params: { symbol: symbol }
+          expect(response).to have_http_status(:ok)
+          expect(JSON.parse(response.body)["status"]).to eq("ready")
+          expect(ScrapeLeapsJob).not_to have_received(:perform_later)
+        end
+      end
+    end
+
+    context "snapshot scraped just outside FRESH_WINDOW" do
+      it "enqueues a job (cache miss)" do
+        travel_to Time.current do
+          LeapsOptionChainSnapshot.create!(
+            base_attrs.merge(scraped_at: (LeapsOptionChainSnapshot::FRESH_WINDOW + 1.minute).ago)
+          )
+          post "/leaps/analyze", params: { symbol: symbol }
+          expect(response).to have_http_status(:ok)
+          expect(JSON.parse(response.body)["job_id"]).to be_present
+          expect(ScrapeLeapsJob).to have_received(:perform_later)
+        end
+      end
+    end
+  end
 end

@@ -15,7 +15,7 @@ RSpec.describe ScrapeLeapsJob, type: :job do
       expect(Rails.cache).to receive(:write).with(
         "leaps_job_#{job_id}",
         { status: "error", errors: [ "connection reset by peer" ] },
-        expires_in: 30.minutes
+        expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW
       )
       allow(Rails.cache).to receive(:write)  # allow leaps_last_errors_ write
       described_class.perform_now(symbol, job_id)
@@ -26,7 +26,7 @@ RSpec.describe ScrapeLeapsJob, type: :job do
       expect(Rails.cache).to receive(:write).with(
         "leaps_last_errors_#{symbol}",
         [ "connection reset by peer" ],
-        expires_in: 30.minutes
+        expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW
       )
       described_class.perform_now(symbol, job_id)
     end
@@ -44,7 +44,7 @@ RSpec.describe ScrapeLeapsJob, type: :job do
       expect(Rails.cache).to receive(:write).with(
         "leaps_job_#{job_id}",
         { status: "success", errors: [] },
-        expires_in: 30.minutes
+        expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW
       )
       described_class.perform_now(symbol, job_id)
     end
@@ -70,7 +70,7 @@ RSpec.describe ScrapeLeapsJob, type: :job do
       expect(Rails.cache).to receive(:write).with(
         "leaps_job_#{job_id}",
         { status: "partial_error", errors: [ partial_msg ] },
-        expires_in: 30.minutes
+        expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW
       )
       described_class.perform_now(symbol, job_id)
     end
@@ -80,7 +80,7 @@ RSpec.describe ScrapeLeapsJob, type: :job do
       expect(Rails.cache).to receive(:write).with(
         "leaps_last_errors_#{symbol}",
         [ partial_msg ],
-        expires_in: 30.minutes
+        expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW
       )
       described_class.perform_now(symbol, job_id)
     end
@@ -99,7 +99,7 @@ RSpec.describe ScrapeLeapsJob, type: :job do
       expect(Rails.cache).to receive(:write).with(
         "leaps_job_#{job_id}",
         { status: "session_expired", errors: [] },
-        expires_in: 30.minutes
+        expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW
       )
       described_class.perform_now(symbol, job_id)
     end

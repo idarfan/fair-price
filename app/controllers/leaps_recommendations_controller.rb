@@ -112,7 +112,7 @@ class LeapsRecommendationsController < ApplicationController
     end
 
     job_id = SecureRandom.hex(8)
-    Rails.cache.write("leaps_job_#{job_id}", { status: "pending" }, expires_in: 5.minutes)
+    Rails.cache.write("leaps_job_#{job_id}", { status: "pending" }, expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW)
     ScrapeLeapsJob.perform_later(symbol, job_id, user_strike: user_strike)
 
     render json: { job_id: job_id, symbol: symbol, user_strike: user_strike }

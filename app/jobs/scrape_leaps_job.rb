@@ -15,17 +15,17 @@ class ScrapeLeapsJob < ApplicationJob
     Rails.cache.write(
       "leaps_job_#{job_id}",
       { status: result_status, errors: errors },
-      expires_in: 30.minutes
+      expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW
     )
     # Write errors by symbol so controller can read them on redirect without job_id
-    Rails.cache.write("leaps_last_errors_#{symbol}", errors, expires_in: 30.minutes) if errors.any?
+    Rails.cache.write("leaps_last_errors_#{symbol}", errors, expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW) if errors.any?
   rescue => e
     err_msg = e.message.first(200)
     Rails.cache.write(
       "leaps_job_#{job_id}",
       { status: "error", errors: [ err_msg ] },
-      expires_in: 30.minutes
+      expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW
     )
-    Rails.cache.write("leaps_last_errors_#{symbol}", [ err_msg ], expires_in: 30.minutes)
+    Rails.cache.write("leaps_last_errors_#{symbol}", [ err_msg ], expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW)
   end
 end
