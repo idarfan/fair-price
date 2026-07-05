@@ -88,28 +88,28 @@
 
 /* ── LEAPS 欄位教學（driver.js 深色主題 override + hover tooltip）──────────── */
 /* driver popover 預設白底；改深色卡片，色值對齊 Tailwind gray 色階（不另造色票） */
-.driver-popover {
+.driver-popover.driver-popover {
   background-color: #111827;            /* gray-900 */
   color: #d1d5db;                       /* gray-300 */
   border: 1px solid #374151;            /* gray-700 */
   box-shadow: 0 10px 30px rgba(0,0,0,.45);
 }
-.driver-popover-title { color: #f9fafb; }                       /* gray-50 */
-.driver-popover-description { color: #d1d5db; }
-.driver-popover-close-btn { color: #6b7280; }                   /* gray-500 */
-.driver-popover-close-btn:hover, .driver-popover-close-btn:focus { color: #f9fafb; }
-.driver-popover-progress-text { color: #9ca3af; }               /* gray-400 */
-.driver-popover-footer button {
+.driver-popover .driver-popover-title { color: #f9fafb; }                       /* gray-50 */
+.driver-popover .driver-popover-description { color: #d1d5db; }
+.driver-popover .driver-popover-close-btn { color: #6b7280; }                   /* gray-500 */
+.driver-popover .driver-popover-close-btn:hover, .driver-popover .driver-popover-close-btn:focus { color: #f9fafb; }
+.driver-popover .driver-popover-progress-text { color: #9ca3af; }               /* gray-400 */
+.driver-popover .driver-popover-footer button {
   background-color: #1f2937;            /* gray-800 */
   color: #e5e7eb;                       /* gray-200 */
   border: 1px solid #4b5563;            /* gray-600 */
   text-shadow: none;
 }
-.driver-popover-footer button:hover { background-color: #374151; }
-.driver-popover-arrow-side-left.driver-popover-arrow   { border-left-color: #111827; }
-.driver-popover-arrow-side-right.driver-popover-arrow  { border-right-color: #111827; }
-.driver-popover-arrow-side-top.driver-popover-arrow    { border-top-color: #111827; }
-.driver-popover-arrow-side-bottom.driver-popover-arrow { border-bottom-color: #111827; }
+.driver-popover .driver-popover-footer button:hover { background-color: #374151; }
+.driver-popover .driver-popover-arrow-side-left.driver-popover-arrow   { border-left-color: #111827; }
+.driver-popover .driver-popover-arrow-side-right.driver-popover-arrow  { border-right-color: #111827; }
+.driver-popover .driver-popover-arrow-side-top.driver-popover-arrow    { border-top-color: #111827; }
+.driver-popover .driver-popover-arrow-side-bottom.driver-popover-arrow { border-bottom-color: #111827; }
 
 /* hover tooltip（#leaps-col-tip，掛 body、export root 之外） */
 #leaps-col-tip {
