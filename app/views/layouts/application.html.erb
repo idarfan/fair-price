@@ -40,6 +40,8 @@
     <%= vite_javascript_tag 'application' %>
     <% if controller_name == 'leaps_recommendations' %>
       <%= javascript_include_tag "jspdf-2.5.2.umd.min" %>
+      <%= javascript_include_tag "driver-1.6.0.iife" %>
+      <%= stylesheet_link_tag "driver-1.6.0" %>
     <% end %>
     <% if controller_name == 'ownership' %>
       <%= vite_javascript_tag 'ownership.tsx' %>

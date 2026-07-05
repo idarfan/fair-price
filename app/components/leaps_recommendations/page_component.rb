@@ -25,6 +25,18 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
   FLOW_COLS = [ "類型", "履約價", "到期日", "DTE", "Delta", "Code", "Size", "Side", "Premium", "方向" ].freeze
 
+  # 欄位教學（leaps-column-tooltips-spec.md）：與上面兩個欄位陣列一一對齊的 tip key。
+  # freeze 前斷言長度，防止未來加欄位時漏同步導致文案錯位。
+  TABLE_COL_KEYS = %w[
+    expiration dte strike delta oi volume liquidity bid ask mid spread
+    intrinsic extrinsic extrinsic_pct time_value_pct iv vega itm_prob
+  ].freeze
+  FLOW_COL_KEYS = %w[
+    f_type f_strike f_expiration f_dte f_delta f_code f_size f_side f_premium f_direction
+  ].freeze
+  raise "TABLE_COL_KEYS 與 TABLE_COLS 長度不一致" unless TABLE_COL_KEYS.size == TABLE_COLS.size
+  raise "FLOW_COL_KEYS 與 FLOW_COLS 長度不一致"   unless FLOW_COL_KEYS.size == FLOW_COLS.size
+
   def initialize(symbol: nil, candidates: [], recommendation: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil)
     @symbol         = symbol
     @candidates     = Array(candidates)
@@ -48,6 +60,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     end
     render_loading_script
     render_export_script
+    render_tooltips_script
   end
 
   private
@@ -61,10 +74,21 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       # 匯出按鈕：data-export-exclude 讓 html-to-image filter 把按鈕排除在輸出畫面外；
       # 無資料時 disabled，避免匯出空頁。
       div(class: "flex items-center gap-2", data_export_exclude: "") do
+        render_tour_button
         render_export_button("png", "匯出 PNG")
         render_export_button("pdf", "匯出 PDF")
       end
     end
+  end
+
+  def render_tour_button
+    exportable = @candidates.any?
+    base  = "px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors whitespace-nowrap"
+    style = exportable ?
+      "border-gray-300 bg-white text-gray-700 hover:bg-gray-50" :
+      "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+    button(id: "leaps-tour-btn", type: "button", disabled: !exportable,
+           class: "#{base} #{style}") { plain "欄位導覽" }
   end
 
   def render_export_button(kind, label)
@@ -215,8 +239,10 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
         table(class: "w-full text-xs text-gray-700") do
           thead(class: "bg-gray-50 text-gray-500 text-xs") do
             tr do
-              TABLE_COLS.each do |col|
-                th(class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain col }
+              TABLE_COLS.each_with_index do |col, idx|
+                key = TABLE_COL_KEYS[idx]
+                th(id: "leaps-th-#{key}", data_tip_key: key,
+                   class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain col }
               end
             end
           end
@@ -314,8 +340,9 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       table(class: "w-full text-xs text-gray-700") do
         thead(class: "bg-gray-50 text-gray-500 text-xs") do
           tr do
-            FLOW_COLS.each do |col|
-              th(class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain col }
+            FLOW_COLS.each_with_index do |col, idx|
+              key = FLOW_COL_KEYS[idx]
+              th(id: "leaps-th-#{key}", data_tip_key: key, class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain col }
             end
           end
         end
@@ -557,6 +584,105 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
               [pngBtn, pdfBtn].forEach(function (b) { if (b) b.disabled = false; });
               btnEl.textContent = origText;
             });
+          });
+        })();
+      JS
+    end
+  end
+
+  # 欄位教學三層互動（leaps-column-tooltips-spec.md）。
+  # LEAPS_COL_EXPLAIN 是文案唯一來源：hover tooltip、點擊單步 popover、多步 tour 共用。
+  def render_tooltips_script
+    script do
+      raw <<~JS.html_safe
+        (function () {
+          var LEAPS_COL_EXPLAIN = {
+            expiration:     { el: '#leaps-th-expiration',     title: '📅 Expiration',           desc: '合約到期日。LEAPS 慣例為一年以上，本表只列 364 天以上。', side: 'bottom' },
+            dte:            { el: '#leaps-th-dte',            title: '⏱ Days to Expiration',    desc: '距到期天數。364–550 近天期、550+ 遠天期；越長時間緩衝越大，Vega 曝險也越高。', side: 'bottom' },
+            strike:         { el: '#leaps-th-strike',         title: '🎯 Strike',               desc: '約定買入股價。深價內的 Call 行為越接近持有正股。', side: 'bottom' },
+            delta:          { el: '#leaps-th-delta',          title: '⚡ Delta',                 desc: '股價每動 $1 權利金的理論變化。本表篩 0.60–0.90；越接近 1 越像股票替代品，槓桿越低但越穩。', side: 'bottom' },
+            oi:             { el: '#leaps-th-oi',             title: '🔓 Open Interest',        desc: '未平倉合約數，本表排序主鍵。OI 高流動性通常較好；只在盤後更新。', side: 'bottom' },
+            volume:         { el: '#leaps-th-volume',         title: '📊 Volume',               desc: '當日成交量（即時）。OI 高但 Volume 長期為零，進出仍可能困難。', side: 'bottom' },
+            liquidity:      { el: '#leaps-th-liquidity',      title: '🚦 流動性判斷',            desc: '依本次查詢候選的 OI 三分位相對排名（充足/普通/偏低），非固定門檻；「⚠ 近期無成交」由 Vol/OI 比率判斷。', side: 'bottom' },
+            bid:            { el: '#leaps-th-bid',            title: '⬇️ Bid',                  desc: '市場最高買價（賣出時的底價參考）。', side: 'bottom' },
+            ask:            { el: '#leaps-th-ask',            title: '⬆️ Ask',                  desc: '市場最低賣價（買入時的天花板參考）。', side: 'bottom' },
+            mid:            { el: '#leaps-th-mid',            title: '⚖️ Mid',                  desc: '(Bid+Ask)/2，掛限價單參考價。本系統衍生欄位一律以 Mid 為權利金基準，不用可能過時的最後成交價。', side: 'bottom' },
+            spread:         { el: '#leaps-th-spread',         title: '↔️ Spread%',              desc: '(Ask−Bid)/Mid，一次進出的滑價成本。深價內常偏寬，>10% 要注意。', side: 'bottom' },
+            intrinsic:      { el: '#leaps-th-intrinsic',      title: '💎 Intrinsic Value',      desc: 'max(0, 現價−履約價)，權利金裡「已在錢裡」的部分，股價不動也不流失。', side: 'bottom' },
+            extrinsic:      { el: '#leaps-th-extrinsic',      title: '🎈 Extrinsic Value',      desc: 'Mid−內在價值，時間＋波動率溢價（保險費），隨時間與 IV 回落流失。', side: 'bottom' },
+            extrinsic_pct:  { el: '#leaps-th-extrinsic_pct',  title: '🧮 外在佔比',              desc: '外在÷Mid，「權利金裡幾 % 是保險費」。深 ITM LEAPS 核心指標：越低越接近持股替代，高 IV 環境尤其要壓低。', side: 'bottom' },
+            time_value_pct: { el: '#leaps-th-time_value_pct', title: '📐 Time Value%',          desc: '外在÷股價，「相對直接持股多付幾 % 溢價」。與外在佔比分母不同，回答不同問題。', side: 'bottom' },
+            iv:             { el: '#leaps-th-iv',             title: '🌊 Implied Volatility',   desc: '該檔位隱含波動率。IV 越高權利金越貴；高 IV 買 LEAPS 要留意回落侵蝕（搭配 Vega）。', side: 'bottom' },
+            vega:           { el: '#leaps-th-vega',           title: '🌀 Vega',                 desc: 'IV 每變 1% 權利金的理論變化。DTE 越長 Vega 越大；IV Crush 風險量化：IV 回落 10% ≈ 損失 Vega×10。', side: 'bottom' },
+            itm_prob:       { el: '#leaps-th-itm_prob',       title: '🎲 ITM Probability',      desc: 'Barchart 估到期價內機率。買方視角＝到期仍有內在價值的機率，與 Delta 相關但獨立模型計算。', side: 'bottom' },
+            f_type:         { el: '#leaps-th-f_type',         title: '🏷 Type',                 desc: 'Call（買權）或 Put（賣權）。搭配 Side 與方向欄一起判讀該筆大單的多空含義。', side: 'bottom' },
+            f_strike:       { el: '#leaps-th-f_strike',       title: '🎯 Strike',               desc: '該筆成交合約的履約價。', side: 'bottom' },
+            f_expiration:   { el: '#leaps-th-f_expiration',   title: '📅 Expiration',           desc: '該筆成交合約的到期日。本面板不限 LEAPS，任何到期日都會入榜。', side: 'bottom' },
+            f_dte:          { el: '#leaps-th-f_dte',          title: '⏱ DTE',                   desc: '距到期天數。與排行表的 364 天門檻無關，這裡看的是當天市場在哪些天期活動。', side: 'bottom' },
+            f_delta:        { el: '#leaps-th-f_delta',        title: '⚡ Delta',                 desc: '正值=Call、負值=Put；絕對值越大越深價內。', side: 'bottom' },
+            f_code:         { el: '#leaps-th-f_code',         title: '🏳 Code',                 desc: '交易所成交代碼。標準單腿代碼可信；AUTO／多腿類（SLAN、MLET、ISOI 等）標記普遍缺失，判讀需保守。', side: 'bottom' },
+            f_size:         { el: '#leaps-th-f_size',         title: '📦 Size',                 desc: '該筆成交口數（1 口 = 100 股）。', side: 'bottom' },
+            f_side:         { el: '#leaps-th-f_side',         title: '↕️ Side',                 desc: '成交價位置：靠 bid=賣方主動（偏空）、靠 ask=買方主動（偏多）、mid=中性。', side: 'bottom' },
+            f_premium:      { el: '#leaps-th-f_premium',      title: '💰 Premium',              desc: '該筆成交的權利金總額。本面板依 Premium 降序取前 20 筆。', side: 'bottom' },
+            f_direction:    { el: '#leaps-th-f_direction',    title: '🧭 方向',                  desc: '綜合 Type／Side／Code 的看多/看空/中性判讀。情緒參考，不參與排行排序。', side: 'bottom' }
+          };
+          var TOUR_ORDER = ['expiration','dte','strike','delta','oi','volume','liquidity','bid','ask','mid','spread',
+                            'intrinsic','extrinsic','extrinsic_pct','time_value_pct','iv','vega','itm_prob',
+                            'f_type','f_strike','f_expiration','f_dte','f_delta','f_code','f_size','f_side','f_premium','f_direction'];
+
+          /* hover tooltip 引擎（document 委派 + 單一 fixed 元素，掛 body、export root 之外） */
+          var tip = document.createElement('div');
+          tip.id = 'leaps-col-tip';
+          tip.innerHTML = '<div class="tip-t"></div><div class="tip-b"></div>';
+          document.body.appendChild(tip);
+          var tT = tip.querySelector('.tip-t'), tB = tip.querySelector('.tip-b');
+          function posTip(e) {
+            var x = e.clientX + 14, y = e.clientY + 12,
+                w = tip.offsetWidth || 280, h = tip.offsetHeight || 100;
+            if (x + w > window.innerWidth - 10)  x = e.clientX - w - 10;
+            if (y + h > window.innerHeight - 10) y = e.clientY - h - 10;
+            tip.style.left = x + 'px'; tip.style.top = y + 'px';
+          }
+          document.addEventListener('mouseover', function (e) {
+            var el = e.target.closest('[data-tip-key]');
+            if (el) {
+              var d = LEAPS_COL_EXPLAIN[el.dataset.tipKey];
+              if (!d) return;
+              tT.textContent = d.title; tB.textContent = d.desc;
+              tip.style.opacity = '1'; posTip(e);
+            } else { tip.style.opacity = '0'; }
+          });
+          document.addEventListener('mousemove', function (e) {
+            if (tip.style.opacity !== '0') posTip(e);
+          });
+          document.addEventListener('mouseout', function (e) {
+            if (!e.target.closest('[data-tip-key]')) tip.style.opacity = '0';
+          });
+
+          /* 點擊 → 單步聚光 popover；導覽按鈕 → 28 步 tour（同一份文案 map） */
+          function drv() { return window.driver && window.driver.js && window.driver.js.driver; }
+          document.addEventListener('click', function (e) {
+            var el = e.target.closest('[data-tip-key]');
+            if (el && drv()) {
+              var d = LEAPS_COL_EXPLAIN[el.dataset.tipKey];
+              if (!d) return;
+              tip.style.opacity = '0';
+              drv()({ animate: true, allowClose: true, overlayOpacity: 0.35,
+                      steps: [{ element: d.el, popover: { title: d.title, description: d.desc, side: d.side, align: 'center' } }] }).drive();
+              return;
+            }
+            var btn = e.target.closest('#leaps-tour-btn');
+            if (btn && !btn.disabled && drv()) {
+              var steps = TOUR_ORDER
+                .filter(function (k) { return document.querySelector(LEAPS_COL_EXPLAIN[k].el); })
+                .map(function (k) {
+                  var d = LEAPS_COL_EXPLAIN[k];
+                  return { element: d.el, popover: { title: d.title, description: d.desc, side: d.side, align: 'center' } };
+                });
+              if (steps.length) {
+                drv()({ animate: true, allowClose: true, overlayOpacity: 0.4, showProgress: true, steps: steps }).drive();
+              }
+            }
           });
         })();
       JS
