@@ -33,3 +33,13 @@ _最後更新：2026-07-04_
 - E2E：NVTS 不帶 user_strike，76/76 rows 新欄位有值；live 手算兩筆與頁面一致
 - 插曲：首跑 E2E 因 pm2 server schema cache 過期（migration 前啟動）→ insert_all ROLLBACK；
   transaction 設計正確保住舊資料；重啟後通過。教訓：migration 後必須重啟 dev server 再跑 E2E。
+---
+
+## Phase I：匯出 PNG/PDF — 已結案 ✅（2026-07-05）
+
+- vendor 本地檔（html-to-image-1.11.11 + jspdf-2.5.2，版本釘死）、layout CDN 標籤一併替換
+- 右上角雙按鈕、事件委派、無資料 disabled、匯出中防重複
+- PDF = PNG 嵌入 + FAST 壓縮（48MB→550KB）
+- 修正：clone 內捲軸 → 無條件展開 overflow 容器再還原
+- E2E：真實點擊下載事件 ×2 + 開檔驗收（20 列 flow 完整、中文正常、背景正確）
+- 352 examples, 0 failures

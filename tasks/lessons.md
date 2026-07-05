@@ -727,3 +727,17 @@ pm2 上長駐的 Rails process 在 migration 前啟動，ActiveRecord schema cac
 `pm2 restart fairprice-rails`（注意 process 名稱是 `fairprice-rails`，不是 `fairprice`）。
 症狀特徵：測試環境全過但 server E2E 失敗 + log 有 ROLLBACK 無明顯錯誤（錯誤被 job rescue
 吞進 memory cache，跨 process 讀不到）。
+
+## 2026-07-05：propshaft load path 在 boot 時固定
+
+新增 asset 目錄（如 `vendor/assets/javascripts/`）後，執行中的 server 不會看到它——
+propshaft 的 load path 在 boot 時決定，dev code reload 不會刷新。症狀：rails runner
+驗證路徑存在（新 process）但頁面 `Propshaft::MissingAssetError`（舊 process）。
+**規則**：新增 asset「目錄」後必須重啟 server；且不要用 rails runner 驗證執行中
+server 的狀態——runner 是新 process，結論不適用（schema cache 教訓的同型錯誤）。
+
+## 2026-07-05：html-to-image 匯出 overflow 容器要無條件展開
+
+clone 在 SVG foreignObject 內字體度量與 live DOM 略異：live 無溢出的容器在 clone
+內可能溢出幾 px，捲軸就被畫進輸出、蓋住最後一列。匯出前對所有 overflow:auto/scroll
+容器無條件暫改 visible（不能只看 live 量測），完成後還原。

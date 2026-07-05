@@ -490,6 +490,29 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             // 背景色取 body 實際計算值，確保輸出不是透明底
             var bg = getComputedStyle(document.body).backgroundColor || '#ffffff';
 
+            // 匯出前把所有 overflow:auto/scroll 容器暫時改為 visible，匯出後還原。
+            // 必須無條件處理，不能只看 live DOM 有沒有實際溢出：html-to-image 的
+            // clone 在 SVG foreignObject 內字體度量略有差異，live 無溢出的容器在
+            // clone 裡可能溢出幾 px，就會把捲軸畫進輸出、蓋住最後一列（實測 NVTS）。
+            var expanded = [];
+            root.querySelectorAll('*').forEach(function (el) {
+              var cs = getComputedStyle(el);
+              if (/(auto|scroll)/.test(cs.overflow + cs.overflowX + cs.overflowY)) {
+                expanded.push({ el: el, style: el.getAttribute('style') });
+                el.style.overflow = 'visible';
+                if (el.scrollHeight > el.clientHeight + 1) {
+                  el.style.maxHeight = 'none';
+                  el.style.height = 'auto';
+                }
+              }
+            });
+            function restoreExpanded() {
+              expanded.forEach(function (s) {
+                if (s.style === null) s.el.removeAttribute('style');
+                else s.el.setAttribute('style', s.style);
+              });
+            }
+
             htmlToImage.toPng(root, {
               pixelRatio: 2,
               backgroundColor: bg,
@@ -518,7 +541,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
                       format: [w, h],
                       hotfixes: ['px_scaling']
                     });
-                    pdf.addImage(dataUrl, 'PNG', 0, 0, w, h);
+                    pdf.addImage(dataUrl, 'PNG', 0, 0, w, h, undefined, 'FAST');
                     pdf.save(fname + '.pdf');
                     resolve();
                   } catch (err) { reject(err); }
@@ -529,6 +552,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             }).catch(function (err) {
               alert('匯出失敗：' + (err && err.message ? err.message : err));
             }).finally(function () {
+              restoreExpanded();
               exporting = false;
               [pngBtn, pdfBtn].forEach(function (b) { if (b) b.disabled = false; });
               btnEl.textContent = origText;
