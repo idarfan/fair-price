@@ -36,7 +36,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   end
 
   def view_template
-    div(class: "space-y-6") do
+    div(id: "leaps-export-root", class: "space-y-6") do
       render_header
       render_search_form
       render_status_bar if @scrape_status
@@ -47,15 +47,37 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       end
     end
     render_loading_script
+    render_export_script
   end
 
   private
 
   def render_header
-    div do
-      h1(class: "text-xl font-bold text-gray-900") { plain "LEAPS Call 候選排行" }
-      p(class: "text-sm text-gray-500 mt-0.5") { plain "Delta 0.60–0.90 深度價內 Call · 依 OI 由高到低排序" }
+    div(class: "flex items-start justify-between gap-4") do
+      div do
+        h1(class: "text-xl font-bold text-gray-900") { plain "LEAPS Call 候選排行" }
+        p(class: "text-sm text-gray-500 mt-0.5") { plain "Delta 0.60–0.90 深度價內 Call · 依 OI 由高到低排序" }
+      end
+      # 匯出按鈕：data-export-exclude 讓 html-to-image filter 把按鈕排除在輸出畫面外；
+      # 無資料時 disabled，避免匯出空頁。
+      div(class: "flex items-center gap-2", data_export_exclude: "") do
+        render_export_button("png", "匯出 PNG")
+        render_export_button("pdf", "匯出 PDF")
+      end
     end
+  end
+
+  def render_export_button(kind, label)
+    exportable = @candidates.any?
+    base  = "px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors whitespace-nowrap"
+    style = exportable ?
+      "border-gray-300 bg-white text-gray-700 hover:bg-gray-50" :
+      "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+    button(
+      id: "leaps-export-#{kind}", type: "button",
+      data_leaps_export: kind, disabled: !exportable,
+      class: "#{base} #{style}"
+    ) { plain label }
   end
 
   def render_search_form
@@ -423,6 +445,93 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
               }, 2500);
             }).catch(function () {
               window.location.href = '/leaps?symbol=' + symbol + '&job_status=error' + strikeSuffix;
+            });
+          });
+        })();
+      JS
+    end
+  end
+
+  # Phase I：匯出 PNG/PDF。事件委派（規格禁止 inline onclick）；
+  # PDF 一律先轉 PNG 再嵌入（頁面含中文，jsPDF 文字模式需嵌 CJK 字型，圖片嵌入繞開豆腐字）。
+  def render_export_script
+    script do
+      raw <<~JS.html_safe
+        (function () {
+          function timestamp() {
+            var d = new Date();
+            function p(n) { return String(n).padStart(2, '0'); }
+            return '' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes());
+          }
+
+          var exporting = false;
+
+          document.addEventListener('click', function (e) {
+            var btnEl = e.target.closest('[data-leaps-export]');
+            if (!btnEl || btnEl.disabled || exporting) return;
+            if (typeof htmlToImage === 'undefined') { alert('匯出元件未載入，請重新整理頁面'); return; }
+
+            var kind = btnEl.getAttribute('data-leaps-export');
+            if (kind === 'pdf' && typeof jspdf === 'undefined') { alert('PDF 元件未載入，請重新整理頁面'); return; }
+
+            var root = document.getElementById('leaps-export-root');
+            if (!root) return;
+
+            var pngBtn = document.getElementById('leaps-export-png');
+            var pdfBtn = document.getElementById('leaps-export-pdf');
+            var origText = btnEl.textContent;
+            exporting = true;
+            [pngBtn, pdfBtn].forEach(function (b) { if (b) b.disabled = true; });
+            btnEl.textContent = '匯出中…';
+
+            var symEl  = document.getElementById('leaps-symbol-input');
+            var symbol = (symEl && symEl.value ? symEl.value : 'UNKNOWN').toUpperCase();
+            var fname  = 'leaps_' + symbol + '_' + timestamp();
+            // 背景色取 body 實際計算值，確保輸出不是透明底
+            var bg = getComputedStyle(document.body).backgroundColor || '#ffffff';
+
+            htmlToImage.toPng(root, {
+              pixelRatio: 2,
+              backgroundColor: bg,
+              filter: function (node) {
+                return !(node.nodeType === 1 && node.hasAttribute && node.hasAttribute('data-export-exclude'));
+              }
+            }).then(function (dataUrl) {
+              if (kind === 'png') {
+                var a = document.createElement('a');
+                a.href = dataUrl;
+                a.download = fname + '.png';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                return;
+              }
+              // PDF：載入 PNG 取得實際尺寸，開自訂尺寸單頁（長條式，不切 A4 避免腰斬表格列）
+              return new Promise(function (resolve, reject) {
+                var img = new Image();
+                img.onload = function () {
+                  try {
+                    var w = img.naturalWidth, h = img.naturalHeight;
+                    var pdf = new jspdf.jsPDF({
+                      orientation: w > h ? 'landscape' : 'portrait',
+                      unit: 'px',
+                      format: [w, h],
+                      hotfixes: ['px_scaling']
+                    });
+                    pdf.addImage(dataUrl, 'PNG', 0, 0, w, h);
+                    pdf.save(fname + '.pdf');
+                    resolve();
+                  } catch (err) { reject(err); }
+                };
+                img.onerror = reject;
+                img.src = dataUrl;
+              });
+            }).catch(function (err) {
+              alert('匯出失敗：' + (err && err.message ? err.message : err));
+            }).finally(function () {
+              exporting = false;
+              [pngBtn, pdfBtn].forEach(function (b) { if (b) b.disabled = false; });
+              btnEl.textContent = origText;
             });
           });
         })();

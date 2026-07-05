@@ -16,7 +16,8 @@
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+    <%# Phase I：html-to-image 改 vendor 本地檔（版本釘死），daily_momentum 匯出與 LEAPS 匯出共用 %>
+    <%= javascript_include_tag "html-to-image-1.11.11" %>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.css">
     <script src="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.min.js"></script>
     <script>
@@ -37,6 +38,9 @@
     </script>
     <%= vite_client_tag %>
     <%= vite_javascript_tag 'application' %>
+    <% if controller_name == 'leaps_recommendations' %>
+      <%= javascript_include_tag "jspdf-2.5.2.umd.min" %>
+    <% end %>
     <% if controller_name == 'ownership' %>
       <%= vite_javascript_tag 'ownership.tsx' %>
     <% end %>
