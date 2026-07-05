@@ -5,6 +5,7 @@ This file provides guidance to Claude Code when working with this repository.
 ## Session Start
 
 - **Always review `tasks/lessons.md`** for relevant project patterns and past corrections.
+- 讀取 LEAPS 規格時只讀主文件 `leaps-call-recommendation-spec.md`；`leaps-call-recommendation-history.md` 僅在追查歷史問題時才讀取。
 
 ## UI 修改強制流程（違反即重做）
 
