@@ -230,6 +230,69 @@ ls /mnt/c/ 2>&1 | head -3
   - ✅ D 的標題文字逐字核對：`page_component.rb` 確認顯示「Options Flow — 情緒參考，非排序依據」，跟規格要求的字串完全一致。
   - 錢誤訊息分情況顯示（第8節）、推薦分析區塊放置順序，已隨 Phase F/C.5b 落地，視為已完成。
 
+### 第 2 節增補（2026-07-05 第二輪）：Phase H／Phase I 規格區塊原文（已交付結案）
+
+
+- **階段 H（✅ 2026-07-04 已交付結案，驗收證據見 history 第 3 節）**：`intrinsic_value`／`extrinsic_value` 衍生欄位
+
+  **背景**：使用者手動評估 NVTS LEAPS（2027-01 與 2028-01 兩條鏈）時，發現「外在價值」與「外在佔比」是深 ITM LEAPS 篩選裡比單看 Delta 更能反映「付了多少保險費」的指標（尤其在 IV 破百的標的上，同一履約價在 197 DTE 外在佔比 33%、拉到 568 DTE 變 52%，直接改變了履約價的優劣排序）。目前這兩個數字每次都要人工從 Mid/現價心算，本階段把它落地成 DB 欄位＋排行表顯示欄。
+
+  **公式（唯一定義處，其他章節引用這裡，不要在別處重抄一份）**：
+
+  ```
+  mid             = (bid + ask) / 2        # 等同 Barchart 頁面的 Mid 欄；DB 沒有 mid 欄位，由 bid/ask 計算
+  intrinsic_value = max(0, underlying_price - strike)          # option_type = call
+  intrinsic_value = max(0, strike - underlying_price)          # option_type = put（本功能只抓 call，但公式必須依 option_type 分支，表結構保留 put 是為了未來 PMCC 共用，不要寫死 call 公式埋地雷）
+  extrinsic_value = mid - intrinsic_value
+  ```
+
+  **⚠️ 權利金基準明確規定為 Mid，不是 Latest（`last_price`）**：Latest 是最後成交價，LEAPS 深 ITM 檔位成交稀疏，Latest 可能是數小時甚至數天前的陳舊價格；Mid = (bid+ask)/2 才貼近當下實際進場要付的權利金。這個選擇是本階段的核心規格，不是實作細節，實作時不得擅自改用 `last_price` 或其他價格欄位。
+
+  **實作位置與範圍**：
+  1. Migration：`leaps_option_chain_snapshots` 加 `intrinsic_value`、`extrinsic_value` 兩欄（`decimal`，precision/scale 跟同表既有的 `bid`/`ask` 報價欄位一致，允許 null——bid/ask 任一缺值時存 null，不要存 0 假裝有值）。**只加這兩欄**，「外在佔比」不落地（純比例，display 層由 `extrinsic_value / mid` 算出，決定性可重現，存了反而多一個要跟著同步的欄位）。
+  2. 計算層：**放在 Ruby 的 `persist_leaps`（bulk insert 前對每筆 row 計算），不動 Python scraper**。理由：這是純算術衍生欄位，輸入（bid/ask/underlying_price/strike/option_type）全部已在抓取結果裡，放 Ruby 層代表 (a) `leaps_scraper.py` 零改動，不需要重跑 Playwright DOM 驗證那一整套流程；(b) 公式跟 `LeapsRankingService` 同在 Ruby 端，未來改公式只動一個 repo 一種語言。
+  3. 舊資料 backfill：寫一個一次性 rake task（或 migration 內 `update_all` 等價 SQL）把既有 rows 依同一公式補值；bid/ask 為 null 的舊 rows 維持 null。5 分鐘 cache 機制代表舊資料很快會被覆蓋，但「排行表某些列有值、某些列空白」這種不一致畫面連短暫出現都不應該。
+  4. 排行表新增「內在價值／外在價值／外在佔比」三個顯示欄（見第 6 節表格輸出的 Phase H 註記）；`time_value_pct` 改讀已存的 `extrinsic_value`，移除排行層的重複計算（見第 6 節計算流程步驟 3 的 Phase H 調整）。
+  5. 推薦分析理由文字**本階段不強制**加入外在佔比（既有 Time Value% 已在理由裡），若順手加上則沿用同一 DB 欄位，不得另算。
+
+  **路由與前端範圍說明**（對照本規格「路由與前端」一節的既有要求）：本階段**沒有新路由、沒有新頁面**，只在既有 `/leaps` 排行表加顯示欄，導覽列不需變動——這是有意識確認過的「不適用」，不是漏掉。
+
+  **測試要求**：
+  1. 單元測試至少覆蓋：深 ITM call（intrinsic > 0）、OTM call（intrinsic = 0、extrinsic = mid）、bid/ask 任一為 null（兩欄皆存 null）、put 分支公式（即使目前抓取層不會產生 put rows，公式分支要有測試釘住，防止未來 PMCC 接上時才發現寫死 call）。
+  2. display 層外在佔比：mid > 0 正常計算、mid = 0 或欄位 null 顯示「—」。
+  3. **request spec（必交付，不是事後補）**：走完整 HTTP 路徑（route → controller → service）驗證回應頁面包含新欄位且數值正確——本專案已發生過「兩個 service 單元測試 38/38 全過、controller 串接處從未被 request 過、使用者手動一按就炸 ArgumentError」的前例，單元測試通過不能替代這條。
+  4. **核心情境 E2E（結案前置條件，凌駕以上所有測試數字）**：實際跑一次**最基本、不帶任何選填參數**的查詢（例如 NVTS 或 NOK，不帶 user_strike），確認排行表每一列的內在/外在價值/外在佔比都有值且合理。只測帶 user_strike 的情境不算數。
+  5. **人工已知值對照**——⚠️ 分成兩層，不要混用：
+     - **fixture 層（釘公式）**：使用者 2026-07-03 提供的 NVTS 截圖數值寫成單元測試 fixture——2028-01-21 鏈、spot 14.46：strike 5（bid 10.70/ask 11.30 → Mid 11.00 → 內在 9.46、外在 1.54、佔比 14%）、strike 10（bid 8.70/ask 9.95 → Mid 9.325 → 內在 4.46、外在 4.87、佔比 52%）。這組數字是歷史快照，**只用於測試,不要拿去對 live 抓取的輸出**——live 的 spot/bid/ask 早就變了,對不上是正常的,對上了反而有鬼。
+     - **live 層（驗 E2E）**：核心情境 E2E 跑完後,從**當次**抓到的資料任取兩筆,用當次的 bid/ask/spot **手算**內在/外在/佔比,跟頁面顯示值比對。一致才算通過（容許四捨五入位數差異）,對不上就是公式或欄位接錯,不是「差不多就好」。回報需附上手算過程與頁面數值的對照。
+
+- **階段 I（✅ 2026-07-05 已交付結案，驗收證據見 history 第 3 節）**：頁面匯出 PNG／PDF
+
+  **需求**：LEAPS 推薦頁面**右上角**新增兩個按鈕「匯出 PNG」「匯出 PDF」，把當前頁面**完整內容**（包含排行表、推薦分析、user_strike 結果等所有已渲染區塊，不是只有視窗可見範圍）輸出成檔案下載。
+
+  **架構決定（實作前先讀，不得擅自改走後端方案）**：
+  1. **純前端 client-side 實作，零後端變動**——不新增 route、controller、service。理由：(a) 專案的 Playwright/CDP 是 Barchart 爬蟲專用基礎設施，不得拿來截自己的頁面，避免匯出功能與爬蟲耦合（scraper 掛掉時連匯出都不能用是不合理的）；(b) 符合本專案「Tailwind CDN + 原生 JS + 事件委派」約束。
+  2. 函式庫**vendor 本地檔載入，不用 CDN**（⚠️ 2026-07-04 修正：原文寫「CDN 載入對齊 Tailwind CDN 模式」是基於過時的專案狀態——專案已改用 `tailwindcss-rails` 本地編譯，不再有 Tailwind CDN。修正後的規格：把函式庫的 UMD build 下載到專案的 vendor JS 目錄（依專案現行 asset 管線的慣例位置），檔名含版本號釘死版本，例如 `html2canvas-1.4.1.min.js`、`jspdf-2.5.2.umd.min.js`，commit 進 repo）。理由：匯出功能不因外部 CDN 斷線/被擋而失效；版本釘死可重現。PNG 用 `html2canvas`（或 `html-to-image`，實作者擇一後在交付說明裡寫明選擇理由），選定後**兩個匯出共用同一個渲染路徑**。PDF 用 `jsPDF`。
+  3. **PDF 一律採「先轉 PNG、再把圖嵌入 PDF」**，不用 jsPDF 文字 API 重排版面。理由：頁面含中文，jsPDF 文字模式需要另外嵌 CJK 字型檔（檔案肥大且易出豆腐字），圖片嵌入完全繞開字型問題，且保證 PNG 與 PDF 兩種輸出畫面一致。PDF 頁面尺寸依圖片長寬比自訂（單頁長條式即可，不強制切 A4 分頁；若實作者選擇分頁，切點不得腰斬表格列）。
+
+  **UI 規格**：
+  1. 按鈕位置在頁面**右上角**（與查詢表單同一行右對齊，或其上方右對齊），沿用頁面既有深色主題樣式，兩顆按鈕：「匯出 PNG」「匯出 PDF」。
+  2. 事件綁定走專案既有的**事件委派**模式，不要 inline `onclick`。
+  3. 匯出範圍是內容根容器（整個 LEAPS 頁面的 wrapper div），**按鈕本身要從輸出畫面排除**（截圖時暫時隱藏或用函式庫的 filter/ignore 選項），導覽列可一併排除。
+  4. 檔名格式：`leaps_{symbol}_{YYYYMMDD_HHmm}.png` / `.pdf`（例如 `leaps_NVTS_20260704_2130.pdf`），symbol 取當前查詢的 ticker；尚未查詢、頁面沒有資料時按鈕停用（disabled），不是匯出一張空頁。
+  5. 匯出進行中按鈕顯示處理中狀態並防止重複點擊（大表格 rasterize 可能需要數秒）。
+
+  **已知風險（實作時要實際驗證，不是寫了就當沒事）**：html2canvas 對部分 CSS（oklch 色彩函式、某些 Tailwind 效果）支援不完整，可能出現顏色跑掉或區塊缺失；深色背景要確認有被畫進輸出（不是透明底配黑字）。如果選用的函式庫在本頁面渲染有明顯瑕疵，換另一個函式庫重試，兩者都不行才回頭討論方案——不要交付一個「有輸出但畫面破損」的結果。
+
+  **路由與前端範圍說明**：本階段沒有新路由（純前端），入口就是頁面右上角按鈕本身——這是有意識確認過的「不適用」，不是漏掉。
+
+  **測試要求**：
+  1. 因為零後端變動，**不需要**新的 request spec（對照本規格既有規則：那條管的是「新 service 接進 controller」，本階段沒有這件事）。
+  2. **核心情境 E2E（結案前置條件）**：實際查詢一個 symbol（不帶 user_strike），等頁面渲染完成後分別點兩顆按鈕，**打開下載的 PNG 和 PDF 檔案逐一檢查**：(a) 內容完整——排行表每一列、推薦分析區塊都在，長頁面沒有被腰斬；(b) 深色主題背景正確、中文沒有變豆腐字或亂碼；(c) 檔名符合規格。「檔案有下載下來」不等於「內容正確」，必須真的打開看過並在回報附上輸出檔或其截圖，這是本專案一貫的「有結果≠結果正確」驗收原則。
+  3. 邊界情境：頁面無資料時按鈕為 disabled；匯出進行中重複點擊不會觸發第二次匯出。
+
+每一步都要以實際讀到的 DOM／資料為準，不要假設或猜測欄位名稱與資料格式。
+
 ## 第 3 節：驗收標準 Checklist（已完成項目與證據，含 fresh window／Phase H／Phase I）
 
 ## 驗收標準 Checklist
@@ -294,3 +357,101 @@ ls /mnt/c/ 2>&1 | head -3
 - [x] 匯出為完整頁面：root `#leaps-export-root` 含推薦分析＋18 欄排行表＋Options Flow 20 列全部；按鈕以 `data-export-exclude` + html-to-image filter 排除；導覽列在 root 之外天然排除。**修正記錄**：首版輸出被 clone 內的捲軸蓋住排行表末列——html-to-image 的 SVG foreignObject clone 字體度量略寬，live DOM 無溢出的 overflow-auto 容器在 clone 內會溢出幾 px 而畫出捲軸；修法是匯出前**無條件**把所有 overflow:auto/scroll 容器暫改 visible（不能只看 live 量測），完成後還原（驗證還原後無殘留 inline style）。
 - [x] 檔名實測 `leaps_NVTS_20260705_1246.png/.pdf` 符合格式；無資料時兩鈕 disabled（實測含樣式）；`exporting` 旗標＋雙鈕 disabled 防重複點擊，匯出中顯示「匯出中…」。
 - [x] **E2E 開檔驗收（2026-07-05）**：真實點擊兩顆按鈕各觸發下載事件（Playwright 回報 `Downloading file leaps_NVTS_20260705_1246.png/.pdf`）；輸出位元組（同管線取回）逐一開檔檢查：排行表 3 列與 Options Flow 20 列完整未腰斬、末列乾淨收尾、背景正確非透明、中文全部正常無豆腐字、按鈕不在輸出中。輸出檔存於驗收 scratchpad 並附截圖於回報。
+
+## 第 4 節：已定案論證與過時標示原文（2026-07-05 第二輪精簡搬移，逐字保存）
+
+### Phase A A.1「需要實際確認」清單（原文，已全部確認完畢）
+
+需要實際確認：
+- 到期日清單從哪裡讀（通常頁面上有 expiration 的 `<select>` 或 tab 清單，**用這個清單拿到全部可用到期日，不要自己猜日期格式**，要包含遠期 LEAPS 到期日，不是只有近期週選）
+- 表格實際欄位有哪些（已確認包含 Strike、Bid、Ask、Last、Volume、Open Interest、Delta、IV，以實際讀到的 column header 為準）
+- Call / Put 是左右並排兩個表格，還是分頁切換，需確認 DOM 結構
+- 頁面是否也有合法的 CSV/Export 下載功能（如果有，優先用下載，不用解析 DOM 表格，沿用 Options Flow 的既有模式）
+
+### 反推公式放棄論證（原 Stage 1 第 1 點原文）
+
+1. **第一階段：估出候選履約價**——選擇 Barchart「Near the Money」檢視（畫面上預設靠近現價的履約價清單），這個檢視本身就直接顯示 Delta 欄位，**不需要另外用股價/權利金反推公式去算錨點**（曾經考慮過用「股價 vs 履約價+權利金」的價格關係去反推候選履約價，但這個公式在深度價內時差距連續縮小、不會有明確交叉點，且越往深價內越容易撞到 Delta=0.0000、IV=0%、無成交記錄的死報價，這個方向已放棄，不要實作）。直接讀 Delta 欄位，篩出 **Delta >= 0.60** 的履約價，當作第二階段要鎖定的候選對象。
+
+### V&G stacked 模式待驗證段（原文，已定案採用鎖履約價模式）
+
+**待驗證（V&G 頁面是否支援同樣模式）**：這次驗證的是 Options Prices 頁面，Volatility & Greeks 頁面**還沒驗證**是否也支援「鎖履約價、Stacked」模式。如果支援，V&G 那層（Vega/itm_probability/vol_oi_ratio）可以用同樣兩階段流程縮減；如果不支援，V&G 那層維持原本逐到期日抓取，只是抓取的到期日清單改成「第二階段那幾個履約價各自有資料的到期日聯集」，而不是全部到期日都要抓。
+
+### A.2 跳過欄位摘要（dup，已併入 A.2 表格）
+
+> 跳過的部分：Gamma/Theta/Rho/Theoretical 不抓、不存。多抓的部分：Vega/itmProbability/volumeOpenInterestRatio 三欄，merge key 確認乾淨對得上，沒有額外風險。
+
+### Phase A 推進語句
+
+> Phase A 全部確認完畢，進 Phase B。
+
+### 新表 vs 擴充 option_snapshots 對比表（原文）
+
+
+### 為什麼需要新表，不是擴充 `option_snapshots`（Phase A 確認）
+
+| | `option_snapshots`（既有） | LEAPS 需求 |
+|---|---|---|
+| 識別方式 | `tracked_ticker_id`（FK 到 `tracked_tickers`，需預先登記） | 任意 ticker 字串，使用者輸入即查，不需預先登記 |
+| `delta` 欄位 | 無 | 核心篩選欄位，必須有 |
+| 主 key 結構 | `tracked_ticker_id` + `contract_symbol` | `(symbol, expiration_date, strike, option_type, scraped_at)` |
+| 用途／粒度 | 追蹤特定合約的價格歷史（每 symbol 一筆彙總快取） | 每次查詢的全標的快照，篩完即用（per-contract） |
+
+兩者 grain 完全不同，不是「順手擴充舊表」能解決的差異，新建表是必要的，不是為了偷懶繞過既有結構。
+
+### DB 欄位表 intrinsic/extrinsic 原兩列（Mid vs last_price 理由已去重至公式處）
+
+| `intrinsic_value` 🆕 Phase H | 內在價值（Intrinsic Value），**Ruby persist 層計算後存入**，不是 Barchart 抓來的欄位。公式見 Phase H 一節 |
+| `extrinsic_value` 🆕 Phase H | 外在價值（Extrinsic Value / Time Value），**以 Mid 為權利金基準計算**（Mid = (bid + ask) / 2，等同 Barchart 頁面的 Mid 欄；**不是用 `last_price`**，因為 Latest 是最後成交價，可能是數小時前的陳舊價格，Mid 才貼近當下實際要付的權利金）。公式見 Phase H 一節 |
+
+### gamma/theta/rho 不新增欄位說明（dup，已併入 A.2 表格）
+
+**不新增 gamma/theta/rho/theoretical 欄位**：理由見第 4 節 A.2，本次 Phase B 補欄位也不重新討論這三個。
+
+### vega 待補殭屍標示（原文，實際已補齊）
+
+> ⚠️ **已知缺漏，待補**：Phase B migration 漏了 `vega`——這不是新提案，是「方案 A + Vega」當時就批准、Phase A 確認結果（第 4 節 A.2）也明確列了的欄位，純粹是建表時漏寫。**決議：補一個小 migration 加 `vega` 欄位即可，不需要整張表重建；gamma/theta/rho 維持不加，沒有新理由推翻原決定。**
+
+### 52 週 DTE 門檻設計修正記錄（原文，NOK 發現過程）
+
+
+### ⚠️ 設計修正記錄：重新引入 52 週 DTE 門檻
+
+**這節的決定覆蓋了更早版本的「不預設遠天期最低天數門檻」決定，原因是實測發現一個沒預料到的漏洞：**
+
+Delta 0.60–0.90 篩的是「深度價內」這個價平關係，跟到期日遠近完全無關——一個 5 天後到期的深度價內買權，Delta 一樣可以落在 0.85，照樣會通過篩選。實測 NOK 時，排行表裡真實出現了 DTE 5、13、20 天的候選，這些根本不是 LEAPS（LEAPS 慣例定義是到期日 1 年以上），純粹是因為「不設天數門檻」+「Delta 篩選不等於天期篩選」這兩件事疊在一起，把近期合約也放進了一個明明叫「LEAPS Call 候選」的功能裡。
+
+**修正後規則：全功能（排行表＋推薦分析兩層）都套用 `DTE >= 364`（52 週）的硬性下限，不是「不預設門檻」。** 這跟之前「不要寫死 `min_open_interest`」是不同性質的決定——OI 門檻是「流動性夠不夠」這種程度問題，因標的而異，不該寫死；但「是不是 LEAPS」是這個功能存在的前提定義，52 週是業界慣例下限，不是隨手選的數字，兩者不能用同一套「不要預設」的邏輯套用。
+
+### 計算流程步驟 3 Phase H 調整註記（原文，指標已改指資料庫設計）
+
+   > 🆕 **Phase H 調整**：`intrinsic_value` 與 `time_value`（= `extrinsic_value`）改為**直接讀取 DB 已存欄位**（persist 時已用同一公式算好，見 Phase H），這一步只做 `time_value_pct = extrinsic_value / underlying_price` 的除法，**不要在排行層重算一次內在/外在價值**——兩處各算一次，未來只要其中一邊改了公式（例如權利金基準從 Mid 換掉）就會出現兩邊數字對不上的漂移，這種雙軌計算是已知的 bug 溫床。
+
+### Options Flow「規格撰寫錯誤」考證段（原文）
+
+> ⚠️ **規格修正記錄**：這節原本被寫成「大單（依既有 Flags/Code 分類）清單」，採用 `large_premium: true`（固定 $50萬門檻，數量不定）取資料，這跟使用者最初提出的「前20大」（固定 20 筆，依 premium 排序）是兩個不同概念，是這份規格在撰寫時的錯誤改寫，不是 Phase D 實作偏離規格——Phase D 當時完全照規格字面做是對的。**確認結果：改回原始需求，固定取前 20 筆，依 premium 降序。**`large_premium` 那個固定門檻判斷（$50萬）保留用在分類/標記上沒問題（例如表格裡可以額外標一個「大單」icon），但**面板抓取的資料範圍**改成「premium 排序前 20 筆」，不是「premium ≥ $50萬 的全部」。
+
+### 配色第 4 點改錯史（原文）
+
+3. 如果三維度儀表板的樣式是寫在共用的 CSS（例如共用的 partial、stylesheet、或 Tailwind class 組合），這個新頁面應該直接 `import`／複用該檔案或共用 component，不要複製貼上一份新的，避免之後兩邊顏色又走偏。
+4. 表格 hover 效果與奇數列底色（已實測調整確認，寫死具體值，不要再用「偏紫色調」這種模糊描述）：
+   - 奇數列底色：灰色系 `bg-gray-50/50`（不是紫色，之前一輪改動誤把這個也換成紫色，已修正回灰色）
+   - 滑鼠 hover 底色：紫色系，比預設的 `purple-50`/`purple-100` 再深一級，用 `hover:bg-purple-200`（如果套用後實測還是太淺看不出差異，下一級是 `hover:bg-purple-300`，但要注意太深會蓋掉文字可讀性，改完務必實際看畫面確認，不要只看 class 名稱猜對不對）
+   - 這兩個顏色是獨立的兩件事：奇數列底色跟 hover 底色不能共用同一個顏色系統，前者灰色、後者紫色，不要混在一起改
+
+### fresh window 5→30 分鐘設計修正記錄（原文，含前科敘述與證據要求）
+
+
+### 🆕 設計修正記錄（2026-07-04）：fresh window 由 5 分鐘延長為 30 分鐘
+
+**使用者已明確要求把 fresh 判斷從 5 分鐘延長到 30 分鐘，但多個 session 後實作仍回報「fresh = 5 分鐘內」，未真正改到。** 根因研判：本規格多處寫死「5 分鐘」，新 session 重讀規格後以規格為準，把口頭修改覆蓋回去；且程式端 5 分鐘可能散落多處（model `fresh` scope、`fetch_leaps` cache 判斷、controller `fresh_data_exists?`、`Rails.cache` `expires_in` 如 `leaps_last_errors_*` 等），改一處漏其他處。本節是這個數值的**唯一權威定義**，本文件其他地方出現的「5 分鐘」若屬歷史驗證記錄則維持原文（記錄的是當時事實），若屬規範描述一律以本節為準：
+
+1. **fresh window = 30 分鐘**（`scraped_at >= 30.minutes.ago`）。
+2. **單一定義來源**：程式內建立一個常數（例如 `LeapsOptionChainSnapshot::FRESH_WINDOW = 30.minutes`），model `fresh` scope、`BarchartScraperService#fetch_leaps`、controller `fresh_data_exists?`、以及所有相關 `Rails.cache` `expires_in` 全部引用這個常數，**全 codebase 不允許再出現第二個寫死的 `5.minutes`／`300`／`30.minutes` 字面值**（測試檔用 `FRESH_WINDOW` 加減運算表達邊界，不寫死數字）。
+3. **修復回報必附證據，不接受口頭「已改」**（本項已有連續多 session 回報未真改的前科）：
+   - (a) `grep -rn "5\.minutes\|expires_in.*300" app/ lib/` 輸出，證明沒有殘留舊值；
+   - (b) 邊界單元測試：`travel_to` 凍結時間，`scraped_at` 29 分鐘前 → cache hit（`persist_leaps` 不執行、不排 job）；31 分鐘前 → cache miss（重新抓取）；
+   - (c) 核心情境實測：同一 symbol 查詢後，間隔 >5 分鐘、<30 分鐘再查一次，Rails log 證明第二次走 cache、沒有觸發 scraper——這一條正是「5 分鐘舊行為」與「30 分鐘新行為」的鑑別區間，只在 5 分鐘內重查是驗不出差異的。
+
+### 執行方式原指標行
+
+> 階段 A／B／C／D／C.5／C.5b／G／F／E 的交付記錄與驗證證據，見 `leaps-call-recommendation-history.md` 第 2 節。
