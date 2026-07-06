@@ -15,6 +15,15 @@ hover 引擎用 document 層級事件委派＋ `data-tip-key` 屬性。
 ## 架構約束
 
 1. driver.js v1.x 走 **vendor 本地檔**（同 html-to-image 模式：UMD build、檔名含版本號、commit 進 repo、零 CDN）。CSS 一併本地化，補**深色主題 override**（driver popover 預設白底，改用頁面既有深色卡片顏色變數，不另造色票）。
+   **字級不沿用第 8 課（第 8 課的 15/13/12.5px 偏小），依下表為準**：
+
+   | 元素 | 字級 |
+   |---|---|
+   | driver popover 標題（`.driver-popover-title`） | 17px |
+   | driver popover 內文（`.driver-popover-description`） | 15px，line-height 1.8 |
+   | driver popover 卡片寬度 | max-width 400px（配合字級放大，避免卡片過長） |
+   | hover tooltip 內文 | 14px，max-width 340px |
+   | hover tooltip 標題 | 15px |
 2. 純前端、零後端變動——無新路由、無 request spec 需求（有意識確認過的「不適用」）。
 3. 文案 map 只定義一份（`LEAPS_COL_EXPLAIN`），三種互動引用同一份，不得複製。
 4. 排行表與 Options Flow 面板的欄位標題都要接上；標頭加可定位的 id 或 data 屬性。
@@ -61,9 +70,42 @@ hover 引擎用 document 層級事件委派＋ `data-tip-key` 屬性。
 | Premium | 權利金總額，本面板依此取前 20 |
 | 方向 | 看多/看空/中性判讀，情緒參考、不參與排行排序 |
 
+## 術語字卡區（含發音）
+
+頁面**底部**（推薦分析之後）新增「術語字卡」區，參考第 8 課字卡模式，適配深色主題：
+
+**互動**：卡片正面顯示英文術語＋KK/IPA 音標＋中文名稱＋一句提示；點卡片翻面（rotateY）看詳細解釋與實例；正面 🔊 按鈕朗讀英文術語（點 🔊 不翻面）。整區包在 `<details>` 收合容器內，預設收合，標題「📚 術語字卡（點擊翻面 · 🔊 聽發音）」。
+
+**發音實作**：照搬第 8 課——瀏覽器原生 Web Speech API，`SpeechSynthesisUtterance`，`lang='en-US'`、`rate=0.85`；朗讀中按鈕加 `speaking` 樣式、結束移除；再次點擊先 `speechSynthesis.cancel()`。零外部服務、零新函式庫。**降級處理**：`speechSynthesis` 不存在或無可用語音時隱藏 🔊 按鈕，不得報錯。
+
+**⚠️ 事件綁定改寫**：第 8 課的 🔊 用 inline `onclick`，違反本專案慣例——改成事件委派＋`data-term` 屬性，翻面與朗讀都走 document 層級委派（點擊目標含 `.speak-btn` 時朗讀不翻面，否則翻面）。
+
+**字卡清單（15 張，音標直接使用，不要自行發明）**：
+
+| 英文 | 音標 | 中文 |
+|---|---|---|
+| LEAPS | /liːps/ | 長天期選擇權 |
+| Strike Price | /straɪk praɪs/ | 履約價 |
+| Delta | /ˈdɛltə/ | 方向敏感度 |
+| Open Interest | /ˈoʊpən ˈɪntrəst/ | 未平倉量 |
+| Volume | /ˈvɑːljuːm/ | 成交量 |
+| Bid | /bɪd/ | 買價 |
+| Ask | /æsk/ | 賣價 |
+| Mid Price | /mɪd praɪs/ | 中間價 |
+| Spread | /sprɛd/ | 買賣價差 |
+| Intrinsic Value | /ɪnˈtrɪnsɪk ˈvæljuː/ | 內在價值 |
+| Extrinsic Value | /ɛkˈstrɪnsɪk ˈvæljuː/ | 外在價值 |
+| Implied Volatility | /ɪmˈplaɪd ˌvɑːləˈtɪləti/ | 隱含波動率 |
+| Vega | /ˈveɪɡə/ | IV 敏感度 |
+| IV Crush | /aɪ viː krʌʃ/ | 波動率回落 |
+| Assignment | /əˈsaɪnmənt/ | 被指派 |
+
+卡片背面解釋文字沿用本檔欄位文案 map 的內容擴寫（LEAPS 買方視角、每張含一個實際數字例子），不要另寫一套互相矛盾的版本。
+
 ## 驗收（E2E 實際操作，不是看 code）
 
-1. 實際查詢後三種互動各實測並附截圖：hover 出 tooltip、點擊出 driver 聚光 popover（**深色主題，不是白底**）、導覽按鈕走完整 tour。
+1. 實際查詢後三種互動各實測並附截圖：hover 出 tooltip、點擊出 driver 聚光 popover（**深色主題，不是白底**）、導覽按鈕走完整 tour。字級驗證用 Playwright 在彈出元素上執行 `getComputedStyle(el).fontSize` 取**實際生效值**，確認符合規格表（popover 內文 15px、tooltip 內文 14px）——驗的是渲染後生效的值，不是 CSS 檔裡寫的值，也不是截圖目測。
 2. 排行表 18 欄＋Options Flow 10 欄逐一點過：無 dead key、無文案錯位。
 3. 匯出 PNG 重跑，**實際開檔**確認 tooltip/導覽元素未入鏡（不是推論確認）。
-4. 回歸：匯出、排序、user_strike 不受影響，352 examples 全過。
+4. 字卡：15 張全數渲染、逐一翻面正常、點 🔊 不觸發翻面；用 Playwright spy 驗證 `speechSynthesis.speak` 被以正確 term 與 `lang='en-US'` 呼叫（自動化部分）；實際聲音輸出由使用者抽聽 2–3 張確認（Playwright 聽不到聲音，這部分誠實標註為人工驗收）。
+5. 回歸：匯出、排序、user_strike 不受影響，全套測試通過。
