@@ -51,3 +51,10 @@ _最後更新：2026-07-04_
   手算內在/外在/佔比，與頁面顯示值比對，附手算過程。
   背景：2026-07-05 的 live 對照跑在休市期間、報價凍結、鑑別力不足。
   一致後 fresh window／Phase H／Phase I 三項才算真正全部結案。
+---
+
+## LEAPS 欄位教學（driver.js tooltips）— 已結案 ✅（2026-07-05）
+
+三層互動全驗收：hover 深色 tooltip、點擊聚光 popover（深色）、28 步 tour；
+28 欄 0 dead key；匯出 PNG md5 與前版逐位元組一致；352 examples 全過。
+規格：leaps-column-tooltips-spec.md（checklist 已附證據打勾）
