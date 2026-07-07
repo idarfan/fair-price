@@ -7,6 +7,7 @@
 LEAPS Call 候選排行功能已結案（2026-07-02）；後續增量 fresh window 30 分鐘（commit `2e46139`）、Phase H 內在/外在價值欄位（`2f9159a`＋`6abc533`）、Phase I 匯出 PNG/PDF（`f233b1f`＋`3f416ca`）均已交付並通過驗收，僅餘文末「待辦」的 live 對照補驗一項。本檔只保留現行有效規範（核心原則、DOM 參考、schema、公式唯一定義處、fresh window 規範、Phase H/I 規格）；歷代開發脈絡、CDP 事件記錄、各階段交付記錄、已完成 checklist 與證據，全部在 `leaps-call-recommendation-history.md`，僅在追查歷史問題時才讀。新功能需求請另開新規格文件，不要在本檔累加。
 
 > 歷史記錄（原「接手前必讀」全文、工具驗證教訓、CDP 事件、待辦狀態演進）見 `leaps-call-recommendation-history.md` 第 1 節。
+> 相關規格文件索引：本功能頁面另有 `leaps-column-tooltips-spec.md`（教學功能：推薦分析圖卡＋欄位 tooltips＋術語字卡，進行中）、`leaps-user-strike-validation-spec.md`（user_strike 三層驗證原始規格與驗收記錄）。
 ## 背景與目標
 
 在 FairPrice 新增一個功能：使用者輸入股票代號後，系統自動從 Barchart 抓取該標的的選擇權報價、Greeks/波動率、Options Flow 三組資料，依 Delta 鎖定深度價內（LEAPS Call 候選）範圍後，**直接輸出履約價 × 到期日的排行表格**（OI 高到低排序），不額外篩選成單一推薦，由使用者自己看表決定。
@@ -139,7 +140,23 @@ Trade, Size, Side, Premium, Volume, "Open Int", IV, Delta, Code, *, Time
 
 **Merge key（Phase A 確認）**：`(strike_price, expiration_date)`，Options Prices 與 Volatility & Greeks 兩頁完全對得上，不需要額外容錯比對。
 
-**主 key**：`(symbol, expiration_date, strike, option_type, scraped_at)`。
+**主 key**：`(symbol, expiration_date, strike, option_type, scraped_at)`。雖含 `scraped_at`，但 `persist_leaps` 為 delete_all＋bulk insert，同 symbol 僅保留最新一批，**非歷史快照表**。
+
+### `strike_chain_snapshots` 履約價鏈快照表（user_strike 驗證用）
+
+依 repo 實際 schema（migration `20260703105300`）：
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `symbol` | string, not null, **unique index** | 每 symbol 一筆（per-symbol upsert 語意） |
+| `strikes` | jsonb, not null, default `[]` | Stage 1 Near-the-Money 頁實際抓到的全部 strike（排序後陣列） |
+| `spot_price` | decimal(10,4)，允許 null | 抓取當下的標的現價，**從 Stage 1 導航的 Barchart 頁面 DOM 直接擷取**（零額外請求） |
+| `scraped_at` | datetime, not null | 快照時間 |
+
+- **資料來源**：Python scraper Stage 1 的 `chain_snapshot` 欄位（所有退出路徑——success／invalid_strike 中止／partial——只要 Stage 1 成功抓到清單都攜帶）→ Ruby `persist_chain_snapshot` **獨立無條件 upsert**，與候選 rows 的 persist 完全解耦、不受 `rows.blank?` 短路影響。
+- **用途**：controller 層 user_strike 快速驗證（見「user_strike 三層驗證」節）。model `StrikeChainSnapshot` 提供 `valid_strike?`（容差 = strike 平均間距，單一 strike 時 fallback 10%）與 `invalid_message`。
+- **與 `leaps_option_chain_snapshots` 的分工**：後者存 Stage 2 篩選後的**候選合約明細**（per expiration × strike，delete_all＋insert 整批 replace）；本表存 Stage 1 的**完整履約價清單**（per-symbol upsert）。不能互相推導——候選明細只含 `_pick_candidates` 選出的少數 strike，用它推 [min, max] 會把合法輸入誤判出局（建表決策四判準見 `leaps-user-strike-validation-spec.md`）。
+- 快照過舊不作廢：履約價鏈變動緩慢，舊快照仍可排除明顯不合理輸入；每次成功查詢刷新。（⚠️ 但見待辦「NOK $7 誤判 bug」——NTM 視窗會隨現價移動，快照範圍語意調查中。）
 
 ### 內在/外在價值公式（唯一定義處，永久規範）
 
@@ -163,6 +180,19 @@ extrinsic_value = mid - intrinsic_value
 > ⚠️ 第 6 節「近期無成交」警示規則需同步更新：原規則是用自行設的 `volume<=3` 門檻判斷，現在改用 Barchart 算好的 `vol_oi_ratio`（見第 6 節更新後內容），門檻數值需要重新依這個比率的實際分布設定，不能直接沿用舊的 `<=3` 那個是針對原始 volume 設計的數字。
 
 ---
+
+## user_strike 三層驗證（現行行為規範）
+
+> ⚠️ **本節驗證語意調查中（NOK $7 誤判 bug）**，根因確認後將修訂，在那之前**不得依本節現有描述新增功能**。
+> 本節自 `leaps-user-strike-validation-spec.md`（原始規格＋2026-07-04 驗收）還原為主文件現行規範——2026-07-05 歸檔時此行為規範未收錄進主文件，特此補回。
+
+**驗證依據是「該 symbol 實際存在的履約價陣列」（`strike_chain_snapshots`），不是現價比例區間之類的啟發式猜測。**
+
+1. **Controller 入列前（權威判定）**：讀該 symbol 的履約價鏈快照。有快照 → 檢查 `user_strike` 是否落在 `[min(strikes) − 容差, max(strikes) + 容差]`（容差 = strike 平均間距）：範圍外 → **不入列**，毫秒內回 `invalid_strike`，訊息帶實據（實際範圍＋現價）；範圍內 → 照常入列。無快照（首查）→ 照常入列，由 Stage 1 兜底。現價用快照的 `spot_price`（Barchart 來源），不打任何外部報價服務。
+2. **Scraper Stage 1 後檢查（無快照時的兜底）**：Stage 1 抓完清單後，`user_strike` 落在範圍外（同一套容差）→ 立即中止回報 `invalid_strike`，不導航 stacked 頁撞 timeout。**不論中止與否，Stage 1 的 strikes 與現價都落地成快照**，下次同 symbol 即可在 controller 層擋下。
+3. **前端表單即時檢查（體驗層）**：analyze 回傳 `invalid_strike` 時顯示紅色 inline 訊息、不跳轉、按鈕復原；切換 symbol 時清空 `user_strike` 欄位。**三層任何一層拿不到資料都是放行，不是阻擋**——驗證功能自身失效時不得讓正常查詢不能用。
+
+狀態歸類：`invalid_strike` 是主動中止，**不是** `partial_error`，不共用既有錯誤文案（錯誤訊息表見「路由與前端」節）。
 
 ## LEAPS 候選排行表 + 推薦分析（兩層）
 
@@ -296,7 +326,7 @@ extrinsic_value = mid - intrinsic_value
 
 實際畫面測試發現：抓取失敗時，畫面只顯示固定字串「抓取過程發生錯誤，部分資料可能不完整」，不管後端 `result[:status]`／`result[:errors]` 實際內容是什麼都顯示同一句，使用者看不出是哪種失敗、不知道下一步該做什麼。這違反第5節「不靜默回傳看起來完整但實際殘缺的表格」的精神——錯誤要講清楚到使用者知道接下來該做什麼，不只是「顯示有錯誤」。
 
-前端必須讀取後端實際回傳的 `result[:status]`，至少分四種情況顯示不同訊息，不能共用同一句：
+前端必須讀取後端實際回傳的 `result[:status]`，至少分五種情況顯示不同訊息，不能共用同一句：
 
 | `result[:status]` | 畫面應顯示 |
 |---|---|
@@ -329,6 +359,7 @@ extrinsic_value = mid - intrinsic_value
 1. **fresh window = 30 分鐘**（`scraped_at >= 30.minutes.ago`）。
 2. **單一定義來源**：`LeapsOptionChainSnapshot::FRESH_WINDOW = 30.minutes`，model `fresh` scope、`fetch_leaps`、`fresh_data_exists?`、相關 `Rails.cache` `expires_in` 全部引用它。
 3. 全 codebase 禁止出現第二個寫死的 `5.minutes`／`300`／`30.minutes` 字面值（測試檔用 `FRESH_WINDOW ± n` 表達邊界）。
+4. 已知限制：盤中報價最舊可達 30 分鐘；`force_refresh` 強制重抓為未來選項，尚未實作。
 
 > 5→30 分鐘的多次未真改前科與修復證據要求，見 history 第 4 節。
 
@@ -355,4 +386,6 @@ extrinsic_value = mid - intrinsic_value
 
 ## 待辦（歸檔後仍未關閉）
 
+- [ ] **NOK user_strike 誤判 bug（調查中）**：快照範圍 $8.00–$17.50 與 Barchart 真實鏈不符（$7 存在，Delta 0.8613、OI 12,716），合法輸入 $7 被 `invalid_strike` 誤擋。根因回報後更新「user_strike 三層驗證」節的規範；在那之前不得依該節現有描述新增功能。
+- [ ] **教學功能規格進行中**：`leaps-column-tooltips-spec.md`（推薦分析圖卡＋欄位 tooltips＋術語字卡），進度見該檔 checklist。
 - [ ] **Phase H live 層對照補驗**：2026-07-05 的 live 對照跑在休市期間（7/3 國慶補假＋週末），報價凍結、鑑別力不足。美股開盤後（台灣時間 2026-07-06 週一約 21:30 後）重查一次 NVTS，從當次抓到的資料任取一筆，用當次 bid/ask/spot 手算內在/外在/佔比，與頁面顯示值比對並附手算過程。一致後 fresh window／Phase H／Phase I 三項才算真正全部結案。
