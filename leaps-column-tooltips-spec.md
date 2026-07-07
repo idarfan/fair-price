@@ -3,6 +3,34 @@
 > 來源指令：`leaps-column-tooltips-instruction.md`（2026-07-05）。依主規格「新功能另開規格文件」規則獨立成檔。
 > 參考模式：`~/csp/option-basics-lesson8.html` 的三層互動架構（已實地解析其實作）。
 
+> 2026-07-07 重組：依 `leaps-teaching-features-instruction.md`，本 spec 涵蓋兩部分——第一部分「推薦分析圖卡」（本節新增）、第二部分「欄位 tooltips 與術語字卡」（已於 2026-07-05/06 交付，見下方原有章節與 checklist）。
+
+# 第一部分：推薦分析區收摺式名詞解釋圖卡（2026-07-07）
+
+## 需求（第一部分）
+
+推薦分析區塊（近天期/遠天期推薦文字）下方加四張收摺式圖卡，標題為名詞本身，預設收合：Bid-Ask Spread／IV（隱含波動率）／Vega／IV Crush 風險。
+
+## 架構（第一部分）
+
+1. 原生 `<details>/<summary>`，零 JS、無新函式庫；深色卡面沿用字卡同一組 gray 色階。
+2. **Phlex server-side 渲染，動態代入當次推薦合約實際數值**（ask−bid、spread_pct、mid、iv、vega、dte、外在價值、現價）。**數值來源合約 = 遠天期推薦優先、無則近天期**（與 instruction 示意「DTE 568」一致；圖卡標註來源合約的到期日/履約價）。完全無推薦時整組不渲染。
+3. `{latest_earnings}`：唯讀查既有 `fundamentals.next_earnings_date`（Barchart overview 抓取的既有資料，不新增 service、不打外部 API）；無資料時顯示「暫無財報日資料」降級，不報錯。
+4. **IV Crush 試算防呆**：instruction 試算式寫死「回落至 90%」；若合約 iv ≤ 90%，改為「回落 10 個百分點」試算（損失 = 10 × Vega），文案同步切換，避免負數損失。
+5. 圖卡是欄位 tooltips 的**深入版**（含損失試算），兩者各自維護；圖卡屬頁面內容，**匯出要入鏡**（不加 data-export-exclude），以當下展開狀態呈現。
+6. 純前端顯示層：無新路由、無新 service（controller 加一行既有表唯讀查詢傳入 component）、無 request spec 需求（有意識確認的不適用）。
+
+## 驗收（第一部分；✅ 2026-07-07 全部驗收完成，證據如下）
+
+- [x] NVTS 實測（開盤後新報價）：四卡預設收合、逐一展開；動態數字三方一致（卡內 Spread $1.25/12.3%/Mid $10.12 = 排行表 = 推薦文字）；**IV Crush 手算驗證**：(125.5−90)×0.0418 = $1.484/股、每口 $148、佔權利金 1.484/10.125 = 14.7%，與卡內顯示一致（容許捨入位差）。IV 卡月波動 36.2% = 125.5/√12 ✓；Vega 卡 $4.18 = 0.0418×100 ✓；DTE 564 動態正確。財報日無資料 → 「暫無財報日資料」降級 ✓。
+- [x] 空狀態頁：`.leaps-concept-card` 數量 0，整組不渲染。
+- [x] 深色卡面、details 展開/收合正常；匯出 PNG 實際開檔（2850×4554）：四卡以展開狀態完整入鏡、文字可讀、無破版，排行表接續正常。
+- [x] 回歸：352 examples, 0 failures；tooltips／字卡／匯出下載事件（`leaps_NVTS_20260707_1313.png`）不受影響。
+
+---
+
+# 第二部分：欄位 tooltips 與術語字卡（已交付）
+
 ## 需求
 
 LEAPS 頁面（`/leaps`）的排行表 18 欄與 Options Flow 面板 10 欄標題，接上三層教學互動：

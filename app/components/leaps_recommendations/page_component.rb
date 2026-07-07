@@ -87,7 +87,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   raise "TABLE_COL_KEYS 與 TABLE_COLS 長度不一致" unless TABLE_COL_KEYS.size == TABLE_COLS.size
   raise "FLOW_COL_KEYS 與 FLOW_COLS 長度不一致"   unless FLOW_COL_KEYS.size == FLOW_COLS.size
 
-  def initialize(symbol: nil, candidates: [], recommendation: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil)
+  def initialize(symbol: nil, candidates: [], recommendation: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil, next_earnings: nil)
     @symbol         = symbol
     @candidates     = Array(candidates)
     @recommendation = recommendation
@@ -95,6 +95,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     @scrape_status  = scrape_status
     @scrape_errors  = Array(scrape_errors)
     @user_strike    = user_strike
+    @next_earnings  = next_earnings
   end
 
   def view_template
@@ -239,6 +240,129 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       div(class: "divide-y divide-gray-100") do
         render_recommendation_group(near)
         render_recommendation_group(far)
+      end
+      render_concept_cards
+    end
+  end
+
+  # ── 第一部分：推薦分析名詞解釋圖卡（leaps-column-tooltips-spec.md 第一部分）────
+  # 數值來源合約：遠天期推薦優先、無則近天期；完全無推薦不渲染。
+  # 原生 details/summary 零 JS；深色卡面；匯出要入鏡（不加 data-export-exclude）。
+  def concept_pick
+    far  = @recommendation&.dig(:far_term)
+    near = @recommendation&.dig(:near_term)
+    [ far, near ].compact.find { |g| !g[:no_candidates] && g[:pick] }&.dig(:pick)
+  end
+
+  def render_concept_cards
+    pick = concept_pick
+    return unless pick
+
+    div(class: "px-4 py-3 border-t border-gray-100 bg-gray-50 space-y-2") do
+      p(class: "text-xs text-gray-400") do
+        plain "名詞解釋（以本次推薦 $#{fmt_strike_short(pick[:strike])} / #{pick[:expiration_date]} 的實際數值試算）"
+      end
+      render_spread_card(pick)
+      render_iv_card(pick)
+      render_vega_card(pick)
+      render_iv_crush_card(pick)
+    end
+  end
+
+  def concept_card(title, &block)
+    details(class: "leaps-concept-card") do
+      summary(class: "leaps-concept-summary") { plain title }
+      div(class: "leaps-concept-body", &block)
+    end
+  end
+
+  def render_spread_card(pick)
+    bid = pick[:bid].to_f; ask = pick[:ask].to_f; mid = pick[:mid].to_f
+    d   = ask - bid
+    concept_card("📉 Bid-Ask Spread（買賣價差）") do
+      p do
+        plain "買方掛單的天花板（Ask）與底價（Bid）的距離，是"
+        strong { plain "進出場的隱形成本" }
+        plain "。"
+      end
+      p do
+        plain "以本次推薦為例：Spread $#{sprintf('%.2f', d)}（#{fmt_pct(pick[:bid_ask_spread_pct])}）——用市價單買進再賣出，一來一回直接損失約 "
+        strong { plain "$#{fmt_int(d * 100)}/口" }
+        plain "，還沒算股價變動。"
+      end
+      p do
+        plain "LEAPS 深價內檔位成交稀疏，Spread 普遍偏寬；"
+        strong { plain "務必用限價單掛 Mid（$#{sprintf('%.2f', mid)}）附近" }
+        plain "，可省下約一半的滑價成本。Spread% 超過 10% 的合約，進出場成本已足以吃掉數個百分點的獲利，部位規劃要把這筆成本算進去。"
+      end
+    end
+  end
+
+  def render_iv_card(pick)
+    iv_pct  = pick[:iv].to_f * 100
+    monthly = iv_pct / Math.sqrt(12)
+    concept_card("🌊 IV（隱含波動率）") do
+      p do
+        plain "市場從權利金反推出的"
+        strong { plain "預期年化波動率" }
+        plain "。本合約 IV #{sprintf('%.1f', iv_pct)}%，代表市場預期未來一年股價年化波動約 ±#{sprintf('%.1f', iv_pct)}%（換算每月約 ±#{sprintf('%.1f', monthly)}%）。"
+      end
+      p do
+        plain "對買方的意義："
+        strong { plain "IV 越高，你買的權利金越貴" }
+        plain "——外在價值裡的波動率溢價成分越大。在高 IV 時買進 LEAPS，等於用貴的價格買保險；就算方向看對，IV 回落也會侵蝕獲利（詳見 IV Crush 卡）。"
+      end
+    end
+  end
+
+  def render_vega_card(pick)
+    vega = pick[:vega].to_f
+    concept_card("🌀 Vega（IV 敏感度）") do
+      p do
+        plain "IV 每變動 1%，權利金的理論變化量。本合約 Vega #{sprintf('%.4f', vega)}，即 "
+        strong { plain "IV 每降 1%，每口損失約 $#{sprintf('%.2f', vega * 100)}" }
+        plain "。"
+      end
+      p do
+        plain "天期越長 Vega 越大——這正是 LEAPS 的特性：DTE #{pick[:dte].to_i} 天給了 IV 均值回歸充分的時間，Vega 曝險遠高於短天期合約。壓低 Vega 風險的方法是選更深價內（外在佔比更低）的履約價。"
+      end
+    end
+  end
+
+  def render_iv_crush_card(pick)
+    iv_pct = pick[:iv].to_f * 100
+    vega   = pick[:vega].to_f
+    mid    = pick[:mid].to_f
+    spot   = pick[:underlying_price].to_f
+    # 防呆：iv <= 90% 時「回落至 90%」會得到負損失，改為「回落 10 個百分點」試算
+    if iv_pct > 90
+      drop_desc = "若回落至 90%（對高波動股仍屬偏高水位）"
+      drop_pts  = iv_pct - 90
+      formula   = "(#{sprintf('%.1f', iv_pct)}−90) × Vega #{sprintf('%.4f', vega)}"
+    else
+      drop_desc = "若回落 10 個百分點"
+      drop_pts  = 10.0
+      formula   = "10 × Vega #{sprintf('%.4f', vega)}"
+    end
+    loss     = drop_pts * vega
+    earnings = @next_earnings.present? ? @next_earnings.to_s : "暫無財報日資料"
+
+    concept_card("⚡ IV Crush 風險（波動率回落損失）") do
+      p do
+        plain "高 IV 不會永遠維持——財報公布、事件落地、恐慌消退後，IV 常快速回落，權利金中的波動率溢價瞬間蒸發，這就是 IV Crush。"
+        strong { plain "股價沒跌，你的合約照樣虧損。" }
+      end
+      p do
+        plain "用本合約試算：IV #{sprintf('%.1f', iv_pct)}% #{drop_desc}，損失 ≈ #{formula} ≈ "
+        strong { plain "$#{sprintf('%.2f', loss)}/股（每口 $#{fmt_int(loss * 100)}）" }
+        if mid.positive? && spot.positive?
+          plain "，約佔權利金 #{sprintf('%.1f', loss / mid * 100)}%——等於股價要先漲 #{sprintf('%.1f', loss / spot * 100)}% 才能打平這筆隱形損耗。"
+        else
+          plain "。"
+        end
+      end
+      p do
+        plain "防禦方式：(1) 選外在佔比低的深價內履約價（本卡損失全部發生在外在價值上，內在價值不受 IV 影響）；(2) 避開財報前 IV 高峰進場（下次財報：#{earnings}）；(3) 用 IV Rank 判斷目前 IV 處於歷史高位或低位。"
       end
     end
   end

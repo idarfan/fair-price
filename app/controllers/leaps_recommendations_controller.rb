@@ -67,6 +67,11 @@ class LeapsRecommendationsController < ApplicationController
       end
     end
 
+    # 推薦分析圖卡的 {latest_earnings}：唯讀既有 fundamentals（Barchart overview 抓取），
+    # 不新增 service、不打外部 API；無資料時 component 端降級顯示。
+    next_earnings = @symbol.present? ?
+      Fundamental.where(symbol: @symbol).order(:updated_at).last&.next_earnings_date : nil
+
     render LeapsRecommendations::PageComponent.new(
       symbol:         @symbol,
       candidates:     @candidates,
@@ -74,7 +79,8 @@ class LeapsRecommendationsController < ApplicationController
       flow_panel:     @flow_panel,
       scrape_status:  @scrape_status,
       scrape_errors:  @scrape_errors,
-      user_strike:    @user_strike
+      user_strike:    @user_strike,
+      next_earnings:  next_earnings
     )
   end
 
