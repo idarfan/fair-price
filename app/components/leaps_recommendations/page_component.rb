@@ -124,7 +124,8 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   # 用既有 fmt_* helper 格式化，確保 PDF 顯示的數字格式與頁面 HTML 完全一致，
   # 不在 JS 端另寫一套格式化邏輯（避免兩處數字格式漂移）。
   def pdf_export_payload
-    pick = concept_pick
+    pick      = concept_pick
+    flow_ok   = @flow_panel&.dig(:status) == :ok
     {
       symbol: @symbol.to_s,
       recommendation: @recommendation ? {
@@ -132,7 +133,18 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
         far_term:  pdf_reco_group(@recommendation[:far_term])
       } : nil,
       candidates: @candidates.map { |row| pdf_candidate_row(row) },
-      flow_rows: (@flow_panel&.dig(:status) == :ok ? Array(@flow_panel[:large_orders]).map { |t| pdf_flow_row(t) } : []),
+      # Options Flow 面板的完整內容，不只前 20 大成交列表：標題列的日期／Call
+      # 、Put 總額，以及「排行候選 × 今日 Flow 重疊」提示，這三塊先前只有列表
+      # 進了 PDF，總額與重疊提示遺漏（使用者實測發現），這裡一次補齊。
+      flow_summary: flow_ok ? {
+        date:      @flow_panel[:date].to_s,
+        call_total: fmt_premium(@flow_panel[:call_premium_total]),
+        put_total:  fmt_premium(@flow_panel[:put_premium_total])
+      } : nil,
+      flow_highlights: flow_ok ? Array(@flow_panel[:highlighted_trades]).map { |hit|
+        "排行 ##{hit[:rank]} · $#{sprintf('%.2f', hit[:candidate_strike].to_f)} / #{hit[:candidate_expiry]} — #{hit[:trades].size} 筆匹配"
+      } : [],
+      flow_rows: (flow_ok ? Array(@flow_panel[:large_orders]).map { |t| pdf_flow_row(t) } : []),
       concept_cards: pick ? pdf_concept_cards_data(pick) : []
     }
   end
@@ -1171,10 +1183,43 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             return pdf.lastAutoTable.finalY + 8;
           }
 
-          function renderFlowTable(pdf, rows, margin, y) {
+          function renderFlowTable(pdf, rows, margin, y, summary, highlights, maxWidth) {
+            var bottom = pageBottom(pdf);
+            if (y > bottom) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
             pdf.setFontSize(11);
             pdf.text('Options Flow — 情緒參考，非排序依據', margin, y);
-            y += 5.5;
+            if (summary) {
+              // 右上角 Call/Put 總額（比照 HTML 頁面右上角同一塊資訊）
+              pdf.setFontSize(9);
+              var summaryText = 'Call ' + summary.call_total + '  ·  Put ' + summary.put_total;
+              var summaryWidth = pdf.getTextWidth(summaryText);
+              pdf.text(summaryText, margin + maxWidth - summaryWidth, y);
+            }
+            y += 4.5;
+            if (summary && summary.date) {
+              pdf.setFontSize(8);
+              pdf.setTextColor(107, 114, 128);
+              pdf.text(summary.date + ' · 前 20 大成交（依 Premium 降序）', margin, y);
+              pdf.setTextColor(0, 0, 0);
+              y += 5;
+            }
+            if (highlights && highlights.length) {
+              pdf.setFontSize(8.5);
+              pdf.setTextColor(29, 78, 216);
+              pdf.text('排行候選 × 今日 Flow 重疊', margin, y);
+              y += 4;
+              pdf.setFontSize(7.5);
+              for (var hi = 0; hi < highlights.length; hi++) {
+                if (y > bottom) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
+                var lines = wrapCjk(pdf, highlights[hi], maxWidth);
+                for (var hli = 0; hli < lines.length; hli++) {
+                  pdf.text(lines[hli], margin, y);
+                  y += 3.6;
+                }
+              }
+              pdf.setTextColor(0, 0, 0);
+              y += 2;
+            }
             var head = [['類型','履約價','到期日','DTE','Delta','Code','Size','Side','Premium','方向']];
             var body = rows.map(function (t) {
               return [t.type, t.strike, t.expires, t.dte, t.delta, t.code, t.size, t.side, t.premium, t.direction];
@@ -1228,7 +1273,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
             if (data.flow_rows && data.flow_rows.length) {
               if (y > pageH - 40) { pdf.addPage(); y = margin; }
-              y = renderFlowTable(pdf, data.flow_rows, margin, y);
+              y = renderFlowTable(pdf, data.flow_rows, margin, y, data.flow_summary, data.flow_highlights, pageW - margin * 2);
             }
 
             var pageCount = pdf.internal.getNumberOfPages();
