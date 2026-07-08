@@ -137,9 +137,11 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       # 、Put 總額，以及「排行候選 × 今日 Flow 重疊」提示，這三塊先前只有列表
       # 進了 PDF，總額與重疊提示遺漏（使用者實測發現），這裡一次補齊。
       flow_summary: flow_ok ? {
-        date:      @flow_panel[:date].to_s,
+        date:       @flow_panel[:date].to_s,
         call_total: fmt_premium(@flow_panel[:call_premium_total]),
-        put_total:  fmt_premium(@flow_panel[:put_premium_total])
+        put_total:  fmt_premium(@flow_panel[:put_premium_total]),
+        call_color: "#16a34a", # text-green-600（跟 HTML render_flow_panel 同一個 class）
+        put_color:  "#ef4444"  # text-red-500
       } : nil,
       flow_highlights: flow_ok ? Array(@flow_panel[:highlighted_trades]).map { |hit|
         "排行 ##{hit[:rank]} · $#{sprintf('%.2f', hit[:candidate_strike].to_f)} / #{hit[:candidate_expiry]} — #{hit[:trades].size} 筆匹配"
@@ -214,10 +216,16 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
   def pdf_reco_group(group)
     return nil unless group
+    pick = group[:no_candidates] ? nil : group[:pick]
     {
       label: group[:label].to_s,
       no_candidates: !!group[:no_candidates],
-      reason: group[:no_candidates] ? nil : build_reason_text(group)
+      reason: group[:no_candidates] ? nil : build_reason_text(group),
+      badge: pick ? {
+        text: "$#{fmt_price(pick[:strike])} / #{pick[:expiration_date]}",
+        delta_text: "Delta #{fmt_decimal(pick[:delta], 3)}",
+        color: pdf_signal_rgb_for_tier(pick[:liquidity_tier].to_s)
+      } : nil
     }
   end
 
@@ -295,11 +303,11 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   # LIQUIDITY_STYLE / DIR_STYLE 的 key（tier / direction），只有顏色的「表示法」
   # 從 class 換成 hex，語義對應本身沒有另造一套。
   PDF_SIGNAL_HEX = {
-    confirm_bull: { bg: "#f0fdf4", text: "#166534" },
-    caution:      { bg: "#fefce8", text: "#854d0e" },
-    warning:      { bg: "#fff7ed", text: "#9a3412" },
-    confirm_bear: { bg: "#fef2f2", text: "#991b1b" },
-    neutral:      { bg: "#f9fafb", text: "#4b5563" }
+    confirm_bull: { bg: "#f0fdf4", border: "#86efac", text: "#166534", dot: "#4ade80" },
+    caution:      { bg: "#fefce8", border: "#fde047", text: "#854d0e", dot: "#facc15" },
+    warning:      { bg: "#fff7ed", border: "#fdba74", text: "#9a3412", dot: "#fb923c" },
+    confirm_bear: { bg: "#fef2f2", border: "#fca5a5", text: "#991b1b", dot: "#f87171" },
+    neutral:      { bg: "#f9fafb", border: "#d1d5db", text: "#4b5563", dot: "#9ca3af" }
   }.freeze
 
   def pdf_signal_rgb_for_tier(tier)
@@ -1110,7 +1118,25 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             if (y > bottom) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
             pdf.setFontSize(11);
             pdf.text(group.label, margin, y);
-            y += 5.5;
+            y += 6.5;
+            if (group.badge) {
+              // 彩色徽章比照 HTML render_pick_badge（色塊背景+邊框+圓點+文字），
+              // 用同一組 PDF_SIGNAL_HEX（跟排行表流動性欄位、Flow 方向欄同一色票）
+              var b = group.badge;
+              pdf.setFontSize(8.5);
+              var badgeText = b.text + '   ' + b.delta_text;
+              var textW = pdf.getTextWidth(badgeText);
+              var padX = 3, boxH = 6.5, boxW = textW + padX * 2 + 4;
+              pdf.setFillColor.apply(pdf, hexToRgb(b.color.bg));
+              pdf.setDrawColor.apply(pdf, hexToRgb(b.color.border));
+              pdf.roundedRect(margin, y - boxH + 1.8, boxW, boxH, 1, 1, 'FD');
+              pdf.setFillColor.apply(pdf, hexToRgb(b.color.dot));
+              pdf.circle(margin + padX + 1, y - boxH / 2 + 1.8, 1, 'F');
+              pdf.setTextColor.apply(pdf, hexToRgb(b.color.text));
+              pdf.text(badgeText, margin + padX + 4, y);
+              pdf.setTextColor(0, 0, 0);
+              y += 6;
+            }
             pdf.setFontSize(8.5);
             var text = group.no_candidates ? '此天期區間目前沒有符合條件的候選。' : (group.reason || '');
             var paragraphs = text.split('\\n');
@@ -1189,11 +1215,22 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             pdf.setFontSize(11);
             pdf.text('Options Flow — 情緒參考，非排序依據', margin, y);
             if (summary) {
-              // 右上角 Call/Put 總額（比照 HTML 頁面右上角同一塊資訊）
+              // 右上角 Call/Put 總額（比照 HTML 頁面右上角同一塊資訊，Call 綠字／Put 紅字）
               pdf.setFontSize(9);
-              var summaryText = 'Call ' + summary.call_total + '  ·  Put ' + summary.put_total;
-              var summaryWidth = pdf.getTextWidth(summaryText);
-              pdf.text(summaryText, margin + maxWidth - summaryWidth, y);
+              var callText = 'Call ' + summary.call_total;
+              var sep = '  ·  ';
+              var putText = 'Put ' + summary.put_total;
+              var totalWidth = pdf.getTextWidth(callText) + pdf.getTextWidth(sep) + pdf.getTextWidth(putText);
+              var sx = margin + maxWidth - totalWidth;
+              pdf.setTextColor.apply(pdf, hexToRgb(summary.call_color));
+              pdf.text(callText, sx, y);
+              sx += pdf.getTextWidth(callText);
+              pdf.setTextColor(156, 163, 175);
+              pdf.text(sep, sx, y);
+              sx += pdf.getTextWidth(sep);
+              pdf.setTextColor.apply(pdf, hexToRgb(summary.put_color));
+              pdf.text(putText, sx, y);
+              pdf.setTextColor(0, 0, 0);
             }
             y += 4.5;
             if (summary && summary.date) {
