@@ -99,7 +99,8 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   end
 
   def view_template
-    div(id: "leaps-export-root", class: "space-y-6") do
+    div(id: "leaps-export-root", class: "space-y-6",
+        data_pdf_font_url: helpers.asset_path("NotoSansTC-Regular-subset-v39.ttf")) do
       render_header
       render_search_form
       render_status_bar if @scrape_status
@@ -110,12 +111,138 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       end
       render_vocab_cards
     end
+    render_pdf_data_script
     render_loading_script
     render_export_script
+    render_vector_pdf_script
     render_tooltips_script
   end
 
   private
+
+  # Phase J（leaps-phase-j-vector-pdf-spec.md）：向量 PDF 用的結構化資料 payload。
+  # 用既有 fmt_* helper 格式化，確保 PDF 顯示的數字格式與頁面 HTML 完全一致，
+  # 不在 JS 端另寫一套格式化邏輯（避免兩處數字格式漂移）。
+  def pdf_export_payload
+    {
+      symbol: @symbol.to_s,
+      recommendation: @recommendation ? {
+        near_term: pdf_reco_group(@recommendation[:near_term]),
+        far_term:  pdf_reco_group(@recommendation[:far_term])
+      } : nil,
+      candidates: @candidates.map { |row| pdf_candidate_row(row) },
+      flow_rows: (@flow_panel&.dig(:status) == :ok ? Array(@flow_panel[:large_orders]).map { |t| pdf_flow_row(t) } : [])
+    }
+  end
+
+  def pdf_reco_group(group)
+    return nil unless group
+    {
+      label: group[:label].to_s,
+      no_candidates: !!group[:no_candidates],
+      reason: group[:no_candidates] ? nil : build_reason_text(group)
+    }
+  end
+
+  # 理由文字目前是分段 plain 呼叫組成畫面，PDF 需要純文字版本；用同一組資料
+  # 重建等義文字（不重算數值，只重組顯示字串），避免維護兩份理由生成邏輯。
+  def build_reason_text(group)
+    pick = group[:pick]
+    return nil unless pick
+    parts = []
+    parts << "建議到期日：#{pick[:expiration_date]}（DTE #{pick[:dte].to_i}），履約價 $#{fmt_strike_short(pick[:strike])}，Delta #{fmt_decimal(pick[:delta], 3)}，Mid $#{fmt_price(pick[:mid])}。"
+    if group[:runner_up]
+      ru = group[:runner_up]
+      parts << "此履約價 OI 為 #{fmt_int(pick[:open_interest])}，為此天期區間最高；次選履約價 $#{fmt_strike_short(ru[:strike])}（#{ru[:expiration_date]}）OI 為 #{fmt_int(ru[:open_interest])}，流動性相對較差。"
+    else
+      parts << "此天期區間僅此一個候選，OI 為 #{fmt_int(pick[:open_interest])}。"
+    end
+    parts << "Time Value 溢價約 #{fmt_pct(pick[:time_value_pct])}（相較直接持股多負擔的時間價值成本）。" if pick[:time_value_pct]
+    if pick[:bid_ask_spread_pct]
+      parts << (pick[:bid_ask_spread_pct].to_f > 0.05 ?
+        "⚠ Bid-Ask Spread 偏高（#{fmt_pct(pick[:bid_ask_spread_pct])}），進出場成本較大，建議使用限價單。" :
+        "Bid-Ask Spread #{fmt_pct(pick[:bid_ask_spread_pct])}，進出場成本合理。")
+    end
+    parts << "IV #{fmt_pct(pick[:iv])}，Vega #{fmt_decimal(pick[:vega], 4)}；若未來 IV 回落，每個百分點 IV 變化對此合約的影響約為 Vega 值，需留意 IV Crush 風險。" if pick[:vega]
+    parts << "⚠ 注意：此天期區間所有候選均有「近期無成交」警示，目前市場成交清淡，進出場可能有困難。" if group[:all_warned]
+    parts.join("\n")
+  end
+
+  def pdf_candidate_row(row)
+    tier = row[:liquidity_tier].to_s
+    {
+      expiration_date: row[:expiration_date].to_s,
+      dte:             fmt_int(row[:dte]),
+      strike:          fmt_price(row[:strike]),
+      delta:           fmt_decimal(row[:delta], 4),
+      oi:              fmt_int(row[:open_interest]),
+      volume:          fmt_int(row[:volume]),
+      liquidity:       tier + (row[:no_recent_volume_warning] ? "（⚠無成交）" : ""),
+      liquidity_rgb:   pdf_signal_rgb_for_tier(tier),
+      bid:             fmt_price(row[:bid]),
+      ask:             fmt_price(row[:ask]),
+      mid:             fmt_price(row[:mid]),
+      spread:          fmt_pct(row[:bid_ask_spread_pct]),
+      intrinsic:       fmt_price(row[:intrinsic_value]),
+      extrinsic:       fmt_price(row[:extrinsic_value]),
+      extrinsic_pct:   fmt_pct(row[:extrinsic_pct]),
+      time_value_pct:  fmt_pct(row[:time_value_pct]),
+      iv:              fmt_pct(row[:iv]),
+      vega:            fmt_decimal(row[:vega], 4),
+      itm_prob:        fmt_pct(row[:itm_probability])
+    }
+  end
+
+  def pdf_flow_row(t)
+    dir = (t[:direction] || "neutral").to_s
+    {
+      type:          t[:option_type].to_s,
+      strike:        fmt_price(t[:strike]),
+      expires:       t[:expires_at].to_s,
+      dte:           t[:dte].to_s,
+      delta:         fmt_decimal(t[:delta], 3),
+      code:          t[:trade_condition].to_s,
+      size:          fmt_int(t[:size]),
+      side:          t[:side].to_s,
+      premium:       fmt_premium(t[:premium]),
+      direction:     DIR_STYLE[dir]&.dig(:label) || dir,
+      direction_rgb: pdf_signal_rgb_for_direction(dir)
+    }
+  end
+
+  # PDF（autotable）不能用 Tailwind class，改用等義 hex 值；語義選擇仍走既有
+  # LIQUIDITY_STYLE / DIR_STYLE 的 key（tier / direction），只有顏色的「表示法」
+  # 從 class 換成 hex，語義對應本身沒有另造一套。
+  PDF_SIGNAL_HEX = {
+    confirm_bull: { bg: "#f0fdf4", text: "#166534" },
+    caution:      { bg: "#fefce8", text: "#854d0e" },
+    warning:      { bg: "#fff7ed", text: "#9a3412" },
+    confirm_bear: { bg: "#fef2f2", text: "#991b1b" },
+    neutral:      { bg: "#f9fafb", text: "#4b5563" }
+  }.freeze
+
+  def pdf_signal_rgb_for_tier(tier)
+    key = case tier
+          when "充足" then :confirm_bull
+          when "普通" then :caution
+          when "偏低" then :warning
+          else :neutral
+          end
+    PDF_SIGNAL_HEX[key]
+  end
+
+  def pdf_signal_rgb_for_direction(dir)
+    key = case dir
+          when "bullish" then :confirm_bull
+          when "bearish" then :confirm_bear
+          else :neutral
+          end
+    PDF_SIGNAL_HEX[key]
+  end
+
+  def render_pdf_data_script
+    script(type: "application/json", id: "leaps-pdf-data") { raw pdf_export_payload.to_json.html_safe }
+  end
 
   def render_header
     div(class: "flex items-start justify-between gap-4") do
@@ -736,28 +863,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
           var exporting = false;
 
-          document.addEventListener('click', function (e) {
-            var btnEl = e.target.closest('[data-leaps-export]');
-            if (!btnEl || btnEl.disabled || exporting) return;
-            if (typeof htmlToImage === 'undefined') { alert('匯出元件未載入，請重新整理頁面'); return; }
-
-            var kind = btnEl.getAttribute('data-leaps-export');
-            if (kind === 'pdf' && typeof jspdf === 'undefined') { alert('PDF 元件未載入，請重新整理頁面'); return; }
-
-            var root = document.getElementById('leaps-export-root');
-            if (!root) return;
-
-            var pngBtn = document.getElementById('leaps-export-png');
-            var pdfBtn = document.getElementById('leaps-export-pdf');
-            var origText = btnEl.textContent;
-            exporting = true;
-            [pngBtn, pdfBtn].forEach(function (b) { if (b) b.disabled = true; });
-            btnEl.textContent = '匯出中…';
-
-            var symEl  = document.getElementById('leaps-symbol-input');
-            var symbol = (symEl && symEl.value ? symEl.value : 'UNKNOWN').toUpperCase();
-            var fname  = 'leaps_' + symbol + '_' + timestamp();
-            // 背景色取 body 實際計算值，確保輸出不是透明底
+          function exportPng(root, fname) {
             var bg = getComputedStyle(document.body).backgroundColor || '#ffffff';
 
             // 匯出前把所有 overflow:auto/scroll 容器暫時改為 visible，匯出後還原。
@@ -790,51 +896,252 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
               });
             }
 
-            htmlToImage.toPng(root, {
+            return htmlToImage.toPng(root, {
               pixelRatio: 2,
               backgroundColor: bg,
               filter: function (node) {
                 return !(node.nodeType === 1 && node.hasAttribute && node.hasAttribute('data-export-exclude'));
               }
             }).then(function (dataUrl) {
-              if (kind === 'png') {
-                var a = document.createElement('a');
-                a.href = dataUrl;
-                a.download = fname + '.png';
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                return;
-              }
-              // PDF：載入 PNG 取得實際尺寸，開自訂尺寸單頁（長條式，不切 A4 避免腰斬表格列）
-              return new Promise(function (resolve, reject) {
-                var img = new Image();
-                img.onload = function () {
-                  try {
-                    var w = img.naturalWidth, h = img.naturalHeight;
-                    var pdf = new jspdf.jsPDF({
-                      orientation: w > h ? 'landscape' : 'portrait',
-                      unit: 'px',
-                      format: [w, h],
-                      hotfixes: ['px_scaling']
-                    });
-                    pdf.addImage(dataUrl, 'PNG', 0, 0, w, h, undefined, 'FAST');
-                    pdf.save(fname + '.pdf');
-                    resolve();
-                  } catch (err) { reject(err); }
-                };
-                img.onerror = reject;
-                img.src = dataUrl;
-              });
-            }).catch(function (err) {
+              var a = document.createElement('a');
+              a.href = dataUrl;
+              a.download = fname + '.png';
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+            }).finally(restoreExpanded);
+          }
+
+          document.addEventListener('click', function (e) {
+            var btnEl = e.target.closest('[data-leaps-export]');
+            if (!btnEl || btnEl.disabled || exporting) return;
+
+            var kind = btnEl.getAttribute('data-leaps-export');
+            if (kind === 'png' && typeof htmlToImage === 'undefined') { alert('匯出元件未載入，請重新整理頁面'); return; }
+            if (kind === 'pdf' && typeof jspdf === 'undefined') { alert('PDF 元件未載入，請重新整理頁面'); return; }
+
+            var root = document.getElementById('leaps-export-root');
+            if (!root) return;
+
+            var pngBtn = document.getElementById('leaps-export-png');
+            var pdfBtn = document.getElementById('leaps-export-pdf');
+            var origText = btnEl.textContent;
+            exporting = true;
+            [pngBtn, pdfBtn].forEach(function (b) { if (b) b.disabled = true; });
+            btnEl.textContent = '匯出中…';
+
+            var symEl  = document.getElementById('leaps-symbol-input');
+            var symbol = (symEl && symEl.value ? symEl.value : 'UNKNOWN').toUpperCase();
+            var fname  = 'leaps_' + symbol + '_' + timestamp();
+
+            // Phase J：PNG 走既有 DOM 截圖路線（完全不動）；PDF 改走向量文字
+            // 路線，直接從結構化資料繪製，不需要 DOM 截圖或 overflow/exclude 處理。
+            var task = kind === 'png' ? exportPng(root, fname) : window.__leapsExportVectorPdf(fname);
+
+            task.catch(function (err) {
               alert('匯出失敗：' + (err && err.message ? err.message : err));
             }).finally(function () {
-              restoreExpanded();
               exporting = false;
               [pngBtn, pdfBtn].forEach(function (b) { if (b) b.disabled = false; });
               btnEl.textContent = origText;
             });
           });
+        })();
+      JS
+    end
+  end
+
+  # Phase J（leaps-phase-j-vector-pdf-spec.md）：PDF 向量文字匯出。
+  # 完全獨立於 PNG 路線——不截圖 DOM，直接從 #leaps-pdf-data 的結構化資料繪製。
+  # 字型載入或 addFont 失敗時必須拋出中止匯出，不得 fallback 到 jsPDF 內建字型
+  # （會產出滿頁豆腐字但「成功下載」），也不得 fallback 回舊的 PNG 嵌入路線。
+  def render_vector_pdf_script
+    script do
+      raw <<~JS.html_safe
+        (function () {
+          var FONT_ALIAS = 'NotoSansTC';
+          var FONT_FILE  = 'NotoSansTC-Regular.ttf';
+
+          function loadFont(pdf, fontUrl) {
+            if (!fontUrl) return Promise.reject(new Error('字型路徑未提供，無法產生向量 PDF'));
+            return fetch(fontUrl).then(function (resp) {
+              if (!resp.ok) throw new Error('字型下載失敗（HTTP ' + resp.status + '），已中止匯出');
+              return resp.arrayBuffer();
+            }).then(function (buf) {
+              var bytes = new Uint8Array(buf);
+              var binary = '';
+              var chunk = 0x8000;
+              for (var i = 0; i < bytes.length; i += chunk) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+              }
+              var base64 = btoa(binary);
+              pdf.addFileToVFS(FONT_FILE, base64);
+              pdf.addFont(FONT_FILE, FONT_ALIAS, 'normal');
+              // 驗證 addFont 真的生效，不是靜默失敗後繼續用內建字型畫豆腐字
+              var list = pdf.getFontList();
+              if (!list[FONT_ALIAS] || list[FONT_ALIAS].indexOf('normal') === -1) {
+                throw new Error('字型載入失敗（addFont 未生效），已中止匯出');
+              }
+              pdf.setFont(FONT_ALIAS, 'normal');
+            });
+          }
+
+          // CJK 沒有空白字元，jsPDF 內建 splitTextToSize 依空白斷詞會讓整段中文
+          // 衝出頁面右緣不換行——改用逐字寬度量測（getTextWidth）自行換行。
+          function wrapCjk(pdf, text, maxWidth) {
+            var lines = [];
+            var current = '';
+            for (var i = 0; i < text.length; i++) {
+              var ch = text[i];
+              var test = current + ch;
+              if (current.length > 0 && pdf.getTextWidth(test) > maxWidth) {
+                lines.push(current);
+                current = ch;
+              } else {
+                current = test;
+              }
+            }
+            if (current.length > 0) lines.push(current);
+            return lines;
+          }
+
+          function hexToRgb(hex) {
+            var h = hex.replace('#', '');
+            return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)];
+          }
+
+          function renderRecoGroup(pdf, group, margin, y, maxWidth) {
+            if (!group) return y;
+            pdf.setFontSize(11);
+            pdf.text(group.label, margin, y);
+            y += 5.5;
+            pdf.setFontSize(8.5);
+            var text = group.no_candidates ? '此天期區間目前沒有符合條件的候選。' : (group.reason || '');
+            var paragraphs = text.split('\n');
+            for (var pi = 0; pi < paragraphs.length; pi++) {
+              var lines = wrapCjk(pdf, paragraphs[pi], maxWidth);
+              for (var li = 0; li < lines.length; li++) {
+                pdf.text(lines[li], margin, y);
+                y += 4;
+              }
+            }
+            y += 3;
+            return y;
+          }
+
+          function renderCandidatesTable(pdf, rows, margin, y) {
+            var head = [['到期日','DTE','履約價','Delta','OI','Volume','流動性判斷','Bid','Ask','Mid',
+                         'Spread%','內在價值','外在價值','外在佔比','Time Value%','IV','Vega','被指派機率']];
+            var body = rows.map(function (r) {
+              return [r.expiration_date, r.dte, r.strike, r.delta, r.oi, r.volume, r.liquidity,
+                      r.bid, r.ask, r.mid, r.spread, r.intrinsic, r.extrinsic, r.extrinsic_pct,
+                      r.time_value_pct, r.iv, r.vega, r.itm_prob];
+            });
+            var liqCol = 6;
+            pdf.autoTable({
+              head: head, body: body, startY: y,
+              margin: { left: margin, right: margin },
+              styles: { font: FONT_ALIAS, fontSize: 6.5, cellPadding: 1.2, textColor: [55, 65, 81] },
+              headStyles: { font: FONT_ALIAS, fillColor: [243, 244, 246], textColor: [55, 65, 81], fontSize: 6.5 },
+              didParseCell: function (hd) {
+                if (hd.section === 'body' && hd.column.index === liqCol) {
+                  var rgb = rows[hd.row.index].liquidity_rgb;
+                  if (rgb) {
+                    hd.cell.styles.fillColor = hexToRgb(rgb.bg);
+                    hd.cell.styles.textColor = hexToRgb(rgb.text);
+                  }
+                }
+              }
+            });
+            return pdf.lastAutoTable.finalY + 8;
+          }
+
+          function renderFlowTable(pdf, rows, margin, y) {
+            pdf.setFontSize(11);
+            pdf.text('Options Flow — 情緒參考，非排序依據', margin, y);
+            y += 5.5;
+            var head = [['類型','履約價','到期日','DTE','Delta','Code','Size','Side','Premium','方向']];
+            var body = rows.map(function (t) {
+              return [t.type, t.strike, t.expires, t.dte, t.delta, t.code, t.size, t.side, t.premium, t.direction];
+            });
+            var dirCol = 9;
+            pdf.autoTable({
+              head: head, body: body, startY: y,
+              margin: { left: margin, right: margin },
+              styles: { font: FONT_ALIAS, fontSize: 7, cellPadding: 1.2 },
+              headStyles: { font: FONT_ALIAS, fillColor: [243, 244, 246], textColor: [55, 65, 81], fontSize: 7 },
+              didParseCell: function (hd) {
+                if (hd.section === 'body' && hd.column.index === dirCol) {
+                  var rgb = rows[hd.row.index].direction_rgb;
+                  if (rgb) hd.cell.styles.textColor = hexToRgb(rgb.text);
+                }
+              }
+            });
+            return pdf.lastAutoTable.finalY + 8;
+          }
+
+          function buildVectorPdf(pdf, data) {
+            var pageW = pdf.internal.pageSize.getWidth();
+            var pageH = pdf.internal.pageSize.getHeight();
+            var margin = 12;
+            var y = margin;
+
+            pdf.setFont(FONT_ALIAS, 'normal');
+            pdf.setFontSize(16);
+            pdf.text('LEAPS Call 候選排行 — ' + data.symbol, margin, y);
+            y += 6;
+            pdf.setFontSize(9);
+            pdf.setTextColor(107, 114, 128);
+            pdf.text('Delta 0.60–0.90 深度價內 Call · 依 OI 由高到低排序', margin, y);
+            pdf.setTextColor(0, 0, 0);
+            y += 8;
+
+            if (data.recommendation) {
+              y = renderRecoGroup(pdf, data.recommendation.near_term, margin, y, pageW - margin * 2);
+              y = renderRecoGroup(pdf, data.recommendation.far_term, margin, y, pageW - margin * 2);
+            }
+
+            if (data.candidates && data.candidates.length) {
+              if (y > pageH - 40) { pdf.addPage(); y = margin; }
+              y = renderCandidatesTable(pdf, data.candidates, margin, y);
+            }
+
+            if (data.flow_rows && data.flow_rows.length) {
+              if (y > pageH - 40) { pdf.addPage(); y = margin; }
+              y = renderFlowTable(pdf, data.flow_rows, margin, y);
+            }
+
+            var pageCount = pdf.internal.getNumberOfPages();
+            for (var p = 1; p <= pageCount; p++) {
+              pdf.setPage(p);
+              pdf.setFont(FONT_ALIAS, 'normal');
+              pdf.setFontSize(7);
+              pdf.setTextColor(156, 163, 175);
+              pdf.text('僅供策略篩選參考，非投資建議，請自行評估。', margin, pageH - 6);
+              pdf.setTextColor(0, 0, 0);
+            }
+          }
+
+          window.__leapsExportVectorPdf = function (fname) {
+            var root = document.getElementById('leaps-export-root');
+            var fontUrl = root ? root.getAttribute('data-pdf-font-url') : null;
+            var dataEl = document.getElementById('leaps-pdf-data');
+
+            var payload;
+            try {
+              payload = JSON.parse(dataEl ? dataEl.textContent : 'null');
+            } catch (parseErr) {
+              return Promise.reject(new Error('PDF 資料解析失敗，已中止匯出'));
+            }
+            if (!payload) return Promise.reject(new Error('找不到匯出資料，已中止匯出'));
+
+            var pdf = new jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+            return loadFont(pdf, fontUrl).then(function () {
+              buildVectorPdf(pdf, payload);
+              pdf.save(fname + '.pdf');
+            });
+          };
         })();
       JS
     end

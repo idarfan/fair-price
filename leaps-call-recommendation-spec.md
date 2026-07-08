@@ -375,8 +375,10 @@ extrinsic_value = mid - intrinsic_value
 - LEAPS 頁面右上角「匯出 PNG」「匯出 PDF」兩顆按鈕：無資料時 disabled、匯出中防重複點擊、事件委派綁定（無 inline onclick）。
 - 檔名 `leaps_{symbol}_{YYYYMMDD_HHmm}.png` / `.pdf`。
 - 函式庫 vendor 本地檔（版本釘死、已 commit、頁面零 CDN script 標籤）：`vendor/assets/javascripts/html-to-image-1.11.11.js`（選用理由：Tailwind v4 oklch 色彩 html2canvas 不支援）＋ `jspdf-2.5.2.umd.min.js`（僅 LEAPS 頁載入）。
-- PDF 一律「先轉 PNG 再嵌入」（FAST flate 壓縮），自訂單頁尺寸不切 A4；匯出前暫時展開 overflow:auto/scroll 容器（避免 clone 內捲軸入畫、腰斬末列），完成後還原。
-- 純前端零後端；實作在 `page_component.rb` `render_export_script`。
+- ~~PDF 一律「先轉 PNG 再嵌入」（FAST flate 壓縮），自訂單頁尺寸不切 A4~~ → **已被 Phase J 取代**（`leaps-phase-j-vector-pdf-spec.md`）：PDF 改為向量文字直接繪製，不再走 PNG 嵌入路線。
+- ~~PNG 與 PDF 畫面一致~~ → **已被 Phase J 取代**：向量 PDF 是重新排版（jspdf-autotable 表格、CJK 自行換行），版面與 PNG 截圖不再像素一致，這是有意識的取捨。
+- 匯出前暫時展開 overflow:auto/scroll 容器（避免 clone 內捲軸入畫、腰斬末列），完成後還原——**此規則僅適用於 PNG 匯出路線**，PNG 路線本身完全不動。
+- 純前端零後端；PNG 實作在 `page_component.rb` `render_export_script`；PDF 向量化實作見 Phase J。
 
 
 ---
