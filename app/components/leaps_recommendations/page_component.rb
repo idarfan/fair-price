@@ -195,6 +195,10 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
   def pdf_flow_row(t)
     dir = (t[:direction] || "neutral").to_s
+    # 與 render_flow_row 的 fallback 邏輯一致：分類器產出的細分類值
+    # （bullish_directional／indeterminate 等）不在 DIR_STYLE 三個 key 內時，
+    # 一律 fallback 顯示「中性」，不要漏掉這層 fallback 讓 PDF 顯示原始分類字串。
+    style = DIR_STYLE[dir] || DIR_STYLE["neutral"]
     {
       type:          t[:option_type].to_s,
       strike:        fmt_price(t[:strike]),
@@ -205,8 +209,8 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       size:          fmt_int(t[:size]),
       side:          t[:side].to_s,
       premium:       fmt_premium(t[:premium]),
-      direction:     DIR_STYLE[dir]&.dig(:label) || dir,
-      direction_rgb: pdf_signal_rgb_for_direction(dir)
+      direction:     style[:label],
+      direction_rgb: pdf_signal_rgb_for_direction(DIR_STYLE.key(style))
     }
   end
 
@@ -1017,7 +1021,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             y += 5.5;
             pdf.setFontSize(8.5);
             var text = group.no_candidates ? '此天期區間目前沒有符合條件的候選。' : (group.reason || '');
-            var paragraphs = text.split('\n');
+            var paragraphs = text.split('\\n');
             for (var pi = 0; pi < paragraphs.length; pi++) {
               var lines = wrapCjk(pdf, paragraphs[pi], maxWidth);
               for (var li = 0; li < lines.length; li++) {
