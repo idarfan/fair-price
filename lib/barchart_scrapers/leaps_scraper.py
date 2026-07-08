@@ -42,6 +42,8 @@ TARGET_PATH    = "options"
 STAGE1_SETTLE  = 5000   # Stage 1 (NTM) fixed sleep — no polling, must be long enough
 OPTIONS_SETTLE = 1500   # Stage 2 opts initial settle; _wait_for_grid polls up to 30 s
 VG_SETTLE      = 1500   # Stage 2 V&G initial settle; _wait_for_grid polls up to 25 s
+LEAPS_MIN_DTE  = 364    # chain_snapshot must be built from a LEAPS-dated expiration (see fix below),
+                        # matches LeapsRankingService::MIN_DTE
 
 # ── Stage 1: Near the Money view — all Call strikes + Deltas ─────────────────
 NEAR_MONEY_JS = """
@@ -323,12 +325,50 @@ async def main(symbol, user_strike=None):
     exp_value_map = {e["value"][:10]: e["value"] for e in expirations}
     first_exp_value = next(iter(exp_value_map.values()), None)
 
-    # ── Build chain_snapshot (Stage 1 full strike list + spot_price) ─────────
-    all_strikes = sorted({
-        r.get("strike") or r.get("strikePrice")
-        for r in near_money_rows
-        if (r.get("strike") or r.get("strikePrice")) is not None
-    })
+    # ── Build chain_snapshot from a LEAPS-dated expiration (root-cause fix) ───
+    # BUG (reported 2026-07-07, NOK): chain_snapshot was built from `near_money_rows`,
+    # which reflects whatever NEAR-TERM expiration Barchart defaults to for
+    # `?moneyness=10` (no explicit `expiration=` param — confirmed via live DOM
+    # inspection). Near-term strike ladders are NOT the same set as LEAPS
+    # (far-dated) ladders: e.g. NOK's nearest weekly lists $6/7/8/8.5/9...16.5,
+    # while its 2028-01-21 LEAPS expiration lists $2/2.5/3/3.5/4/4.5/5/5.5/7/10/
+    # 12/15/17/20/22/25/27/30/32 — different increments, different deep-ITM/OTM
+    # strikes present. Validating a LEAPS user_strike against the near-term
+    # expiration's strikes is validating against the wrong chain entirely; a
+    # legitimate deep-ITM LEAPS strike (e.g. $7, Delta ~0.85, real OI) can be
+    # absent from the near-term ladder purely because of this expiration
+    # mismatch, independent of the moneyness window width.
+    #
+    # Fix: find the nearest expiration with DTE >= LEAPS_MIN_DTE and read ITS
+    # full strike list (`moneyness=100` empirically returns the complete listed
+    # ladder for whichever expiration is loaded — verified live, larger values
+    # plateau at the same set) — that is the chain a LEAPS user_strike actually
+    # refers to.
+    leaps_exp_date = None
+    for date_str in sorted(exp_value_map):
+        y, m, d = (int(x) for x in date_str.split("-"))
+        if (date(y, m, d) - date.today()).days >= LEAPS_MIN_DTE:
+            leaps_exp_date = date_str
+            break
+
+    if leaps_exp_date:
+        leaps_chain_url = (
+            f"https://www.barchart.com/stocks/quotes/{symbol}/options"
+            f"?moneyness=100&expiration={exp_value_map[leaps_exp_date]}"
+        )
+        await cdp_navigate(ws_url, leaps_chain_url, settle_ms=2000)
+        await activate_target(target_id)
+        leaps_chain_rows = await _wait_for_grid(ws_url, NEAR_MONEY_JS, max_wait_s=30) or []
+        all_strikes = sorted({r["strike"] for r in leaps_chain_rows if r.get("strike") is not None})
+    else:
+        # No expiration far enough out for this symbol (rare) — fall back to
+        # the near-term near-money list rather than an empty chain_snapshot.
+        all_strikes = sorted({
+            r.get("strike") or r.get("strikePrice")
+            for r in near_money_rows
+            if (r.get("strike") or r.get("strikePrice")) is not None
+        })
+
     chain_snapshot = {"strikes": all_strikes, "spot_price": underlying_price}
 
     # ── Stage 1 post-check: validate user_strike against actual chain ─────────

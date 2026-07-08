@@ -375,5 +375,115 @@ class TestInvalidStrike(unittest.TestCase):
         self.assertNotEqual(result.get("status"), "invalid_strike")
 
 
+class TestLeapsChainSnapshot(unittest.TestCase):
+    """
+    Regression tests for the 2026-07-07 NOK bug: chain_snapshot was built from
+    the near-term (nearest weekly) near-money view, not the LEAPS-dated
+    expiration — legitimate deep-ITM LEAPS strikes absent from the near-term
+    ladder were falsely rejected as invalid_strike.
+    """
+
+    NEAR_TERM_ROWS = [
+        {"strike": 8.0, "delta": 0.55, "strikePrice": 8.0},
+        {"strike": 9.0, "delta": 0.45, "strikePrice": 9.0},
+    ]
+    # $7 exists only on the LEAPS chain (deep ITM, real Delta/OI) — absent
+    # from NEAR_TERM_ROWS above, mirroring the live NOK repro.
+    LEAPS_CHAIN_ROWS = [
+        {"strike": 7.0, "delta": 0.85, "strikePrice": 7.0},
+        {"strike": 10.0, "delta": 0.70, "strikePrice": 10.0},
+        {"strike": 12.0, "delta": 0.60, "strikePrice": 12.0},
+    ]
+
+    def _run_with_two_near_money_calls(self, user_strike):
+        near_money_calls = {"n": 0}
+
+        # GOOD_EXPIRATIONS (2027-01-15) isn't reliably >= LEAPS_MIN_DTE relative
+        # to "today" whenever this suite runs — compute a genuinely far-dated
+        # expiration so the fix's happy path (LEAPS-dated fetch) is exercised.
+        far_date = (scraper.date.today() + scraper.timedelta(days=scraper.LEAPS_MIN_DTE + 30))
+        far_exp = [{"value": far_date.strftime("%Y-%m-%d") + "-m", "text": "far LEAPS"}]
+
+        async def eval_side(ws, js, **kw):
+            if "bc-overlay-modal" in js:
+                return False
+            if "angular.element" in js:
+                return 12.07
+            if "querySelectorAll" in js:
+                return far_exp
+            return None
+
+        async def wait_s(ws, js, max_wait_s=30, **kw):
+            if "symbolType" in js and "bidPrice" not in js and "itmProbability" not in js:
+                near_money_calls["n"] += 1
+                # 1st call = original NTM page (near-term expiration, no `expiration=` param)
+                # 2nd call = new LEAPS-dated-expiration fetch (the fix)
+                return self.NEAR_TERM_ROWS if near_money_calls["n"] == 1 else self.LEAPS_CHAIN_ROWS
+            if "itmProbability" in js:
+                return GOOD_VG
+            if "bidPrice" in js:
+                return GOOD_OPTS
+            return None
+
+        buf = io.StringIO()
+        with (
+            patch("leaps_scraper.prepare_page", new=AsyncMock(return_value=("tid", "ws://fake"))),
+            patch("leaps_scraper.cdp_navigate", new=AsyncMock()),
+            patch("leaps_scraper.activate_target", new=AsyncMock()),
+            patch("leaps_scraper.cdp_eval", new=AsyncMock(side_effect=eval_side)),
+            patch("leaps_scraper._wait_for_grid", new=AsyncMock(side_effect=wait_s)),
+            patch("sys.stdout", buf),
+        ):
+            _run(scraper.main("NOK", user_strike=user_strike))
+        return json.loads(buf.getvalue().strip()), near_money_calls["n"]
+
+    def test_chain_snapshot_reflects_leaps_expiration_not_near_term(self):
+        """chain_snapshot.strikes must be the LEAPS-dated chain (7/10/12), not
+        the near-term ladder (8/9) — this is the root-cause fix itself."""
+        result, calls = self._run_with_two_near_money_calls(user_strike=10.0)
+        self.assertEqual(calls, 2, "expected two NEAR_MONEY_JS fetches: near-term + LEAPS-dated")
+        self.assertEqual(result["chain_snapshot"]["strikes"], [7.0, 10.0, 12.0])
+
+    def test_strike_absent_from_near_term_but_present_in_leaps_is_valid(self):
+        """$7 exists only on the LEAPS chain — must NOT be rejected as invalid_strike
+        even though it's absent from the near-term ladder (the exact NOK repro)."""
+        result, _ = self._run_with_two_near_money_calls(user_strike=7.0)
+        self.assertNotEqual(result.get("status"), "invalid_strike")
+
+    def test_strike_absent_from_both_chains_is_invalid(self):
+        """Sanity check: a strike outside BOTH ladders is still correctly rejected."""
+        result, _ = self._run_with_two_near_money_calls(user_strike=2.0)
+        self.assertEqual(result["status"], "invalid_strike")
+
+    def test_no_leaps_dated_expiration_falls_back_to_near_term(self):
+        """If no expiration is >= LEAPS_MIN_DTE out, fall back to the near-term
+        near-money list rather than an empty chain_snapshot."""
+        near_term_only_eval = AsyncMock(side_effect=lambda ws, js, **kw: (
+            False if "bc-overlay-modal" in js else
+            12.07 if "angular.element" in js else
+            [{"value": "2026-07-10-w", "text": "near-term only"}] if "querySelectorAll" in js else
+            None
+        ))
+
+        async def wait_s(ws, js, max_wait_s=30, **kw):
+            if "symbolType" in js and "bidPrice" not in js and "itmProbability" not in js:
+                return self.NEAR_TERM_ROWS
+            return None
+
+        buf = io.StringIO()
+        with (
+            patch("leaps_scraper.prepare_page", new=AsyncMock(return_value=("tid", "ws://fake"))),
+            patch("leaps_scraper.cdp_navigate", new=AsyncMock()),
+            patch("leaps_scraper.activate_target", new=AsyncMock()),
+            patch("leaps_scraper.cdp_eval", new=near_term_only_eval),
+            patch("leaps_scraper._wait_for_grid", new=AsyncMock(side_effect=wait_s)),
+            patch("sys.stdout", buf),
+        ):
+            _run(scraper.main("NOK", user_strike=8.5))
+
+        result = json.loads(buf.getvalue().strip())
+        self.assertEqual(result["chain_snapshot"]["strikes"], [8.0, 9.0])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

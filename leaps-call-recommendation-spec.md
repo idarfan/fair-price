@@ -183,7 +183,8 @@ extrinsic_value = mid - intrinsic_value
 
 ## user_strike 三層驗證（現行行為規範）
 
-> ⚠️ **本節驗證語意調查中（NOK $7 誤判 bug）**，根因確認後將修訂，在那之前**不得依本節現有描述新增功能**。
+> ✅ **2026-07-08 根因已確認並修復**：`chain_snapshot`（`strike_chain_snapshots.strikes`）原本建自 Stage 1 Near-the-Money 頁的**近期到期日**（`?moneyness=10` 無 `expiration=` 參數時，Barchart 預設載入最近的到期日，例如週選），但近期到期日的履約價階梯與 LEAPS（遠期）到期日**不是同一組**（深度價內/價外的間距、存在與否都不同——實測 NOK：週選鏈為 $6/7/8/8.5/9…16.5，2028-01-21 LEAPS 鏈為 $2/2.5/3/3.5/4/4.5/5/5.5/7/10/12/15/17/20/22/25/27/30/32）。對 LEAPS user_strike 驗證用近期到期日的履約價清單當作真值，等於拿錯的鏈在驗證，導致合法的深度價內 LEAPS 履約價（如 $7，Delta 0.85+、真實 OI）被誤判為 `invalid_strike`。
+> **修復**：Stage 1 額外定位第一個 `DTE >= LEAPS_MIN_DTE`（364）的到期日，用寬淨值（`moneyness=100`，實測會回傳該到期日完整履約價階梯）另外抓一次該到期日的履約價清單，`chain_snapshot.strikes` 改用這份 LEAPS 到期日資料；找不到符合天期的到期日時 fallback 回近期到期日清單（維持舊行為，不留空快照）。實作見 `lib/barchart_scrapers/leaps_scraper.py`（`LEAPS_MIN_DTE` 常數＋新增一次導航），新增 4 個 Python 回歸測試（`TestLeapsChainSnapshot`，23/23 全過）。E2E 實測：NOK strike=7 清空舊快照後重查，新快照 `strikes=[1,2,3,4,5,7,10,12,15,17,20,22,25,27,30,32]`、`valid_strike?(7)=true`，完整跑出推薦結果（不再誤判）。
 > 本節自 `leaps-user-strike-validation-spec.md`（原始規格＋2026-07-04 驗收）還原為主文件現行規範——2026-07-05 歸檔時此行為規範未收錄進主文件，特此補回。
 
 **驗證依據是「該 symbol 實際存在的履約價陣列」（`strike_chain_snapshots`），不是現價比例區間之類的啟發式猜測。**
@@ -386,6 +387,6 @@ extrinsic_value = mid - intrinsic_value
 
 ## 待辦（歸檔後仍未關閉）
 
-- [ ] **NOK user_strike 誤判 bug（調查中）**：快照範圍 $8.00–$17.50 與 Barchart 真實鏈不符（$7 存在，Delta 0.8613、OI 12,716），合法輸入 $7 被 `invalid_strike` 誤擋。根因回報後更新「user_strike 三層驗證」節的規範；在那之前不得依該節現有描述新增功能。
+- [x] **NOK user_strike 誤判 bug — ✅ 2026-07-08 已修復**：根因是 chain_snapshot 建自近期到期日而非 LEAPS 到期日的履約價階梯（兩者不同組）。修復＋回歸測試＋E2E 驗證見「user_strike 三層驗證」節。
 - [ ] **教學功能規格進行中**：`leaps-column-tooltips-spec.md`（推薦分析圖卡＋欄位 tooltips＋術語字卡），進度見該檔 checklist。
 - [ ] **Phase H live 層對照補驗**：2026-07-05 的 live 對照跑在休市期間（7/3 國慶補假＋週末），報價凍結、鑑別力不足。美股開盤後（台灣時間 2026-07-06 週一約 21:30 後）重查一次 NVTS，從當次抓到的資料任取一筆，用當次 bid/ask/spot 手算內在/外在/佔比，與頁面顯示值比對並附手算過程。一致後 fresh window／Phase H／Phase I 三項才算真正全部結案。
