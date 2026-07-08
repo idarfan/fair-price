@@ -9,7 +9,7 @@
 
 ## 需求（第一部分）
 
-推薦分析區塊（近天期/遠天期推薦文字）下方加四張收摺式圖卡，標題為名詞本身，預設收合：Bid-Ask Spread／IV（隱含波動率）／Vega／IV Crush 風險。
+推薦分析區塊（近天期/遠天期推薦文字）下方加收摺式圖卡，標題為名詞本身，預設收合：Bid-Ask Spread／IV（隱含波動率）／Vega／IV Crush 風險／**Open Interest（未平倉量）／Delta／Time Value%（時間價值溢價）**（2026-07-08 新增後三張）。
 
 ## 架構（第一部分）
 
@@ -26,6 +26,14 @@
 - [x] 空狀態頁：`.leaps-concept-card` 數量 0，整組不渲染。
 - [x] 深色卡面、details 展開/收合正常；匯出 PNG 實際開檔（2850×4554）：四卡以展開狀態完整入鏡、文字可讀、無破版，排行表接續正常。
 - [x] 回歸：352 examples, 0 failures；tooltips／字卡／匯出下載事件（`leaps_NVTS_20260707_1313.png`）不受影響。
+
+### 2026-07-08 追加三張圖卡（OI／Delta／Time Value%）
+
+- [x] 新增 `render_oi_card`／`render_delta_card`／`render_time_value_card`，同一套動態代入機制（來源合約：遠天期優先）。
+- [x] NOK strike=7 實測：七卡渲染順序 OI／Delta／Spread／Time Value%／IV／Vega／IV Crush；三方數字一致（推薦文字 OI 266、Delta 0.814、Time Value 18.6% ＝ 卡內同值）。
+- [x] 空狀態頁：`.leaps-concept-card` 仍為 0，不因新增卡數而破壞不渲染規則。
+- [x] 匯出 PNG 開檔：七卡展開後輸出 2850×6072，高度隨新卡數合理增長，下載事件正常（`leaps_NOK_20260708_1304.png`）。
+- [x] 回歸：352 examples, 0 failures。
 
 ---
 

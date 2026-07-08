@@ -262,7 +262,10 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       p(class: "text-xs text-gray-400") do
         plain "名詞解釋（以本次推薦 $#{fmt_strike_short(pick[:strike])} / #{pick[:expiration_date]} 的實際數值試算）"
       end
+      render_oi_card(pick)
+      render_delta_card(pick)
       render_spread_card(pick)
+      render_time_value_card(pick)
       render_iv_card(pick)
       render_vega_card(pick)
       render_iv_crush_card(pick)
@@ -273,6 +276,71 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     details(class: "leaps-concept-card") do
       summary(class: "leaps-concept-summary") { plain title }
       div(class: "leaps-concept-body", &block)
+    end
+  end
+
+  def render_oi_card(pick)
+    oi     = pick[:open_interest]
+    tier   = pick[:liquidity_tier].to_s
+    warned = pick[:no_recent_volume_warning]
+    concept_card("🔓 Open Interest（未平倉量）") do
+      p do
+        plain "市場上還沒被平倉的合約總數，只在盤後更新一次（跟即時成交量 Volume 不同）。是本表排行的排序主鍵。"
+      end
+      p do
+        plain "本合約 OI #{fmt_int(oi)}，本次查詢候選中的相對排名為"
+        strong { plain "「#{tier}」" }
+        plain "。OI 越高，通常代表這個履約價／到期日組合有越多人在交易，掛單簿越厚、進出價格越不容易被自己的單子打歪。"
+      end
+      if warned
+        p do
+          strong { plain "⚠ 但本合約近期無成交" }
+          plain "（Volume 對 OI 比率偏低）——OI 高不代表現在還在動，掛單簿可能已經很久沒更新，實際進出前務必先看報價是否合理、掛限價單試單。"
+        end
+      else
+        p { plain "OI 高只代表「歷史上累積的未平倉量」，不保證今天一定買得到／賣得掉，仍要搭配 Volume 一起看。" }
+      end
+    end
+  end
+
+  def render_delta_card(pick)
+    delta = pick[:delta].to_f
+    dte   = pick[:dte].to_i
+    concept_card("⚡ Delta（方向敏感度）") do
+      p do
+        plain "股價每漲 $1，這口合約的權利金理論上會變動多少錢；也常被拿來當「到期價內機率」的粗略估計。"
+      end
+      p do
+        plain "本合約 Delta #{sprintf('%.3f', delta)}，代表股價 +$1 時，權利金理論上約 +$#{sprintf('%.2f', delta)}；"
+        strong { plain "越接近 1，行為越像直接持有正股" }
+        plain "（100 股），但用的資金遠比買正股少，這正是深價內 LEAPS 被拿來取代持股的原因。"
+      end
+      p do
+        plain "本表只挑 Delta 0.60–0.90 的深價內合約：太低（Delta 太小）槓桿雖高但方向不夠貼近正股、時間價值佔比也高；太高（Delta 逼近 1）則買進成本已經很接近正股，槓桿效益變小。DTE #{dte} 天——天期越長，同一履約價的 Delta 通常越往中間值靠攏（時間價值稀釋方向性），這也是「深價內＋長天期」要挑履約價再往下修正緩衝的原因。"
+      end
+    end
+  end
+
+  def render_time_value_card(pick)
+    tv_pct = pick[:time_value_pct]
+    extrinsic = pick[:extrinsic_value]&.to_f
+    spot      = pick[:underlying_price].to_f
+    concept_card("📐 Time Value%（時間價值溢價）") do
+      p do
+        plain "外在價值除以"
+        strong { plain "股價" }
+        plain "（不是除以權利金 Mid，這是它跟「外在佔比」卡的關鍵差異）——回答的問題是「跟直接持有正股比，我用這口合約多付了幾 % 的溢價」。"
+      end
+      if tv_pct && extrinsic
+        p do
+          plain "本合約外在價值 $#{sprintf('%.2f', extrinsic)}、現價 $#{sprintf('%.2f', spot)}，Time Value 溢價約 "
+          strong { plain "#{fmt_pct(tv_pct)}" }
+          plain "——換句話說，用這口 LEAPS 取代持有 100 股正股，多付出的成本大約是股價的這個百分比，是你為了少壓資金、卻仍保留大部分漲幅所付出的代價。"
+        end
+      else
+        p { plain "本合約缺少 bid/ask 或現價資料，Time Value% 無法計算，顯示為「—」。" }
+      end
+      p { plain "Time Value% 越低，代表這口合約的溢價成本越接近直接持股；搭配「外在佔比」卡一起看：兩者分母不同（一個除股價、一個除權利金），回答的是「多付幾 % 股價」跟「權利金裡幾 % 是保險費」兩個不同問題，不要混為一談。" }
     end
   end
 
