@@ -147,7 +147,12 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
         "排行 ##{hit[:rank]} · $#{sprintf('%.2f', hit[:candidate_strike].to_f)} / #{hit[:candidate_expiry]} — #{hit[:trades].size} 筆匹配"
       } : [],
       flow_rows: (flow_ok ? Array(@flow_panel[:large_orders]).map { |t| pdf_flow_row(t) } : []),
-      concept_cards: pick ? pdf_concept_cards_data(pick) : []
+      concept_cards: pick ? pdf_concept_cards_data(pick) : [],
+      # 術語字卡（VOCAB_CARDS 15 張）：PDF 是平面文件沒有翻面概念，正反面
+      # 攤平合併顯示（英文/音標/中文/提示 + 解釋/例句），不留白等待翻面。
+      vocab_cards: VOCAB_CARDS.map { |card|
+        { en: card[:en], ipa: card[:ipa], zh: card[:zh], hint: card[:hint], back: card[:back], ex: card[:ex] }
+      }
     }
   end
 
@@ -1182,6 +1187,61 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             return y;
           }
 
+          function renderVocabCards(pdf, cards, margin, y, maxWidth) {
+            if (!cards || !cards.length) return y;
+            var bottom = pageBottom(pdf);
+            if (y > bottom) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
+            pdf.setFontSize(13);
+            pdf.text('術語字卡', margin, y);
+            y += 4;
+            pdf.setFontSize(8);
+            pdf.setTextColor(156, 163, 175);
+            var noteLines = wrapCjk(pdf, '（正反面內容攤平合併顯示；音標從缺——Noto Sans TC 字型本身不含 IPA 音標字元，網頁版仍完整顯示並可點擊聽發音）', maxWidth);
+            for (var ni = 0; ni < noteLines.length; ni++) {
+              pdf.text(noteLines[ni], margin, y);
+              y += 3.6;
+            }
+            pdf.setTextColor(0, 0, 0);
+            y += 3;
+            for (var vi = 0; vi < cards.length; vi++) {
+              var card = cards[vi];
+              // 標題+提示至少留一行空間，避免標題畫在頁尾、內文被切到下一頁開頭
+              if (y > bottom - 10) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
+              pdf.setFontSize(10);
+              // 音標（IPA）刻意不畫：Noto Sans TC 原字型本身缺 ɪ/ɛ/ə/ʊ/ˈ/ː 等符號，
+              // 畫出來會變成字元靜默消失的殘缺音標（如 /liːps/ 變 /lips/），
+              // 比完全不顯示更容易誤導使用者。英文/中文/提示/解釋/例句不受影響。
+              pdf.text(card.en + '  — ' + card.zh, margin, y);
+              y += 4.2;
+              pdf.setFontSize(7.5);
+              pdf.setTextColor(107, 114, 128);
+              var hintLines = wrapCjk(pdf, card.hint, maxWidth);
+              for (var hi = 0; hi < hintLines.length; hi++) {
+                if (y > bottom) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
+                pdf.text(hintLines[hi], margin, y);
+                y += 3.6;
+              }
+              pdf.setTextColor(0, 0, 0);
+              pdf.setFontSize(8);
+              var backLines = wrapCjk(pdf, card.back, maxWidth);
+              for (var bi = 0; bi < backLines.length; bi++) {
+                if (y > bottom) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
+                pdf.text(backLines[bi], margin, y);
+                y += 3.8;
+              }
+              pdf.setTextColor(107, 114, 128);
+              var exLines = wrapCjk(pdf, card.ex, maxWidth);
+              for (var ei = 0; ei < exLines.length; ei++) {
+                if (y > bottom) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
+                pdf.text(exLines[ei], margin, y);
+                y += 3.6;
+              }
+              pdf.setTextColor(0, 0, 0);
+              y += 3;
+            }
+            return y;
+          }
+
           function renderCandidatesTable(pdf, rows, margin, y) {
             var head = [['到期日','DTE','履約價','Delta','OI','Volume','流動性判斷','Bid','Ask','Mid',
                          'Spread%','內在價值','外在價值','外在佔比','Time Value%','IV','Vega','被指派機率']];
@@ -1311,6 +1371,11 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             if (data.flow_rows && data.flow_rows.length) {
               if (y > pageH - 40) { pdf.addPage(); y = margin; }
               y = renderFlowTable(pdf, data.flow_rows, margin, y, data.flow_summary, data.flow_highlights, pageW - margin * 2);
+            }
+
+            if (data.vocab_cards && data.vocab_cards.length) {
+              pdf.addPage(); y = margin; // 教學資源另起一頁，跟查詢結果本身分開
+              y = renderVocabCards(pdf, data.vocab_cards, margin, y, pageW - margin * 2);
             }
 
             var pageCount = pdf.internal.getNumberOfPages();
