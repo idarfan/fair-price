@@ -100,7 +100,8 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
   def view_template
     div(id: "leaps-export-root", class: "space-y-6",
-        data_pdf_font_url: helpers.asset_path("NotoSansTC-Regular-subset-v39.ttf")) do
+        data_pdf_font_url: helpers.asset_path("NotoSansTC-Regular-subset-v39.ttf"),
+        data_pdf_ipa_font_url: helpers.asset_path("NotoSans-Regular-ipa-subset-v42.ttf")) do
       render_header
       render_search_form
       render_status_bar if @scrape_status
@@ -1064,13 +1065,19 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     script do
       raw <<~JS.html_safe
         (function () {
-          var FONT_ALIAS = 'NotoSansTC';
-          var FONT_FILE  = 'NotoSansTC-Regular.ttf';
+          var FONT_ALIAS     = 'NotoSansTC';
+          var FONT_FILE      = 'NotoSansTC-Regular.ttf';
+          var IPA_FONT_ALIAS = 'NotoSansIPA';
+          var IPA_FONT_FILE  = 'NotoSans-Regular-ipa.ttf';
 
-          function loadFont(pdf, fontUrl) {
-            if (!fontUrl) return Promise.reject(new Error('字型路徑未提供，無法產生向量 PDF'));
+          // 通用字型載入：fetch → arrayBuffer → base64 → addFileToVFS/addFont，
+          // 驗證 addFont 真的生效才算成功。任一字型失敗都必須中止匯出，不得
+          // fallback 到 jsPDF 內建字型（豆腐字）——這條規則對主字型與 IPA
+          // 字型一視同仁，IPA 字型是術語字卡音標顯示的必要條件，不是可選項。
+          function loadFontFile(pdf, fontUrl, fontFile, fontAlias, label) {
+            if (!fontUrl) return Promise.reject(new Error(label + '字型路徑未提供，無法產生向量 PDF'));
             return fetch(fontUrl).then(function (resp) {
-              if (!resp.ok) throw new Error('字型下載失敗（HTTP ' + resp.status + '），已中止匯出');
+              if (!resp.ok) throw new Error(label + '字型下載失敗（HTTP ' + resp.status + '），已中止匯出');
               return resp.arrayBuffer();
             }).then(function (buf) {
               var bytes = new Uint8Array(buf);
@@ -1080,15 +1087,19 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
                 binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
               }
               var base64 = btoa(binary);
-              pdf.addFileToVFS(FONT_FILE, base64);
-              pdf.addFont(FONT_FILE, FONT_ALIAS, 'normal');
-              // 驗證 addFont 真的生效，不是靜默失敗後繼續用內建字型畫豆腐字
+              pdf.addFileToVFS(fontFile, base64);
+              pdf.addFont(fontFile, fontAlias, 'normal');
               var list = pdf.getFontList();
-              if (!list[FONT_ALIAS] || list[FONT_ALIAS].indexOf('normal') === -1) {
-                throw new Error('字型載入失敗（addFont 未生效），已中止匯出');
+              if (!list[fontAlias] || list[fontAlias].indexOf('normal') === -1) {
+                throw new Error(label + '字型載入失敗（addFont 未生效），已中止匯出');
               }
-              pdf.setFont(FONT_ALIAS, 'normal');
             });
+          }
+
+          function loadFont(pdf, fontUrl, ipaFontUrl) {
+            return loadFontFile(pdf, fontUrl, FONT_FILE, FONT_ALIAS, '主')
+              .then(function () { return loadFontFile(pdf, ipaFontUrl, IPA_FONT_FILE, IPA_FONT_ALIAS, 'IPA 音標'); })
+              .then(function () { pdf.setFont(FONT_ALIAS, 'normal'); });
           }
 
           // CJK 沒有空白字元，jsPDF 內建 splitTextToSize 依空白斷詞會讓整段中文
@@ -1196,22 +1207,32 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             y += 4;
             pdf.setFontSize(8);
             pdf.setTextColor(156, 163, 175);
-            var noteLines = wrapCjk(pdf, '（正反面內容攤平合併顯示；音標從缺——Noto Sans TC 字型本身不含 IPA 音標字元，網頁版仍完整顯示並可點擊聽發音）', maxWidth);
-            for (var ni = 0; ni < noteLines.length; ni++) {
-              pdf.text(noteLines[ni], margin, y);
-              y += 3.6;
-            }
+            pdf.text('（正反面內容攤平合併顯示）', margin, y);
             pdf.setTextColor(0, 0, 0);
-            y += 3;
+            y += 6;
             for (var vi = 0; vi < cards.length; vi++) {
               var card = cards[vi];
               // 標題+提示至少留一行空間，避免標題畫在頁尾、內文被切到下一頁開頭
               if (y > bottom - 10) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
+              // 混合字型繪製同一行：英文/中文用嵌入的 Noto Sans TC 子集，
+              // 音標用第二個嵌入字型 NotoSansIPA（Noto Sans 拉丁字型子集，
+              // 涵蓋 Noto Sans TC 缺少的 ɪ/ɛ/ə/ʊ/ˈ/ː 等 IPA Extensions 符號）。
+              // jsPDF 單次 pdf.text() 呼叫只能用單一字型，混合字型需要逐段
+              // 呼叫 getTextWidth() 手動定位 x 座標分段畫。
               pdf.setFontSize(10);
-              // 音標（IPA）刻意不畫：Noto Sans TC 原字型本身缺 ɪ/ɛ/ə/ʊ/ˈ/ː 等符號，
-              // 畫出來會變成字元靜默消失的殘缺音標（如 /liːps/ 變 /lips/），
-              // 比完全不顯示更容易誤導使用者。英文/中文/提示/解釋/例句不受影響。
-              pdf.text(card.en + '  — ' + card.zh, margin, y);
+              var vx = margin;
+              pdf.setFont(FONT_ALIAS, 'normal');
+              var enSeg = card.en + '  ';
+              pdf.text(enSeg, vx, y);
+              vx += pdf.getTextWidth(enSeg);
+
+              pdf.setFont(IPA_FONT_ALIAS, 'normal');
+              var ipaSeg = card.ipa + '  ';
+              pdf.text(ipaSeg, vx, y);
+              vx += pdf.getTextWidth(ipaSeg);
+
+              pdf.setFont(FONT_ALIAS, 'normal');
+              pdf.text('— ' + card.zh, vx, y);
               y += 4.2;
               pdf.setFontSize(7.5);
               pdf.setTextColor(107, 114, 128);
@@ -1391,7 +1412,8 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
           window.__leapsExportVectorPdf = function (fname) {
             var root = document.getElementById('leaps-export-root');
-            var fontUrl = root ? root.getAttribute('data-pdf-font-url') : null;
+            var fontUrl    = root ? root.getAttribute('data-pdf-font-url') : null;
+            var ipaFontUrl = root ? root.getAttribute('data-pdf-ipa-font-url') : null;
             var dataEl = document.getElementById('leaps-pdf-data');
 
             var payload;
@@ -1404,7 +1426,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
             var pdf = new jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-            return loadFont(pdf, fontUrl).then(function () {
+            return loadFont(pdf, fontUrl, ipaFontUrl).then(function () {
               buildVectorPdf(pdf, payload);
               pdf.save(fname + '.pdf');
             });
