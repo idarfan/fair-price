@@ -20,7 +20,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
   TABLE_RIGHT_ALIGN_COLS = (
     %w[DTE Delta OI Volume Bid Ask Mid IV Vega] +
-    ["履約價", "Spread%", "內在價值", "外在價值", "外在佔比", "Time Value%", "被指派機率"]
+    [ "履約價", "Spread%", "內在價值", "外在價值", "外在佔比", "Time Value%", "被指派機率" ]
   ).freeze
 
   FLOW_COLS = [ "類型", "履約價", "到期日", "DTE", "Delta", "Code", "Size", "Side", "Premium", "方向" ].freeze
@@ -318,20 +318,20 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
   def pdf_signal_rgb_for_tier(tier)
     key = case tier
-          when "充足" then :confirm_bull
-          when "普通" then :caution
-          when "偏低" then :warning
-          else :neutral
-          end
+    when "充足" then :confirm_bull
+    when "普通" then :caution
+    when "偏低" then :warning
+    else :neutral
+    end
     PDF_SIGNAL_HEX[key]
   end
 
   def pdf_signal_rgb_for_direction(dir)
     key = case dir
-          when "bullish" then :confirm_bull
-          when "bearish" then :confirm_bear
-          else :neutral
-          end
+    when "bullish" then :confirm_bull
+    when "bearish" then :confirm_bear
+    else :neutral
+    end
     PDF_SIGNAL_HEX[key]
   end
 
@@ -1168,6 +1168,25 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             return y;
           }
 
+          // 卡片底色/邊框比照 HTML 版 leaps-concept-card／leaps-vocab-card
+          // （奇數綠底 #dcfce7、偶數紫底 #ede9fe、橘框 #f97316，見 application.css）。
+          var CARD_FILL_COLORS = ['#dcfce7', '#ede9fe'];
+          var CARD_BORDER_COLOR = '#f97316';
+          var CARD_TITLE_COLOR = '#111827';
+          var CARD_BODY_COLOR = '#1f2937';
+
+          // 量測卡片段落換行後的總高度，用來在畫底色框之前先算好框的高度。
+          function measureWrappedLines(pdf, paragraphs, maxWidth) {
+            var wrapped = [];
+            var total = 0;
+            for (var pi = 0; pi < paragraphs.length; pi++) {
+              var lines = wrapCjk(pdf, paragraphs[pi], maxWidth);
+              wrapped.push(lines);
+              total += lines.length;
+            }
+            return { wrapped: wrapped, lineCount: total };
+          }
+
           function renderConceptCards(pdf, cards, margin, y, maxWidth) {
             if (!cards || !cards.length) return y;
             var bottom = pageBottom(pdf);
@@ -1179,20 +1198,34 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             y += 6;
             for (var ci = 0; ci < cards.length; ci++) {
               var card = cards[ci];
-              if (y > bottom - 10) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
-              pdf.setFontSize(10.5);
-              pdf.text(card.title, margin, y);
-              y += 5;
               pdf.setFontSize(8.5);
-              for (var pi = 0; pi < card.paragraphs.length; pi++) {
-                var lines = wrapCjk(pdf, card.paragraphs[pi], maxWidth);
+              var measured = measureWrappedLines(pdf, card.paragraphs, maxWidth - 6);
+              var titleH = 5, lineH = 4;
+              var cardH = titleH + measured.lineCount * lineH + 3;
+              if (y - 4 + 5 + cardH + 3 > bottom) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
+
+              var innerX = margin + 3;
+              var textY = y + 5;
+              pdf.setFillColor.apply(pdf, hexToRgb(CARD_FILL_COLORS[ci % 2]));
+              pdf.setDrawColor.apply(pdf, hexToRgb(CARD_BORDER_COLOR));
+              pdf.setLineWidth(0.35);
+              pdf.roundedRect(margin, y - 4, maxWidth, 5 + titleH + measured.lineCount * lineH + 3, 2, 2, 'FD');
+
+              pdf.setFontSize(10.5);
+              pdf.setTextColor.apply(pdf, hexToRgb(CARD_TITLE_COLOR));
+              pdf.text(card.title, innerX, textY);
+              textY += titleH;
+              pdf.setFontSize(8.5);
+              pdf.setTextColor.apply(pdf, hexToRgb(CARD_BODY_COLOR));
+              for (var pi = 0; pi < measured.wrapped.length; pi++) {
+                var lines = measured.wrapped[pi];
                 for (var li = 0; li < lines.length; li++) {
-                  if (y > bottom) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
-                  pdf.text(lines[li], margin, y);
-                  y += 4;
+                  pdf.text(lines[li], innerX, textY);
+                  textY += lineH;
                 }
               }
-              y += 3;
+              pdf.setTextColor(0, 0, 0);
+              y = textY + 4;
             }
             y += 2;
             return y;
@@ -1210,18 +1243,38 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             pdf.text('（正反面內容攤平合併顯示）', margin, y);
             pdf.setTextColor(0, 0, 0);
             y += 6;
+            var innerWidth = maxWidth - 6;
             for (var vi = 0; vi < cards.length; vi++) {
               var card = cards[vi];
-              // 標題+提示至少留一行空間，避免標題畫在頁尾、內文被切到下一頁開頭
-              if (y > bottom - 10) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
+              pdf.setFontSize(7.5);
+              var hintLines = wrapCjk(pdf, card.hint, innerWidth);
+              pdf.setFontSize(8);
+              var backLines = wrapCjk(pdf, card.back, innerWidth);
+              pdf.setFontSize(7.5);
+              var exLines = wrapCjk(pdf, card.ex, innerWidth);
+              var cardH = 4.2 + hintLines.length * 3.6 + backLines.length * 3.8 + exLines.length * 3.6 + 3;
+              // 卡片可能整張跨頁面過長，這裡只確保「至少一行」不被切在頁尾。
+              if (y - 4 + 5 + cardH > bottom && cardH <= bottom - margin) {
+                pdf.addPage(); y = margin; bottom = pageBottom(pdf);
+              } else if (y > bottom - 10) {
+                pdf.addPage(); y = margin; bottom = pageBottom(pdf);
+              }
+
+              var innerX = margin + 3;
+              pdf.setFillColor.apply(pdf, hexToRgb(CARD_FILL_COLORS[vi % 2]));
+              pdf.setDrawColor.apply(pdf, hexToRgb(CARD_BORDER_COLOR));
+              pdf.setLineWidth(0.35);
+              pdf.roundedRect(margin, y - 4, maxWidth, 5 + cardH, 2, 2, 'FD');
+
               // 混合字型繪製同一行：英文/中文用嵌入的 Noto Sans TC 子集，
               // 音標用第二個嵌入字型 NotoSansIPA（Noto Sans 拉丁字型子集，
               // 涵蓋 Noto Sans TC 缺少的 ɪ/ɛ/ə/ʊ/ˈ/ː 等 IPA Extensions 符號）。
               // jsPDF 單次 pdf.text() 呼叫只能用單一字型，混合字型需要逐段
               // 呼叫 getTextWidth() 手動定位 x 座標分段畫。
               pdf.setFontSize(10);
-              var vx = margin;
+              var vx = innerX;
               pdf.setFont(FONT_ALIAS, 'normal');
+              pdf.setTextColor.apply(pdf, hexToRgb(CARD_TITLE_COLOR));
               var enSeg = card.en + '  ';
               pdf.text(enSeg, vx, y);
               vx += pdf.getTextWidth(enSeg);
@@ -1236,29 +1289,24 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
               y += 4.2;
               pdf.setFontSize(7.5);
               pdf.setTextColor(107, 114, 128);
-              var hintLines = wrapCjk(pdf, card.hint, maxWidth);
               for (var hi = 0; hi < hintLines.length; hi++) {
-                if (y > bottom) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
-                pdf.text(hintLines[hi], margin, y);
+                pdf.text(hintLines[hi], innerX, y);
                 y += 3.6;
               }
-              pdf.setTextColor(0, 0, 0);
+              pdf.setTextColor.apply(pdf, hexToRgb(CARD_BODY_COLOR));
               pdf.setFontSize(8);
-              var backLines = wrapCjk(pdf, card.back, maxWidth);
               for (var bi = 0; bi < backLines.length; bi++) {
-                if (y > bottom) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
-                pdf.text(backLines[bi], margin, y);
+                pdf.text(backLines[bi], innerX, y);
                 y += 3.8;
               }
               pdf.setTextColor(107, 114, 128);
-              var exLines = wrapCjk(pdf, card.ex, maxWidth);
+              pdf.setFontSize(7.5);
               for (var ei = 0; ei < exLines.length; ei++) {
-                if (y > bottom) { pdf.addPage(); y = margin; bottom = pageBottom(pdf); }
-                pdf.text(exLines[ei], margin, y);
+                pdf.text(exLines[ei], innerX, y);
                 y += 3.6;
               }
               pdf.setTextColor(0, 0, 0);
-              y += 3;
+              y += 3 + 4;
             }
             return y;
           }
