@@ -6,6 +6,10 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
   before do
     allow(service).to receive(:cdp_available?).and_return(true)
     allow(service).to receive(:log_fetch)
+    # 這份 spec 測的是 leaps 快取/CLI 參數行為，不是 options_flow 補抓；
+    # 讓 refresh_options_flow_if_stale 視為「今天已抓過」直接跳過，
+    # 避免污染下方對 run_scraper("leaps", ...) 的嚴格 .with 期待。
+    allow(OptionsFlow).to receive_message_chain(:where, :exists?).and_return(true)
   end
 
   # ── Helper: stub the 5-minute cache check ───────────────────────────────────
@@ -44,7 +48,7 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
     let!(:aapl_row) { create(:leaps_option_chain_snapshot, symbol: "AAPL") }
 
     let(:one_row) do
-      [{
+      [ {
         "expiration_date" => "2027-01-15", "dte" => 202,
         "strike" => 10.0, "option_type" => "Call",
         "bid" => 3.1, "ask" => 3.3, "last_price" => 3.2,
@@ -52,7 +56,7 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
         "volume" => 100, "open_interest" => 500,
         "delta" => 0.78, "iv" => 0.76,
         "itm_probability" => 0.82, "vol_oi_ratio" => 0.006, "vega" => 0.013
-      }]
+      } ]
     end
 
     it "deletes the original NOK row by id" do
@@ -80,7 +84,7 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
 
   describe "session expiry mid-loop" do
     let(:partial_rows) do
-      [{
+      [ {
         "expiration_date" => "2026-06-20", "dte" => 357,
         "strike" => 8.0, "option_type" => "Call",
         "bid" => 5.1, "ask" => 5.3, "last_price" => 5.2,
@@ -88,7 +92,7 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
         "volume" => 200, "open_interest" => 41_000,
         "delta" => 0.85, "iv" => 0.70,
         "itm_probability" => 0.88, "vol_oi_ratio" => 0.005, "vega" => 0.011
-      }]
+      } ]
     end
 
     let(:partial_data) do
@@ -148,7 +152,7 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
 
   describe "V&G-only session expiry (Options Prices fetched cleanly)" do
     let(:vg_partial_rows) do
-      [{
+      [ {
         "expiration_date" => "2027-01-15", "dte" => 365,
         "strike" => 10.0, "option_type" => "Call",
         "bid" => 3.1, "ask" => 3.3, "last_price" => 3.2,
@@ -156,7 +160,7 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
         "volume" => 100, "open_interest" => 41_000,
         "delta" => 0.82, "iv" => 0.74,
         "itm_probability" => nil, "vol_oi_ratio" => nil, "vega" => nil
-      }]
+      } ]
     end
 
     let(:vg_partial_data) do
@@ -241,7 +245,7 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
 
       # Only one row should remain — the second batch's row
       expect(LeapsOptionChainSnapshot.where(symbol: "NOK").count).to eq(1)
-      expect(LeapsOptionChainSnapshot.where(symbol: "NOK").pluck(:strike).map(&:to_f)).to eq([12.0])
+      expect(LeapsOptionChainSnapshot.where(symbol: "NOK").pluck(:strike).map(&:to_f)).to eq([ 12.0 ])
 
       # No rows with the old scraped_at should exist
       expect(LeapsOptionChainSnapshot.where(symbol: "NOK", scraped_at: first_scraped_at)).not_to exist
@@ -278,7 +282,7 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
 
     it "passes user_strike as CLI extra arg when provided" do
       expect(service).to receive(:run_scraper)
-        .with("leaps", extra_args: ["10.0"])
+        .with("leaps", extra_args: [ "10.0" ])
         .and_return({ status: "success", data: scraper_success })
       allow(service).to receive(:persist_leaps)
 
@@ -390,5 +394,4 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
       service.fetch_leaps
     end
   end
-
 end

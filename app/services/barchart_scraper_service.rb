@@ -77,13 +77,15 @@ class BarchartScraperService
       return result
     end
 
+    refresh_options_flow_if_stale
+
     if LeapsOptionChainSnapshot.for_symbol(@symbol).fresh.exists?
       result[:status] = "cached"
       log_fetch("leaps", "cached", nil)
       return result
     end
 
-    fetch_result = run_scraper("leaps", extra_args: user_strike ? [user_strike.to_s] : [])
+    fetch_result = run_scraper("leaps", extra_args: user_strike ? [ user_strike.to_s ] : [])
 
     case fetch_result[:status]
     when "barchart_session_expired"
@@ -114,13 +116,13 @@ class BarchartScraperService
       end
       result[:status] = "partial_error"
       result[:errors] << case reason
-                         when "session_expired"
+      when "session_expired"
                            "Session 已過期（抓取 #{location_label} 的 #{layer_label} 時格線出現登入提示），請重新登入 Barchart 後重試"
-                         when "page_load_timeout"
+      when "page_load_timeout"
                            "抓取 #{location_label} 的 #{layer_label} 時頁面 30 秒內未完成載入（非 Session 問題），請稍後重試"
-                         else
+      else
                            "抓取 #{location_label} 的 #{layer_label} 時格線無回應，請確認 Barchart 仍在登入狀態後重試"
-                         end
+      end
     when "invalid_strike"
       data = fetch_result[:data]
       persist_chain_snapshot(data)
@@ -167,6 +169,24 @@ class BarchartScraperService
     false
   end
 
+  # LEAPS 查詢屬於任意 symbol，未必在 watchlist.yml 每日排程範圍內，
+  # Options Flow 面板因此可能停在多天前的舊快照。查詢時順手補一次，
+  # 當天已抓過就跳過；失敗僅記錄、不影響 LEAPS 查詢本身的結果。
+  def refresh_options_flow_if_stale
+    return if OptionsFlow.where(symbol: @symbol, snapshot_date: @today).exists?
+
+    fetch_result = run_scraper("options_flow")
+    if fetch_result[:status] == "success"
+      persist("options_flow", fetch_result[:data])
+      log_fetch("options_flow", "success", "triggered_by=leaps_query")
+    else
+      log_fetch("options_flow", "error", "triggered_by=leaps_query error=#{fetch_result[:error]}")
+    end
+  rescue => e
+    Rails.logger.warn("[leaps] options_flow refresh failed: #{e.message}")
+    log_fetch("options_flow", "error", "triggered_by=leaps_query exception=#{e.message.to_s.first(200)}")
+  end
+
   # Convert UI filter values to CLI positional args for the Python scraper.
   # Strips Angular "string:" prefix from expiration if present.
   def build_max_pain_args(expiration, strikes, volume_oi)
@@ -178,7 +198,7 @@ class BarchartScraperService
                            .strip
                            .gsub(" (", "-")
                            .delete_suffix(")")
-    [cli_expiry, strikes.to_s, volume_oi.to_s]
+    [ cli_expiry, strikes.to_s, volume_oi.to_s ]
   end
 
   def run_scraper(type, extra_args: [])
@@ -251,9 +271,9 @@ class BarchartScraperService
         created_at:         now,
         updated_at:         now
       },
-      unique_by: [:symbol, :snapshot_date, :expiration, :strikes_filter, :volume_oi_filter],
-      update_only: [:fetched_at, :dte, :last_price, :max_pain_strike,
-                    :strikes, :call_pain, :put_pain, :call_oi, :put_oi, :iv_combined]
+      unique_by: [ :symbol, :snapshot_date, :expiration, :strikes_filter, :volume_oi_filter ],
+      update_only: [ :fetched_at, :dte, :last_price, :max_pain_strike,
+                    :strikes, :call_pain, :put_pain, :call_oi, :put_oi, :iv_combined ]
     )
 
     return unless update_contract_snapshot
@@ -269,8 +289,8 @@ class BarchartScraperService
         created_at:           now,
         updated_at:           now
       },
-      unique_by: [:symbol, :snapshot_date],
-      update_only: [:fetched_at, :max_pain_by_expiry, :available_expirations]
+      unique_by: [ :symbol, :snapshot_date ],
+      update_only: [ :fetched_at, :max_pain_by_expiry, :available_expirations ]
     )
   end
 

@@ -509,6 +509,51 @@ RSpec.describe "GET /leaps", type: :request do
       end
     end
   end
+
+  # ── 9b. fresh 快取必須涵蓋新請求的 user_strike，不能只看時間窗 ─────────────
+  # 根因（2026-07-09 NOK 履約價 7 查出 2 候選）：上一次查詢（自動偵測或別的
+  # 履約價）留下的候選在 FRESH_WINDOW 內，這次換一個 user_strike 重查時，
+  # fresh_data_exists? 只看時間新舊、不看候選是否落在新履約價附近，於是誤判
+  # 為 cache hit，沿用跟輸入值完全無關的舊候選。
+  describe "POST /leaps/analyze — fresh cache must cover the requested user_strike" do
+    let(:symbol) { "COVREQ" }
+
+    before do
+      allow_any_instance_of(LeapsRecommendationsController)
+        .to receive(:cdp_online?).and_return(true)
+      allow(ScrapeLeapsJob).to receive(:perform_later)
+    end
+
+    after { LeapsOptionChainSnapshot.where(symbol: symbol).delete_all }
+
+    context "fresh candidates centered on a different strike than the new request" do
+      it "treats it as cache miss and enqueues a re-scrape centered on the new strike" do
+        LeapsOptionChainSnapshot.create!(
+          symbol: symbol, expiration_date: Date.new(2028, 1, 21),
+          strike: 12.0, option_type: "Call", scraped_at: Time.current
+        )
+        post "/leaps/analyze", params: { symbol: symbol, user_strike: "7" }, as: :json
+        expect(response).to have_http_status(:ok)
+        body = JSON.parse(response.body)
+        expect(body["status"]).not_to eq("invalid_strike")
+        expect(body["job_id"]).to be_present
+        expect(ScrapeLeapsJob).to have_received(:perform_later).with(symbol, anything, user_strike: 7.0)
+      end
+    end
+
+    context "fresh candidates already cover the requested strike (within buffer)" do
+      it "returns ready and does NOT enqueue a job" do
+        LeapsOptionChainSnapshot.create!(
+          symbol: symbol, expiration_date: Date.new(2028, 1, 21),
+          strike: 7.0, option_type: "Call", scraped_at: Time.current
+        )
+        post "/leaps/analyze", params: { symbol: symbol, user_strike: "7" }, as: :json
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)["status"]).to eq("ready")
+        expect(ScrapeLeapsJob).not_to have_received(:perform_later)
+      end
+    end
+  end
   # ── 10. Phase H：內在/外在價值欄位走完整 HTTP 路徑（真實 DB rows）──────────────
   # 規格明文：「兩個 service 單元測試全過、controller 串接處從未被 request 過、
   # 使用者一按就炸」的前例，request spec 必交付。
