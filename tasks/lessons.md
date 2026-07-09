@@ -777,3 +777,23 @@ miss，強制用新的中心履約價重新爬取。同時 `LeapsRankingService`
 `LeapsRecommendationService` 本身仍不篩 user_strike——它們依賴 persist 層
 （`persist_leaps` 每次 delete_all 舊資料）已經把資料窄化到新中心附近，
 篩選履約價這件事實際發生在爬蟲 Stage 1，不是排行層。
+
+
+## 2026-07-09（補充）：cache 判斷要看「查詢中心點是否吻合」，不是「涵蓋範圍」
+
+上一條教訓的第一版修法用「user_strike ± 緩衝範圍」去檢查 fresh 候選是否涵蓋——
+不夠精準：使用者接著追問「NOK 不帶履約價時，不是該列出最適宜的價格嗎？」才發現
+對稱的反向案例——手動查過履約價 7 之後，30 分鐘內留空重查（auto 模式），系統一樣
+誤判為 cache hit，沿用手動模式窄化過的 6/7/8 candidates，而不是重新做 auto 偵測。
+
+**正確設計**：不用緩衝範圍猜，而是把「這批候選是為哪個中心點爬的」直接記錄下來——
+`strike_chain_snapshots.last_query_strike`（nil＝auto 模式，數值＝手動履約價），
+`persist_chain_snapshot(data, user_strike:)` 在爬蟲成功/partial 時寫入；
+`LeapsOptionChainSnapshot.fresh_for?(symbol, user_strike:)` 同時比對「時間新鮮」
+與「這次要求的 user_strike（nil-safe）是否等於上次記錄的中心點」，兩者都要吻合
+才算 cache hit。`invalid_strike` 分支（只驗證、沒有實際重新爬）不會更新
+last_query_strike，因為候選本身沒變。
+
+**規則**：這個判斷邏輯只能有一個權威定義（在 model 的 class method），controller
+的 fresh_data_exists? 與 service fetch_leaps 內部的 cache 短路都必須呼叫同一個
+方法，不能各自維護一份緩衝公式或涵蓋範圍猜測邏輯。

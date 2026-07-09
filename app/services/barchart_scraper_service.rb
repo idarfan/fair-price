@@ -79,7 +79,7 @@ class BarchartScraperService
 
     refresh_options_flow_if_stale
 
-    if LeapsOptionChainSnapshot.for_symbol(@symbol).fresh.exists?
+    if LeapsOptionChainSnapshot.fresh_for?(@symbol, user_strike: user_strike)
       result[:status] = "cached"
       log_fetch("leaps", "cached", nil)
       return result
@@ -95,12 +95,12 @@ class BarchartScraperService
       log_fetch("leaps", "no_candidates", "user_strike=#{user_strike}")
       result[:status] = "no_candidates"
     when "success"
-      persist_chain_snapshot(fetch_result[:data])
+      persist_chain_snapshot(fetch_result[:data], user_strike: user_strike)
       persist_leaps(fetch_result[:data])
       log_fetch("leaps", "success", "rows=#{fetch_result[:data]["rows"]&.length}")
       result[:status] = "success"
     when "partial"
-      persist_chain_snapshot(fetch_result[:data])
+      persist_chain_snapshot(fetch_result[:data], user_strike: user_strike)
       persist_leaps(fetch_result[:data])
       data          = fetch_result[:data]
       expired_at    = data["expired_at_strike"] || data["expired_at_expiration"]
@@ -347,19 +347,25 @@ class BarchartScraperService
     end
   end
 
-  def persist_chain_snapshot(data)
+  # user_strike: :unset（預設）＝ invalid_strike 這種只驗證、沒有實際重新爬候選
+  # 的呼叫，不動 last_query_strike；success/partial 才會傳實際查詢值（含 nil＝auto
+  # 模式），讓 fresh_for? 能判斷這批候選到底是為哪個中心點爬的。
+  def persist_chain_snapshot(data, user_strike: :unset)
     snap = data["chain_snapshot"]
     return unless snap.is_a?(Hash)
 
-    strikes  = Array(snap["strikes"]).map(&:to_f)
-    spot     = snap["spot_price"]&.to_f
+    strikes = Array(snap["strikes"]).map(&:to_f)
+    spot    = snap["spot_price"]&.to_f
     return if strikes.empty?
 
-    StrikeChainSnapshot.upsert(
-      { symbol: @symbol, strikes: strikes, spot_price: spot, scraped_at: Time.current },
-      unique_by: :symbol,
-      update_only: %i[strikes spot_price scraped_at]
-    )
+    values      = { symbol: @symbol, strikes: strikes, spot_price: spot, scraped_at: Time.current }
+    update_cols = %i[strikes spot_price scraped_at]
+    unless user_strike == :unset
+      values[:last_query_strike] = user_strike
+      update_cols << :last_query_strike
+    end
+
+    StrikeChainSnapshot.upsert(values, unique_by: :symbol, update_only: update_cols)
   rescue => e
     Rails.logger.error("[leaps] persist_chain_snapshot failed: #{e.message}")
   end

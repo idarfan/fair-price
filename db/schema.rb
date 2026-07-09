@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_04_151000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_09_074508) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -368,6 +368,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_04_151000) do
 
   create_table "strike_chain_snapshots", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.decimal "last_query_strike", precision: 10, scale: 4
     t.datetime "scraped_at", null: false
     t.decimal "spot_price", precision: 10, scale: 4
     t.jsonb "strikes", default: [], null: false

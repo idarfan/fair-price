@@ -510,12 +510,16 @@ RSpec.describe "GET /leaps", type: :request do
     end
   end
 
-  # ── 9b. fresh 快取必須涵蓋新請求的 user_strike，不能只看時間窗 ─────────────
-  # 根因（2026-07-09 NOK 履約價 7 查出 2 候選）：上一次查詢（自動偵測或別的
-  # 履約價）留下的候選在 FRESH_WINDOW 內，這次換一個 user_strike 重查時，
-  # fresh_data_exists? 只看時間新舊、不看候選是否落在新履約價附近，於是誤判
-  # 為 cache hit，沿用跟輸入值完全無關的舊候選。
-  describe "POST /leaps/analyze — fresh cache must cover the requested user_strike" do
+  # ── 9b. fresh 快取必須「中心履約價吻合」才算數，不能只看時間窗 ─────────────
+  # 根因（2026-07-09 NOK 履約價 7 查出跟輸入無關的候選；同日再追一個對稱案例：
+  # 留空查詢卻沿用了上一次手動指定履約價留下的窄範圍候選）：上一次查詢（自動
+  # 偵測或別的履約價）留下的候選在 FRESH_WINDOW 內，這次換一種查詢方式
+  # （不同履約價、或手動→留空、或留空→手動）時，舊版 fresh_data_exists? 只看
+  # 時間新舊，於是誤判為 cache hit，沿用跟這次請求無關的舊候選。
+  # 判斷依據唯一權威：LeapsOptionChainSnapshot.fresh_for?（比對
+  # StrikeChainSnapshot#last_query_strike 是否等於這次的 user_strike，nil 也要
+  # 精準比對，代表「上次是不是也留空查詢」）。
+  describe "POST /leaps/analyze — fresh cache must match the requested query center" do
     let(:symbol) { "COVREQ" }
 
     before do
@@ -524,14 +528,29 @@ RSpec.describe "GET /leaps", type: :request do
       allow(ScrapeLeapsJob).to receive(:perform_later)
     end
 
-    after { LeapsOptionChainSnapshot.where(symbol: symbol).delete_all }
+    after do
+      LeapsOptionChainSnapshot.where(symbol: symbol).delete_all
+      StrikeChainSnapshot.where(symbol: symbol).delete_all
+    end
+
+    # 履約價階梯故意涵蓋 7 跟 12，避免 seed 出的資料被 analyze 快速路徑的
+    # StrikeChainSnapshot#valid_strike? 誤判成 invalid_strike——這裡要測的是
+    # fresh_for? 的中心點比對，不是履約價合法性檢查。
+    def seed_snapshot(symbol, strike:, last_query_strike:)
+      LeapsOptionChainSnapshot.create!(
+        symbol: symbol, expiration_date: Date.new(2028, 1, 21),
+        strike: strike, option_type: "Call", scraped_at: Time.current
+      )
+      StrikeChainSnapshot.upsert(
+        { symbol: symbol, strikes: [ 7.0, 12.0 ], spot_price: strike,
+          last_query_strike: last_query_strike, scraped_at: Time.current },
+        unique_by: :symbol
+      )
+    end
 
     context "fresh candidates centered on a different strike than the new request" do
       it "treats it as cache miss and enqueues a re-scrape centered on the new strike" do
-        LeapsOptionChainSnapshot.create!(
-          symbol: symbol, expiration_date: Date.new(2028, 1, 21),
-          strike: 12.0, option_type: "Call", scraped_at: Time.current
-        )
+        seed_snapshot(symbol, strike: 12.0, last_query_strike: 12.0)
         post "/leaps/analyze", params: { symbol: symbol, user_strike: "7" }, as: :json
         expect(response).to have_http_status(:ok)
         body = JSON.parse(response.body)
@@ -541,13 +560,31 @@ RSpec.describe "GET /leaps", type: :request do
       end
     end
 
-    context "fresh candidates already cover the requested strike (within buffer)" do
+    context "fresh candidates already centered on exactly the requested strike" do
       it "returns ready and does NOT enqueue a job" do
-        LeapsOptionChainSnapshot.create!(
-          symbol: symbol, expiration_date: Date.new(2028, 1, 21),
-          strike: 7.0, option_type: "Call", scraped_at: Time.current
-        )
+        seed_snapshot(symbol, strike: 7.0, last_query_strike: 7.0)
         post "/leaps/analyze", params: { symbol: symbol, user_strike: "7" }, as: :json
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)["status"]).to eq("ready")
+        expect(ScrapeLeapsJob).not_to have_received(:perform_later)
+      end
+    end
+
+    context "last query was a manual strike, this request leaves it blank (auto mode)" do
+      it "treats it as cache miss and re-scrapes in auto mode (not just the narrow manual strike range)" do
+        seed_snapshot(symbol, strike: 7.0, last_query_strike: 7.0)
+        post "/leaps/analyze", params: { symbol: symbol }, as: :json
+        expect(response).to have_http_status(:ok)
+        body = JSON.parse(response.body)
+        expect(body["job_id"]).to be_present
+        expect(ScrapeLeapsJob).to have_received(:perform_later).with(symbol, anything, user_strike: nil)
+      end
+    end
+
+    context "last query was auto mode, this request is also blank" do
+      it "returns ready and does NOT enqueue a job" do
+        seed_snapshot(symbol, strike: 12.0, last_query_strike: nil)
+        post "/leaps/analyze", params: { symbol: symbol }, as: :json
         expect(response).to have_http_status(:ok)
         expect(JSON.parse(response.body)["status"]).to eq("ready")
         expect(ScrapeLeapsJob).not_to have_received(:perform_later)

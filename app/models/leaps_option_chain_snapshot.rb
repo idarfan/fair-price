@@ -12,6 +12,20 @@ class LeapsOptionChainSnapshot < ApplicationRecord
   scope :calls,      -> { where(option_type: "Call") }
   scope :fresh,      -> { where(scraped_at: FRESH_WINDOW.ago..) }
 
+  # 時間新鮮不夠——還要確認目前存的候選是「為這次要求的中心履約價」爬的。
+  # user_strike 每次查詢都可能不同（或這次留空要 auto 偵測、上次卻是手動指定），
+  # 只看 scraped_at 會誤把「中心點對不上」的候選當成 cache hit 直接沿用
+  # （2026-07-09：NOK 履約價 7 查出跟輸入無關的 $12 候選）。
+  # controller 的 fresh_data_exists? 與 BarchartScraperService#fetch_leaps 內部
+  # 自己的 cache 短路，都必須呼叫這個唯一權威判斷，不能各自重寫一份。
+  def self.fresh_for?(symbol, user_strike: nil)
+    return false unless for_symbol(symbol).fresh.exists?
+
+    requested   = user_strike.present? ? user_strike.to_f : nil
+    last_center = StrikeChainSnapshot.find_by(symbol: symbol.upcase)&.last_query_strike&.to_f
+    last_center == requested
+  end
+
   def mid_price
     return nil if bid.nil? && ask.nil?
     return ask if bid.nil?
@@ -29,9 +43,9 @@ class LeapsOptionChainSnapshot < ApplicationRecord
     mid       = (bid.to_f + ask.to_f) / 2.0
     intrinsic = if option_type.to_s.casecmp("put").zero?
                   [ strike.to_f - underlying_price.to_f, 0.0 ].max
-                else
+    else
                   [ underlying_price.to_f - strike.to_f, 0.0 ].max
-                end
+    end
     { intrinsic_value: intrinsic, extrinsic_value: mid - intrinsic }
   end
 end

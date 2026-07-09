@@ -134,18 +134,11 @@ class LeapsRecommendationsController < ApplicationController
 
   private
 
-  # user_strike 有值時，快取除了要「時間新鮮」還要「涵蓋這個中心履約價」——
-  # 否則使用者換一個履約價重新查詢，會誤用上一次查詢（不同中心點）留下的舊候選，
-  # 畫面顯示的推薦履約價跟輸入值完全無關（2026-07-09 NOK 履約價 7 查出 2 候選的成因）。
-  # 緩衝寬度呼應 leaps_scraper.py Stage 1 的「中心履約價 ±1 檔」設計，用比例逼近避免與
-  # 爬蟲端的實際檔位邏輯脫鉤；低價股（如 -）另設最低  緩衝避免視窗過窄。
+  # 判斷邏輯唯一定義在 LeapsOptionChainSnapshot.fresh_for?（時間新鮮 +
+  # 中心履約價吻合），這裡跟 BarchartScraperService#fetch_leaps 內部的
+  # cache 短路都呼叫同一個方法，避免兩處各自維護一份、又漂移出不一致。
   def fresh_data_exists?(symbol, user_strike: nil)
-    scope = LeapsOptionChainSnapshot.for_symbol(symbol).fresh
-    return false unless scope.exists?
-    return true if user_strike.blank?
-
-    buffer = [ user_strike.to_f * 0.25, 1.0 ].max
-    scope.where(strike: (user_strike.to_f - buffer)..(user_strike.to_f + buffer)).exists?
+    LeapsOptionChainSnapshot.fresh_for?(symbol, user_strike: user_strike)
   end
 
   def cached_errors(symbol)
