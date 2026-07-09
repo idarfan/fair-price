@@ -797,3 +797,24 @@ last_query_strike，因為候選本身沒變。
 **規則**：這個判斷邏輯只能有一個權威定義（在 model 的 class method），controller
 的 fresh_data_exists? 與 service fetch_leaps 內部的 cache 短路都必須呼叫同一個
 方法，不能各自維護一份緩衝公式或涵蓋範圍猜測邏輯。
+
+
+## 2026-07-09（三）：Stage 1 auto 偵測用近期 Delta 判斷，深度價內合約常年被誤排除
+
+使用者追問「NOK 留空查詢，7 這檔明明前面手動查時 Delta 0.85+，為什麼 auto 偵測
+沒抓到？」才發現：`_pick_candidates`（leaps_scraper.py）auto 模式用「Near the
+Money 視圖」（預設抓最近到期日）的 Delta 判斷候選履約價（Delta>=0.60），但
+Barchart 對「近期到期日 + 深度價內 + 近期無成交」的合約常常根本不計算 Greeks，
+delta/iv 兩者都回傳 0——不是「Delta 真的低於 0.60」，是「Delta 沒被算出來」。
+NOK 履約價 7 在 2026-07-10（DTE 2）這個最近到期日 delta=0.0、iv=0.0，因此
+auto 偵測完全跳過它，即使同一履約價在 LEAPS 到期日（DTE 562）Delta 高達 0.851。
+
+**規則**：`_pick_candidates` auto 模式判斷候選時，delta 為 0 且 iv 也為 0
+（雙零＝Greeks 未計算的訊號，非「合約沒有方向性」）時，改用內在價值判斷
+（履約價 < 現價即代表 Call 為價內，理當視為候選），不能單純看 delta>=0.60
+一刀切；delta/iv 任一非零仍照原邏輯（代表 Greeks 有算，且確實偏低就該排除）。
+
+**教訓延伸**：這是繼 2026-07-08「近期到期日 ≠ LEAPS 到期日的履約價階梯」之後
+第二個「近期到期日資料品質/存在性不能直接當作 LEAPS 判斷依據」的具體案例，
+往後任何借用近期到期日資料做 LEAPS 決策的邏輯，都要先確認資料本身在深度
+價內/價外、近期無成交的情境下是否可靠，不能預設 Greeks 一定有算。

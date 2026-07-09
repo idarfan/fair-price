@@ -179,12 +179,12 @@ def _fill_exp_dates(rows):
             r["expiration_date"] = _dte_to_date(r["dte"])
 
 
-def _pick_candidates(near_money_rows, user_strike=None):
+def _pick_candidates(near_money_rows, user_strike=None, underlying_price=None):
     """
     Stage 1: determine which strikes to query in Stage 2.
 
     Returns sorted list of strike prices.
-    Empty list means auto mode found no Delta>=0.60 in near-money view.
+    Empty list means auto mode found no qualifying strike in near-money view.
 
     Buffer rule: always add one strike below the lowest center and one
     above the highest center (from the visible near-money list), so that
@@ -193,6 +193,17 @@ def _pick_candidates(near_money_rows, user_strike=None):
     Key invariant: 0.60 here is a Stage 1 filter only.  The caller
     (BarchartScraperService / LeapsRankingService) still applies the
     final 0.60-0.90 filter in Stage 2 / Ruby — this is a SEPARATE rule.
+
+    BUG FIX (reported 2026-07-09, NOK strike 7): the Near the Money view reads
+    Greeks from the NEAREST expiration (short DTE). For deep ITM strikes with
+    little/no recent volume at that near expiration, Barchart does not compute
+    Delta/IV at all and reports them as 0 — not "Delta is genuinely low", but
+    "Delta was never calculated". Filtering on `delta >= 0.60` alone silently
+    drops these strikes from Stage 1, even though the SAME strike has a
+    perfectly good Delta (0.85+) at the LEAPS-dated expirations Stage 2 would
+    have fetched. A row with delta == 0 AND iv == 0 is treated as "Greeks not
+    computed" and falls back to a plain intrinsic-value ITM check instead of
+    being excluded outright.
     """
     all_strikes = sorted({r["strike"] for r in near_money_rows if r.get("strike") is not None})
 
@@ -200,10 +211,23 @@ def _pick_candidates(near_money_rows, user_strike=None):
         # Manual mode: user-specified center, skip Delta filter
         center_strikes = [float(user_strike)]
     else:
-        # Auto mode: Delta >= 0.60 from Near the Money view
+        def _qualifies(row):
+            delta = row.get("delta")
+            if delta is not None and delta >= 0.60:
+                return True
+            greeks_computed = delta not in (None, 0) or row.get("iv") not in (None, 0)
+            if greeks_computed:
+                return False
+            # Greeks missing (delta == 0 and iv == 0): fall back to intrinsic
+            # value — a call strike below the underlying price is in-the-money
+            # regardless of what Barchart's (uncomputed) Delta field shows.
+            return underlying_price is not None and row["strike"] < underlying_price
+
+        # Auto mode: Delta >= 0.60 from Near the Money view, with the
+        # missing-Greeks fallback above.
         center_strikes = sorted({
             r["strike"] for r in near_money_rows
-            if r.get("delta") is not None and r["delta"] >= 0.60
+            if r.get("strike") is not None and _qualifies(r)
         })
         if not center_strikes:
             return []
@@ -395,7 +419,7 @@ async def main(symbol, user_strike=None):
             return
 
     # ── Stage 1: pick candidate strikes ──────────────────────────────────────
-    candidate_strikes = _pick_candidates(near_money_rows, user_strike)
+    candidate_strikes = _pick_candidates(near_money_rows, user_strike, underlying_price)
     if not candidate_strikes:
         # Auto mode: no Delta>=0.60 strikes visible in near-money view
         print(json.dumps({"status": "no_candidates", "chain_snapshot": chain_snapshot}))

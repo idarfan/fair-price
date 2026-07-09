@@ -485,5 +485,54 @@ class TestLeapsChainSnapshot(unittest.TestCase):
         self.assertEqual(result["chain_snapshot"]["strikes"], [8.0, 9.0])
 
 
+
+class TestPickCandidatesMissingGreeks(unittest.TestCase):
+    """
+    Regression tests for the 2026-07-09 NOK bug: auto mode (no user_strike)
+    silently dropped strike 7 from Stage 1 candidates. Root cause: the Near
+    the Money view reads Delta/IV from the NEAREST expiration (short DTE).
+    For a deep ITM strike with little/no recent volume at that near
+    expiration, Barchart never computes Greeks and reports delta=0, iv=0 —
+    not "Delta is genuinely below 0.60", but "Delta was never calculated".
+    The same strike can have Delta 0.85+ at the LEAPS-dated expirations Stage
+    2 would have fetched, so filtering on delta >= 0.60 alone loses a
+    perfectly good candidate.
+    """
+
+    def test_strike_with_computed_delta_above_threshold_included(self):
+        rows = [ { "strike": 12.0, "delta": 0.65, "iv": 0.7 } ]
+        result = scraper._pick_candidates(rows, user_strike=None, underlying_price=12.0)
+        self.assertIn(12.0, result)
+
+    def test_strike_with_computed_delta_below_threshold_excluded(self):
+        # Greeks ARE computed (nonzero iv) and genuinely say low Delta — must
+        # NOT be rescued by the missing-Greeks fallback.
+        rows = [ { "strike": 20.0, "delta": 0.10, "iv": 0.5 } ]
+        result = scraper._pick_candidates(rows, user_strike=None, underlying_price=12.0)
+        self.assertEqual(result, [])
+
+    def test_deep_itm_strike_with_uncomputed_greeks_is_rescued(self):
+        # delta == 0 and iv == 0 together signal "not computed", strike is
+        # below underlying_price (in-the-money) → included despite delta 0.
+        rows = [ { "strike": 7.0, "delta": 0.0, "iv": 0.0 } ]
+        result = scraper._pick_candidates(rows, user_strike=None, underlying_price=11.95)
+        self.assertIn(7.0, result)
+
+    def test_otm_strike_with_uncomputed_greeks_is_not_rescued(self):
+        # delta == 0 and iv == 0, but strike is ABOVE underlying_price
+        # (out-of-the-money) — no intrinsic value fallback applies here.
+        rows = [ { "strike": 25.0, "delta": 0.0, "iv": 0.0 } ]
+        result = scraper._pick_candidates(rows, user_strike=None, underlying_price=11.95)
+        self.assertNotIn(25.0, result)
+
+    def test_manual_mode_unaffected_by_missing_greeks_logic(self):
+        # Manual mode centers on the given strike and always adds the +/-1
+        # buffer strike from all_strikes, regardless of the missing-Greeks
+        # fallback (that logic only runs in auto mode).
+        rows = [ { "strike": 7.0, "delta": 0.0, "iv": 0.0 }, { "strike": 12.0, "delta": 0.65, "iv": 0.7 } ]
+        result = scraper._pick_candidates(rows, user_strike=7.0, underlying_price=11.95)
+        self.assertEqual(result, [7.0, 12.0])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
