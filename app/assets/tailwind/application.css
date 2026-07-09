@@ -179,19 +179,22 @@ th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 }
 .leaps-vocab-summary:hover { color: #2563eb; }
 
-/* ── LEAPS 推薦分析名詞解釋圖卡（原生 details、深色卡面、匯出入鏡）──────────── */
+/* ── LEAPS 推薦分析名詞解釋圖卡（原生 details、奇偶區隔、匯出入鏡）──────────── */
 .leaps-concept-card {
-  background: #111827; border: 1px solid #374151; border-radius: 10px;
-  color: #d1d5db; overflow: hidden;
+  border: 2px solid #f97316; /* orange-500 */
+  border-radius: 10px;
+  color: #1f2937; overflow: hidden;
 }
+.leaps-concept-card:nth-of-type(odd)  { background: #dcfce7; } /* green-100 */
+.leaps-concept-card:nth-of-type(even) { background: #ede9fe; } /* purple-100 */
 .leaps-concept-summary {
   cursor: pointer; padding: 10px 14px; font-size: 14px; font-weight: 700;
-  color: #f9fafb; user-select: none; list-style-position: inside;
+  color: #1f2937; user-select: none; list-style-position: inside;
 }
-.leaps-concept-summary:hover { background: #1f2937; }
+.leaps-concept-summary:hover { background: rgba(0, 0, 0, .05); }
 .leaps-concept-body {
   padding: 4px 16px 14px; font-size: 13.5px; line-height: 1.75;
-  border-top: 1px solid #374151;
+  border-top: 1px solid #f97316;
 }
 .leaps-concept-body p { margin-top: 8px; }
-.leaps-concept-body strong { color: #f9fafb; font-weight: 700; }
+.leaps-concept-body strong { color: #111827; font-weight: 700; }
