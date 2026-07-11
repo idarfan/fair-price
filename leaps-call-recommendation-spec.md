@@ -315,6 +315,7 @@ extrinsic_value = mid - intrinsic_value
 
 - 路由不要憑空另開一個孤立的頂層資源：先看 `config/routes.rb` 現有結構，三維度儀表板（`technical_dashboards` 或類似名稱，請依實際檔案確認）跟既有的 `iv_skew_dashboard`／options flow 相關路由放在哪個 namespace／哪個區塊下，這次新增的 `leaps_recommendations` 應該跟著放在同一層級／同一 namespace 下，維持路由結構一致，不要平行另開一塊。
 - **要加進現有的導覽列/選單**：找到目前 Phlex layout 裡放導覽連結的位置（例如 header 或 sidebar 的 nav 元件），把這個新頁面的連結加進去，不能只新增 controller/route 卻沒有任何入口可以點進去，使用者不該需要自己手動輸入網址才能用到這個功能。
+  - **現行位置（已交付事實）**：`app/components/fair_value/app_switcher_component.rb` 的 `APP_LINKS` 陣列最後一項（第 12 項，排在「三維度判斷」之後）：`{ icon: "📐", label: "LEAPS 排行", href: "/leaps", desc: "深度價內 Call 候選排行 · Delta 0.75–0.90 · OI 排序" }`。所屬應用程式：FairPrice（同一 Rails process，port 3003，非獨立 app）。
 - Phlex 元件，沿用專案既有慣例（不用 ERB/Hotwire）
 - 輸入區塊新增**選填**的履約價輸入框（放在股票代號旁邊或下方），留空時走 Stage 1 自動偵測（Delta>=0.60），填了則直接當 Stage 2 的中心履約價，後續流程（上下加緩衝檔、Stage 2 抓取、最終 0.60–0.90 篩選）完全不變，不是另開一套邏輯。
 - 頁面流程：輸入股票代號（＋選填履約價）→ 送出後顯示抓取中狀態（Playwright 抓取需要數秒，用 ActiveJob + Turbo Stream/polling）→ 完成後顯示：
