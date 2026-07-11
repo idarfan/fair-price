@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_09_074508) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_054225) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -313,6 +313,42 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_09_074508) do
     t.datetime "updated_at", null: false
     t.index ["ticker", "quarter"], name: "index_ownership_snapshots_on_ticker_and_quarter", unique: true
     t.index ["ticker", "snapshot_date"], name: "index_ownership_snapshots_on_ticker_and_snapshot_date"
+  end
+
+  create_table "pmcc_short_call_snapshots", force: :cascade do |t|
+    t.decimal "ask", precision: 10, scale: 4
+    t.decimal "bid", precision: 10, scale: 4
+    t.decimal "change", precision: 10, scale: 4
+    t.datetime "created_at", null: false
+    t.decimal "delta", precision: 8, scale: 6
+    t.integer "dte"
+    t.date "expiration_date", null: false
+    t.decimal "extrinsic_value", precision: 10, scale: 4
+    t.decimal "gamma", precision: 10, scale: 6
+    t.decimal "intrinsic_value", precision: 10, scale: 4
+    t.decimal "itm_probability", precision: 8, scale: 6
+    t.decimal "iv", precision: 8, scale: 6
+    t.decimal "last_price", precision: 10, scale: 4
+    t.date "last_trade_date"
+    t.decimal "mid_price", precision: 10, scale: 4
+    t.decimal "moneyness", precision: 8, scale: 4
+    t.integer "oi_change"
+    t.integer "open_interest"
+    t.string "option_type", default: "Call", null: false
+    t.decimal "percent_change", precision: 8, scale: 4
+    t.decimal "rho", precision: 10, scale: 6
+    t.datetime "scraped_at", null: false
+    t.decimal "strike", precision: 10, scale: 4, null: false
+    t.string "symbol", null: false
+    t.decimal "theoretical_price", precision: 10, scale: 4
+    t.decimal "theta", precision: 10, scale: 6
+    t.decimal "underlying_price", precision: 10, scale: 4
+    t.datetime "updated_at", null: false
+    t.decimal "vega", precision: 10, scale: 6
+    t.decimal "vol_oi_ratio", precision: 8, scale: 4
+    t.integer "volume"
+    t.index ["symbol", "expiration_date", "strike"], name: "idx_pmcc_short_unique", unique: true
+    t.index ["symbol", "scraped_at"], name: "idx_pmcc_short_symbol_scraped"
   end
 
   create_table "portfolios", force: :cascade do |t|
