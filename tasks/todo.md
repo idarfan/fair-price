@@ -58,3 +58,19 @@ _最後更新：2026-07-04_
 三層互動全驗收：hover 深色 tooltip、點擊聚光 popover（深色）、28 步 tour；
 28 欄 0 dead key；匯出 PNG md5 與前版逐位元組一致；352 examples 全過。
 規格：leaps-column-tooltips-spec.md（checklist 已附證據打勾）
+---
+
+## LEAPS 主 spec 索引同步（規格文件，非程式碼）— 已結案 ✅（2026-07-11）
+
+- [x] 審視 `leaps-call-recommendation-spec.md` 是否已納入 `leaps-phase-j-vector-pdf-spec.md`（PDF 向量文字化）的完成狀態
+- [x] 補「接手前必讀」摘要句：加入 Phase J 交付內容＋4 輪補做清單（名詞解釋圖卡／Flow 總額與重疊提示／語意色與推薦徽章／術語字卡＋IPA 音標字型）
+- [x] 補「執行方式」階段索引：Phase J 已結案，指向子規格檔進度追蹤區
+- [x] 補「路由與前端」節：記錄 LEAPS 頁面在 sidebar 的現行位置（`APP_LINKS` 第 12 項、icon/label/href/desc、所屬 app = FairPrice port 3003）
+- [x] commit + push（`a11ac6b..4357146`）
+- [x] Obsidian 工作日誌寫入（`fairprice/2026-07-11 工作日誌.md`）
+
+## Review（2026-07-11）
+
+- 純規格文件同步，無程式碼異動，未觸發 RSpec/E2E。
+- 根因：Phase J 獨立成子規格檔後，主 spec 的頂層摘要句／階段索引沒有同步更新，造成新 session 讀「接手前必讀」時會誤判 Phase J 還沒開始，需額外去查子規格檔進度追蹤區才發現其實已結案。
+- 教訓（已寫入 Obsidian 日誌，待補進 `tasks/lessons.md`）：往後每完成一個獨立 Phase 子規格，除子規格自身的進度追蹤區外，也要回頭檢查主 spec 頂層摘要是否同步列入；規格中的「原則性指示」與「已交付事實」應分開記錄，避免事實面隨程式改動而與規格脫節。
