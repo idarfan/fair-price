@@ -97,6 +97,13 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   raise "TABLE_COL_KEYS 與 TABLE_COLS 長度不一致" unless TABLE_COL_KEYS.size == TABLE_COLS.size
   raise "FLOW_COL_KEYS 與 FLOW_COLS 長度不一致"   unless FLOW_COL_KEYS.size == FLOW_COLS.size
 
+  # 使用者回報：PMCC 表格桶內排序只依 max_profit，不能依 KS 瀏覽——需求擴大為
+  # LEAPS 排行表跟 PMCC 表都要能點表頭切換排序鍵。跟 TABLE_COL_KEYS 一樣一一對齊。
+  PMCC_TABLE_COL_KEYS = %w[
+    kl pl long_dte long_delta ks ps short_delta spread net_debit max_profit yield_ann passes
+  ].freeze
+  raise "PMCC_TABLE_COL_KEYS 與 PMCC_TABLE_COLS 長度不一致" unless PMCC_TABLE_COL_KEYS.size == PMCC_TABLE_COLS.size
+
   def initialize(symbol: nil, candidates: [], recommendation: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil, next_earnings: nil, pmcc_ranking: nil)
     @symbol         = symbol
     @candidates     = Array(candidates)
@@ -131,6 +138,11 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     render_loading_script
     render_export_script
     render_vector_pdf_script
+    # 排序腳本必須先於教學 popover 腳本註冊：兩者都用 document 委派 click，
+    # 排序點擊區域（.sort-arrow）若被教學腳本先攔截，會同時彈出 popover
+    # 又觸發排序（實測發現的真實 bug）。排序腳本命中 .sort-arrow 時呼叫
+    # stopImmediatePropagation，越早註冊才能真的擋住後面的教學腳本監聽器。
+    render_sortable_table_script
     render_tooltips_script
   end
 
@@ -352,6 +364,72 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
   def render_pdf_data_script
     script(type: "application/json", id: "leaps-pdf-data") { raw pdf_export_payload.to_json.html_safe }
+  end
+
+  # 使用者回報：PMCC 表格桶內排序只依 max_profit 一種，不能依 KS 瀏覽——擴大成
+  # LEAPS 排行表 + PMCC 表都能點表頭切換排序鍵。一支通用 JS，靠 table 上的
+  # data-sortable + th 上的 data-sort-key + tr 上的 data-sort-json（每列一份
+  # {key: 數值} JSON）就能運作，不用替兩張表各寫一份。
+  def render_sortable_table_script
+    script do
+      raw <<~JS.html_safe
+        (function () {
+          function getVal(tr, key) {
+            var raw = tr.getAttribute('data-sort-json');
+            if (!raw) return null;
+            try {
+              var obj = JSON.parse(raw);
+              var v = obj[key];
+              if (v === null || v === undefined) return null;
+              var f = parseFloat(v);
+              return isFinite(f) ? f : null;
+            } catch (e) { return null; }
+          }
+
+          function sortTable(table, key, dir) {
+            var tbody = table.querySelector('tbody');
+            if (!tbody) return;
+            var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+            var floor = -Infinity;
+            rows.sort(function (a, b) {
+              var av = getVal(a, key);
+              var bv = getVal(b, key);
+              av = av === null ? floor : av;
+              bv = bv === null ? floor : bv;
+              return dir === 'asc' ? av - bv : bv - av;
+            });
+            rows.forEach(function (r) { tbody.appendChild(r); });
+          }
+
+          document.addEventListener('click', function (e) {
+            // 命中排序圖示（.sort-arrow）才處理，且用 stopImmediatePropagation
+            // 擋掉後面才註冊的教學 popover 委派——同一個 th 上還有 data-tip-key，
+            // 兩層委派都掛在 document，若不擋，點排序圖示會同時彈出教學 popover。
+            var arrow = e.target.closest('.sort-arrow[data-sort-key]');
+            if (!arrow) return;
+            e.stopImmediatePropagation();
+
+            var table = arrow.closest('table[data-sortable]');
+            if (!table) return;
+
+            var key     = arrow.getAttribute('data-sort-key');
+            var curDir  = arrow.getAttribute('data-sort-dir');
+            var nextDir = curDir === 'desc' ? 'asc' : 'desc';
+
+            table.querySelectorAll('.sort-arrow[data-sort-key]').forEach(function (a) {
+              if (a === arrow) return;
+              a.removeAttribute('data-sort-dir');
+              a.textContent = '⇅';
+            });
+
+            arrow.setAttribute('data-sort-dir', nextDir);
+            arrow.textContent = nextDir === 'desc' ? '▾' : '▴';
+
+            sortTable(table, key, nextDir);
+          });
+        })();
+      JS
+    end
   end
 
   def render_header
@@ -727,13 +805,27 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
         end
       end
       div(class: "overflow-x-auto") do
-        table(class: "w-full text-xs text-gray-700") do
+        table(class: "w-full text-xs text-gray-700", data_sortable: "true") do
           thead(class: "bg-gray-50 text-gray-500 text-xs") do
             tr do
               TABLE_COLS.each_with_index do |col, idx|
                 key = TABLE_COL_KEYS[idx]
-                th(id: "leaps-th-#{key}", data_tip_key: key,
-                   class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain col }
+                if key == "expiration" # 日期字串，不參與數值排序
+                  th(id: "leaps-th-#{key}", data_tip_key: key,
+                     class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain col }
+                else
+                  # data-sort-key 故意放在內層排序圖示，不放在 th 本身——th 上還有
+                  # data-tip-key（點擊會開欄位教學 popover），兩個 click 委派都掛在
+                  # document 上，若共用同一個點擊區域，點表頭會同時觸發排序跟教學
+                  # popover（實測發現的真的 bug，不是假設）。分開兩個可點擊區域，
+                  # 互不干擾：點文字＝看說明（沿用既有行為不變），點 ⇅ 圖示＝排序。
+                  th(id: "leaps-th-#{key}", data_tip_key: key,
+                     class: "px-3 py-2 text-center font-medium whitespace-nowrap") do
+                    plain col
+                    span(class: "sort-arrow ml-0.5 text-gray-400 cursor-pointer hover:text-blue-600 select-none",
+                         data_sort_key: key) { plain "⇅" }
+                  end
+                end
               end
             end
           end
@@ -755,7 +847,8 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     style = LIQUIDITY_STYLE[tier] || LIQUIDITY_STYLE["普通"]
     warn  = row[:no_recent_volume_warning]
 
-    tr(class: "border-t border-gray-100 hover:bg-purple-200 #{i.odd? ? 'bg-gray-50/50' : ''}") do
+    tr(class: "border-t border-gray-100 hover:bg-purple-200 #{i.odd? ? 'bg-gray-50/50' : ''}",
+       data_sort_json: leaps_row_sort_json(row, tier)) do
       td(class: "px-3 py-2 text-center font-mono whitespace-nowrap") { plain row[:expiration_date].to_s }
       td(class: "px-3 py-2 text-center")                             { plain row[:dte].to_s }
       td(class: "px-3 py-2 text-center font-semibold")               { plain fmt_price(row[:strike]) }
@@ -928,11 +1021,16 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
   def render_pmcc_table(combos)
     div(class: "overflow-x-auto") do
-      table(class: "w-full text-xs text-gray-700") do
+      table(class: "w-full text-xs text-gray-700", data_sortable: "true") do
         thead(class: "bg-gray-50 text-gray-500 text-xs") do
           tr do
-            PMCC_TABLE_COLS.each do |col|
-              th(class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain col }
+            PMCC_TABLE_COLS.each_with_index do |col, idx|
+              key = PMCC_TABLE_COL_KEYS[idx]
+              th(class: "px-3 py-2 text-center font-medium whitespace-nowrap") do
+                plain col
+                span(class: "sort-arrow ml-0.5 text-gray-400 cursor-pointer hover:text-blue-600 select-none",
+                     data_sort_key: key) { plain "⇅" }
+              end
             end
             th(class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain "詳細" }
           end
@@ -950,7 +1048,8 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     fail_row  = !combo[:passes_golden_rule]
     row_bg    = fail_row ? "bg-red-50" : (i.odd? ? "bg-gray-50/50" : "")
 
-    tr(class: "border-t border-gray-100 hover:bg-purple-200 #{row_bg}") do
+    tr(class: "border-t border-gray-100 hover:bg-purple-200 #{row_bg}",
+       data_sort_json: pmcc_combo_sort_json(combo)) do
       td(class: "px-3 py-2 text-center font-semibold text-blue-600") { plain fmt_price(long_leg[:strike]) }
       td(class: "px-3 py-2 text-center")                             { plain fmt_price(long_leg[:mid]) }
       td(class: "px-3 py-2 text-center")                             { plain long_leg[:dte].to_s }
@@ -1968,6 +2067,53 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   def fmt_strike_short(val)
     f = val.to_f
     f == f.to_i ? f.to_i.to_s : f.to_s
+  end
+
+  # ── 表格點表頭排序（LEAPS 排行表 + PMCC 表共用同一套 JS，見 render_sortable_table_script）──
+
+  # 每個 key 對應 TABLE_COL_KEYS 同名欄位，供前端 JS 依 data-sort-key 做數值排序。
+  # liquidity 不是天然數值，借用 LeapsRecommendationService::TIER_ORDER 轉成排序用等第。
+  def leaps_row_sort_json(row, tier)
+    {
+      dte:            row[:dte],
+      strike:         row[:strike]&.to_f,
+      delta:          row[:delta]&.to_f,
+      oi:             row[:open_interest],
+      volume:         row[:volume],
+      liquidity:      LeapsRecommendationService::TIER_ORDER[tier.to_s] || 0,
+      bid:            row[:bid]&.to_f,
+      ask:            row[:ask]&.to_f,
+      mid:            row[:mid]&.to_f,
+      spread:         row[:bid_ask_spread_pct]&.to_f,
+      intrinsic:      row[:intrinsic_value]&.to_f,
+      extrinsic:      row[:extrinsic_value]&.to_f,
+      extrinsic_pct:  row[:extrinsic_pct]&.to_f,
+      time_value_pct: row[:time_value_pct]&.to_f,
+      iv:             row[:iv]&.to_f,
+      vega:           row[:vega]&.to_f,
+      itm_prob:       row[:itm_probability]&.to_f
+    }.to_json
+  end
+
+  # 每個 key 對應 PMCC_TABLE_COL_KEYS 同名欄位。passes（Golden Rule）借用 1/0 排序，
+  # 讓使用者也能點「Golden Rule」欄把通過的組合集中在最上面或最下面。
+  def pmcc_combo_sort_json(combo)
+    long_leg  = combo[:long_leg]
+    short_leg = combo[:short_leg]
+    {
+      kl:          long_leg[:strike]&.to_f,
+      pl:          long_leg[:mid]&.to_f,
+      long_dte:    long_leg[:dte],
+      long_delta:  long_leg[:delta]&.to_f,
+      ks:          short_leg[:strike]&.to_f,
+      ps:          short_leg[:mid]&.to_f,
+      short_delta: short_leg[:delta]&.to_f,
+      spread:      combo[:spread]&.to_f,
+      net_debit:   combo[:net_debit]&.to_f,
+      max_profit:  combo[:max_profit]&.to_f,
+      yield_ann:   combo[:premium_yield_ann]&.to_f,
+      passes:      combo[:passes_golden_rule] ? 1 : 0
+    }.to_json
   end
 
   # ── Formatters ──────────────────────────────────────────────────────────────

@@ -108,6 +108,28 @@ RSpec.describe "GET /leaps", type: :request do
       get "/leaps", params: { symbol: symbol }
       expect(response.body).to include("LEAPS 候選排行")
     end
+
+    # 使用者回報：點表頭排序同時彈出教學 popover——排序圖示（.sort-arrow）跟
+    # 欄位教學觸發點（data-tip-key）曾經是同一個可點擊區域，兩個 document 級
+    # click 委派互相干擾。這裡鎖住「兩者是分開的元素」這個結構前提，防止未來
+    # 有人把 data-sort-key 改回直接放在 th 上而不自知重新踩雷。
+    it "keeps the sort trigger (.sort-arrow[data-sort-key]) separate from the tooltip trigger (th[data-tip-key])" do
+      get "/leaps", params: { symbol: symbol }
+      body = response.body
+
+      # th 本身仍帶 data-tip-key（既有欄位教學功能不變）
+      expect(body).to match(/<th[^>]*data-tip-key="oi"[^>]*>/)
+      # 但 th 標籤本身不能直接帶 data-sort-key（必須是內層 .sort-arrow 才有）
+      expect(body).not_to match(/<th[^>]*data-tip-key="oi"[^>]*data-sort-key=/)
+      # .sort-arrow 元素本身要帶 data-sort-key
+      expect(body).to match(/class="sort-arrow[^"]*"\s+data-sort-key="oi"/)
+    end
+
+    it "renders each row's data-sort-json for the table[data-sortable] JS to read" do
+      get "/leaps", params: { symbol: symbol }
+      expect(response.body).to match(/<table[^>]*data-sortable="true"/)
+      expect(response.body).to match(/data-sort-json="[^"]*&quot;dte&quot;/)
+    end
   end
 
   # ── PMCC v3 §8: pmcc_ranking_for wiring ──────────────────────────────────
