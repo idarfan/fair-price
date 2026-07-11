@@ -33,19 +33,22 @@ class LeapsOptionChainSnapshot < ApplicationRecord
     (bid + ask) / 2.0
   end
 
-  # Phase H：內在/外在價值的唯一公式定義處。persist 層（BarchartScraperService#persist_leaps）
-  # 寫入時呼叫；排行層直接讀 DB 欄位，不得重算（雙軌計算是規格明文禁止的 bug 溫床）。
-  # 權利金基準是 Mid = (bid+ask)/2，不是 last_price（Latest 可能是數小時前的陳舊成交價）。
-  # bid/ask/underlying_price 任一缺值 → 兩欄皆 null，不存 0 假裝有值。
-  def self.derived_values(option_type:, strike:, underlying_price:, bid:, ask:)
-    return { intrinsic_value: nil, extrinsic_value: nil } if bid.nil? || ask.nil? || underlying_price.nil?
+  # Phase H：內在/外在價值的唯一公式定義處。persist 層（BarchartScraperService#persist_leaps／
+  # #persist_pmcc_short_calls）寫入時呼叫；排行層直接讀 DB 欄位，不得重算（雙軌計算是規格明文
+  # 禁止的 bug 溫床）。
+  # PMCC v3 §2.1：mid 的決定（Barchart midpoint 原值 → fallback (bid+ask)/2 → 任一缺值則 null）
+  # 由呼叫端決定並傳入，本方法不得自行從 bid/ask 重算——同一列的 mid_price 欄與這裡算
+  # extrinsic_value 用的 mid 必須是同一個數字。LEAPS 呼叫端傳 (bid+ask)/2（無獨立 midpoint
+  # 欄位可用），行為與改版前一致。
+  # mid/underlying_price 任一缺值 → 兩欄皆 null，不存 0 假裝有值。
+  def self.derived_values(option_type:, strike:, underlying_price:, mid:)
+    return { intrinsic_value: nil, extrinsic_value: nil } if mid.nil? || underlying_price.nil?
 
-    mid       = (bid.to_f + ask.to_f) / 2.0
     intrinsic = if option_type.to_s.casecmp("put").zero?
                   [ strike.to_f - underlying_price.to_f, 0.0 ].max
     else
                   [ underlying_price.to_f - strike.to_f, 0.0 ].max
     end
-    { intrinsic_value: intrinsic, extrinsic_value: mid - intrinsic }
+    { intrinsic_value: intrinsic, extrinsic_value: mid.to_f - intrinsic }
   end
 end

@@ -300,12 +300,14 @@ class BarchartScraperService
 
     now = Time.current
     records = rows.map do |r|
+      # PMCC v3 §2.1：LEAPS 無獨立 midpoint 欄位，mid 固定走 (bid+ask)/2；
+      # 任一缺值 → mid=nil，derived_values 兩欄皆回 null（行為與改版前一致）。
+      mid = r["bid"].nil? || r["ask"].nil? ? nil : (r["bid"].to_f + r["ask"].to_f) / 2.0
       derived = LeapsOptionChainSnapshot.derived_values(
         option_type:      r["option_type"],
         strike:           r["strike"],
         underlying_price: r["underlying_price"],
-        bid:              r["bid"],
-        ask:              r["ask"]
+        mid:              mid
       )
       {
         symbol:           @symbol,

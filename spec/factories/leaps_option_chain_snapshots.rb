@@ -25,12 +25,12 @@ FactoryBot.define do
     # 測試若明確指定這兩欄（例如驗證排行層讀 DB 不重算），以指定值為準。
     after(:build) do |snap, _evaluator|
       if snap.intrinsic_value.nil? && snap.extrinsic_value.nil?
+        mid = snap.bid.nil? || snap.ask.nil? ? nil : (snap.bid.to_f + snap.ask.to_f) / 2.0
         d = LeapsOptionChainSnapshot.derived_values(
           option_type:      snap.option_type,
           strike:           snap.strike,
           underlying_price: snap.underlying_price,
-          bid:              snap.bid,
-          ask:              snap.ask
+          mid:              mid
         )
         snap.intrinsic_value = d[:intrinsic_value]
         snap.extrinsic_value = d[:extrinsic_value]
