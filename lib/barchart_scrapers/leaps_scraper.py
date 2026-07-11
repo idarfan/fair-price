@@ -122,6 +122,7 @@ STACKED_OPTIONS_JS = """
       last:    typeof r.lastPrice     === 'number' ? r.lastPrice     : null,
       volume:  typeof r.volume        === 'number' ? r.volume        : null,
       oi:      typeof r.openInterest  === 'number' ? r.openInterest  : null,
+      oi_chg:  typeof r.openInterestChange === 'number' ? r.openInterestChange : (typeof r.oiChange === 'number' ? r.oiChange : null),
       delta:   typeof r.delta         === 'number' ? r.delta         : null,
       iv:      typeof r.volatility    === 'number' ? r.volatility    : null,
       moneyness: typeof r.moneyness   === 'number' ? r.moneyness     : null,
