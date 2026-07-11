@@ -4,7 +4,7 @@
 
 ## 接手前必讀（2026-07-05 歸檔版）
 
-LEAPS Call 候選排行功能已結案（2026-07-02）；後續增量 fresh window 30 分鐘（commit `2e46139`）、Phase H 內在/外在價值欄位（`2f9159a`＋`6abc533`）、Phase I 匯出 PNG/PDF（`f233b1f`＋`3f416ca`）均已交付並通過驗收，僅餘文末「待辦」的 live 對照補驗一項。本檔只保留現行有效規範（核心原則、DOM 參考、schema、公式唯一定義處、fresh window 規範、Phase H/I 規格）；歷代開發脈絡、CDP 事件記錄、各階段交付記錄、已完成 checklist 與證據，全部在 `leaps-call-recommendation-history.md`，僅在追查歷史問題時才讀。新功能需求請另開新規格文件，不要在本檔累加。
+LEAPS Call 候選排行功能已結案（2026-07-02）；後續增量 fresh window 30 分鐘（commit `2e46139`）、Phase H 內在/外在價值欄位（`2f9159a`＋`6abc533`）、Phase I 匯出 PNG/PDF（`f233b1f`＋`3f416ca`）、Phase J PDF 向量文字化（含 4 輪補做：名詞解釋圖卡／Flow 總額與重疊提示／語意色與推薦徽章／術語字卡＋IPA 音標字型，見 `leaps-phase-j-vector-pdf-spec.md`）均已交付並通過驗收，僅餘文末「待辦」的 live 對照補驗一項。本檔只保留現行有效規範（核心原則、DOM 參考、schema、公式唯一定義處、fresh window 規範、Phase H/I/J 規格）；歷代開發脈絡、CDP 事件記錄、各階段交付記錄、已完成 checklist 與證據，全部在 `leaps-call-recommendation-history.md`，僅在追查歷史問題時才讀。新功能需求請另開新規格文件，不要在本檔累加。
 
 > 歷史記錄（原「接手前必讀」全文、工具驗證教訓、CDP 事件、待辦狀態演進）見 `leaps-call-recommendation-history.md` 第 1 節。
 > 相關規格文件索引：本功能頁面另有 `leaps-column-tooltips-spec.md`（教學功能：推薦分析圖卡＋欄位 tooltips＋術語字卡，進行中）、`leaps-user-strike-validation-spec.md`（user_strike 三層驗證原始規格與驗收記錄）。
@@ -368,7 +368,7 @@ extrinsic_value = mid - intrinsic_value
 
 ## 執行方式（請務必分階段進行，每階段做完跟使用者確認再繼續）
 
-> 階段 A–I 全部交付記錄與規格原文（含 Phase H／Phase I 完整區塊），見 `leaps-call-recommendation-history.md` 第 2 節；驗收證據見第 3 節。
+> 階段 A–I 全部交付記錄與規格原文（含 Phase H／Phase I 完整區塊），見 `leaps-call-recommendation-history.md` 第 2 節；驗收證據見第 3 節。Phase J（PDF 向量文字化，已結案，含 4 輪補做）完整規格與進度追蹤見 `leaps-phase-j-vector-pdf-spec.md`。
 
 ## 匯出功能現況（Phase I 交付結果，現行行為事實）
 
