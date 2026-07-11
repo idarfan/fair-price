@@ -356,12 +356,16 @@ extrinsic_value = mid - intrinsic_value
 ## 排程
 
 不需要每日自動排程，使用者觸發查詢時才抓取最新資料。同一 symbol 短時間內（**30 分鐘內**）已抓過可直接讀 DB，避免重複打 Barchart。
+
+**scraper 路徑**：`lib/barchart_scrapers/leaps_scraper.py`（由 `app/jobs/scrape_leaps_job.rb` 觸發）。**fresh window／cache 判斷邏輯不在這支檔案裡**——scraper 只負責實際抓取（Stage 1 履約價清單、Stage 2 V&G），是否需要重抓完全由 Ruby 端 `LeapsOptionChainSnapshot.fresh_for?` 決定，呼叫端（controller `fresh_data_exists?` / service `fetch_leaps`）判斷不需要重抓時，scraper 根本不會被呼叫。
+
 ### fresh window 規範
 
 1. **fresh window = 30 分鐘**（`scraped_at >= 30.minutes.ago`）。
 2. **單一定義來源**：`LeapsOptionChainSnapshot::FRESH_WINDOW = 30.minutes`，model `fresh` scope、`fetch_leaps`、`fresh_data_exists?`、相關 `Rails.cache` `expires_in` 全部引用它。
 3. 全 codebase 禁止出現第二個寫死的 `5.minutes`／`300`／`30.minutes` 字面值（測試檔用 `FRESH_WINDOW ± n` 表達邊界）。
 4. 已知限制：盤中報價最舊可達 30 分鐘；`force_refresh` 強制重抓為未來選項，尚未實作。
+5. **cache hit 不能只看時間新鮮，必須同時比對「查詢中心點」**（2026-07-09 修復，見 lessons.md）：`LeapsOptionChainSnapshot.fresh_for?(symbol, user_strike:)` 除了 `fresh` scope（時間新鮮）外，還會比對 `StrikeChainSnapshot#last_query_strike`（`nil`＝上次是 auto 模式，數值＝上次手動履約價）是否等於這次請求的 `user_strike`（nil-safe 比較），兩者都吻合才算 cache hit。**不用「user_strike ± 緩衝範圍」猜涵蓋範圍**——這是修法前的舊設計，會誤判（例如手動查過履約價 7 後，30 分鐘內留空重查 auto 模式，舊設計會誤判為 cache hit 並沿用手動模式窄化過的候選，而非重新做 auto 偵測）。`invalid_strike` 分支（只驗證未實際重抓）不更新 `last_query_strike`。這是唯一權威定義，controller 與 service 的 cache 短路都必須呼叫這個 class method，不能各自維護一份判斷邏輯。
 
 > 5→30 分鐘的多次未真改前科與修復證據要求，見 history 第 4 節。
 
