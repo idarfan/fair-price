@@ -138,6 +138,54 @@ class BarchartScraperService
     result
   end
 
+  # PMCC v3 §7：Short Call 三到期日快照抓取（近三個到期日 × 全履約價）。
+  # 獨立於 fetch_leaps 之外——§1 鐵律「PMCC 失敗不可讓 LEAPS 查詢變 error」由
+  # 呼叫端（ScrapeLeapsJob）自行 try/catch 隔離這個方法的呼叫，這裡本身不吞例外
+  # （persist 層驗證失敗時仍會 raise，交給呼叫端決定要不要吞）。
+  def fetch_pmcc_short_calls
+    result = { symbol: @symbol, status: nil, errors: [] }
+
+    unless cdp_available?
+      result[:status] = "error"
+      result[:errors] << "Chrome CDP not reachable at #{CDP_URL}"
+      log_fetch("pmcc_short", "error", "CDP unavailable")
+      return result
+    end
+
+    fetch_result = run_scraper("pmcc_short_call")
+
+    case fetch_result[:status]
+    when "barchart_session_expired"
+      log_fetch("pmcc_short", "barchart_session_expired", nil)
+      result[:status] = "barchart_session_expired"
+    when "no_candidates"
+      log_fetch("pmcc_short", "no_candidates", nil)
+      result[:status] = "no_candidates"
+    when "success"
+      persist_pmcc_short_calls(fetch_result[:data])
+      log_fetch("pmcc_short", "success", "rows=#{fetch_result[:data]["rows"]&.length}")
+      result[:status] = "success"
+    when "partial"
+      persist_pmcc_short_calls(fetch_result[:data])
+      data          = fetch_result[:data]
+      expired_at    = data["expired_at_expiration"]
+      expired_layer = data["expired_layer"]
+      reason        = data["reason"] || "unknown"
+      skipped       = Array(data["skipped_expirations"])
+      log_fetch("pmcc_short", "partial_error",
+                "expired_at=#{expired_at} layer=#{expired_layer} reason=#{reason} " \
+                "skipped=#{skipped.map { |s| "#{s["expiration"]}/#{s["layer"]}" }.join(",")}")
+      result[:status] = "partial_error"
+      result[:errors] << "PMCC Short Call 在 #{expired_at} 時 #{expired_layer} 中斷（#{reason}），已抓部分用於組合"
+    else
+      log_fetch("pmcc_short", "error", fetch_result[:error])
+      result[:status] = "error"
+      result[:errors] << fetch_result[:error].to_s
+    end
+
+    result
+  end
+
   # UI-triggered max pain fetch for a specific filter combination.
   # Chart 4 (Max Pain by Contract) is filter-independent — NOT re-upserted here.
   def fetch_max_pain(expiration: nil, strikes: "show_all", volume_oi: "open_interest")
@@ -346,6 +394,75 @@ class BarchartScraperService
     ActiveRecord::Base.transaction do
       LeapsOptionChainSnapshot.where(symbol: @symbol).delete_all
       LeapsOptionChainSnapshot.insert_all(records)
+    end
+  end
+
+  def persist_pmcc_short_calls(data)
+    rows = data["rows"]
+    return if rows.blank?
+
+    now = Time.current
+    records = rows.map do |r|
+      # PMCC v3 §2.1：mid 的唯一決定順序——Barchart midpoint 原值優先；缺值才 fallback
+      # (bid+ask)/2；兩者都缺才是 nil（不以 0 代）。存入 mid_price 欄的數字，跟傳給
+      # derived_values 算 extrinsic_value 用的 mid，必須是同一個數字。
+      mid = if r["mid"].present?
+              r["mid"].to_f
+      elsif r["bid"].present? && r["ask"].present?
+              (r["bid"].to_f + r["ask"].to_f) / 2.0
+      end
+
+      derived = LeapsOptionChainSnapshot.derived_values(
+        option_type:      r["option_type"] || "Call",
+        strike:           r["strike"],
+        underlying_price: r["underlying_price"],
+        mid:              mid
+      )
+
+      {
+        symbol:             @symbol,
+        expiration_date:    r["expiration_date"],
+        dte:                r["dte"],
+        strike:             r["strike"],
+        option_type:        r["option_type"] || "Call",
+        bid:                r["bid"],
+        ask:                r["ask"],
+        mid_price:          mid,
+        last_price:         r["last_price"],
+        moneyness:          r["moneyness"],
+        underlying_price:   r["underlying_price"],
+        change:             r["change"],
+        percent_change:     r["percent_change"],
+        volume:             r["volume"],
+        open_interest:      r["open_interest"],
+        oi_change:          r["oi_change"],
+        vol_oi_ratio:       r["vol_oi_ratio"],
+        iv:                 r["iv"],
+        delta:              r["delta"],
+        gamma:              r["gamma"],
+        theta:              r["theta"],
+        vega:               r["vega"],
+        rho:                r["rho"],
+        theoretical_price:  r["theoretical_price"],
+        itm_probability:    r["itm_probability"],
+        intrinsic_value:    derived[:intrinsic_value],
+        extrinsic_value:    derived[:extrinsic_value],
+        scraped_at:         now,
+        created_at:         now,
+        updated_at:         now
+      }
+    end
+
+    # 防護性驗證：insert_all 不觸發 model validation，手動檢查必要欄位，讓呼叫端
+    # （ScrapeLeapsJob 的 try/catch）可以把人話訊息寫進 log，不讓壞資料悄悄落地。
+    incomplete = records.count { |r| r[:expiration_date].blank? || r[:strike].blank? || r[:strike].to_f <= 0 }
+    if incomplete > 0
+      raise "PMCC Short Call 資料不完整（#{incomplete}/#{records.size} 筆缺少到期日或履約價無效），請重新查詢"
+    end
+
+    ActiveRecord::Base.transaction do
+      PmccShortCallSnapshot.where(symbol: @symbol).delete_all
+      PmccShortCallSnapshot.insert_all(records)
     end
   end
 
