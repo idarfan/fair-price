@@ -210,6 +210,17 @@ RSpec.describe "GET /leaps", type: :request do
       expect(response.body).to match(/<table[^>]*data-sortable="true"/)
       expect(response.body).to match(/data-sort-json="[^"]*&quot;ks&quot;/)
     end
+
+    it "renders pmcc_ prefixed data-tip-key on every PMCC header (driver.js hover/click explain)" do
+      get "/leaps", params: { symbol: symbol }
+      body = response.body
+      expect(body).to match(/<th data-tip-key="pmcc_ks"/)
+      expect(body).to match(/<th data-tip-key="pmcc_max_profit"/)
+      expect(body).to match(/<th data-tip-key="pmcc_passes"/)
+      # 這個 fixture 只有 1 個到期日桶；真實資料有 3 桶時，同一個 key 的 th
+      # 會出現 3 次（沒有唯一 id，故意設計成這樣，見 render_pmcc_table 註解）。
+      expect(body.scan('data-tip-key="pmcc_ks"').size).to eq(1)
+    end
   end
 
   # ── 4. job_status=session_expired 帶回（Barchart 過期）────────────────────

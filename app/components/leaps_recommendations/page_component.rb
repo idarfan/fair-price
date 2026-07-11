@@ -1027,8 +1027,14 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       table(class: "w-full text-xs text-gray-700", data_sortable: "true") do
         thead(class: "bg-gray-50 text-gray-500 text-xs") do
           tr do
-            PMCC_TABLE_COLS.each do |col|
-              th(class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain col }
+            PMCC_TABLE_COLS.each_with_index do |col, idx|
+              # data-tip-key 用 pmcc_ 前綴跟 LEAPS 表既有的 tip key（spread 等）分開，
+              # 兩邊「Spread」意義不同（PMCC 是 KS−KL 價差，LEAPS 是 Bid-Ask Spread%）。
+              # 這裡沒有 id——PMCC 表格每個到期日桶各渲染一次，同一個 key 的 th 在
+              # 頁面上出現三次，用 id 會重複；hover tip 靠 data-tip-key 委派即可，
+              # 不需要唯一 id，見 render_tooltips_script。
+              th(data_tip_key: "pmcc_#{PMCC_TABLE_COL_KEYS[idx]}",
+                 class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain col }
             end
             th(class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain "詳細" }
           end
@@ -1977,7 +1983,23 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             f_size:         { el: '#leaps-th-f_size',         title: '📦 Size',                 desc: '該筆成交口數（1 口 = 100 股）。', side: 'bottom' },
             f_side:         { el: '#leaps-th-f_side',         title: '↕️ Side',                 desc: '成交價位置：靠 bid=賣方主動（偏空）、靠 ask=買方主動（偏多）、mid=中性。', side: 'bottom' },
             f_premium:      { el: '#leaps-th-f_premium',      title: '💰 Premium',              desc: '該筆成交的權利金總額。本面板依 Premium 降序取前 20 筆。', side: 'bottom' },
-            f_direction:    { el: '#leaps-th-f_direction',    title: '🧭 方向',                  desc: '綜合 Type／Side／Code 的看多/看空/中性判讀。情緒參考，不參與排行排序。', side: 'bottom' }
+            f_direction:    { el: '#leaps-th-f_direction',    title: '🧭 方向',                  desc: '綜合 Type／Side／Code 的看多/看空/中性判讀。情緒參考，不參與排行排序。', side: 'bottom' },
+            /* PMCC v3 §9.1 表格欄位教學。這批沒有 el（表格每個到期日桶各渲染一次，
+               同一個 key 的 th 出現三次，沒有唯一 id 可對應）——點擊時改用被點到的
+               元素本身當 popover 目標（見下方 click handler），不查表；因此也不放進
+               TOUR_ORDER（28 步全覽需要每個 key 對應唯一一個元素）。 */
+            pmcc_kl:         { title: '🔵 KL（LEAPS 履約價）',      desc: 'Long Call 的履約價，黃金法則公式裡的 KL。深 ITM 越接近持股替代。', side: 'bottom' },
+            pmcc_pl:         { title: '💵 PL（LEAPS Mid）',        desc: 'Long Call 的權利金（Mid 基準），黃金法則公式裡的 PL，也是實際買入成本／張。', side: 'bottom' },
+            pmcc_long_dte:   { title: '⏱ Long DTE',               desc: 'LEAPS 腳距到期天數。前置檢查 (b) 要求 Long DTE ≥ Short DTE + 180 天，否則黃金法則不成立。', side: 'bottom' },
+            pmcc_long_delta: { title: '⚡ Long Δ',                 desc: 'LEAPS 腳 Delta。✅ 標記門檻 ≥0.80（僅標記不淘汰），越高越接近持股替代。', side: 'bottom' },
+            pmcc_ks:         { title: '🔴 KS（Short Call 履約價）', desc: 'Short Call 的履約價，黃金法則公式裡的 KS。前置檢查 (a) 要求 KS > KL，否則直接判定失敗。', side: 'bottom' },
+            pmcc_ps:         { title: '💰 PS（Short Call Mid）',    desc: 'Short Call 的權利金（Mid 基準），黃金法則公式裡的 PS，賣出後收到的收租金額。', side: 'bottom' },
+            pmcc_short_delta:{ title: '⚡ Short Δ',                desc: 'Short Call 腳 Delta。粗篩 0.15–0.40 才會列入組合；✅ 建議標記門檻 0.20–0.35（兩者是不同規則，見 §2.3）。', side: 'bottom' },
+            pmcc_spread:     { title: '↔️ Spread',                desc: 'KS−KL，兩腳履約價的價差，代表這組 PMCC 理論上最多能賺多少（不含收租）。', side: 'bottom' },
+            pmcc_net_debit:  { title: '🧾 NetDebit',              desc: 'PL−PS，實際投入的淨成本（買 LEAPS 付的錢減去賣 Short Call 收的租）。', side: 'bottom' },
+            pmcc_max_profit: { title: '🏆 MaxProfit(含SC)',        desc: 'Spread−NetDebit，★這組合真正的最大獲利（已扣掉/加上收租），本表主排序鍵。展開列可見未收租版本 MaxProfit(未收租) 供對照。', side: 'bottom' },
+            pmcc_yield_ann:  { title: '📈 年化收租率',              desc: '(PS/NetDebit)÷Short DTE×365，把不同天期的收租率換算成同一個年化基準才能公平比較（6 天跟 45 天的原始收租率相近時，年化後差異會很大）。', side: 'bottom' },
+            pmcc_passes:     { title: '⚖️ Golden Rule',           desc: '黃金法則判定：✅通過（PL < Spread）或 ❌ 未通過並附數值化原因（例如 KS≤KL 或 DTE 差距不足 180 天）。未通過的列會標紅底。', side: 'bottom' }
           };
           var TOUR_ORDER = ['expiration','dte','strike','delta','oi','volume','liquidity','bid','ask','mid','spread',
                             'intrinsic','extrinsic','extrinsic_pct','time_value_pct','iv','vega','itm_prob',
@@ -2041,8 +2063,11 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
               var d = LEAPS_COL_EXPLAIN[el.dataset.tipKey];
               if (!d) return;
               tip.style.opacity = '0';
+              // 用被點到的元素本身當 popover 目標，不查 d.el——PMCC 表格欄位
+              // 沒有唯一 id（同一個 key 會在三個到期日桶各出現一次），這樣寫法
+              // 對 LEAPS（有唯一 id）跟 PMCC（無 id）都適用，不用分兩套邏輯。
               drv()({ animate: true, allowClose: true, overlayOpacity: 0.35,
-                      steps: [{ element: d.el, popover: { title: d.title, description: d.desc, side: d.side, align: 'center' } }] }).drive();
+                      steps: [{ element: el, popover: { title: d.title, description: d.desc, side: d.side, align: 'center' } }] }).drive();
               return;
             }
             var btn = e.target.closest('#leaps-tour-btn');
