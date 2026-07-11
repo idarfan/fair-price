@@ -108,28 +108,6 @@ RSpec.describe "GET /leaps", type: :request do
       get "/leaps", params: { symbol: symbol }
       expect(response.body).to include("LEAPS 候選排行")
     end
-
-    # 使用者回報：點表頭排序同時彈出教學 popover——排序圖示（.sort-arrow）跟
-    # 欄位教學觸發點（data-tip-key）曾經是同一個可點擊區域，兩個 document 級
-    # click 委派互相干擾。這裡鎖住「兩者是分開的元素」這個結構前提，防止未來
-    # 有人把 data-sort-key 改回直接放在 th 上而不自知重新踩雷。
-    it "keeps the sort trigger (.sort-arrow[data-sort-key]) separate from the tooltip trigger (th[data-tip-key])" do
-      get "/leaps", params: { symbol: symbol }
-      body = response.body
-
-      # th 本身仍帶 data-tip-key（既有欄位教學功能不變）
-      expect(body).to match(/<th[^>]*data-tip-key="oi"[^>]*>/)
-      # 但 th 標籤本身不能直接帶 data-sort-key（必須是內層 .sort-arrow 才有）
-      expect(body).not_to match(/<th[^>]*data-tip-key="oi"[^>]*data-sort-key=/)
-      # .sort-arrow 元素本身要帶 data-sort-key
-      expect(body).to match(/class="sort-arrow[^"]*"\s+data-sort-key="oi"/)
-    end
-
-    it "renders each row's data-sort-json for the table[data-sortable] JS to read" do
-      get "/leaps", params: { symbol: symbol }
-      expect(response.body).to match(/<table[^>]*data-sortable="true"/)
-      expect(response.body).to match(/data-sort-json="[^"]*&quot;dte&quot;/)
-    end
   end
 
   # ── PMCC v3 §8: pmcc_ranking_for wiring ──────────────────────────────────
@@ -174,6 +152,63 @@ RSpec.describe "GET /leaps", type: :request do
         .and_return(instance_double(PmccRankingService, call: fake_pmcc_ranking))
       get "/leaps", params: { symbol: symbol }
       expect(response).to have_http_status(:ok)
+    end
+  end
+
+  describe "PMCC combo table renders a mutually-exclusive sort toggle row (not per-column headers)" do
+    let(:fake_combo) do
+      {
+        long_leg:  { strike: 7.0, mid: 6.25, bid: 6.2, ask: 6.3, delta: 0.852, dte: 524,
+                     oi: 1305, expiration_date: Date.new(2027, 12, 17), intrinsic: 5.44, extrinsic: 0.81 },
+        short_leg: { strike: 13.0, mid: 0.24, bid: 0.23, ask: 0.25, theoretical_price: 0.24,
+                     moneyness: -0.045, delta: 0.33, gamma: 0.05, theta: -0.02, vega: 0.006,
+                     iv: 0.72, itm_probability: 0.32, vol: 100, oi: 500, vol_oi_ratio: 0.2,
+                     oi_change: 20, expiration_date: Date.new(2026, 7, 17), dte: 6 },
+        spread: 6.0, net_debit: 6.01, max_profit_no_sc: -0.25, max_profit: -0.01,
+        premium_yield: 4.0, premium_yield_ann: 243.3,
+        passes_golden_rule: false, fail_reason: "PL(6.25) >= Spread(6.00)",
+        leaps_delta_ok: true, short_delta_ok: true
+      }
+    end
+    let(:fake_pmcc_ranking) do
+      {
+        status: :ok,
+        "2026-07-17" => {
+          expiration: "2026-07-17", expiration_date: Date.new(2026, 7, 17),
+          short_dte: 6, combos: [ fake_combo ], has_passing: false
+        },
+        summary: { total_combos: 1, passing_combos: 0, expirations: [ "2026-07-17" ] }
+      }
+    end
+
+    before do
+      allow(LeapsOptionChainSnapshot)
+        .to receive_message_chain(:for_symbol, :fresh, :exists?)
+        .and_return(true)
+      allow(LeapsRankingService).to receive(:new).with(symbol)
+        .and_return(instance_double(LeapsRankingService, call: fake_candidates))
+      allow(LeapsOptionsFlowPanelService).to receive(:new).with(symbol, fake_candidates)
+        .and_return(instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel))
+      allow(PmccShortCallSnapshot).to receive_message_chain(:for_symbol, :exists?).and_return(true)
+      allow(PmccRankingService).to receive(:new).with(symbol)
+        .and_return(instance_double(PmccRankingService, call: fake_pmcc_ranking))
+    end
+
+    it "renders one toggle per PMCC column, scoped with the table under data-sort-scope" do
+      get "/leaps", params: { symbol: symbol }
+      body = response.body
+
+      expect(body).to match(/data-sort-scope="true"/)
+      expect(body).to match(/data-sort-key="ks"[^>]*class="sort-toggle/)
+      expect(body).to match(/data-sort-key="max_profit"[^>]*class="sort-toggle/)
+      # LEAPS 排行表本身沒有排序功能（只有 PMCC 表才有），確認沒有意外外溢
+      expect(body).not_to match(/id="leaps-th-oi"[^>]*data-sort-key/)
+    end
+
+    it "renders each combo row's data-sort-json for the toggle JS to read" do
+      get "/leaps", params: { symbol: symbol }
+      expect(response.body).to match(/<table[^>]*data-sortable="true"/)
+      expect(response.body).to match(/data-sort-json="[^"]*&quot;ks&quot;/)
     end
   end
 

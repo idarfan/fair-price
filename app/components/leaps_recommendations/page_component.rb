@@ -138,12 +138,8 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     render_loading_script
     render_export_script
     render_vector_pdf_script
-    # 排序腳本必須先於教學 popover 腳本註冊：兩者都用 document 委派 click，
-    # 排序點擊區域（.sort-arrow）若被教學腳本先攔截，會同時彈出 popover
-    # 又觸發排序（實測發現的真實 bug）。排序腳本命中 .sort-arrow 時呼叫
-    # stopImmediatePropagation，越早註冊才能真的擋住後面的教學腳本監聽器。
-    render_sortable_table_script
     render_tooltips_script
+    render_sortable_table_script
   end
 
   private
@@ -401,31 +397,48 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             rows.forEach(function (r) { tbody.appendChild(r); });
           }
 
+          // 一排互斥 toggle：同一個 data-sort-scope 內同時只能有一個開關是 on。
+          // 點還沒開的 toggle → 關掉其他、開這個、預設高到低；
+          // 點已經開著的 toggle → 原地切換高到低/低到高（不影響互斥狀態）。
+          function setToggleState(btn, on, dir) {
+            btn.classList.toggle('sort-toggle-active', on);
+            var track = btn.querySelector('.sort-toggle-track');
+            var knob  = btn.querySelector('.sort-toggle-knob');
+            var arrow = btn.querySelector('.sort-toggle-arrow');
+            if (on) {
+              btn.setAttribute('data-sort-dir', dir);
+              if (track) { track.classList.remove('bg-gray-300'); track.classList.add('bg-green-400'); }
+              if (knob)  knob.classList.add('translate-x-2.5');
+              if (arrow) arrow.textContent = dir === 'desc' ? '▾' : '▴';
+            } else {
+              btn.removeAttribute('data-sort-dir');
+              if (track) { track.classList.remove('bg-green-400'); track.classList.add('bg-gray-300'); }
+              if (knob)  knob.classList.remove('translate-x-2.5');
+              if (arrow) arrow.textContent = '';
+            }
+          }
+
           document.addEventListener('click', function (e) {
-            // 命中排序圖示（.sort-arrow）才處理，且用 stopImmediatePropagation
-            // 擋掉後面才註冊的教學 popover 委派——同一個 th 上還有 data-tip-key，
-            // 兩層委派都掛在 document，若不擋，點排序圖示會同時彈出教學 popover。
-            var arrow = e.target.closest('.sort-arrow[data-sort-key]');
-            if (!arrow) return;
-            e.stopImmediatePropagation();
+            var btn = e.target.closest('.sort-toggle[data-sort-key]');
+            if (!btn) return;
 
-            var table = arrow.closest('table[data-sortable]');
-            if (!table) return;
+            var scope = btn.closest('[data-sort-scope]');
+            if (!scope) return;
+            var tables = scope.querySelectorAll('table[data-sortable]');
+            if (!tables.length) return;
 
-            var key     = arrow.getAttribute('data-sort-key');
-            var curDir  = arrow.getAttribute('data-sort-dir');
-            var nextDir = curDir === 'desc' ? 'asc' : 'desc';
+            var wasOn  = btn.classList.contains('sort-toggle-active');
+            var curDir = btn.getAttribute('data-sort-dir');
+            var nextDir = wasOn ? (curDir === 'desc' ? 'asc' : 'desc') : 'desc';
 
-            table.querySelectorAll('.sort-arrow[data-sort-key]').forEach(function (a) {
-              if (a === arrow) return;
-              a.removeAttribute('data-sort-dir');
-              a.textContent = '⇅';
+            scope.querySelectorAll('.sort-toggle[data-sort-key]').forEach(function (b) {
+              if (b === btn) return;
+              setToggleState(b, false, null);
             });
+            setToggleState(btn, true, nextDir);
 
-            arrow.setAttribute('data-sort-dir', nextDir);
-            arrow.textContent = nextDir === 'desc' ? '▾' : '▴';
-
-            sortTable(table, key, nextDir);
+            var key = btn.getAttribute('data-sort-key');
+            tables.forEach(function (table) { sortTable(table, key, nextDir); });
           });
         })();
       JS
@@ -805,27 +818,13 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
         end
       end
       div(class: "overflow-x-auto") do
-        table(class: "w-full text-xs text-gray-700", data_sortable: "true") do
+        table(class: "w-full text-xs text-gray-700") do
           thead(class: "bg-gray-50 text-gray-500 text-xs") do
             tr do
               TABLE_COLS.each_with_index do |col, idx|
                 key = TABLE_COL_KEYS[idx]
-                if key == "expiration" # 日期字串，不參與數值排序
-                  th(id: "leaps-th-#{key}", data_tip_key: key,
-                     class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain col }
-                else
-                  # data-sort-key 故意放在內層排序圖示，不放在 th 本身——th 上還有
-                  # data-tip-key（點擊會開欄位教學 popover），兩個 click 委派都掛在
-                  # document 上，若共用同一個點擊區域，點表頭會同時觸發排序跟教學
-                  # popover（實測發現的真的 bug，不是假設）。分開兩個可點擊區域，
-                  # 互不干擾：點文字＝看說明（沿用既有行為不變），點 ⇅ 圖示＝排序。
-                  th(id: "leaps-th-#{key}", data_tip_key: key,
-                     class: "px-3 py-2 text-center font-medium whitespace-nowrap") do
-                    plain col
-                    span(class: "sort-arrow ml-0.5 text-gray-400 cursor-pointer hover:text-blue-600 select-none",
-                         data_sort_key: key) { plain "⇅" }
-                  end
-                end
+                th(id: "leaps-th-#{key}", data_tip_key: key,
+                   class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain col }
               end
             end
           end
@@ -847,8 +846,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     style = LIQUIDITY_STYLE[tier] || LIQUIDITY_STYLE["普通"]
     warn  = row[:no_recent_volume_warning]
 
-    tr(class: "border-t border-gray-100 hover:bg-purple-200 #{i.odd? ? 'bg-gray-50/50' : ''}",
-       data_sort_json: leaps_row_sort_json(row, tier)) do
+    tr(class: "border-t border-gray-100 hover:bg-purple-200 #{i.odd? ? 'bg-gray-50/50' : ''}") do
       td(class: "px-3 py-2 text-center font-mono whitespace-nowrap") { plain row[:expiration_date].to_s }
       td(class: "px-3 py-2 text-center")                             { plain row[:dte].to_s }
       td(class: "px-3 py-2 text-center font-semibold")               { plain fmt_price(row[:strike]) }
@@ -985,9 +983,14 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       when :no_leaps, :no_short, :no_data
         div(class: "px-4 py-6 text-center text-sm text-gray-400") { plain "尚無 Short Call 資料，請重新查詢" }
       when :ok
-        div(class: "divide-y divide-gray-100") do
-          @pmcc_ranking[:summary][:expirations].each_with_index do |exp_key, idx|
-            render_pmcc_bucket(exp_key, @pmcc_ranking[exp_key], idx)
+        # data-sort-scope 包住三個到期日桶，一排 toggle 同時控制底下全部
+        # table[data-sortable]（不是每桶各自一排——使用者要求共用一份）。
+        div(data_sort_scope: "true") do
+          render_pmcc_sort_toggles
+          div(class: "divide-y divide-gray-100") do
+            @pmcc_ranking[:summary][:expirations].each_with_index do |exp_key, idx|
+              render_pmcc_bucket(exp_key, @pmcc_ranking[exp_key], idx)
+            end
           end
         end
       end
@@ -1024,19 +1027,35 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       table(class: "w-full text-xs text-gray-700", data_sortable: "true") do
         thead(class: "bg-gray-50 text-gray-500 text-xs") do
           tr do
-            PMCC_TABLE_COLS.each_with_index do |col, idx|
-              key = PMCC_TABLE_COL_KEYS[idx]
-              th(class: "px-3 py-2 text-center font-medium whitespace-nowrap") do
-                plain col
-                span(class: "sort-arrow ml-0.5 text-gray-400 cursor-pointer hover:text-blue-600 select-none",
-                     data_sort_key: key) { plain "⇅" }
-              end
+            PMCC_TABLE_COLS.each do |col|
+              th(class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain col }
             end
             th(class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain "詳細" }
           end
         end
         tbody do
           combos.each_with_index { |combo, i| render_pmcc_combo_row(combo, i) }
+        end
+      end
+    end
+  end
+
+  # 使用者回報：每欄都能點排序太多餘、下拉選單也不要，要一排互斥的 toggle
+  # 開關（截圖範例：一個欄位一個開關，開哪個就依那欄排序，同時只能開一個）。
+  # 一個容器 data-sort-scope 內放 toggle 列 + 表格，JS 用 closest 從被點的
+  # toggle 找到同一個 scope 裡的 table[data-sortable]。
+  def render_pmcc_sort_toggles
+    div(class: "flex flex-wrap items-center gap-1.5 px-1 pb-2") do
+      PMCC_TABLE_COLS.each_with_index do |col, idx|
+        key = PMCC_TABLE_COL_KEYS[idx]
+        button(type: "button", data_sort_key: key,
+               class: "sort-toggle flex items-center gap-1 px-1.5 py-1 rounded-full border " \
+                      "border-gray-200 bg-white text-[10px] text-gray-500 hover:border-blue-300 transition-colors") do
+          span(class: "sort-toggle-track relative inline-block w-6 h-3.5 rounded-full bg-gray-300 transition-colors flex-shrink-0") do
+            span(class: "sort-toggle-knob absolute top-0.5 left-0.5 w-2.5 h-2.5 rounded-full bg-white shadow transition-transform")
+          end
+          span(class: "sort-toggle-arrow w-2.5 text-gray-400 text-[9px]") { plain "" }
+          span(class: "whitespace-nowrap") { plain col }
         end
       end
     end
@@ -2073,28 +2092,6 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
   # 每個 key 對應 TABLE_COL_KEYS 同名欄位，供前端 JS 依 data-sort-key 做數值排序。
   # liquidity 不是天然數值，借用 LeapsRecommendationService::TIER_ORDER 轉成排序用等第。
-  def leaps_row_sort_json(row, tier)
-    {
-      dte:            row[:dte],
-      strike:         row[:strike]&.to_f,
-      delta:          row[:delta]&.to_f,
-      oi:             row[:open_interest],
-      volume:         row[:volume],
-      liquidity:      LeapsRecommendationService::TIER_ORDER[tier.to_s] || 0,
-      bid:            row[:bid]&.to_f,
-      ask:            row[:ask]&.to_f,
-      mid:            row[:mid]&.to_f,
-      spread:         row[:bid_ask_spread_pct]&.to_f,
-      intrinsic:      row[:intrinsic_value]&.to_f,
-      extrinsic:      row[:extrinsic_value]&.to_f,
-      extrinsic_pct:  row[:extrinsic_pct]&.to_f,
-      time_value_pct: row[:time_value_pct]&.to_f,
-      iv:             row[:iv]&.to_f,
-      vega:           row[:vega]&.to_f,
-      itm_prob:       row[:itm_probability]&.to_f
-    }.to_json
-  end
-
   # 每個 key 對應 PMCC_TABLE_COL_KEYS 同名欄位。passes（Golden Rule）借用 1/0 排序，
   # 讓使用者也能點「Golden Rule」欄把通過的組合集中在最上面或最下面。
   def pmcc_combo_sort_json(combo)
