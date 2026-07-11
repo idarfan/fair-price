@@ -36,7 +36,7 @@ RSpec.describe ScrapeLeapsJob, type: :job do
     let(:fake_result) { { status: "success", errors: [] } }
 
     before do
-      svc = instance_double(BarchartScraperService, fetch_leaps: fake_result)
+      svc = instance_double(BarchartScraperService, fetch_leaps: fake_result, fetch_pmcc_short_calls: { status: "no_candidates" })
       allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc)
     end
 
@@ -61,7 +61,7 @@ RSpec.describe ScrapeLeapsJob, type: :job do
     let(:fake_result) { { status: "partial_error", errors: [ partial_msg ] } }
 
     before do
-      svc = instance_double(BarchartScraperService, fetch_leaps: fake_result)
+      svc = instance_double(BarchartScraperService, fetch_leaps: fake_result, fetch_pmcc_short_calls: { status: "no_candidates" })
       allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc)
     end
 
@@ -90,7 +90,7 @@ RSpec.describe ScrapeLeapsJob, type: :job do
     let(:fake_result) { { status: "barchart_session_expired", errors: [] } }
 
     before do
-      svc = instance_double(BarchartScraperService, fetch_leaps: fake_result)
+      svc = instance_double(BarchartScraperService, fetch_leaps: fake_result, fetch_pmcc_short_calls: { status: "no_candidates" })
       allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc)
     end
 
@@ -102,6 +102,32 @@ RSpec.describe ScrapeLeapsJob, type: :job do
         expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW
       )
       described_class.perform_now(symbol, job_id)
+    end
+  end
+
+  # PMCC v3 §1/§8 鐵律：PMCC 失敗不可讓 LEAPS 查詢的 job 狀態變 error。
+  describe "#perform — PMCC Short Call failure is isolated from the LEAPS result" do
+    let(:fake_result) { { status: "success", errors: [] } }
+
+    before do
+      svc = instance_double(BarchartScraperService, fetch_leaps: fake_result)
+      allow(svc).to receive(:fetch_pmcc_short_calls).and_raise(RuntimeError, "PMCC Short Call 資料不完整")
+      allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc)
+    end
+
+    it "still writes the LEAPS success status to job cache, not error" do
+      allow(Rails.cache).to receive(:write)
+      expect(Rails.cache).to receive(:write).with(
+        "leaps_job_#{job_id}",
+        { status: "success", errors: [] },
+        expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW
+      )
+      described_class.perform_now(symbol, job_id)
+    end
+
+    it "does not raise out of perform_now" do
+      allow(Rails.cache).to receive(:write)
+      expect { described_class.perform_now(symbol, job_id) }.not_to raise_error
     end
   end
 end

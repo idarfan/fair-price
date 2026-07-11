@@ -595,3 +595,48 @@ option-basics-lesson9.html :root 1-150          · CSS token
 config/routes.rb:12-16                          · leaps 路由
 db/schema.rb                                    · leaps 表結構參考
 ```
+
+---
+
+# 進度追蹤（2026-07-11）
+
+> 規則同 Phase J：狀態只有三種——`未開始`／`進行中`／`已完成（附證據）`。
+
+## 實作進度（§13 Step0–7）
+
+| Step | 項目 | 狀態 | 證據 |
+|---|---|---|---|
+| 0 | `derived_values` 改接收 `mid:` 參數 | 已完成（附證據） | `app/models/leaps_option_chain_snapshot.rb`；LEAPS 呼叫端傳 `(bid+ask)/2`；NVTS fixture 回歸測試數值不變；356→356 examples 全過 |
+| 1 | DB migration（`pmcc_short_call_snapshots`） | 已完成（附證據） | 原 migration 狀態確認為 `down`，改檔補齊 §5 完整 DDL（29 欄）後 `db:migrate` 成功；欄位逐一比對 §5 清單全數存在 |
+| 2 | Python scraper `pmcc_short_call_scraper.py` | 已完成（附證據） | 24 個單元測試全過；**真實 CDP 對 NOK 即時頁面驗證揪出規格本身兩個錯誤**：(a) §6 給的 `EXPIRATIONS_JS` 抓錯 select（改用 leaps_scraper 已驗證的 `className.includes('ng-')` 邏輯，實測 18 個到期日日期升序）(b) `change`/`percent_change` 欄位名寫錯（`r.change`→`r.priceChange`，`r.changePercent`→`r.percentChange`，實測修正前恆為 null，修正後有值）；`leaps_scraper.py` 同步補 `oi_chg` 並實測 |
+| 3 | Ruby Service（`fetch_pmcc_short_calls`／`persist_pmcc_short_calls`） | 已完成（附證據） | `PmccShortCallSnapshot` model + `BarchartScraperService` 新方法；23 個測試涵蓋 mid 一致性（原始 midpoint 優先於 (bid+ask)/2）、mid 缺值 nil、partial 仍落地、delete_all scope 隔離 |
+| 4 | `PmccRankingService` | 已完成（附證據） | 14 個測試，§12 範例 A/B/C 數字逐項比對相符；(a)(b) 未過保留＋fail_reason／(c) mid 缺值不列入；三桶分桶、桶內排序、Delta 兩區間並存、年化收租率分化，皆有對應測試 |
+| 5 | `ScrapeLeapsJob` 接上 `fetch_pmcc_short_calls` | 已完成（附證據） | 獨立 `begin/rescue`；新增測試證明 PMCC 拋例外時 `leaps_job_#{job_id}` 仍寫入 LEAPS 的成功狀態、`perform_now` 不往外拋例外 |
+| 6 | Controller 載入 `@pmcc_ranking` | 已完成（附證據） | `pmcc_ranking_for` helper（無候選／無 Short Call 資料 → `:no_data`，不硬跑空計算）；PageComponent 新增 `pmcc_ranking:` kwarg；2 個新 request spec |
+| 7 | Phlex `render_pmcc_section` + `render_pmcc_edu_section` | 已完成（附證據） | 見下方「瀏覽器驗收」小節 |
+
+## 瀏覽器驗收（Playwright，NOK 實測，2026-07-11）
+
+用 dev DB 既有 129 筆 LEAPS 快照（touch `scraped_at` 使其 fresh）+ 手動 seed 7 筆 Short Call 快照（近似真實 Barchart 數值），實際開 `/leaps?symbol=NOK` 驗證：
+
+- PMCC 區塊三到期日標籤（6/13/20 DTE）皆正確渲染，表格 12 關鍵欄 + 展開列皆有值
+- **DTE 警示 badge**：13 DTE 桶正確顯示橘黃警示，且該桶組合照常列出（未被篩掉）
+- **黃金法則未通過列**：紅底（`bg-red-50`）+ `fail_reason`（例："PL(6.25) >= Spread(6.00)"）正確顯示
+- **hover 淺紫實測**（`getComputedStyle`，非目測非 class 檢查）：對紅底失敗列 hover，`backgroundColor` 從透明變為 `oklch(0.902 0.063 306.703)`（Tailwind purple-200），證實 hover 確實蓋過紅底生效
+- **教育說明區四張卡**：無資料時全部顯示「—」不 500（symbol 未查詢狀態下截圖確認）；有資料時自動代入實際數字（黃金法則卡："NOK $7→$15 差價8.00 費用6.25 → ✅"；最大獲利卡："(15.00-7.00) - (6.25-0.11) = 1.86"；PMCC 定義卡：買100股成本$1,195／LEAPS成本$625／收租$11／資金比例52.3%）
+- 空狀態（無 Short Call 資料）：request spec 確認顯示「尚無 Short Call 資料，請重新查詢」非 500
+- 全套 `bundle exec rspec`：**397 examples, 0 failures**
+
+## 未完成 / 待決事項（誠實記錄，不假裝已完成）
+
+- [ ] **★ 核心情境 E2E 真實抓取**：`/leaps?symbol=NOK` 不帶 `user_strike`，**從空白狀態走完整條 job 流程**（`ScrapeLeapsJob` → 真實 CDP 抓 LEAPS + PMCC Short Call → persist → 渲染）尚未跑過。目前瀏覽器驗收用的是「既有 LEAPS 快照 touch 成 fresh ＋ 手動 seed 的 PMCC 資料」，不是真實 job 觸發的一條龍流程。scraper 本身（Python 層 JS 抓取邏輯）已對 Barchart 即時頁面驗證過，但**沒有驗證過 job → `fetch_pmcc_short_calls` → `persist_pmcc_short_calls` 這段接線在真實 CDP 環境下跑一次完整成功**。
+- [ ] **★ lesson9 對帳**：規格要求把 §12 範例 A 的數字實際輸入 `option-basics-lesson9.html` 的計算器逐項比對。這個檔案不在本 repo 內，`localhost:8765` 也未啟動（`ERR_CONNECTION_REFUSED`），本次**沒有機會做這項對帳**。目前的替代驗證是：`spec/services/pmcc_ranking_service_spec.rb` 已經用範例 A 的原始數字（KL=10, PL=5.75, KS=17, PS=0.42, dte=564/6）跑過 `PmccRankingService`，逐項斷言 spread/net_debit/max_profit/premium_yield/premium_yield_ann 與規格給的期望值相符——這驗證了「本專案公式實作」與「規格文件寫的公式」一致，但**未驗證過「規格文件寫的公式」與「lesson9 計算器本身」一致**，兩者不是同一件事。
+- [ ] 手算驗證（任選一列手算 spread/net_debit/max_profit/年化收租率，與頁面顯示逐項比對，附手算過程）：未做書面手算記錄，等同前項以 RSpec 精確數值斷言替代，但規格要求的是「人工拿計算機算一次」這個動作本身，尚未執行。
+
+**這三項都需要使用者提供環境（真實登入 Barchart 的 Chrome session／lesson9 網頁能連上）才能完成，AI 端目前無法自行補完。**
+
+## 變更記錄
+
+| 日期 | 內容 |
+|---|---|
+| 2026-07-11 | Step0–7 全部實作完成；發現並修正規格 §6 兩個 JS 錯誤（expiration 下拉選錯 select、change/percent_change 欄位名錯誤）；瀏覽器驗收完成；三項需要真實環境才能補完的驗收項誠實記錄為未完成 |

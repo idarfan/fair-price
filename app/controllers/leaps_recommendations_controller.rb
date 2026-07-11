@@ -72,6 +72,8 @@ class LeapsRecommendationsController < ApplicationController
     next_earnings = @symbol.present? ?
       Fundamental.where(symbol: @symbol).order(:updated_at).last&.next_earnings_date : nil
 
+    @pmcc_ranking = pmcc_ranking_for(@symbol, @candidates)
+
     render LeapsRecommendations::PageComponent.new(
       symbol:         @symbol,
       candidates:     @candidates,
@@ -80,7 +82,8 @@ class LeapsRecommendationsController < ApplicationController
       scrape_status:  @scrape_status,
       scrape_errors:  @scrape_errors,
       user_strike:    @user_strike,
-      next_earnings:  next_earnings
+      next_earnings:  next_earnings,
+      pmcc_ranking:   @pmcc_ranking
     )
   end
 
@@ -143,6 +146,18 @@ class LeapsRecommendationsController < ApplicationController
 
   def cached_errors(symbol)
     Array(Rails.cache.read("leaps_last_errors_#{symbol}"))
+  end
+
+  # PMCC v3 §8：只有 LEAPS 排行有候選、且該 symbol 曾抓過 Short Call 資料時
+  # 才跑純計算的 PmccRankingService；否則回傳 :no_data，component 端據此顯示
+  # 「尚無資料」而不是硬跑一次空計算。PMCC 計算本身不打 Barchart、不寫 DB，
+  # 失敗只可能是資料本身缺失（有 PmccRankingService 自己的 :no_leaps/:no_short
+  # 分支），這裡不需要額外 rescue。
+  def pmcc_ranking_for(symbol, candidates)
+    return { status: :no_data } if symbol.blank? || candidates.blank?
+    return { status: :no_data } unless PmccShortCallSnapshot.for_symbol(symbol).exists?
+
+    PmccRankingService.new(symbol).call
   end
 
   def cdp_online?

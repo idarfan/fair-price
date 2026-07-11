@@ -110,6 +110,51 @@ RSpec.describe "GET /leaps", type: :request do
     end
   end
 
+  # ── PMCC v3 §8: pmcc_ranking_for wiring ──────────────────────────────────
+
+  describe "with fresh LEAPS data but no PMCC Short Call data" do
+    before do
+      allow(LeapsOptionChainSnapshot)
+        .to receive_message_chain(:for_symbol, :fresh, :exists?)
+        .and_return(true)
+      allow(LeapsRankingService).to receive(:new).with(symbol)
+        .and_return(instance_double(LeapsRankingService, call: fake_candidates))
+      allow(LeapsOptionsFlowPanelService).to receive(:new).with(symbol, fake_candidates)
+        .and_return(instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel))
+      allow(PmccShortCallSnapshot).to receive_message_chain(:for_symbol, :exists?).and_return(false)
+    end
+
+    it "returns 200 without invoking PmccRankingService" do
+      expect(PmccRankingService).not_to receive(:new)
+      get "/leaps", params: { symbol: symbol }
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
+  describe "with fresh LEAPS data and PMCC Short Call data present" do
+    let(:fake_pmcc_ranking) do
+      { status: :ok, summary: { total_combos: 0, passing_combos: 0, expirations: [] } }
+    end
+
+    before do
+      allow(LeapsOptionChainSnapshot)
+        .to receive_message_chain(:for_symbol, :fresh, :exists?)
+        .and_return(true)
+      allow(LeapsRankingService).to receive(:new).with(symbol)
+        .and_return(instance_double(LeapsRankingService, call: fake_candidates))
+      allow(LeapsOptionsFlowPanelService).to receive(:new).with(symbol, fake_candidates)
+        .and_return(instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel))
+      allow(PmccShortCallSnapshot).to receive_message_chain(:for_symbol, :exists?).and_return(true)
+    end
+
+    it "calls PmccRankingService with the symbol" do
+      expect(PmccRankingService).to receive(:new).with(symbol)
+        .and_return(instance_double(PmccRankingService, call: fake_pmcc_ranking))
+      get "/leaps", params: { symbol: symbol }
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
   # ── 4. job_status=session_expired 帶回（Barchart 過期）────────────────────
 
   describe "job_status=session_expired with fresh data" do
@@ -261,7 +306,7 @@ RSpec.describe "GET /leaps", type: :request do
         .and_return(false)
       allow(Rails.cache).to receive(:read)
         .with("leaps_last_errors_#{symbol}")
-        .and_return(["抓取時發生系統錯誤"])
+        .and_return([ "抓取時發生系統錯誤" ])
     end
 
     it "returns 200 and shows generic error from scrape_errors" do
@@ -351,7 +396,7 @@ RSpec.describe "GET /leaps", type: :request do
       )
       allow(Rails.cache).to receive(:read)
         .with("leaps_last_errors_#{symbol}")
-        .and_return(["Session 在抓取 Strike 255 的 Options Prices 時過期，已抓到的部分資料可能不完整，請重新登入 Barchart 後點查詢重試"])
+        .and_return([ "Session 在抓取 Strike 255 的 Options Prices 時過期，已抓到的部分資料可能不完整，請重新登入 Barchart 後點查詢重試" ])
     end
 
     it "shows partial_error banner with Barchart login hint, not blank page" do
@@ -407,7 +452,7 @@ RSpec.describe "GET /leaps", type: :request do
     context "snapshot exists + user_strike out of range" do
       before do
         StrikeChainSnapshot.upsert(
-          { symbol: symbol, strikes: [500.0, 520.0, 540.0], spot_price: 510.0, scraped_at: Time.current },
+          { symbol: symbol, strikes: [ 500.0, 520.0, 540.0 ], spot_price: 510.0, scraped_at: Time.current },
           unique_by: :symbol
         )
       end
@@ -429,7 +474,7 @@ RSpec.describe "GET /leaps", type: :request do
     context "snapshot exists + user_strike in range" do
       before do
         StrikeChainSnapshot.upsert(
-          { symbol: symbol, strikes: [500.0, 520.0, 540.0], spot_price: 510.0, scraped_at: Time.current },
+          { symbol: symbol, strikes: [ 500.0, 520.0, 540.0 ], spot_price: 510.0, scraped_at: Time.current },
           unique_by: :symbol
         )
       end
