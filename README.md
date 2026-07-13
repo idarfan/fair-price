@@ -1,5 +1,13 @@
 # FairPrice
 
+### 2026-07-13 — 新增牛市差價看跌期權(三級版)試算工具
+
+- 新增 `/bpus` 頁面：輸入代號 → 選履約日 → 從 Barchart Put 鏈選保護腳(Long Put)/CSP 腳(Short Put) → 即時算淨權利金、押金、損益平衡點、ROC、風險報酬比，並標示賠錢情境
+- 新增 Python sidecar `bpus_expirations_scraper.py` / `bpus_put_chain_scraper.py`，沿用既有 CDP 9222 直連模式（未經 9223 relay）
+- 新增 `BullPutSpreadCalculatorService` 純計算 service、`BullPutSpreadsController`、`BpusFetchExpirationsJob`/`BpusFetchChainJob`、`BullPutSpreads::PageComponent`
+- Sidebar 最後一項加入口
+- 修正過程中發現並修正兩個既有機制的相容性問題：`FetchLog::FETCH_TYPES` 白名單需同步加入新 fetch_type（否則 `log_fetch` 內部 rescue 會靜默吞掉 `RecordInvalid`）；Barchart Options 頁面帶 `view=sbs` 時會同時掛載多個 `bc-data-grid`（Call/Put/合併），不能只抓第一個 grid
+
 ### 2026-06-21 — 技術面/基本面/Options Flow 三維度判斷儀表板
 
 - 新增 Barchart CDP scraper 三件套（, , ）

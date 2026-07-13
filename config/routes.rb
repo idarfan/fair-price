@@ -123,6 +123,13 @@ Rails.application.routes.draw do
   post "leaps/analyze", to: "leaps_recommendations#analyze", as: :leaps_recommendations_analyze
   get  "leaps/status",  to: "leaps_recommendations#status",  as: :leaps_recommendations_status
 
+  # Bull Put Spread 三級試算工具
+  get  "bpus",                    to: "bull_put_spreads#index",             as: :bull_put_spreads
+  post "bpus/fetch_expirations",  to: "bull_put_spreads#fetch_expirations", as: :bull_put_spreads_fetch_expirations
+  post "bpus/fetch_chain",        to: "bull_put_spreads#fetch_chain",       as: :bull_put_spreads_fetch_chain
+  get  "bpus/status",             to: "bull_put_spreads#status",            as: :bull_put_spreads_status
+  post "bpus/calculate",          to: "bull_put_spreads#calculate",         as: :bull_put_spreads_calculate
+
 # IV Skew Watchlist
 resources :iv_watchlists, only: [ :index, :create, :destroy ] do
   member do
@@ -133,7 +140,7 @@ resources :iv_watchlists, only: [ :index, :create, :destroy ] do
   end
 end
 
-# Lookbook component previews (development only)
+  # Lookbook component previews (development only)
 
   mount Lookbook::Engine, at: "/lookbook" if defined?(Lookbook)
 end

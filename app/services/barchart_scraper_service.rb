@@ -186,6 +186,88 @@ class BarchartScraperService
     result
   end
 
+  # BPUS §3.1：履約日清單抓取，(symbol) 為 key，5 分鐘快取（規格明講「Rails cache
+  # 即可」，不落地 DB model——跟 LEAPS/PMCC 排行不同，這是純即時互動工具，沒有
+  # candidate 排序需要持久化）。
+  def fetch_bpus_expirations
+    unless cdp_available?
+      log_fetch("bpus_expirations", "error", "CDP unavailable")
+      return { status: "error", errors: [ "Chrome CDP not reachable at #{CDP_URL}" ] }
+    end
+
+    cache_key = "bpus_expirations_#{@symbol}"
+    cached = Rails.cache.read(cache_key)
+    return cached if cached
+
+    fetch_result = run_scraper("bpus_expirations")
+
+    result = case fetch_result[:status]
+    when "barchart_session_expired"
+      log_fetch("bpus_expirations", "barchart_session_expired", nil)
+      { status: "barchart_session_expired" }
+    when "no_candidates"
+      log_fetch("bpus_expirations", "no_candidates", nil)
+      { status: "no_candidates" }
+    when "success"
+      data = fetch_result[:data]
+      Rails.logger.info("[bpus] expirations fetched url=#{data["debug_url"]} symbol=#{@symbol}")
+      log_fetch("bpus_expirations", "success", "count=#{Array(data["expirations"]).length}")
+      {
+        status:            "success",
+        expirations:       data["expirations"],
+        underlying_price:  data["underlying_price"]
+      }
+    else
+      log_fetch("bpus_expirations", "error", fetch_result[:error])
+      { status: "error", errors: [ fetch_result[:error].to_s ] }
+    end
+
+    # 只快取成功結果——error/session_expired/no_candidates 都是暫時性狀態，
+    # 快取住會讓使用者重試 5 分鐘內拿到同一個舊錯誤，不符合「重試應該重新抓」的預期。
+    Rails.cache.write(cache_key, result, expires_in: 5.minutes) if result[:status] == "success"
+    result
+  end
+
+  # BPUS §3.2：指定履約日的 Put 鏈抓取，(symbol, expiration) 為 key，5 分鐘快取。
+  # bid/ask 皆 null/0 的過濾在此（Ruby 業務規則層），不在 Python（沿用既有分工）。
+  def fetch_bpus_put_chain(expiration:)
+    unless cdp_available?
+      log_fetch("bpus_put_chain", "error", "CDP unavailable")
+      return { status: "error", errors: [ "Chrome CDP not reachable at #{CDP_URL}" ] }
+    end
+
+    cache_key = "bpus_put_chain_#{@symbol}_#{expiration}"
+    cached = Rails.cache.read(cache_key)
+    return cached if cached
+
+    fetch_result = run_scraper("bpus_put_chain", extra_args: [ expiration ])
+
+    result = case fetch_result[:status]
+    when "barchart_session_expired"
+      log_fetch("bpus_put_chain", "barchart_session_expired", nil)
+      { status: "barchart_session_expired" }
+    when "no_candidates"
+      log_fetch("bpus_put_chain", "no_candidates", "expiration=#{expiration}")
+      { status: "no_candidates" }
+    when "success"
+      data = fetch_result[:data]
+      Rails.logger.info("[bpus] put chain fetched url=#{data["debug_url"]} symbol=#{@symbol} expiration=#{expiration}")
+      rows = Array(data["rows"]).select { |r| r["bid"].present? || r["ask"].present? }
+      log_fetch("bpus_put_chain", "success", "rows=#{rows.length} expiration=#{expiration}")
+      {
+        status:            "success",
+        rows:              rows,
+        underlying_price:  data["underlying_price"]
+      }
+    else
+      log_fetch("bpus_put_chain", "error", fetch_result[:error])
+      { status: "error", errors: [ fetch_result[:error].to_s ] }
+    end
+
+    Rails.cache.write(cache_key, result, expires_in: 5.minutes) if result[:status] == "success"
+    result
+  end
+
   # UI-triggered max pain fetch for a specific filter combination.
   # Chart 4 (Max Pain by Contract) is filter-independent — NOT re-upserted here.
   def fetch_max_pain(expiration: nil, strikes: "show_all", volume_oi: "open_interest")

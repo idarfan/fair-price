@@ -1,6 +1,6 @@
 class FetchLog < ApplicationRecord
   STATUSES = %w[success barchart_session_expired dom_structure_changed error no_candidates partial_error cached].freeze
-  FETCH_TYPES = %w[technical fundamental options_flow max_pain leaps pmcc_short].freeze
+  FETCH_TYPES = %w[technical fundamental options_flow max_pain leaps pmcc_short bpus_expirations bpus_put_chain].freeze
 
   validates :symbol, :fetch_type, :status, :fetched_at, presence: true
   validates :status, inclusion: { in: STATUSES }

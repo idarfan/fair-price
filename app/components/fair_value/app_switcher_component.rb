@@ -14,6 +14,7 @@ class FairValue::AppSwitcherComponent < ApplicationComponent
     { icon: "🎯", label: "期權收益計算",   href: "/option_profit_calc",   desc: "期權賣出目標價試算｜達成預期獲利" },
     { icon: "🧭", label: "三維度判斷",     href: "/technical_dashboard",  desc: "技術面·基本面·Options Flow 獨立訊號並列" },
     { icon: "📐", label: "LEAPS 排行",    href: "/leaps",               desc: "深度價內 Call 候選排行 · Delta 0.75–0.90 · OI 排序" },
+    { icon: "🛡️", label: "牛市差價看跌期權(三級版)", href: "/bpus",     desc: "Bull Put Spread 三級試算 · 押金/ROC/BE 即時計算" }
   ].freeze
 
   def initialize(navbar: false)
