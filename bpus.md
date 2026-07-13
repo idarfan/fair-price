@@ -33,7 +33,7 @@
 - 回傳 JSON;Rails 端過濾掉 bid 與 ask 皆為 null/0 的 strike(無報價不可選)
 
 ### 3.3 快取與錯誤
-- 兩階段結果各以 (ticker, expiration) 為 key 快取 5 分鐘(Rails cache 即可),避免重複開頁
+- 兩階段結果各以 (ticker, expiration) 為 key 快取 15 分鐘(Rails cache 即可),避免重複開頁
 - 錯誤情境需回傳可辨識代碼並在 UI 顯示友善訊息:代號不存在 / 抓取逾時 / sidecar 未啟動
 - 每次抓取需 log 實際導覽 URL(驗收會查)
 

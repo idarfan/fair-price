@@ -223,12 +223,12 @@ class BarchartScraperService
     end
 
     # 只快取成功結果——error/session_expired/no_candidates 都是暫時性狀態，
-    # 快取住會讓使用者重試 5 分鐘內拿到同一個舊錯誤，不符合「重試應該重新抓」的預期。
-    Rails.cache.write(cache_key, result, expires_in: 5.minutes) if result[:status] == "success"
+    # 快取住會讓使用者重試 15 分鐘內拿到同一個舊錯誤，不符合「重試應該重新抓」的預期。
+    Rails.cache.write(cache_key, result, expires_in: 15.minutes) if result[:status] == "success"
     result
   end
 
-  # BPUS §3.2：指定履約日的 Put 鏈抓取，(symbol, expiration) 為 key，5 分鐘快取。
+  # BPUS §3.2：指定履約日的 Put 鏈抓取，(symbol, expiration) 為 key，15 分鐘快取。
   # bid/ask 皆 null/0 的過濾在此（Ruby 業務規則層），不在 Python（沿用既有分工）。
   def fetch_bpus_put_chain(expiration:)
     unless cdp_available?
@@ -264,7 +264,7 @@ class BarchartScraperService
       { status: "error", errors: [ fetch_result[:error].to_s ] }
     end
 
-    Rails.cache.write(cache_key, result, expires_in: 5.minutes) if result[:status] == "success"
+    Rails.cache.write(cache_key, result, expires_in: 15.minutes) if result[:status] == "success"
     result
   end
 
