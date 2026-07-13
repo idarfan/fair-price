@@ -74,3 +74,15 @@ _最後更新：2026-07-04_
 - 純規格文件同步，無程式碼異動，未觸發 RSpec/E2E。
 - 根因：Phase J 獨立成子規格檔後，主 spec 的頂層摘要句／階段索引沒有同步更新，造成新 session 讀「接手前必讀」時會誤判 Phase J 還沒開始，需額外去查子規格檔進度追蹤區才發現其實已結案。
 - 教訓（已寫入 Obsidian 日誌，待補進 `tasks/lessons.md`）：往後每完成一個獨立 Phase 子規格，除子規格自身的進度追蹤區外，也要回頭檢查主 spec 頂層摘要是否同步列入；規格中的「原則性指示」與「已交付事實」應分開記錄，避免事實面隨程式改動而與規格脫節。
+
+---
+
+## 待辦：CdpPrecheckable concern — 尚未開始 ❌
+
+背景：全域 CLAUDE.md「CDP 預檢（全域強制）」規則要求所有觸發 Barchart/Playwright CDP 抓取的 controller action，在排 job 之前先檢查 CDP 是否連線；但 fairprice app 目前完全沒有落地這個機制（2026-07-11 同步 fairprice-installer 時順手核對發現）。
+
+- [ ] 建立 `app/controllers/concerns/cdp_precheckable.rb`：對 `http://127.0.0.1:9222/json/version` 發請求，2 秒 timeout，失敗直接回錯誤、不排 job
+- [ ] `LeapsRecommendationsController`、`TechnicalDashboardsController` 等所有會觸發 `BarchartScraperService` 的 controller `include CdpPrecheckable`
+- [ ] 錯誤訊息固定文字：「CDP 未連線，請確認 Windows 端 Chrome 已以 `--remote-debugging-port=9222` 啟動。若電腦曾經睡眠/喚醒，這通常是 WSL2 的 `/mnt/c/` 掛載失效造成的，請在 Windows PowerShell 執行 `wsl --shutdown` 後等待 WSL2 重新啟動，再重試一次。」
+- [ ] 驗收標準：CDP 離線時使用者 1-2 秒內看到錯誤（不是等 job timeout）；每個相關 controller 要有測試覆蓋「CDP 離線時直接擋下、不送 job」
+- [ ] 規則本身只負責回報，不嘗試自動修復（`wsl --shutdown` 需要 Windows 端手動執行，Rails process 跑在 WSL2 內部無法自己叫外部 PowerShell）
