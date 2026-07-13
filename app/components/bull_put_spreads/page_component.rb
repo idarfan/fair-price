@@ -29,6 +29,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
       render_chain_section if @expiration && @chain_status
       render_notes
     end
+    render_hover_style
     render_script
   end
 
@@ -40,7 +41,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
   def render_header
     div do
       h1(class: "text-xl font-bold text-gray-900") { plain "牛市差價看跌期權(三級版)" }
-      p(class: "text-sm text-gray-500 mt-0.5") do
+      p(class: "text-[26px] text-gray-500 mt-0.5") do
         plain "三級帳戶 Bull Put Spread 試算 · 複式單押金 = (價差寬度 × 100) − 淨權利金"
       end
     end
@@ -157,7 +158,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
   def render_chain_table
     div(class: "space-y-2") do
       h2(class: "text-sm font-semibold text-gray-700") { plain "Step 3/4 · 先選保護腳(藍)，再選 CSP 腳(紅)" }
-      p(class: "text-xs text-gray-500") do
+      p(class: "text-[26px] text-gray-500") do
         plain "保守計價：賣方取 bid、買方取 ask，以最不利成交價估算，實際可用 mid 價掛單"
       end
       # 選腳結果放表格「上方」——選完不用捲動到下面才看得到。
@@ -165,11 +166,11 @@ class BullPutSpreads::PageComponent < ApplicationComponent
       p(class: "text-xs") do
         a(href: "#", id: "bpus-reset-legs", class: "text-blue-600 hover:underline") { plain "清空已選腳" }
       end
-      div(class: "overflow-x-auto border border-gray-200 rounded-lg") do
-        table(id: "bpus-chain-table", class: "min-w-full text-sm") do
-          thead(class: "bg-gray-50 text-gray-500 text-xs uppercase") do
+      div(class: "w-full overflow-x-auto border border-gray-200 rounded-lg") do
+        table(id: "bpus-chain-table", class: "min-w-full text-[24px] bpus-phase-protection") do
+          thead(class: "bg-gray-50 text-gray-500 uppercase") do
             tr do
-              COLUMNS.each { |col| th(class: "px-3 py-2 #{col[:align]}") { plain col[:label] } }
+              COLUMNS.each { |col| th(class: "px-4 py-3 #{col[:align]}") { plain col[:label] } }
             end
           end
           tbody do
@@ -201,31 +202,31 @@ class BullPutSpreads::PageComponent < ApplicationComponent
   def render_chain_cell(key, row, strike)
     case key
     when "strike"
-      td(class: "px-3 py-1.5 font-medium text-gray-900") { plain sprintf("%.2f", strike) }
+      td(class: "px-4 py-2 font-medium text-gray-900") { plain sprintf("%.2f", strike) }
     when "moneyness"
-      td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["moneyness"] ? sprintf("%.2f%%", row["moneyness"].to_f * 100) : "—" }
+      td(class: "px-4 py-2 text-right text-gray-500") { plain row["moneyness"] ? sprintf("%.2f%%", row["moneyness"].to_f * 100) : "—" }
     when "bid"
-      td(class: "px-3 py-1.5 text-right") { plain row["bid"].nil? ? "—" : sprintf("%.2f", row["bid"].to_f) }
+      td(class: "px-4 py-2 text-right") { plain row["bid"].nil? ? "—" : sprintf("%.2f", row["bid"].to_f) }
     when "mid"
-      td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["mid"] ? sprintf("%.2f", row["mid"].to_f) : "—" }
+      td(class: "px-4 py-2 text-right text-gray-500") { plain row["mid"] ? sprintf("%.2f", row["mid"].to_f) : "—" }
     when "ask"
-      td(class: "px-3 py-1.5 text-right") { plain row["ask"].nil? ? "—" : sprintf("%.2f", row["ask"].to_f) }
+      td(class: "px-4 py-2 text-right") { plain row["ask"].nil? ? "—" : sprintf("%.2f", row["ask"].to_f) }
     when "last"
-      td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["last"] ? sprintf("%.2f", row["last"].to_f) : "—" }
+      td(class: "px-4 py-2 text-right text-gray-500") { plain row["last"] ? sprintf("%.2f", row["last"].to_f) : "—" }
     when "change"
       render_delta_cell(row["change"]) { |v| sprintf("%+.2f", v) }
     when "pct_change"
       render_delta_cell(row["pct_change"]) { |v| sprintf("%+.2f%%", v * 100) }
     when "volume"
-      td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["volume"].nil? ? "—" : row["volume"] }
+      td(class: "px-4 py-2 text-right text-gray-500") { plain row["volume"].nil? ? "—" : row["volume"] }
     when "open_interest"
-      td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["open_interest"].nil? ? "—" : row["open_interest"] }
+      td(class: "px-4 py-2 text-right text-gray-500") { plain row["open_interest"].nil? ? "—" : row["open_interest"] }
     when "oi_change"
       render_delta_cell(row["oi_change"]) { |v| sprintf("%+d", v.to_i) }
     when "iv"
-      td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["iv"] ? sprintf("%.1f%%", row["iv"].to_f * 100) : "—" }
+      td(class: "px-4 py-2 text-right text-gray-500") { plain row["iv"] ? sprintf("%.1f%%", row["iv"].to_f * 100) : "—" }
     when "delta"
-      td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["delta"] ? sprintf("%.2f", row["delta"].to_f) : "—" }
+      td(class: "px-4 py-2 text-right text-gray-500") { plain row["delta"] ? sprintf("%.2f", row["delta"].to_f) : "—" }
     end
   end
 
@@ -234,11 +235,11 @@ class BullPutSpreads::PageComponent < ApplicationComponent
   # 誤把 0 當成「有變動」，這裡用明確的 nil?/zero? 分開三種狀態。
   def render_delta_cell(value)
     if value.nil?
-      td(class: "px-3 py-1.5 text-right text-gray-400") { plain "—" }
+      td(class: "px-4 py-2 text-right text-gray-400") { plain "—" }
     elsif value.to_f.zero?
-      td(class: "px-3 py-1.5 text-right text-gray-400") { plain "unch" }
+      td(class: "px-4 py-2 text-right text-gray-400") { plain "unch" }
     else
-      td(class: "px-3 py-1.5 text-right #{change_color(value)}") { plain yield(value.to_f) }
+      td(class: "px-4 py-2 text-right #{change_color(value)}") { plain yield(value.to_f) }
     end
   end
 
@@ -246,12 +247,12 @@ class BullPutSpreads::PageComponent < ApplicationComponent
   # 放在表格「上方」不用捲動；選好 CSP 腳後再多長一排——兩排跟主表格同一套
   # COLUMNS 定義，不另造第二套欄位格式。
   def render_selected_legs_panel
-    div(id: "bpus-selected-legs", class: "hidden mb-3 overflow-x-auto border border-gray-200 rounded-lg") do
-      table(class: "min-w-full text-sm") do
-        thead(class: "bg-gray-50 text-gray-500 text-xs uppercase") do
+    div(id: "bpus-selected-legs", class: "hidden mb-3 w-full overflow-x-auto border border-gray-200 rounded-lg") do
+      table(class: "min-w-full text-[24px]") do
+        thead(class: "bg-gray-50 text-gray-500 uppercase") do
           tr do
-            th(class: "px-3 py-2 text-left") { plain "腳位" }
-            COLUMNS.each { |col| th(class: "px-3 py-2 #{col[:align]}") { plain col[:label] } }
+            th(class: "px-4 py-3 text-left") { plain "腳位" }
+            COLUMNS.each { |col| th(class: "px-4 py-3 #{col[:align]}") { plain col[:label] } }
           end
         end
         tbody do
@@ -264,8 +265,8 @@ class BullPutSpreads::PageComponent < ApplicationComponent
 
   def render_selected_leg_row(id:, label:, row_class:)
     tr(id: id, class: "hidden border-t border-gray-100 #{row_class}") do
-      td(class: "px-3 py-1.5 font-medium") { plain label }
-      COLUMNS.each { |col| td(class: "px-3 py-1.5 text-right", data: { field: col[:key] }) }
+      td(class: "px-4 py-2 font-medium") { plain label }
+      COLUMNS.each { |col| td(class: "px-4 py-2 text-right", data: { field: col[:key] }) }
     end
   end
 
@@ -297,6 +298,28 @@ class BullPutSpreads::PageComponent < ApplicationComponent
     "6. 到期日風險(pin risk)：到期日股價貼著 short strike 時，是否被指派有不確定性，建議到期前主動平倉或 roll。",
     "7. 資料來源為 Barchart 頁面快照(延遲報價)，僅供試算，非下單依據。"
   ].freeze
+
+  # ---------------------------------------------------------------------------
+  # 選腳 hover/press 高亮：原本選腳完全沒有 hover 回饋，使用者不知道現在在選
+  # 哪一腳、也不知道列可以點。用 #bpus-chain-table 上的 phase class（JS 依選取
+  # 狀態切換）決定 hover 顏色——選保護腳階段淺藍、選 CSP 腳階段淺紅，按下時加深；
+  # 已選定的列(.bpus-selected)不參與 hover，避免選完後再滑過去顏色被蓋掉。
+  def render_hover_style
+    style { raw <<~CSS.html_safe }
+      #bpus-chain-table.bpus-phase-protection tr[data-bpus-row]:not(.bpus-selected):hover {
+        background-color: #dbeafe;
+      }
+      #bpus-chain-table.bpus-phase-protection tr[data-bpus-row]:not(.bpus-selected):active {
+        background-color: #93c5fd;
+      }
+      #bpus-chain-table.bpus-phase-csp tr[data-bpus-row]:not(.bpus-selected):hover {
+        background-color: #fee2e2;
+      }
+      #bpus-chain-table.bpus-phase-csp tr[data-bpus-row]:not(.bpus-selected):active {
+        background-color: #fecaca;
+      }
+    CSS
+  end
 
   # ---------------------------------------------------------------------------
   # JS：fetch_expirations / fetch_chain job 輪詢 + 選腳互動 + calculate
@@ -406,7 +429,14 @@ class BullPutSpreads::PageComponent < ApplicationComponent
         var state = { protection: null, csp: null };
 
         function clearHighlight(row) {
-          row.classList.remove('bg-blue-50', 'border-blue-400', 'bg-red-50', 'border-red-400');
+          row.classList.remove('bg-blue-50', 'border-blue-400', 'bg-red-50', 'border-red-400', 'bpus-selected');
+        }
+
+        function setPhase(phase) {
+          var table = document.getElementById('bpus-chain-table');
+          if (!table) return;
+          table.classList.toggle('bpus-phase-protection', phase === 'protection');
+          table.classList.toggle('bpus-phase-csp', phase === 'csp');
         }
 
         function resetSelection() {
@@ -419,6 +449,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
               // 保持原本無報價列的禁用狀態不變（由後端 render 決定）
             }
           });
+          setPhase('protection');
           var panel = document.getElementById('bpus-calc-panel');
           if (panel) panel.classList.add('hidden');
           var legsPanel = document.getElementById('bpus-selected-legs');
@@ -545,8 +576,9 @@ class BullPutSpreads::PageComponent < ApplicationComponent
             if (!state.protection) {
               state.protection = Object.assign({ row: row }, data);
               clearHighlight(row);
-              row.classList.add('bg-blue-50', 'border-blue-400');
+              row.classList.add('bg-blue-50', 'border-blue-400', 'bpus-selected');
               fillLegRow('bpus-protection-row', data);
+              setPhase('csp');
               document.querySelectorAll('[data-bpus-row]').forEach(function (r) {
                 var rd = rowData(r);
                 if (r !== row && rd.strike <= data.strike) {
@@ -559,7 +591,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
             if (!state.csp && data.strike > state.protection.strike) {
               state.csp = Object.assign({ row: row }, data);
               clearHighlight(row);
-              row.classList.add('bg-red-50', 'border-red-400');
+              row.classList.add('bg-red-50', 'border-red-400', 'bpus-selected');
               fillLegRow('bpus-csp-row', data);
               runCalculate();
             }
