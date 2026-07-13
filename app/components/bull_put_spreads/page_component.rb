@@ -140,7 +140,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
   # %Change/Volume/OI/OI Chg/IV/Delta——選腳表格(render_selected_legs_panel)
   # 沿用同一份 COLUMNS 定義，兩處欄位保證不會各自漂移。
   COLUMNS = [
-    { key: "strike",        label: "Strike",    align: "text-left" },
+    { key: "strike",        label: "履約價格",  align: "text-left" },
     { key: "moneyness",     label: "Moneyness", align: "text-right" },
     { key: "bid",           label: "Bid",       align: "text-right" },
     { key: "mid",           label: "Mid",       align: "text-right" },
@@ -252,20 +252,22 @@ class BullPutSpreads::PageComponent < ApplicationComponent
         thead(class: "bg-gray-50 text-gray-500 uppercase") do
           tr do
             th(class: "px-4 py-3 text-left") { plain "腳位" }
+            th(class: "px-4 py-3 text-left") { plain "操作方式" }
             COLUMNS.each { |col| th(class: "px-4 py-3 #{col[:align]}") { plain col[:label] } }
           end
         end
         tbody do
-          render_selected_leg_row(id: "bpus-protection-row", label: "保護腳(Long Put)", row_class: "bg-blue-50 text-blue-900")
-          render_selected_leg_row(id: "bpus-csp-row", label: "CSP腳(Short Put)", row_class: "bg-red-50 text-red-900")
+          render_selected_leg_row(id: "bpus-protection-row", label: "保護腳(Long Put)", action: "Buy to Open", row_class: "bg-blue-50 text-blue-900")
+          render_selected_leg_row(id: "bpus-csp-row", label: "CSP腳(Short Put)", action: "Sell to Open", row_class: "bg-red-50 text-red-900")
         end
       end
     end
   end
 
-  def render_selected_leg_row(id:, label:, row_class:)
+  def render_selected_leg_row(id:, label:, action:, row_class:)
     tr(id: id, class: "hidden border-t border-gray-100 #{row_class}") do
       td(class: "px-4 py-2 font-medium") { plain label }
+      td(class: "px-4 py-2 font-medium") { plain action }
       COLUMNS.each { |col| td(class: "px-4 py-2 text-right", data: { field: col[:key] }) }
     end
   end
