@@ -95,10 +95,23 @@ async def main(symbol):
         print(json.dumps({"status": "barchart_session_expired"}))
         return
 
-    expirations = await cdp_eval(ws_url, EXPIRATIONS_JS) or []
+    # 實測(2026-07-13, RKLB)：完整 reload 後單次固定 3 秒 settle 常常不夠——
+    # t=4.0s 時 select 還是空的，t=5.3s 才填滿 15 個履約日。用短輪詢取代單次讀取，
+    # 比拉長固定 sleep 更省時間又更穩（同一頁面 grid row 資料也有相同現象，見
+    # bpus_put_chain_scraper.py 的 _wait_for_grid）。
+    expirations = []
+    for _ in range(8):
+        expirations = await cdp_eval(ws_url, EXPIRATIONS_JS) or []
+        if expirations:
+            break
+        await asyncio.sleep(1.0)
 
     if not expirations:
-        print(json.dumps({"status": "no_candidates"}))
+        is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
+        if is_expired:
+            print(json.dumps({"status": "barchart_session_expired"}))
+        else:
+            print(json.dumps({"status": "no_candidates"}))
         return
 
     # 現價來自 bc-data-grid 的 moneyness 反推（Angular rootScope 探測常在剛 reload

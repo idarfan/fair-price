@@ -94,6 +94,11 @@ class TestNoCandidates(unittest.TestCase):
             return None
 
         scraper.cdp_eval = AsyncMock(side_effect=fake_eval)
+        self._sleep_patcher = unittest.mock.patch("asyncio.sleep", AsyncMock())
+        self._sleep_patcher.start()
+
+    def tearDown(self):
+        self._sleep_patcher.stop()
 
     def test_returns_no_candidates_when_dropdown_empty(self):
         out = _capture_main("RKLB")
