@@ -166,6 +166,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
       p(class: "text-xs") do
         a(href: "#", id: "bpus-reset-legs", class: "text-blue-600 hover:underline") { plain "清空已選腳" }
       end
+      render_recommend_tabs
       div(class: "w-full overflow-x-auto border border-gray-200 rounded-lg") do
         table(id: "bpus-chain-table", class: "min-w-full text-[24px] bpus-phase-protection") do
           thead(class: "bg-gray-50 text-gray-500 uppercase") do
@@ -179,6 +180,19 @@ class BullPutSpreads::PageComponent < ApplicationComponent
         end
       end
     end
+  end
+
+  # 保守/激進收租建議分頁：純前端 JS 從已渲染的表格 data-* 屬性挑選建議兩腳
+  # （不需要額外的 Ruby/JSON round trip，資料本來就已經在 DOM 裡）。不點擊時
+  # 說明區塊維持 hidden，不佔版面。
+  def render_recommend_tabs
+    div(class: "flex items-center gap-2 mt-2") do
+      button(type: "button", class: "px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:border-blue-400",
+             data: { "bpus-recommend-tab": "conservative" }) { plain "保守收租" }
+      button(type: "button", class: "px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:border-blue-400",
+             data: { "bpus-recommend-tab": "aggressive" }) { plain "激進收租" }
+    end
+    div(id: "bpus-recommend-explain", class: "hidden mt-2 px-3 py-2 bg-yellow-50 border border-yellow-200 text-yellow-900 text-xs rounded-lg")
   end
 
   def render_chain_row(row, index)
@@ -441,6 +455,25 @@ class BullPutSpreads::PageComponent < ApplicationComponent
           table.classList.toggle('bpus-phase-csp', phase === 'csp');
         }
 
+        // kind 為 null 時兩個分頁都恢復未選取樣式。
+        function setActiveTab(kind) {
+          document.querySelectorAll('[data-bpus-recommend-tab]').forEach(function (btn) {
+            var active = btn.getAttribute('data-bpus-recommend-tab') === kind;
+            btn.classList.toggle('bg-blue-600', active);
+            btn.classList.toggle('text-white', active);
+            btn.classList.toggle('border-blue-600', active);
+            btn.classList.toggle('bg-white', !active);
+            btn.classList.toggle('text-gray-700', !active);
+            btn.classList.toggle('border-gray-300', !active);
+          });
+        }
+
+        function hideRecommendExplain() {
+          var el = document.getElementById('bpus-recommend-explain');
+          if (el) { el.classList.add('hidden'); el.textContent = ''; }
+          setActiveTab(null);
+        }
+
         function resetSelection() {
           state.protection = null;
           state.csp = null;
@@ -452,6 +485,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
             }
           });
           setPhase('protection');
+          hideRecommendExplain();
           var panel = document.getElementById('bpus-calc-panel');
           if (panel) panel.classList.add('hidden');
           var legsPanel = document.getElementById('bpus-selected-legs');
@@ -512,6 +546,93 @@ class BullPutSpreads::PageComponent < ApplicationComponent
             if (cell) cell.textContent = fmtField(k, data[k]);
           });
         }
+
+        // 保守/激進收租建議：從已渲染的表格挑兩腳，不用額外打後端。
+        // CSP 腳挑 |delta| 最接近目標值的 strike；保護腳挑其下一個「有真實
+        // 報價」的 strike（維持窄價差，沿用注意事項§5「三級的甜蜜點在窄價
+        // 差」）。iv/volume/oi 同時為 0 的列視為無真實報價的殘影資料，排除。
+        var RECOMMEND_TARGETS = { conservative: 0.15, aggressive: 0.30 };
+
+        function isRealQuoteRow(d) {
+          var hasQuote = !isNaN(d.bid) || !isNaN(d.ask);
+          var isGhost = d.iv === 0 && d.volume === 0 && d.open_interest === 0;
+          return hasQuote && !isGhost;
+        }
+
+        function collectValidRows() {
+          return [ ...document.querySelectorAll('[data-bpus-row]') ]
+            .map(function (r) { return { el: r, data: rowData(r) }; })
+            .filter(function (x) { return isRealQuoteRow(x.data); })
+            .sort(function (a, b) { return a.data.strike - b.data.strike; });
+        }
+
+        function findRecommendation(targetAbsDelta) {
+          var rows = collectValidRows();
+          var shortCandidate = null;
+          var shortDiff = Infinity;
+          rows.forEach(function (r) {
+            if (isNaN(r.data.delta)) return;
+            var diff = Math.abs(Math.abs(r.data.delta) - targetAbsDelta);
+            if (diff < shortDiff) { shortDiff = diff; shortCandidate = r; }
+          });
+          if (!shortCandidate) return null;
+
+          var lower = rows.filter(function (r) { return r.data.strike < shortCandidate.data.strike; });
+          if (!lower.length) return null;
+          var protectionCandidate = lower[lower.length - 1]; // 最接近的下一個 strike = 最窄價差
+
+          return { protection: protectionCandidate, short: shortCandidate };
+        }
+
+        function applyRecommendation(kind) {
+          resetSelection();
+          var rec = findRecommendation(RECOMMEND_TARGETS[kind]);
+          var explainEl = document.getElementById('bpus-recommend-explain');
+          if (!rec) {
+            if (explainEl) {
+              explainEl.classList.remove('hidden');
+              explainEl.textContent = '此履約日的期權鏈找不到符合條件的建議組合（報價或 Delta 資料不足），請手動選腳。';
+            }
+            return;
+          }
+          setActiveTab(kind);
+
+          var pRow = rec.protection.el, pData = rec.protection.data;
+          state.protection = Object.assign({ row: pRow }, pData);
+          clearHighlight(pRow);
+          pRow.classList.add('bg-blue-50', 'border-blue-400', 'bpus-selected');
+          fillLegRow('bpus-protection-row', pData);
+          setPhase('csp');
+          document.querySelectorAll('[data-bpus-row]').forEach(function (r) {
+            var rd = rowData(r);
+            if (r !== pRow && rd.strike <= pData.strike) r.classList.add('opacity-40', 'pointer-events-none');
+          });
+
+          var sRow = rec.short.el, sData = rec.short.data;
+          state.csp = Object.assign({ row: sRow }, sData);
+          clearHighlight(sRow);
+          sRow.classList.add('bg-red-50', 'border-red-400', 'bpus-selected');
+          fillLegRow('bpus-csp-row', sData);
+          runCalculate();
+
+          if (explainEl) {
+            var label       = kind === 'conservative' ? '保守收租' : '激進收租';
+            var targetLabel = kind === 'conservative' ? '-0.15' : '-0.30';
+            var profile     = kind === 'conservative'
+              ? '較遠價外、勝率較高但權利金較低，適合重視安全邊際的收租策略。'
+              : '較接近價平、權利金較高但勝率較低、被指派機率較高，適合追求更高 ROC 的積極策略。';
+            explainEl.classList.remove('hidden');
+            explainEl.textContent = label + '建議：CSP 腳選 |Delta| 最接近 ' + targetLabel + ' 的履約價 $' +
+              fmt(sData.strike) + '（實際 Delta ' + sData.delta.toFixed(2) + '），保護腳取其下一個有報價的履約價 $' +
+              fmt(pData.strike) + '，維持窄價差以降低押金；' + profile;
+          }
+        }
+
+        document.querySelectorAll('[data-bpus-recommend-tab]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            applyRecommendation(btn.getAttribute('data-bpus-recommend-tab'));
+          });
+        });
 
         function runCalculate() {
           fetch('#{bull_put_spreads_calculate_path}', {
