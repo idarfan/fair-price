@@ -148,9 +148,11 @@ class BullPutSpreads::PageComponent < ApplicationComponent
               th(class: "px-3 py-2 text-left") { plain "Strike" }
               th(class: "px-3 py-2 text-right") { plain "Bid" }
               th(class: "px-3 py-2 text-right") { plain "Ask" }
+              th(class: "px-3 py-2 text-right") { plain "Last" }
+              th(class: "px-3 py-2 text-right") { plain "Volume" }
+              th(class: "px-3 py-2 text-right") { plain "OI" }
               th(class: "px-3 py-2 text-right") { plain "IV" }
               th(class: "px-3 py-2 text-right") { plain "Delta" }
-              th(class: "px-3 py-2 text-right") { plain "OI" }
             end
           end
           tbody do
@@ -161,6 +163,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
       p(class: "text-xs") do
         a(href: "#", id: "bpus-reset-legs", class: "text-blue-600 hover:underline") { plain "清空已選腳" }
       end
+      render_selected_legs_panel
     end
   end
 
@@ -177,19 +180,64 @@ class BullPutSpreads::PageComponent < ApplicationComponent
       class: row_class,
       data: {
         "bpus-row": "",
-        strike: strike,
-        bid: bid,
-        ask: ask,
-        iv: row["iv"],
-        delta: row["delta"]
+        strike:         strike,
+        bid:            bid,
+        ask:            ask,
+        last:           row["last"],
+        volume:         row["volume"],
+        oi:             row["open_interest"],
+        iv:             row["iv"],
+        delta:          row["delta"]
       }
     ) do
       td(class: "px-3 py-1.5 font-medium text-gray-900") { plain sprintf("%.2f", strike) }
       td(class: "px-3 py-1.5 text-right") { plain bid.nil? ? "—" : sprintf("%.2f", bid.to_f) }
       td(class: "px-3 py-1.5 text-right") { plain ask.nil? ? "—" : sprintf("%.2f", ask.to_f) }
+      td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["last"] ? sprintf("%.2f", row["last"].to_f) : "—" }
+      td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["volume"].nil? ? "—" : row["volume"] }
+      td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["open_interest"].nil? ? "—" : row["open_interest"] }
       td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["iv"] ? sprintf("%.1f%%", row["iv"].to_f * 100) : "—" }
       td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["delta"] ? sprintf("%.2f", row["delta"].to_f) : "—" }
-      td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["open_interest"] || "—" }
+    end
+  end
+
+  # 選好保護腳後立即完整呈現該列讀到的 Barchart 原始資料(不用等 CSP 腳也選完)；
+  # 選好 CSP 腳後再多長一排——兩排都沿用同一套欄位(跟主表格一致)，不另造格式。
+  def render_selected_legs_panel
+    div(id: "bpus-selected-legs", class: "hidden mt-3 overflow-x-auto border border-gray-200 rounded-lg") do
+      table(class: "min-w-full text-sm") do
+        thead(class: "bg-gray-50 text-gray-500 text-xs uppercase") do
+          tr do
+            th(class: "px-3 py-2 text-left") { plain "腳位" }
+            th(class: "px-3 py-2 text-left") { plain "Strike" }
+            th(class: "px-3 py-2 text-right") { plain "Bid" }
+            th(class: "px-3 py-2 text-right") { plain "Ask" }
+            th(class: "px-3 py-2 text-right") { plain "Last" }
+            th(class: "px-3 py-2 text-right") { plain "Volume" }
+            th(class: "px-3 py-2 text-right") { plain "OI" }
+            th(class: "px-3 py-2 text-right") { plain "IV" }
+            th(class: "px-3 py-2 text-right") { plain "Delta" }
+          end
+        end
+        tbody do
+          render_selected_leg_row(id: "bpus-protection-row", label: "保護腳(Long Put)", row_class: "bg-blue-50 text-blue-900")
+          render_selected_leg_row(id: "bpus-csp-row", label: "CSP腳(Short Put)", row_class: "bg-red-50 text-red-900")
+        end
+      end
+    end
+  end
+
+  def render_selected_leg_row(id:, label:, row_class:)
+    tr(id: id, class: "hidden border-t border-gray-100 #{row_class}") do
+      td(class: "px-3 py-1.5 font-medium") { plain label }
+      td(class: "px-3 py-1.5", data: { field: "strike" })
+      td(class: "px-3 py-1.5 text-right", data: { field: "bid" })
+      td(class: "px-3 py-1.5 text-right", data: { field: "ask" })
+      td(class: "px-3 py-1.5 text-right", data: { field: "last" })
+      td(class: "px-3 py-1.5 text-right", data: { field: "volume" })
+      td(class: "px-3 py-1.5 text-right", data: { field: "oi" })
+      td(class: "px-3 py-1.5 text-right", data: { field: "iv" })
+      td(class: "px-3 py-1.5 text-right", data: { field: "delta" })
     end
   end
 
@@ -345,14 +393,42 @@ class BullPutSpreads::PageComponent < ApplicationComponent
           });
           var panel = document.getElementById('bpus-calc-panel');
           if (panel) panel.classList.add('hidden');
+          var legsPanel = document.getElementById('bpus-selected-legs');
+          if (legsPanel) legsPanel.classList.add('hidden');
+          [ 'bpus-protection-row', 'bpus-csp-row' ].forEach(function (id) {
+            var row = document.getElementById(id);
+            if (row) row.classList.add('hidden');
+          });
         }
 
         function rowData(row) {
           return {
             strike: parseFloat(row.getAttribute('data-strike')),
             bid: parseFloat(row.getAttribute('data-bid')),
-            ask: parseFloat(row.getAttribute('data-ask'))
+            ask: parseFloat(row.getAttribute('data-ask')),
+            last: parseFloat(row.getAttribute('data-last')),
+            volume: parseFloat(row.getAttribute('data-volume')),
+            oi: parseFloat(row.getAttribute('data-oi')),
+            iv: parseFloat(row.getAttribute('data-iv')),
+            delta: parseFloat(row.getAttribute('data-delta'))
           };
+        }
+
+        // 完整呈現讀到的 Barchart 原始資料（不重算、不篩選欄位），選一腳就立刻長一排。
+        function fillLegRow(rowId, data) {
+          var row = document.getElementById(rowId);
+          if (!row) return;
+          var legsPanel = document.getElementById('bpus-selected-legs');
+          if (legsPanel) legsPanel.classList.remove('hidden');
+          row.classList.remove('hidden');
+          row.querySelector('[data-field="strike"]').textContent = fmt(data.strike);
+          row.querySelector('[data-field="bid"]').textContent = fmt(data.bid);
+          row.querySelector('[data-field="ask"]').textContent = fmt(data.ask);
+          row.querySelector('[data-field="last"]').textContent = fmt(data.last);
+          row.querySelector('[data-field="volume"]').textContent = (isNaN(data.volume) ? '—' : data.volume);
+          row.querySelector('[data-field="oi"]').textContent = (isNaN(data.oi) ? '—' : data.oi);
+          row.querySelector('[data-field="iv"]').textContent = (isNaN(data.iv) ? '—' : (data.iv * 100).toFixed(1) + '%');
+          row.querySelector('[data-field="delta"]').textContent = (isNaN(data.delta) ? '—' : data.delta.toFixed(2));
         }
 
         function runCalculate() {
@@ -421,6 +497,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
               state.protection = Object.assign({ row: row }, data);
               clearHighlight(row);
               row.classList.add('bg-blue-50', 'border-blue-400');
+              fillLegRow('bpus-protection-row', data);
               document.querySelectorAll('[data-bpus-row]').forEach(function (r) {
                 var rd = rowData(r);
                 if (r !== row && rd.strike <= data.strike) {
@@ -434,6 +511,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
               state.csp = Object.assign({ row: row }, data);
               clearHighlight(row);
               row.classList.add('bg-red-50', 'border-red-400');
+              fillLegRow('bpus-csp-row', data);
               runCalculate();
             }
           });
