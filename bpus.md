@@ -28,7 +28,7 @@
 
 ### 3.2 階段二:指定履約日的 Put 鏈
 - 輸入:ticker + expiration
-- 解析 Put 側每個 strike 的:`strike, bid, ask, last, volume, open_interest, iv, delta`(頁面缺欄位則回 null,不得造值)
+- 解析 Put 側每個 strike 的:`strike, moneyness, bid, mid, ask, last, change, pct_change, volume, open_interest, oi_change, iv, delta`(頁面缺欄位則回 null,不得造值；表格呈現需與 Barchart 頁面欄位一致)
 - 一併解析現價(underlying last price)
 - 回傳 JSON;Rails 端過濾掉 bid 與 ask 皆為 null/0 的 strike(無報價不可選)
 

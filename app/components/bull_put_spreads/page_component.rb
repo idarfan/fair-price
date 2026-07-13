@@ -135,24 +135,41 @@ class BullPutSpreads::PageComponent < ApplicationComponent
     end
   end
 
+  # 欄位順序跟 Barchart Puts 表格一致：Strike/Moneyness/Bid/Mid/Ask/Last/Change/
+  # %Change/Volume/OI/OI Chg/IV/Delta——選腳表格(render_selected_legs_panel)
+  # 沿用同一份 COLUMNS 定義，兩處欄位保證不會各自漂移。
+  COLUMNS = [
+    { key: "strike",        label: "Strike",    align: "text-left" },
+    { key: "moneyness",     label: "Moneyness", align: "text-right" },
+    { key: "bid",           label: "Bid",       align: "text-right" },
+    { key: "mid",           label: "Mid",       align: "text-right" },
+    { key: "ask",           label: "Ask",       align: "text-right" },
+    { key: "last",          label: "Last",      align: "text-right" },
+    { key: "change",        label: "Change",    align: "text-right" },
+    { key: "pct_change",    label: "%Change",   align: "text-right" },
+    { key: "volume",        label: "Volume",    align: "text-right" },
+    { key: "open_interest", label: "OI",        align: "text-right" },
+    { key: "oi_change",     label: "OI Chg",    align: "text-right" },
+    { key: "iv",            label: "IV",        align: "text-right" },
+    { key: "delta",         label: "Delta",     align: "text-right" }
+  ].freeze
+
   def render_chain_table
     div(class: "space-y-2") do
       h2(class: "text-sm font-semibold text-gray-700") { plain "Step 3/4 · 先選保護腳(藍)，再選 CSP 腳(紅)" }
       p(class: "text-xs text-gray-500") do
         plain "保守計價：賣方取 bid、買方取 ask，以最不利成交價估算，實際可用 mid 價掛單"
       end
+      # 選腳結果放表格「上方」——選完不用捲動到下面才看得到。
+      render_selected_legs_panel
+      p(class: "text-xs") do
+        a(href: "#", id: "bpus-reset-legs", class: "text-blue-600 hover:underline") { plain "清空已選腳" }
+      end
       div(class: "overflow-x-auto border border-gray-200 rounded-lg") do
         table(id: "bpus-chain-table", class: "min-w-full text-sm") do
           thead(class: "bg-gray-50 text-gray-500 text-xs uppercase") do
             tr do
-              th(class: "px-3 py-2 text-left") { plain "Strike" }
-              th(class: "px-3 py-2 text-right") { plain "Bid" }
-              th(class: "px-3 py-2 text-right") { plain "Ask" }
-              th(class: "px-3 py-2 text-right") { plain "Last" }
-              th(class: "px-3 py-2 text-right") { plain "Volume" }
-              th(class: "px-3 py-2 text-right") { plain "OI" }
-              th(class: "px-3 py-2 text-right") { plain "IV" }
-              th(class: "px-3 py-2 text-right") { plain "Delta" }
+              COLUMNS.each { |col| th(class: "px-3 py-2 #{col[:align]}") { plain col[:label] } }
             end
           end
           tbody do
@@ -160,10 +177,6 @@ class BullPutSpreads::PageComponent < ApplicationComponent
           end
         end
       end
-      p(class: "text-xs") do
-        a(href: "#", id: "bpus-reset-legs", class: "text-blue-600 hover:underline") { plain "清空已選腳" }
-      end
-      render_selected_legs_panel
     end
   end
 
@@ -176,47 +189,69 @@ class BullPutSpreads::PageComponent < ApplicationComponent
     row_class = (index.odd? ? "bg-gray-50/50" : "") + " border-t border-gray-100"
     row_class += " opacity-40 pointer-events-none" if no_quote
 
-    tr(
-      class: row_class,
-      data: {
-        "bpus-row": "",
-        strike:         strike,
-        bid:            bid,
-        ask:            ask,
-        last:           row["last"],
-        volume:         row["volume"],
-        oi:             row["open_interest"],
-        iv:             row["iv"],
-        delta:          row["delta"]
-      }
-    ) do
+    data_attrs = { "bpus-row": "" }
+    COLUMNS.each { |col| data_attrs[col[:key].to_sym] = row[col[:key]] }
+    data_attrs[:strike] = strike
+
+    tr(class: row_class, data: data_attrs) do
+      COLUMNS.each { |col| render_chain_cell(col[:key], row, strike) }
+    end
+  end
+
+  def render_chain_cell(key, row, strike)
+    case key
+    when "strike"
       td(class: "px-3 py-1.5 font-medium text-gray-900") { plain sprintf("%.2f", strike) }
-      td(class: "px-3 py-1.5 text-right") { plain bid.nil? ? "—" : sprintf("%.2f", bid.to_f) }
-      td(class: "px-3 py-1.5 text-right") { plain ask.nil? ? "—" : sprintf("%.2f", ask.to_f) }
+    when "moneyness"
+      td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["moneyness"] ? sprintf("%.2f%%", row["moneyness"].to_f * 100) : "—" }
+    when "bid"
+      td(class: "px-3 py-1.5 text-right") { plain row["bid"].nil? ? "—" : sprintf("%.2f", row["bid"].to_f) }
+    when "mid"
+      td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["mid"] ? sprintf("%.2f", row["mid"].to_f) : "—" }
+    when "ask"
+      td(class: "px-3 py-1.5 text-right") { plain row["ask"].nil? ? "—" : sprintf("%.2f", row["ask"].to_f) }
+    when "last"
       td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["last"] ? sprintf("%.2f", row["last"].to_f) : "—" }
+    when "change"
+      render_delta_cell(row["change"]) { |v| sprintf("%+.2f", v) }
+    when "pct_change"
+      render_delta_cell(row["pct_change"]) { |v| sprintf("%+.2f%%", v * 100) }
+    when "volume"
       td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["volume"].nil? ? "—" : row["volume"] }
+    when "open_interest"
       td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["open_interest"].nil? ? "—" : row["open_interest"] }
+    when "oi_change"
+      render_delta_cell(row["oi_change"]) { |v| sprintf("%+d", v.to_i) }
+    when "iv"
       td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["iv"] ? sprintf("%.1f%%", row["iv"].to_f * 100) : "—" }
+    when "delta"
       td(class: "px-3 py-1.5 text-right text-gray-500") { plain row["delta"] ? sprintf("%.2f", row["delta"].to_f) : "—" }
     end
   end
 
-  # 選好保護腳後立即完整呈現該列讀到的 Barchart 原始資料(不用等 CSP 腳也選完)；
-  # 選好 CSP 腳後再多長一排——兩排都沿用同一套欄位(跟主表格一致)，不另造格式。
+  # Change/%Change/OI Chg 欄位沿用 Barchart 自己的顯示慣例：完全沒變動(0)顯示
+  # 「unch」灰字，不是「+0.00」——0 在 Ruby 是 truthy，用 row["x"] ? ... 判斷會
+  # 誤把 0 當成「有變動」，這裡用明確的 nil?/zero? 分開三種狀態。
+  def render_delta_cell(value)
+    if value.nil?
+      td(class: "px-3 py-1.5 text-right text-gray-400") { plain "—" }
+    elsif value.to_f.zero?
+      td(class: "px-3 py-1.5 text-right text-gray-400") { plain "unch" }
+    else
+      td(class: "px-3 py-1.5 text-right #{change_color(value)}") { plain yield(value.to_f) }
+    end
+  end
+
+  # 選好保護腳後立即完整呈現該列讀到的 Barchart 原始資料(不用等 CSP 腳也選完)，
+  # 放在表格「上方」不用捲動；選好 CSP 腳後再多長一排——兩排跟主表格同一套
+  # COLUMNS 定義，不另造第二套欄位格式。
   def render_selected_legs_panel
-    div(id: "bpus-selected-legs", class: "hidden mt-3 overflow-x-auto border border-gray-200 rounded-lg") do
+    div(id: "bpus-selected-legs", class: "hidden mb-3 overflow-x-auto border border-gray-200 rounded-lg") do
       table(class: "min-w-full text-sm") do
         thead(class: "bg-gray-50 text-gray-500 text-xs uppercase") do
           tr do
             th(class: "px-3 py-2 text-left") { plain "腳位" }
-            th(class: "px-3 py-2 text-left") { plain "Strike" }
-            th(class: "px-3 py-2 text-right") { plain "Bid" }
-            th(class: "px-3 py-2 text-right") { plain "Ask" }
-            th(class: "px-3 py-2 text-right") { plain "Last" }
-            th(class: "px-3 py-2 text-right") { plain "Volume" }
-            th(class: "px-3 py-2 text-right") { plain "OI" }
-            th(class: "px-3 py-2 text-right") { plain "IV" }
-            th(class: "px-3 py-2 text-right") { plain "Delta" }
+            COLUMNS.each { |col| th(class: "px-3 py-2 #{col[:align]}") { plain col[:label] } }
           end
         end
         tbody do
@@ -230,14 +265,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
   def render_selected_leg_row(id:, label:, row_class:)
     tr(id: id, class: "hidden border-t border-gray-100 #{row_class}") do
       td(class: "px-3 py-1.5 font-medium") { plain label }
-      td(class: "px-3 py-1.5", data: { field: "strike" })
-      td(class: "px-3 py-1.5 text-right", data: { field: "bid" })
-      td(class: "px-3 py-1.5 text-right", data: { field: "ask" })
-      td(class: "px-3 py-1.5 text-right", data: { field: "last" })
-      td(class: "px-3 py-1.5 text-right", data: { field: "volume" })
-      td(class: "px-3 py-1.5 text-right", data: { field: "oi" })
-      td(class: "px-3 py-1.5 text-right", data: { field: "iv" })
-      td(class: "px-3 py-1.5 text-right", data: { field: "delta" })
+      COLUMNS.each { |col| td(class: "px-3 py-1.5 text-right", data: { field: col[:key] }) }
     end
   end
 
@@ -401,17 +429,42 @@ class BullPutSpreads::PageComponent < ApplicationComponent
           });
         }
 
+        // 跟 Ruby 端 COLUMNS 常數(app/components/bull_put_spreads/page_component.rb)
+        // 保持同一份欄位清單——表格 data-* 屬性、選腳明細列的 data-field，都用這份
+        // key 對應，避免兩處各自維護漂移。
+        var COLUMN_KEYS = [ 'strike', 'moneyness', 'bid', 'mid', 'ask', 'last',
+          'change', 'pct_change', 'volume', 'open_interest', 'oi_change', 'iv', 'delta' ];
+
+        function attrName(key) { return 'data-' + key.replace(/_/g, '-'); }
+
         function rowData(row) {
-          return {
-            strike: parseFloat(row.getAttribute('data-strike')),
-            bid: parseFloat(row.getAttribute('data-bid')),
-            ask: parseFloat(row.getAttribute('data-ask')),
-            last: parseFloat(row.getAttribute('data-last')),
-            volume: parseFloat(row.getAttribute('data-volume')),
-            oi: parseFloat(row.getAttribute('data-oi')),
-            iv: parseFloat(row.getAttribute('data-iv')),
-            delta: parseFloat(row.getAttribute('data-delta'))
-          };
+          var d = {};
+          COLUMN_KEYS.forEach(function (k) { d[k] = parseFloat(row.getAttribute(attrName(k))); });
+          return d;
+        }
+
+        function fmtField(key, v) {
+          var isDelta = (key === 'change' || key === 'pct_change' || key === 'oi_change');
+          if (isNaN(v)) return isDelta ? 'unch' : '—';
+          if (isDelta && v === 0) return 'unch';
+          switch (key) {
+            case 'strike': case 'bid': case 'mid': case 'ask': case 'last':
+              return v.toFixed(2);
+            case 'moneyness':
+              return (v * 100).toFixed(2) + '%';
+            case 'iv':
+              return (v * 100).toFixed(1) + '%';
+            case 'delta':
+              return v.toFixed(2);
+            case 'change':
+              return (v >= 0 ? '+' : '') + v.toFixed(2);
+            case 'pct_change':
+              return (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
+            case 'oi_change':
+              return (v >= 0 ? '+' : '') + v;
+            default:
+              return v;
+          }
         }
 
         // 完整呈現讀到的 Barchart 原始資料（不重算、不篩選欄位），選一腳就立刻長一排。
@@ -421,14 +474,10 @@ class BullPutSpreads::PageComponent < ApplicationComponent
           var legsPanel = document.getElementById('bpus-selected-legs');
           if (legsPanel) legsPanel.classList.remove('hidden');
           row.classList.remove('hidden');
-          row.querySelector('[data-field="strike"]').textContent = fmt(data.strike);
-          row.querySelector('[data-field="bid"]').textContent = fmt(data.bid);
-          row.querySelector('[data-field="ask"]').textContent = fmt(data.ask);
-          row.querySelector('[data-field="last"]').textContent = fmt(data.last);
-          row.querySelector('[data-field="volume"]').textContent = (isNaN(data.volume) ? '—' : data.volume);
-          row.querySelector('[data-field="oi"]').textContent = (isNaN(data.oi) ? '—' : data.oi);
-          row.querySelector('[data-field="iv"]').textContent = (isNaN(data.iv) ? '—' : (data.iv * 100).toFixed(1) + '%');
-          row.querySelector('[data-field="delta"]').textContent = (isNaN(data.delta) ? '—' : data.delta.toFixed(2));
+          COLUMN_KEYS.forEach(function (k) {
+            var cell = row.querySelector('[data-field="' + k + '"]');
+            if (cell) cell.textContent = fmtField(k, data[k]);
+          });
         }
 
         function runCalculate() {

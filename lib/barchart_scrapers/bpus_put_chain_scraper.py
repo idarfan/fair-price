@@ -1,8 +1,9 @@
 """
 Barchart Bull Put Spread (BPUS) 三級試算工具 — Stage 2: 指定履約日的 Put 鏈抓取。
 
-bpus.md §3.2：導覽指定 expiration 的 options 頁，解析 Put 側每個 strike 的
-strike/bid/ask/last/volume/open_interest/iv/delta，缺欄位回 null，不得造值。
+bpus.md §3.2：導覽指定 expiration 的 options 頁，解析 Put 側每個 strike 的完整
+Barchart 欄位（strike/moneyness/bid/mid/ask/last/change/pct_change/volume/
+open_interest/oi_change/iv/delta），跟頁面呈現一致，缺欄位回 null，不得造值。
 bid/ask 過濾（§3.2「Rails 端過濾」）留給 Ruby，這裡只管 DOM 原始值——沿用
 pmcc_short_call_scraper.py「Python 不做業務規則篩選，只做 DOM 抽取」的分工。
 
@@ -48,11 +49,16 @@ PUT_CHAIN_JS = """
       expiration_date: r.expirationDate||r.expirationDateString||null,
       dte: typeof r.daysToExpiration==='number'?r.daysToExpiration:null,
       strike: r.strikePrice,
+      moneyness: typeof r.moneyness==='number'?r.moneyness:null,
       bid: typeof r.bidPrice==='number'?r.bidPrice:null,
+      mid: typeof r.midpoint==='number'?r.midpoint:null,
       ask: typeof r.askPrice==='number'?r.askPrice:null,
       last: typeof r.lastPrice==='number'?r.lastPrice:null,
+      change: typeof r.priceChange==='number'?r.priceChange:null,
+      pct_change: typeof r.percentChange==='number'?r.percentChange:null,
       volume: typeof r.volume==='number'?r.volume:null,
       open_interest: typeof r.openInterest==='number'?r.openInterest:null,
+      oi_change: typeof r.openInterestChange==='number'?r.openInterestChange:(typeof r.oiChange==='number'?r.oiChange:null),
       iv: typeof r.volatility==='number'?r.volatility:null,
       delta: typeof r.delta==='number'?r.delta:null,
     }));
