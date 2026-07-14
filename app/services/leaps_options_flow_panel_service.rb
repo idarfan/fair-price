@@ -71,7 +71,9 @@ class LeapsOptionsFlowPanelService
   end
 
   def matches?(trade, candidate)
-    trade.strike.to_f      == candidate[:strike].to_f &&
+    return false if trade.strike.nil? || trade.expires_at.nil? || candidate[:expiration_date].nil?
+
+    trade.strike.to_f        == candidate[:strike].to_f &&
       trade.expires_at.to_date == candidate[:expiration_date].to_date
   end
 
