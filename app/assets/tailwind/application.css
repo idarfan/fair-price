@@ -135,6 +135,25 @@
 th[data-tip-key] { cursor: help; }
 th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 
+/* hover tooltip（#bpus-col-tip，BPUS 表頭教學，樣式沿用 #leaps-col-tip） */
+#bpus-col-tip {
+  position: fixed;
+  z-index: 99999;
+  max-width: 340px;
+  background: #111827;
+  color: #d1d5db;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .12s ease;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+#bpus-col-tip .tip-t { font-weight: 700; color: #f9fafb; margin-bottom: 4px; font-size: 15px; }
+
 /* ── LEAPS 術語字卡（rotateY 翻面、Web Speech 發音、奇偶區隔同 concept-card）─── */
 .leaps-vocab-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 12px; }
 @media (max-width: 900px) { .leaps-vocab-grid { grid-template-columns: repeat(2, 1fr); } }

@@ -30,6 +30,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
       render_notes
     end
     render_hover_style
+    render_tooltips_script
     render_script
   end
 
@@ -140,7 +141,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
   # %Change/Volume/OI/OI Chg/IV/Delta——選腳表格(render_selected_legs_panel)
   # 沿用同一份 COLUMNS 定義，兩處欄位保證不會各自漂移。
   COLUMNS = [
-    { key: "strike",        label: "履約價格",  align: "text-left" },
+    { key: "strike",        label: "履約價",    align: "text-left" },
     { key: "moneyness",     label: "Moneyness", align: "text-right" },
     { key: "bid",           label: "Bid",       align: "text-right" },
     { key: "mid",           label: "Mid",       align: "text-right" },
@@ -154,6 +155,64 @@ class BullPutSpreads::PageComponent < ApplicationComponent
     { key: "iv",            label: "IV",        align: "text-right" },
     { key: "delta",         label: "Delta",     align: "text-right" }
   ].freeze
+
+  # 表頭 driver.js 教學 tooltip（hover 顯示 + 點擊彈出 popover），沿用
+  # LEAPS/PMCC 表格既有的 data-tip-key 委派機制與 #leaps-col-tip 樣式
+  # （app/assets/tailwind/application.css 已是全站共用 CSS，不用重刻一份）。
+  COLUMN_EXPLAIN = {
+    "strike" => {
+      title: "履約價（Strike）",
+      desc: "選擇權合約約定的履約價格。保護腳(Long Put)取 Ask 買入、CSP 腳(Short Put)取 Bid 賣出，兩腳履約價之差即為價差寬度。"
+    },
+    "moneyness" => {
+      title: "Moneyness（價內外程度）",
+      desc: "(現價−履約價)/現價 的百分比。負值代表 Put 為價外(OTM)，正值代表價內(ITM)——數字越負代表這個履約價離現價越遠、越安全但權利金越低。"
+    },
+    "bid" => {
+      title: "Bid（買方出價）",
+      desc: "市場上買方目前願意支付的最高價格。CSP 腳(Short Put)以 Bid 掛單可立即成交，但只拿得到最低價，本頁「賣方取 bid」就是採用這個保守估算。"
+    },
+    "mid" => {
+      title: "Mid（中價）",
+      desc: "(Bid+Ask)/2，市場中間價。實際下單建議掛 Mid 價、耐心等候造市商撮合成交，通常能拿到比保守估算更好的價格。"
+    },
+    "ask" => {
+      title: "Ask（賣方要價）",
+      desc: "市場上賣方目前願意賣出的最低價格。保護腳(Long Put)以 Ask 掛單可立即成交，但要付最高價，本頁「買方取 ask」就是採用這個保守估算。"
+    },
+    "last" => {
+      title: "Last（最後成交價）",
+      desc: "這個履約價最近一次實際成交的價格，可能是幾分鐘前、也可能是好幾天前——成交量少的履約價，這個數字參考價值較低。"
+    },
+    "change" => {
+      title: "Change（漲跌）",
+      desc: "這個履約價的權利金比前一交易日收盤價變動了多少（絕對金額）。顯示 unch 代表今天完全沒有成交，無從比較。"
+    },
+    "pct_change" => {
+      title: "%Change（漲跌幅）",
+      desc: "權利金變動的百分比。選擇權基期價格通常很小，同樣的漲跌金額換算成百分比可能非常誇張，建議搭配 Change 絕對金額一起看。"
+    },
+    "volume" => {
+      title: "Volume（成交量）",
+      desc: "當日這個履約價實際成交的口數。量越大代表流動性越好，成交價越貼近真實市場共識；量是 0 代表今天還沒有人成交。"
+    },
+    "open_interest" => {
+      title: "OI（未平倉量）",
+      desc: "目前市場上尚未平倉的合約總口數，反映這個履約價有多少人持有部位。OI 過低代表流動性差，實際成交價可能明顯偏離畫面估算，注意事項§4 提過的風險就是這個。"
+    },
+    "oi_change" => {
+      title: "OI Chg（未平倉量變化）",
+      desc: "跟前一交易日相比，未平倉量增加或減少了多少。大幅增加通常代表當天有新倉位進場（開倉），減少則可能是平倉。"
+    },
+    "iv" => {
+      title: "IV（隱含波動率）",
+      desc: "市場對這個履約價未來波動幅度的預期，數字越高代表市場預期波動越劇烈、權利金越貴。財報前 IV 通常會墊高，財報後容易 IV crush（注意事項§3）。"
+    },
+    "delta" => {
+      title: "Delta（避險比率）",
+      desc: "股價變動 $1 時，這個 Put 權利金理論上變動多少，也常被當作「到期價內機率」的粗略估計。CSP 腳建議分頁就是用 |Delta| 挑選履約價——數字越大代表離價平越近、被指派機率越高。"
+    }
+  }.freeze
 
   def render_chain_table
     div(class: "space-y-2") do
@@ -171,7 +230,10 @@ class BullPutSpreads::PageComponent < ApplicationComponent
         table(id: "bpus-chain-table", class: "min-w-full text-[24px] bpus-phase-protection") do
           thead(class: "bg-gray-50 text-gray-500 uppercase") do
             tr do
-              COLUMNS.each { |col| th(class: "px-4 py-3 #{col[:align]}") { plain col[:label] } }
+              COLUMNS.each do |col|
+                th(id: "bpus-th-#{col[:key]}", data_tip_key: col[:key],
+                   class: "px-4 py-3 #{col[:align]}") { plain col[:label] }
+              end
             end
           end
           tbody do
@@ -335,6 +397,66 @@ class BullPutSpreads::PageComponent < ApplicationComponent
         background-color: #fecaca;
       }
     CSS
+  end
+
+  # 欄位教學三層互動（沿用 LEAPS leaps-column-tooltips-spec.md 同一套 hover
+  # tooltip + 點擊聚光 popover 機制，見 LeapsRecommendations::PageComponent
+  # #render_tooltips_script；BPUS 只有表頭沒有導覽 tour/術語字卡，故省略）。
+  # COLUMN_EXPLAIN 是文案唯一來源，hover 與點擊 popover 共用同一份。
+  def render_tooltips_script
+    script { raw tooltips_script_js.html_safe }
+  end
+
+  def tooltips_script_js
+    <<~JS
+      (function () {
+        var BPUS_COL_EXPLAIN = #{bpus_col_explain_json};
+
+        var tip = document.createElement('div');
+        tip.id = 'bpus-col-tip';
+        tip.innerHTML = '<div class="tip-t"></div><div class="tip-b"></div>';
+        document.body.appendChild(tip);
+        var tT = tip.querySelector('.tip-t'), tB = tip.querySelector('.tip-b');
+        function posTip(e) {
+          var x = e.clientX + 14, y = e.clientY + 12,
+              w = tip.offsetWidth || 280, h = tip.offsetHeight || 100;
+          if (x + w > window.innerWidth - 10)  x = e.clientX - w - 10;
+          if (y + h > window.innerHeight - 10) y = e.clientY - h - 10;
+          tip.style.left = x + 'px'; tip.style.top = y + 'px';
+        }
+        document.addEventListener('mouseover', function (e) {
+          var el = e.target.closest('[data-tip-key]');
+          if (el) {
+            var d = BPUS_COL_EXPLAIN[el.dataset.tipKey];
+            if (!d) return;
+            tT.textContent = d.title; tB.textContent = d.desc;
+            tip.style.opacity = '1'; posTip(e);
+          } else { tip.style.opacity = '0'; }
+        });
+        document.addEventListener('mousemove', function (e) {
+          if (tip.style.opacity !== '0') posTip(e);
+        });
+        document.addEventListener('mouseout', function (e) {
+          if (!e.target.closest('[data-tip-key]')) tip.style.opacity = '0';
+        });
+
+        function drv() { return window.driver && window.driver.js && window.driver.js.driver; }
+        document.addEventListener('click', function (e) {
+          var el = e.target.closest('[data-tip-key]');
+          if (el && drv()) {
+            var d = BPUS_COL_EXPLAIN[el.dataset.tipKey];
+            if (!d) return;
+            tip.style.opacity = '0';
+            drv()({ animate: true, allowClose: true, overlayOpacity: 0.35,
+                    steps: [{ element: el, popover: { title: d.title, description: d.desc, side: 'bottom', align: 'center' } }] }).drive();
+          }
+        });
+      })();
+    JS
+  end
+
+  def bpus_col_explain_json
+    COLUMN_EXPLAIN.transform_values { |v| { title: v[:title], desc: v[:desc] } }.to_json
   end
 
   # ---------------------------------------------------------------------------
