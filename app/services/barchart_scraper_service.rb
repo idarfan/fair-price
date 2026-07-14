@@ -224,7 +224,7 @@ class BarchartScraperService
 
     # 只快取成功結果——error/session_expired/no_candidates 都是暫時性狀態，
     # 快取住會讓使用者重試 15 分鐘內拿到同一個舊錯誤，不符合「重試應該重新抓」的預期。
-    Rails.cache.write(cache_key, result, expires_in: 15.minutes) if result[:status] == "success"
+    Rails.cache.write(cache_key, result, expires_in: 30.minutes) if result[:status] == "success"
     result
   end
 
@@ -264,7 +264,7 @@ class BarchartScraperService
       { status: "error", errors: [ fetch_result[:error].to_s ] }
     end
 
-    Rails.cache.write(cache_key, result, expires_in: 15.minutes) if result[:status] == "success"
+    Rails.cache.write(cache_key, result, expires_in: 30.minutes) if result[:status] == "success"
     result
   end
 
@@ -306,7 +306,7 @@ class BarchartScraperService
       { status: "error", errors: [ fetch_result[:error].to_s ] }
     end
 
-    Rails.cache.write(cache_key, result, expires_in: 15.minutes) if result[:status] == "success"
+    Rails.cache.write(cache_key, result, expires_in: 30.minutes) if result[:status] == "success"
     result
   end
 
