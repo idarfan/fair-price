@@ -263,7 +263,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
       button(type: "button", class: "px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:border-blue-400",
              data: { "bpus-recommend-tab": "aggressive" }) { plain "激進收租" }
     end
-    div(id: "bpus-recommend-explain", class: "hidden mt-2 px-3 py-2 bg-yellow-50 border border-yellow-200 text-yellow-900 text-xs rounded-lg")
+    div(id: "bpus-recommend-explain", class: "hidden mt-2 px-3 py-2 bg-yellow-50 border border-yellow-200 text-yellow-900 text-[24px] rounded-lg")
     div(id: "bpus-volatility-explain", class: "hidden mt-2 px-3 py-2 bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs rounded-lg")
   end
 
