@@ -131,7 +131,6 @@ class BullPutSpreads::PageComponent < ApplicationComponent
       case @chain_status
       when :cached
         render_chain_table
-        render_calc_panel
       when :session_expired
         render_status_alert("Barchart 登入已過期，請重新登入後重試")
       when :cdp_offline
@@ -235,6 +234,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
         a(href: "#", id: "bpus-reset-legs", class: "text-blue-600 hover:underline") { plain "清空已選腳" }
       end
       render_recommend_tabs
+      render_calc_panel
       div(class: "w-full overflow-x-auto border border-gray-200 rounded-lg") do
         table(id: "bpus-chain-table", class: "min-w-full text-xs whitespace-nowrap bpus-phase-protection") do
           thead(class: "bg-gray-50 text-gray-500 uppercase") do
