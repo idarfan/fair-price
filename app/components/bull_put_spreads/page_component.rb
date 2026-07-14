@@ -258,13 +258,13 @@ class BullPutSpreads::PageComponent < ApplicationComponent
   # 說明區塊維持 hidden，不佔版面。
   def render_recommend_tabs
     div(class: "flex items-center gap-2 mt-2") do
-      button(type: "button", class: "px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:border-blue-400",
+      button(type: "button", class: "px-3 py-1.5 rounded-lg text-[24px] font-medium bg-white border border-gray-300 text-gray-700 hover:border-blue-400",
              data: { "bpus-recommend-tab": "conservative" }) { plain "保守收租" }
-      button(type: "button", class: "px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:border-blue-400",
+      button(type: "button", class: "px-3 py-1.5 rounded-lg text-[24px] font-medium bg-white border border-gray-300 text-gray-700 hover:border-blue-400",
              data: { "bpus-recommend-tab": "aggressive" }) { plain "激進收租" }
     end
     div(id: "bpus-recommend-explain", class: "hidden mt-2 px-3 py-2 bg-yellow-50 border border-yellow-200 text-yellow-900 text-[24px] rounded-lg")
-    div(id: "bpus-volatility-explain", class: "hidden mt-2 px-3 py-2 bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs rounded-lg")
+    div(id: "bpus-volatility-explain", class: "hidden mt-2 px-3 py-2 bg-indigo-50 border border-indigo-200 text-indigo-900 text-[24px] rounded-lg")
   end
 
   def render_chain_row(row, index)
@@ -362,15 +362,15 @@ class BullPutSpreads::PageComponent < ApplicationComponent
     div(id: "bpus-calc-panel", class: "hidden space-y-3 p-4 bg-white border border-gray-200 rounded-lg") do
       div(class: "flex items-center justify-between") do
         h2(class: "text-sm font-semibold text-gray-700") { plain "Step 5 · 計算結果" }
-        label(class: "flex items-center gap-2 text-xs text-gray-600") do
+        label(class: "flex items-center gap-2 text-[24px] text-gray-600") do
           plain "口數"
           input(type: "number", id: "bpus-lots-input", value: "1", min: "1", step: "1",
                 class: "w-16 border border-gray-300 rounded px-2 py-1 text-right")
         end
       end
-      div(id: "bpus-calc-warning", class: "hidden px-3 py-2 bg-red-50 border border-red-300 text-red-800 text-sm rounded-lg")
-      dl(id: "bpus-calc-grid", class: "grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm")
-      div(id: "bpus-scenario", class: "text-sm space-y-1")
+      div(id: "bpus-calc-warning", class: "hidden px-3 py-2 bg-red-50 border border-red-300 text-red-800 text-[24px] rounded-lg")
+      dl(id: "bpus-calc-grid", class: "grid grid-cols-2 sm:grid-cols-4 gap-3 text-[24px]")
+      div(id: "bpus-scenario", class: "text-[24px] space-y-1")
     end
   end
 
@@ -925,14 +925,15 @@ class BullPutSpreads::PageComponent < ApplicationComponent
           }
 
           grid.innerHTML =
-            '<div><dt class="text-xs text-gray-500">淨權利金收入</dt><dd class="font-semibold">' + fmtLots(d.net_credit, lots) + '</dd></div>' +
-            '<div><dt class="text-xs text-gray-500">價差寬度</dt><dd class="font-semibold">' + fmt(d.width) + '</dd></div>' +
-            '<div><dt class="text-xs text-gray-500">最大獲利</dt><dd class="font-semibold text-green-700">' + fmtLots(d.max_profit, lots) + '</dd></div>' +
-            '<div><dt class="text-xs text-gray-500">最大虧損 / 押金</dt><dd class="font-semibold text-red-700">' + fmtLots(d.max_loss, lots) + '</dd></div>' +
-            '<div><dt class="text-xs text-gray-500">損益平衡點</dt><dd class="font-semibold">$' + fmt(d.breakeven) + '</dd></div>' +
-            '<div><dt class="text-xs text-gray-500">ROC</dt><dd class="font-semibold text-yellow-700">' + (d.roc === null ? '—' : d.roc + '%') + '</dd></div>' +
-            '<div><dt class="text-xs text-gray-500">風險報酬比</dt><dd class="font-semibold">' + (d.risk_reward === null ? '—' : '1 : ' + d.risk_reward) + '</dd></div>' +
-            '<div><dt class="text-xs text-gray-500">提前指派：承接現金</dt><dd class="font-semibold text-purple-700">' + assignCashHtml + '</dd></div>';
+            '<div><dt class="text-[24px] text-gray-500">淨權利金收入</dt><dd class="font-semibold">' + fmtLots(d.net_credit, lots) + '</dd></div>' +
+            '<div><dt class="text-[24px] text-gray-500">價差寬度</dt><dd class="font-semibold">' + fmt(d.width) + '</dd></div>' +
+            '<div><dt class="text-[24px] text-gray-500">最大獲利</dt><dd class="font-semibold text-green-700">' + fmtLots(d.max_profit, lots) + '</dd></div>' +
+            '<div><dt class="text-[24px] text-gray-500">最大虧損</dt><dd class="font-semibold text-red-700">' + fmtLots(d.max_loss, lots) + '</dd></div>' +
+            '<div><dt class="text-[24px] text-gray-500">押金</dt><dd class="font-semibold text-red-700">' + fmtLots(d.margin, lots) + '</dd></div>' +
+            '<div><dt class="text-[24px] text-gray-500">損益平衡點</dt><dd class="font-semibold">$' + fmt(d.breakeven) + '</dd></div>' +
+            '<div><dt class="text-[24px] text-gray-500">ROC</dt><dd class="font-semibold text-yellow-700">' + (d.roc === null ? '—' : d.roc + '%') + '</dd></div>' +
+            '<div><dt class="text-[24px] text-gray-500">風險報酬比</dt><dd class="font-semibold">' + (d.risk_reward === null ? '—' : '1 : ' + d.risk_reward) + '</dd></div>' +
+            '<div><dt class="text-[24px] text-gray-500">提前指派：承接現金</dt><dd class="font-semibold text-purple-700">' + assignCashHtml + '</dd></div>';
 
           if (d.warning !== 'invalid_width') {
             scen.innerHTML =
