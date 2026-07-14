@@ -299,7 +299,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
   # §7 靜態注意事項
   # ---------------------------------------------------------------------------
   def render_notes
-    div(class: "p-4 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 space-y-1.5") do
+    div(class: "p-4 bg-gray-50 border border-gray-200 rounded-lg text-[26px] text-gray-600 space-y-1.5") do
       h2(class: "text-sm font-semibold text-gray-700 mb-1") { plain "注意事項" }
       NOTES.each { |n| p { plain n } }
     end
