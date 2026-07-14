@@ -129,6 +129,7 @@ Rails.application.routes.draw do
   post "bpus/fetch_chain",        to: "bull_put_spreads#fetch_chain",       as: :bull_put_spreads_fetch_chain
   get  "bpus/status",             to: "bull_put_spreads#status",            as: :bull_put_spreads_status
   post "bpus/calculate",          to: "bull_put_spreads#calculate",         as: :bull_put_spreads_calculate
+  get  "bpus/volatility",         to: "bull_put_spreads#volatility",        as: :bull_put_spreads_volatility
 
 # IV Skew Watchlist
 resources :iv_watchlists, only: [ :index, :create, :destroy ] do

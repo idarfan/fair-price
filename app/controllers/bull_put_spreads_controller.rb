@@ -147,6 +147,26 @@ class BullPutSpreadsController < ApplicationController
     }
   end
 
+  # bpus-fix.md 項目6：背景波動率資料。前端頁面載入後打這支輪詢；第一次呼叫
+  # 若快取不存在就背景排 job 並回 pending，不阻塞、不等待 job 完成再回應。
+  # pending guard 用短 TTL 避免使用者輪詢期間重複排多個 job。
+  def volatility
+    symbol     = params[:symbol].to_s.upcase.strip
+    expiration = params[:expiration].to_s.strip
+    return render json: { status: "error" }, status: :unprocessable_entity if symbol.blank? || expiration.blank?
+
+    cached = Rails.cache.read("bpus_volatility_#{symbol}_#{expiration}")
+    return render json: cached if cached
+
+    pending_key = "bpus_volatility_pending_#{symbol}_#{expiration}"
+    unless Rails.cache.exist?(pending_key)
+      Rails.cache.write(pending_key, true, expires_in: 30.seconds)
+      BpusVolatilityJob.perform_later(symbol, expiration)
+    end
+
+    render json: { status: "pending" }
+  end
+
   private
 
   def job_status_symbol(job_status)

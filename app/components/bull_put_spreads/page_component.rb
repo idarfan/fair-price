@@ -24,6 +24,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
     div(class: "space-y-6") do
       render_header
       render_symbol_form
+      render_progress_bar
       render_symbol_error if @symbol_error
       render_expiration_section if @symbol
       render_chain_section if @expiration && @chain_status
@@ -60,6 +61,14 @@ class BullPutSpreads::PageComponent < ApplicationComponent
         plain "查詢履約日"
       end
       span(id: "bpus-loading", class: "hidden text-xs text-blue-600 animate-pulse") { plain "抓取中…" }
+    end
+  end
+
+  # 進度條：抓履約日／Put 鏈共用同一條，JS 依情境顯示/隱藏、並在抓取期間
+  # disable 對應按鈕（避免使用者重複送出或在抓取途中切換履約日）。
+  def render_progress_bar
+    div(id: "bpus-progress", class: "hidden h-1.5 w-full bg-gray-100 rounded-full overflow-hidden") do
+      div(id: "bpus-progress-fill", class: "h-full w-1/3 bg-blue-500 rounded-full bpus-progress-anim")
     end
   end
 
@@ -141,7 +150,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
   # %Change/Volume/OI/OI Chg/IV/Delta——選腳表格(render_selected_legs_panel)
   # 沿用同一份 COLUMNS 定義，兩處欄位保證不會各自漂移。
   COLUMNS = [
-    { key: "strike",        label: "履約價",    align: "text-left" },
+    { key: "strike",        label: "價格",      align: "text-left" },
     { key: "moneyness",     label: "Moneyness", align: "text-right" },
     { key: "bid",           label: "Bid",       align: "text-right" },
     { key: "mid",           label: "Mid",       align: "text-right" },
@@ -227,12 +236,12 @@ class BullPutSpreads::PageComponent < ApplicationComponent
       end
       render_recommend_tabs
       div(class: "w-full overflow-x-auto border border-gray-200 rounded-lg") do
-        table(id: "bpus-chain-table", class: "min-w-full text-[24px] bpus-phase-protection") do
+        table(id: "bpus-chain-table", class: "min-w-full text-xs whitespace-nowrap bpus-phase-protection") do
           thead(class: "bg-gray-50 text-gray-500 uppercase") do
             tr do
               COLUMNS.each do |col|
                 th(id: "bpus-th-#{col[:key]}", data_tip_key: col[:key],
-                   class: "px-4 py-3 #{col[:align]}") { plain col[:label] }
+                   class: "px-2 py-1.5 #{col[:align]}") { plain col[:label] }
               end
             end
           end
@@ -255,6 +264,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
              data: { "bpus-recommend-tab": "aggressive" }) { plain "激進收租" }
     end
     div(id: "bpus-recommend-explain", class: "hidden mt-2 px-3 py-2 bg-yellow-50 border border-yellow-200 text-yellow-900 text-xs rounded-lg")
+    div(id: "bpus-volatility-explain", class: "hidden mt-2 px-3 py-2 bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs rounded-lg")
   end
 
   def render_chain_row(row, index)
@@ -324,12 +334,12 @@ class BullPutSpreads::PageComponent < ApplicationComponent
   # COLUMNS 定義，不另造第二套欄位格式。
   def render_selected_legs_panel
     div(id: "bpus-selected-legs", class: "hidden mb-3 w-full overflow-x-auto border border-gray-200 rounded-lg") do
-      table(class: "min-w-full text-[24px]") do
+      table(class: "min-w-full text-xs whitespace-nowrap") do
         thead(class: "bg-gray-50 text-gray-500 uppercase") do
           tr do
-            th(class: "px-4 py-3 text-left") { plain "腳位" }
-            th(class: "px-4 py-3 text-left") { plain "操作方式" }
-            COLUMNS.each { |col| th(class: "px-4 py-3 #{col[:align]}") { plain col[:label] } }
+            th(class: "px-2 py-1.5 text-left") { plain "腳位" }
+            th(class: "px-2 py-1.5 text-left") { plain "方式" }
+            COLUMNS.each { |col| th(class: "px-2 py-1.5 #{col[:align]}") { plain col[:label] } }
           end
         end
         tbody do
@@ -342,15 +352,22 @@ class BullPutSpreads::PageComponent < ApplicationComponent
 
   def render_selected_leg_row(id:, label:, action:, row_class:)
     tr(id: id, class: "hidden border-t border-gray-100 #{row_class}") do
-      td(class: "px-4 py-2 font-medium") { plain label }
-      td(class: "px-4 py-2 font-medium") { plain action }
-      COLUMNS.each { |col| td(class: "px-4 py-2 text-right", data: { field: col[:key] }) }
+      td(class: "px-2 py-1.5 font-medium") { plain label }
+      td(class: "px-2 py-1.5 font-medium") { plain action }
+      COLUMNS.each { |col| td(class: "px-2 py-1.5 text-right", data: { field: col[:key] }) }
     end
   end
 
   def render_calc_panel
     div(id: "bpus-calc-panel", class: "hidden space-y-3 p-4 bg-white border border-gray-200 rounded-lg") do
-      h2(class: "text-sm font-semibold text-gray-700") { plain "Step 5 · 計算結果" }
+      div(class: "flex items-center justify-between") do
+        h2(class: "text-sm font-semibold text-gray-700") { plain "Step 5 · 計算結果" }
+        label(class: "flex items-center gap-2 text-xs text-gray-600") do
+          plain "口數"
+          input(type: "number", id: "bpus-lots-input", value: "1", min: "1", step: "1",
+                class: "w-16 border border-gray-300 rounded px-2 py-1 text-right")
+        end
+      end
       div(id: "bpus-calc-warning", class: "hidden px-3 py-2 bg-red-50 border border-red-300 text-red-800 text-sm rounded-lg")
       dl(id: "bpus-calc-grid", class: "grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm")
       div(id: "bpus-scenario", class: "text-sm space-y-1")
@@ -488,6 +505,16 @@ class BullPutSpreads::PageComponent < ApplicationComponent
           }, 2000);
         }
 
+        // ── 進度條：抓履約日／Put 鏈共用 ─────────────────────────────────────
+        function showProgress() {
+          var bar = document.getElementById('bpus-progress');
+          if (bar) bar.classList.remove('hidden');
+        }
+        function hideProgress() {
+          var bar = document.getElementById('bpus-progress');
+          if (bar) bar.classList.add('hidden');
+        }
+
         // ── Step1: 送出代號 → 抓履約日 ──────────────────────────────────────
         var form = document.getElementById('bpus-symbol-form');
         var inp  = document.getElementById('bpus-symbol-input');
@@ -496,6 +523,11 @@ class BullPutSpreads::PageComponent < ApplicationComponent
         function fetchExpirations(symbol) {
           var loading = document.getElementById('bpus-loading');
           if (loading) loading.classList.remove('hidden');
+          showProgress();
+          var submitBtn = document.getElementById('bpus-submit-btn');
+          var retryBtnEl = document.getElementById('bpus-fetch-expirations-btn');
+          if (submitBtn) submitBtn.disabled = true;
+          if (retryBtnEl) retryBtnEl.disabled = true;
           fetch('#{bull_put_spreads_fetch_expirations_path}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf() },
@@ -540,6 +572,8 @@ class BullPutSpreads::PageComponent < ApplicationComponent
           btn.addEventListener('click', function () {
             var exp = btn.getAttribute('data-exp');
             var symbol = #{@symbol.to_json};
+            showProgress();
+            document.querySelectorAll('[data-bpus-expiration-btn]').forEach(function (b) { b.disabled = true; });
             fetch('#{bull_put_spreads_fetch_chain_path}', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf() },
@@ -566,8 +600,12 @@ class BullPutSpreads::PageComponent < ApplicationComponent
         // ── Step3/4: 選腳互動 ────────────────────────────────────────────────
         var state = { protection: null, csp: null };
 
+        // 用 !important 變體(!bg-blue-50 等)蓋過列本身的斑馬紋 bg-gray-50/50——
+        // 兩者都是同層級 utility class，DOM classList 加入順序不影響 CSS
+        // cascade，實測發現奇數列(有斑馬紋)加了 bg-red-50/bg-blue-50 仍被斑馬紋
+        // 蓋掉、完全看不到標色(bpus-fix.md 項目3)。!important 變體確保一定蓋過。
         function clearHighlight(row) {
-          row.classList.remove('bg-blue-50', 'border-blue-400', 'bg-red-50', 'border-red-400', 'bpus-selected');
+          row.classList.remove('!bg-blue-50', '!border-blue-400', '!bg-red-50', '!border-red-400', 'bpus-selected');
         }
 
         function setPhase(phase) {
@@ -593,7 +631,51 @@ class BullPutSpreads::PageComponent < ApplicationComponent
         function hideRecommendExplain() {
           var el = document.getElementById('bpus-recommend-explain');
           if (el) { el.classList.add('hidden'); el.textContent = ''; }
+          var volEl = document.getElementById('bpus-volatility-explain');
+          if (volEl) { volEl.classList.add('hidden'); volEl.textContent = ''; }
+          activeRecommendKind = null;
           setActiveTab(null);
+        }
+
+        // ── 波動率背景資料(bpus-fix.md 項目6)：頁面載入後背景輪詢，抓到才顯示，
+        // 不阻塞履約日/Put 鏈這條主流程；抓不到就靜靜維持隱藏，不報錯打擾使用者。
+        var lastVolatility = null;
+        var activeRecommendKind = null;
+
+        function renderVolatilityExplain() {
+          var volEl = document.getElementById('bpus-volatility-explain');
+          if (!volEl || !activeRecommendKind || !lastVolatility || lastVolatility.status !== 'success') return;
+          var v = lastVolatility;
+          var levelNote = v.iv >= 80
+            ? 'IV 偏高：權利金較厚、ROC 較有吸引力，但要留意財報後或事件後的 IV crush 侵蝕權利金價值。'
+            : (v.iv <= 40
+              ? 'IV 偏低：權利金較薄，同樣寬度的價差 ROC 會偏低，賣方吸引力較弱。'
+              : 'IV 中等：權利金與 ROC 落在一般水準。');
+          var rankNote = (typeof v.iv_rank === 'number')
+            ? '目前 IV Rank ' + v.iv_rank.toFixed(1) + '%（相對自身歷史的百分位）' +
+              (v.iv_rank >= 50 ? '，處於相對高檔，賣方（收租）策略相對有利。' : '，處於相對低檔，賣方拿到的權利金相對單薄。')
+            : '';
+          var kindLabel = activeRecommendKind === 'conservative' ? '保守收租' : '激進收租';
+          volEl.classList.remove('hidden');
+          volEl.textContent = '📊 ' + kindLabel + ' × 目前波動率：IV ' + fmt(v.iv) + '%、HV ' + fmt(v.hv) + '%。' +
+            levelNote + rankNote;
+        }
+
+        function fetchVolatility(symbol, expiration) {
+          fetch('#{bull_put_spreads_volatility_path}?symbol=' + encodeURIComponent(symbol) + '&expiration=' + encodeURIComponent(expiration))
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (d.status === 'pending') {
+                setTimeout(function () { fetchVolatility(symbol, expiration); }, 4000);
+              } else {
+                lastVolatility = d;
+                renderVolatilityExplain();
+              }
+            }).catch(function () {});
+        }
+
+        if (document.getElementById('bpus-chain-table') && #{@expiration.to_json}) {
+          fetchVolatility(#{@symbol.to_json}, #{@expiration.to_json});
         }
 
         function resetSelection() {
@@ -722,7 +804,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
           var pRow = rec.protection.el, pData = rec.protection.data;
           state.protection = Object.assign({ row: pRow }, pData);
           clearHighlight(pRow);
-          pRow.classList.add('bg-blue-50', 'border-blue-400', 'bpus-selected');
+          pRow.classList.add('!bg-blue-50', '!border-blue-400', 'bpus-selected');
           fillLegRow('bpus-protection-row', pData);
           setPhase('csp');
           document.querySelectorAll('[data-bpus-row]').forEach(function (r) {
@@ -733,7 +815,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
           var sRow = rec.short.el, sData = rec.short.data;
           state.csp = Object.assign({ row: sRow }, sData);
           clearHighlight(sRow);
-          sRow.classList.add('bg-red-50', 'border-red-400', 'bpus-selected');
+          sRow.classList.add('!bg-red-50', '!border-red-400', 'bpus-selected');
           fillLegRow('bpus-csp-row', sData);
           runCalculate();
 
@@ -748,6 +830,9 @@ class BullPutSpreads::PageComponent < ApplicationComponent
               fmt(sData.strike) + '（實際 Delta ' + sData.delta.toFixed(2) + '），保護腳取其下一個有報價的履約價 $' +
               fmt(pData.strike) + '，維持窄價差以降低押金；' + profile;
           }
+
+          activeRecommendKind = kind;
+          renderVolatilityExplain();
         }
 
         document.querySelectorAll('[data-bpus-recommend-tab]').forEach(function (btn) {
@@ -772,6 +857,43 @@ class BullPutSpreads::PageComponent < ApplicationComponent
 
         function fmt(n) { return (typeof n === 'number' && !isNaN(n)) ? n.toFixed(2) : '—'; }
 
+        // 口數：金額類結果用「單口 × 口數 = 總計」呈現；BE/ROC/風險報酬比是
+        // 比率，不隨口數變化，維持單口顯示(bpus-fix.md 項目5)。
+        function currentLots() {
+          var el = document.getElementById('bpus-lots-input');
+          var n = el ? parseInt(el.value, 10) : 1;
+          return (!n || n < 1) ? 1 : n;
+        }
+
+        function fmtLots(perLot, lots) {
+          if (typeof perLot !== 'number' || isNaN(perLot)) return '—';
+          if (lots <= 1) return '$' + fmt(perLot);
+          return '$' + fmt(perLot) + ' × ' + lots + ' = $' + fmt(perLot * lots);
+        }
+
+        var lastCalcResult = null;
+
+        function runCalculate() {
+          fetch('#{bull_put_spreads_calculate_path}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf() },
+            body: JSON.stringify({
+              short_strike: state.csp.strike, short_bid: state.csp.bid,
+              long_strike: state.protection.strike, long_ask: state.protection.ask
+            })
+          })
+          .then(function (r) { return r.json(); })
+          .then(function (d) { lastCalcResult = d; renderCalcResult(d); })
+          .catch(function () {});
+        }
+
+        var lotsInput = document.getElementById('bpus-lots-input');
+        if (lotsInput) {
+          lotsInput.addEventListener('input', function () {
+            if (lastCalcResult) renderCalcResult(lastCalcResult);
+          });
+        }
+
         function renderCalcResult(d) {
           var panel = document.getElementById('bpus-calc-panel');
           var grid  = document.getElementById('bpus-calc-grid');
@@ -790,20 +912,33 @@ class BullPutSpreads::PageComponent < ApplicationComponent
             warn.classList.add('hidden');
           }
 
+          var lots = currentLots();
+
+          // 提前指派所需現金：CSP 履約價 × 100 × 口數；括號附註扣除已收
+          // 權利金(net_credit，已隨口數放大)後的淨成本(bpus-fix.md 項目4)。
+          var assignCashHtml = '—';
+          if (d.warning !== 'invalid_width' && typeof d.short_strike === 'number') {
+            var cashTotal = d.short_strike * 100 * lots;
+            var netCreditTotal = (typeof d.net_credit === 'number' ? d.net_credit : 0) * lots;
+            var netCost = cashTotal - netCreditTotal;
+            assignCashHtml = '$' + fmt(cashTotal) + '（淨成本 $' + fmt(netCost) + '）';
+          }
+
           grid.innerHTML =
-            '<div><dt class="text-xs text-gray-500">淨權利金收入</dt><dd class="font-semibold">$' + fmt(d.net_credit) + '</dd></div>' +
+            '<div><dt class="text-xs text-gray-500">淨權利金收入</dt><dd class="font-semibold">' + fmtLots(d.net_credit, lots) + '</dd></div>' +
             '<div><dt class="text-xs text-gray-500">價差寬度</dt><dd class="font-semibold">' + fmt(d.width) + '</dd></div>' +
-            '<div><dt class="text-xs text-gray-500">最大獲利</dt><dd class="font-semibold text-green-700">$' + fmt(d.max_profit) + '</dd></div>' +
-            '<div><dt class="text-xs text-gray-500">最大虧損 / 押金</dt><dd class="font-semibold text-red-700">$' + fmt(d.max_loss) + '</dd></div>' +
+            '<div><dt class="text-xs text-gray-500">最大獲利</dt><dd class="font-semibold text-green-700">' + fmtLots(d.max_profit, lots) + '</dd></div>' +
+            '<div><dt class="text-xs text-gray-500">最大虧損 / 押金</dt><dd class="font-semibold text-red-700">' + fmtLots(d.max_loss, lots) + '</dd></div>' +
             '<div><dt class="text-xs text-gray-500">損益平衡點</dt><dd class="font-semibold">$' + fmt(d.breakeven) + '</dd></div>' +
             '<div><dt class="text-xs text-gray-500">ROC</dt><dd class="font-semibold text-yellow-700">' + (d.roc === null ? '—' : d.roc + '%') + '</dd></div>' +
-            '<div><dt class="text-xs text-gray-500">風險報酬比</dt><dd class="font-semibold">' + (d.risk_reward === null ? '—' : '1 : ' + d.risk_reward) + '</dd></div>';
+            '<div><dt class="text-xs text-gray-500">風險報酬比</dt><dd class="font-semibold">' + (d.risk_reward === null ? '—' : '1 : ' + d.risk_reward) + '</dd></div>' +
+            '<div><dt class="text-xs text-gray-500">提前指派：承接現金</dt><dd class="font-semibold text-purple-700">' + assignCashHtml + '</dd></div>';
 
           if (d.warning !== 'invalid_width') {
             scen.innerHTML =
-              '<p>🌞 股價 ≥ $' + fmt(d.short_strike) + '：全額獲利 = $' + fmt(d.net_credit) + '</p>' +
+              '<p>🌞 股價 ≥ $' + fmt(d.short_strike) + '：全額獲利 = ' + fmtLots(d.net_credit, lots) + '</p>' +
               '<p>🧊 股價介於 $' + fmt(d.long_strike) + ' ~ $' + fmt(d.breakeven) + '：開始賠錢</p>' +
-              '<p>🥶 股價 ≤ $' + fmt(d.long_strike) + '：最大虧損鎖定 = $' + fmt(d.max_loss) + '</p>';
+              '<p>🥶 股價 ≤ $' + fmt(d.long_strike) + '：最大虧損鎖定 = ' + fmtLots(d.max_loss, lots) + '</p>';
           } else {
             scen.innerHTML = '';
           }
@@ -821,7 +956,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
             if (!state.protection) {
               state.protection = Object.assign({ row: row }, data);
               clearHighlight(row);
-              row.classList.add('bg-blue-50', 'border-blue-400', 'bpus-selected');
+              row.classList.add('!bg-blue-50', '!border-blue-400', 'bpus-selected');
               fillLegRow('bpus-protection-row', data);
               setPhase('csp');
               document.querySelectorAll('[data-bpus-row]').forEach(function (r) {
@@ -836,7 +971,7 @@ class BullPutSpreads::PageComponent < ApplicationComponent
             if (!state.csp && data.strike > state.protection.strike) {
               state.csp = Object.assign({ row: row }, data);
               clearHighlight(row);
-              row.classList.add('bg-red-50', 'border-red-400', 'bpus-selected');
+              row.classList.add('!bg-red-50', '!border-red-400', 'bpus-selected');
               fillLegRow('bpus-csp-row', data);
               runCalculate();
             }

@@ -268,6 +268,48 @@ class BarchartScraperService
     result
   end
 
+  # BPUS §6(bpus-fix.md 項目6)：背景波動率背景資料，(symbol, expiration) 為
+  # key、15 分鐘快取。純背景輔助資訊，抓不到就回 no_candidates／error，不影響
+  # 主流程(履約日/Put 鏈)的顯示。
+  def fetch_bpus_volatility(expiration:)
+    unless cdp_available?
+      log_fetch("bpus_volatility", "error", "CDP unavailable")
+      return { status: "error", errors: [ "Chrome CDP not reachable at #{CDP_URL}" ] }
+    end
+
+    cache_key = "bpus_volatility_#{@symbol}_#{expiration}"
+    cached = Rails.cache.read(cache_key)
+    return cached if cached
+
+    fetch_result = run_scraper("bpus_volatility", extra_args: [ expiration ])
+
+    result = case fetch_result[:status]
+    when "barchart_session_expired"
+      log_fetch("bpus_volatility", "barchart_session_expired", nil)
+      { status: "barchart_session_expired" }
+    when "no_candidates"
+      log_fetch("bpus_volatility", "no_candidates", "expiration=#{expiration}")
+      { status: "no_candidates" }
+    when "success"
+      data = fetch_result[:data]
+      log_fetch("bpus_volatility", "success", "expiration=#{expiration}")
+      {
+        status:          "success",
+        iv:              data["iv"],
+        hv:              data["hv"],
+        iv_rank:         data["iv_rank"],
+        iv_percentile:   data["iv_percentile"],
+        latest_earnings: data["latest_earnings"]
+      }
+    else
+      log_fetch("bpus_volatility", "error", fetch_result[:error])
+      { status: "error", errors: [ fetch_result[:error].to_s ] }
+    end
+
+    Rails.cache.write(cache_key, result, expires_in: 15.minutes) if result[:status] == "success"
+    result
+  end
+
   # UI-triggered max pain fetch for a specific filter combination.
   # Chart 4 (Max Pain by Contract) is filter-independent — NOT re-upserted here.
   def fetch_max_pain(expiration: nil, strikes: "show_all", volume_oi: "open_interest")
