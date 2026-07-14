@@ -40,10 +40,13 @@ sys.path.insert(0, os.path.dirname(__file__))
 from cdp_helper import prepare_page, cdp_eval, cdp_navigate, activate_target
 
 TARGET_PATH    = "options"
-STAGE1_SETTLE  = 3000
+STAGE1_SETTLE  = 5000  # 對齊 leaps_scraper.py 的 5000ms——3000ms 太短，實測(2026-07-13/14,
+                       # KLAC)LEAPS 同一輪抓取成功但 PMCC 緊接著抓 no_candidates，
+                       # 兩者讀同一個 expiration dropdown，差異只在 settle 時間
 OPTIONS_SETTLE = 1500
 VG_SETTLE      = 1500
 EXP_COUNT      = 3   # spec §3: 三時段 = 前三個到期日（DOM 順序，已按日期升序）
+EXPIRATIONS_MAX_WAIT_S = 10  # dropdown 輪詢上限（見 _wait_for_grid 用法）
 
 # ── Stage 1: expiration dropdown ──────────────────────────────────────────────
 # NOTE: spec §6 provided a `select[name="expiration"]` snippet flagged "需實測".
@@ -266,7 +269,20 @@ async def main(symbol):
 
     underlying_price = await cdp_eval(ws_url, UNDERLYING_JS)
 
-    expirations = await cdp_eval(ws_url, EXPIRATIONS_JS) or []
+    # 原本是單次 cdp_eval，settle 時間到但 Angular dropdown 還沒 render 完就直接
+    # 判定 no_candidates（實測 KLAC 案例：LEAPS 用同一個 selector 在同一輪抓取
+    # 就成功了）。這裡直接呼叫 cdp_eval 重試（不共用 _wait_for_grid），因為
+    # 那支是給「每個到期日的 bc-data-grid」輪詢用、測試已經把它整支 mock 掉
+    # 來避免 real sleep；expiration dropdown 屬於 symbol 層級只讀一次，跟
+    # per-expiration 的 grid 輪詢語意不同，混用會讓既有測試對不上。
+    expirations = None
+    deadline = asyncio.get_event_loop().time() + EXPIRATIONS_MAX_WAIT_S
+    while asyncio.get_event_loop().time() < deadline:
+        expirations = await cdp_eval(ws_url, EXPIRATIONS_JS)
+        if expirations:
+            break
+        await asyncio.sleep(0.5)
+    expirations = expirations or []
     selected_expirations = expirations[:EXP_COUNT]
 
     if not selected_expirations:
