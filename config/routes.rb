@@ -131,6 +131,14 @@ Rails.application.routes.draw do
   post "bpus/calculate",          to: "bull_put_spreads#calculate",         as: :bull_put_spreads_calculate
   get  "bpus/volatility",         to: "bull_put_spreads#volatility",        as: :bull_put_spreads_volatility
 
+  # 牛市看漲價差（Bull Call Vertical Spread）試算工具
+  get  "bcvs",                   to: "bull_call_spreads#index",             as: :bull_call_spreads
+  post "bcvs/fetch_expirations", to: "bull_call_spreads#fetch_expirations", as: :bull_call_spreads_fetch_expirations
+  post "bcvs/fetch_chain",       to: "bull_call_spreads#fetch_chain",       as: :bull_call_spreads_fetch_chain
+  get  "bcvs/status",            to: "bull_call_spreads#status",            as: :bull_call_spreads_status
+  post "bcvs/recommend",         to: "bull_call_spreads#recommend",         as: :bull_call_spreads_recommend
+  post "bcvs/calculate",         to: "bull_call_spreads#calculate",         as: :bull_call_spreads_calculate
+
 # IV Skew Watchlist
 resources :iv_watchlists, only: [ :index, :create, :destroy ] do
   member do

@@ -310,6 +310,80 @@ class BarchartScraperService
     result
   end
 
+  # BCVS §功能流程 步驟1：履約日清單抓取，(symbol) 為 key，快取層改用
+  # BcvsCacheService（Postgres，非 bpus 的 Rails.cache）——bcvs.md 明講快取層為
+  # 本工具新增的持久化差異，30 分鐘 TTL 與 UPSERT 語意皆由該 service 負責。
+  def fetch_bcvs_expirations
+    unless cdp_available?
+      log_fetch("bcvs_expirations", "error", "CDP unavailable")
+      return { status: "error", errors: [ "Chrome CDP not reachable at #{CDP_URL}" ] }
+    end
+
+    if BcvsCacheService.fresh_expirations?(@symbol)
+      cached = BcvsCacheService.read_expirations(@symbol)
+      return { status: "success", expirations: cached[:expirations], underlying_price: cached[:underlying_price] }
+    end
+
+    fetch_result = run_scraper("bcvs_expirations")
+
+    case fetch_result[:status]
+    when "barchart_session_expired"
+      log_fetch("bcvs_expirations", "barchart_session_expired", nil)
+      { status: "barchart_session_expired" }
+    when "no_candidates"
+      log_fetch("bcvs_expirations", "no_candidates", nil)
+      { status: "no_candidates" }
+    when "success"
+      data = fetch_result[:data]
+      Rails.logger.info("[bcvs] expirations fetched url=#{data["debug_url"]} symbol=#{@symbol}")
+      BcvsCacheService.upsert_expirations!(
+        @symbol, expirations: data["expirations"], underlying_price: data["underlying_price"]
+      )
+      log_fetch("bcvs_expirations", "success", "count=#{Array(data["expirations"]).length}")
+      { status: "success", expirations: data["expirations"], underlying_price: data["underlying_price"] }
+    else
+      log_fetch("bcvs_expirations", "error", fetch_result[:error])
+      { status: "error", errors: [ fetch_result[:error].to_s ] }
+    end
+  end
+
+  # BCVS §功能流程 步驟2：指定履約日的 Call 鏈抓取，(symbol, expiration) 為
+  # key。bid=0/OI=0 剔除在 BcvsCacheService#upsert_chain! 內完成（Ruby 業務
+  # 規則層，沿用 bpus「Python 不做業務篩選」的分工）。
+  def fetch_bcvs_call_chain(expiration:)
+    unless cdp_available?
+      log_fetch("bcvs_call_chain", "error", "CDP unavailable")
+      return { status: "error", errors: [ "Chrome CDP not reachable at #{CDP_URL}" ] }
+    end
+
+    if BcvsCacheService.fresh_chain?(@symbol, expiration)
+      cached = BcvsCacheService.read_chain(@symbol, expiration)
+      return { status: "success", rows: cached[:strikes], underlying_price: cached[:underlying_price] }
+    end
+
+    fetch_result = run_scraper("bcvs_call_chain", extra_args: [ expiration ])
+
+    case fetch_result[:status]
+    when "barchart_session_expired"
+      log_fetch("bcvs_call_chain", "barchart_session_expired", nil)
+      { status: "barchart_session_expired" }
+    when "no_candidates"
+      log_fetch("bcvs_call_chain", "no_candidates", "expiration=#{expiration}")
+      { status: "no_candidates" }
+    when "success"
+      data = fetch_result[:data]
+      Rails.logger.info("[bcvs] call chain fetched url=#{data["debug_url"]} symbol=#{@symbol} expiration=#{expiration}")
+      snapshot = BcvsCacheService.upsert_chain!(
+        @symbol, expiration, strikes: data["rows"], underlying_price: data["underlying_price"]
+      )
+      log_fetch("bcvs_call_chain", "success", "rows=#{snapshot.strikes.length} expiration=#{expiration}")
+      { status: "success", rows: snapshot.strikes, underlying_price: snapshot.underlying_price&.to_f }
+    else
+      log_fetch("bcvs_call_chain", "error", fetch_result[:error])
+      { status: "error", errors: [ fetch_result[:error].to_s ] }
+    end
+  end
+
   # UI-triggered max pain fetch for a specific filter combination.
   # Chart 4 (Max Pain by Contract) is filter-independent — NOT re-upserted here.
   def fetch_max_pain(expiration: nil, strikes: "show_all", volume_oi: "open_interest")

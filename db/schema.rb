@@ -10,9 +10,30 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_054225) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_18_044101) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "bcvs_chain_snapshots", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "expiration", null: false
+    t.datetime "scraped_at", null: false
+    t.jsonb "strikes", default: [], null: false
+    t.string "symbol", null: false
+    t.decimal "underlying_price", precision: 10, scale: 4
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "expiration"], name: "index_bcvs_chain_snapshots_on_symbol_and_expiration", unique: true
+  end
+
+  create_table "bcvs_expiration_snapshots", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.jsonb "expirations", default: [], null: false
+    t.datetime "scraped_at", null: false
+    t.string "symbol", null: false
+    t.decimal "underlying_price", precision: 10, scale: 4
+    t.datetime "updated_at", null: false
+    t.index ["symbol"], name: "index_bcvs_expiration_snapshots_on_symbol", unique: true
+  end
 
   create_table "fetch_logs", force: :cascade do |t|
     t.datetime "created_at", null: false
