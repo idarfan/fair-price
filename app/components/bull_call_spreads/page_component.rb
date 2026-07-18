@@ -32,6 +32,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
       render_expiration_section if @symbol
       render_chain_section if @expiration && @chain_status
       render_notes
+      render_repair_panel if @expiration && @chain_status
     end
     render_hover_style
     render_tooltips_script
@@ -231,7 +232,6 @@ class BullCallSpreads::PageComponent < ApplicationComponent
       end
       render_k1_select
       render_recommend_tabs
-      render_repair_panel
       div(class: "w-full overflow-x-auto border border-gray-200 rounded-lg") do
         table(id: "bcvs-chain-table", class: "min-w-full text-xs whitespace-nowrap") do
           thead(class: "bg-gray-50 text-gray-500 uppercase") do
@@ -279,6 +279,9 @@ class BullCallSpreads::PageComponent < ApplicationComponent
       end
       div(id: "bcvs-recommend-error", class: "hidden px-3 py-2 bg-red-50 border border-red-200 text-red-700 text-[24px] rounded-lg")
       render_calc_panel
+      render_interval_table
+      render_naked_comparison
+      render_early_close_panel
     end
   end
 
@@ -294,6 +297,31 @@ class BullCallSpreads::PageComponent < ApplicationComponent
       end
       div(id: "bcvs-calc-warning", class: "hidden px-3 py-2 bg-red-50 border border-red-300 text-red-800 text-[24px] rounded-lg")
       dl(id: "bcvs-calc-grid", class: "grid grid-cols-2 sm:grid-cols-4 gap-3 text-[24px]")
+    end
+  end
+
+  # bcvs.md §損益區間表：動態，D=淨成本 debit。以實際數字渲染，不得只顯示公式
+  # ——JS 依當前 tab 的 k1/k2/debit/breakeven 與現價即時算出五列文字。
+  def render_interval_table
+    div(class: "p-4 bg-white border border-gray-200 rounded-lg space-y-2") do
+      h2(class: "text-sm font-semibold text-gray-700") { plain "損益區間表" }
+      div(id: "bcvs-interval-table", class: "text-[24px] space-y-1")
+    end
+  end
+
+  # bcvs.md §為什麼不直接裸買 LEAPS Call：對照表 + 到期損益交叉價 S*。
+  def render_naked_comparison
+    div(class: "p-4 bg-white border border-gray-200 rounded-lg space-y-2") do
+      h2(class: "text-sm font-semibold text-gray-700") { plain "為什麼不直接裸買 LEAPS Call？" }
+      div(id: "bcvs-naked-comparison", class: "text-[24px] space-y-1")
+    end
+  end
+
+  # bcvs.md §提前平倉指引：現在平倉可收回金額 + 已實現最大價值比例 Y%。
+  def render_early_close_panel
+    div(class: "p-4 bg-white border border-gray-200 rounded-lg space-y-2") do
+      h2(class: "text-sm font-semibold text-gray-700") { plain "提前平倉指引（不必等到期）" }
+      div(id: "bcvs-early-close", class: "text-[24px] space-y-1")
     end
   end
 
@@ -497,6 +525,8 @@ class BullCallSpreads::PageComponent < ApplicationComponent
           return 'bcvs-row-' + Number(strike).toFixed(2).replace('.', '_');
         }
 
+        var CURRENT_PRICE = #{@underlying_price.to_json};
+
         function pollJob(jobId, statusPath, onDone) {
           var attempts = 0;
           var timer = setInterval(function () {
@@ -673,7 +703,83 @@ class BullCallSpreads::PageComponent < ApplicationComponent
             '<div><dt class="text-[24px] text-gray-500">損益兩平</dt><dd class="font-semibold">$' + fmt(tab.breakeven) + '</dd></div>' +
             '<div><dt class="text-[24px] text-gray-500">報酬風險比</dt><dd class="font-semibold text-yellow-700">' + (tab.risk_reward === null ? '—' : tab.risk_reward) + '</dd></div>';
 
+          renderIntervalTable(tab, lots);
+          renderNakedComparison(tab, lots);
+          renderEarlyClose(tab, lots);
           fillRepairFromTab(tab);
+        }
+
+        // ── 損益區間表（bcvs.md §損益區間表：動態，以實際數字渲染）───────────────
+        function renderIntervalTable(tab, lots) {
+          var el = document.getElementById('bcvs-interval-table');
+          if (!el || tab.warning === 'invalid_width') { if (el) el.innerHTML = ''; return; }
+
+          var k1 = tab.k1, k2 = tab.k2, be = tab.breakeven;
+          var maxLoss = tab.max_loss, maxProfit = tab.max_profit;
+          var price = CURRENT_PRICE;
+          var exampleHtml = '';
+
+          if (typeof price === 'number' && price > k1 && price < be) {
+            var pnl = (price - k1 - tab.debit) * 100 * lots;
+            exampleHtml = '（如以現價 $' + fmt(price) + ' 到期 → ' + (pnl >= 0 ? '+' : '') + '$' + fmt(pnl) + '）';
+          }
+          var exampleHtml2 = '';
+          if (typeof price === 'number' && price >= be && price < k2) {
+            var pnl2 = (price - k1 - tab.debit) * 100 * lots;
+            exampleHtml2 = '（如以現價 $' + fmt(price) + ' 到期 → +$' + fmt(pnl2) + '）';
+          }
+
+          el.innerHTML =
+            '<p>≤ $' + fmt(k1) + '：賠掉全部成本 −' + fmtLots(maxLoss, lots) + '</p>' +
+            '<p>$' + fmt(k1) + ' ~ $' + fmt(be) + '：部分虧損，隨股價遞減 ' + exampleHtml + '</p>' +
+            '<p>= $' + fmt(be) + '：損益兩平 $0</p>' +
+            '<p>$' + fmt(be) + ' ~ $' + fmt(k2) + '：開始獲利，隨股價遞增 ' + exampleHtml2 + '</p>' +
+            '<p>≥ $' + fmt(k2) + '：最大獲利（封頂）+' + fmtLots(maxProfit, lots) + '</p>';
+        }
+
+        // ── 裸買 LEAPS 對照表（bcvs.md §為什麼不直接裸買）─────────────────────
+        function renderNakedComparison(tab, lots) {
+          var el = document.getElementById('bcvs-naked-comparison');
+          if (!el || tab.warning === 'invalid_width') { if (el) el.innerHTML = ''; return; }
+
+          var priceNote = '';
+          if (typeof CURRENT_PRICE === 'number' && typeof tab.s_star === 'number') {
+            priceNote = CURRENT_PRICE < tab.s_star
+              ? '目前現價 $' + fmt(CURRENT_PRICE) + ' 低於 S*，價差策略暫時領先。'
+              : '目前現價 $' + fmt(CURRENT_PRICE) + ' 高於 S*，裸買暫時領先。';
+          }
+
+          el.innerHTML =
+            '<table class="w-full text-[24px]"><thead><tr class="text-gray-500 text-left">' +
+            '<th class="py-1">項目</th><th class="py-1 text-right">裸買 K1 Call</th><th class="py-1 text-right">價差（K1/K2）</th></tr></thead><tbody>' +
+            '<tr><td class="py-1">每口成本</td><td class="py-1 text-right">' + fmtLots(tab.naked_cost, lots) + '</td><td class="py-1 text-right">' + fmtLots(tab.cost_per_contract, lots) + '</td></tr>' +
+            '<tr><td class="py-1">最大損失</td><td class="py-1 text-right">' + fmtLots(tab.naked_cost, lots) + '</td><td class="py-1 text-right">' + fmtLots(tab.max_loss, lots) + '（金額小得多）</td></tr>' +
+            '<tr><td class="py-1">損益兩平</td><td class="py-1 text-right">$' + fmt(tab.naked_breakeven) + '</td><td class="py-1 text-right">$' + fmt(tab.breakeven) + '（低得多）</td></tr>' +
+            '<tr><td class="py-1">最大獲利</td><td class="py-1 text-right">無上限</td><td class="py-1 text-right">' + fmtLots(tab.max_profit, lots) + '（封頂）</td></tr>' +
+            '</tbody></table>' +
+            '<p class="mt-2">到期損益交叉價 <strong>S* = $' + fmt(tab.s_star) + '</strong>（= K2 + K2 bid）：到期價 &lt; S* 時價差策略勝出，&gt; S* 時裸買勝出。' + priceNote + '</p>';
+        }
+
+        // ── 提前平倉指引（bcvs.md §提前平倉指引）───────────────────────────────
+        function renderEarlyClose(tab, lots) {
+          var el = document.getElementById('bcvs-early-close');
+          if (!el || tab.warning === 'invalid_width') { if (el) el.innerHTML = ''; return; }
+
+          if (tab.closeout_value === null || tab.closeout_value === undefined) {
+            el.innerHTML = '<p class="text-gray-500">需要 K1 現價 bid 才能估算平倉可收回金額。</p>';
+            return;
+          }
+
+          var pct = tab.realized_pct;
+          var suggestHtml = (typeof pct === 'number' && pct >= 80)
+            ? '<p class="text-green-700 font-semibold">✅ 已實現 ' + pct + '%，達 80% 閾值，建議考慮獲利了結——剩餘部分要再抱數月，報酬/時間比會急遽變差，還多扛提前指派與回檔風險。</p>'
+            : '';
+
+          el.innerHTML =
+            '<p>判斷基準＝價差現值佔最大價值的比例。以快取 chain 保守估（K1 bid − K2 ask）：</p>' +
+            '<p>現在平倉可收回 <strong>' + fmtLots(tab.closeout_value, lots) + '</strong>，已實現最大價值 <strong>' + (typeof pct === 'number' ? pct + '%' : '—') + '</strong>（最大價值 ' + fmtLots(tab.spread_max_value, lots) + '）</p>' +
+            suggestHtml +
+            '<p class="text-gray-500">平倉一律組合單兩腳同出。</p>';
         }
 
         document.querySelectorAll('[data-bcvs-recommend-tab]').forEach(function (btn) {
@@ -685,11 +791,13 @@ class BullCallSpreads::PageComponent < ApplicationComponent
         var lotsInput = document.getElementById('bcvs-lots-input');
         if (lotsInput) lotsInput.addEventListener('input', renderTab);
 
-        function runRecommend(k1, k1Ask) {
+        function runRecommend(k1, k1Ask, k1Bid) {
+          var payload = { symbol: #{@symbol.to_json}, expiration: #{@expiration.to_json}, k1: k1, k1_ask: k1Ask };
+          if (!isNaN(k1Bid)) payload.k1_bid = k1Bid;
           fetch('#{bull_call_spreads_recommend_path}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf() },
-            body: JSON.stringify({ symbol: #{@symbol.to_json}, expiration: #{@expiration.to_json}, k1: k1, k1_ask: k1Ask })
+            body: JSON.stringify(payload)
           })
           .then(function (r) { return r.json(); })
           .then(function (d) {
@@ -709,7 +817,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
           k1Select.addEventListener('change', function () {
             var opt = k1Select.options[k1Select.selectedIndex];
             if (!opt || !opt.value) return;
-            runRecommend(parseFloat(opt.value), parseFloat(opt.getAttribute('data-ask')));
+            runRecommend(parseFloat(opt.value), parseFloat(opt.getAttribute('data-ask')), parseFloat(opt.getAttribute('data-bid')));
           });
           if (k1Select.value) k1Select.dispatchEvent(new Event('change'));
         }

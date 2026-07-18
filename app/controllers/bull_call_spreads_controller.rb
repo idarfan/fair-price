@@ -122,6 +122,7 @@ class BullCallSpreadsController < ApplicationController
     expiration = params[:expiration].to_s.strip
     k1         = params[:k1].to_s
     k1_ask     = params[:k1_ask].to_s
+    k1_bid     = params[:k1_bid].to_s
 
     numeric = /\A\d+(\.\d+)?\z/
     unless symbol.match?(SYMBOL_PATTERN) && expiration.present? &&
@@ -136,7 +137,8 @@ class BullCallSpreadsController < ApplicationController
 
     strikes = BcvsCacheService.read_chain(symbol, expiration)[:strikes]
     tabs = BullCallSpreadRecommenderService.new(
-      k1: k1.to_f, k1_ask: k1_ask.to_f, candidates: strikes
+      k1: k1.to_f, k1_ask: k1_ask.to_f, candidates: strikes,
+      k1_bid: k1_bid.match?(numeric) ? k1_bid.to_f : nil
     ).call
 
     render json: { tabs: serialize_tabs(tabs) }
@@ -184,6 +186,7 @@ class BullCallSpreadsController < ApplicationController
     tabs.transform_values do |tab|
       r = tab[:result]
       {
+        k1:            r.k1,
         k2:            tab[:k2],
         ratio:         tab[:ratio],
         target_ratio:  tab[:target_ratio],
@@ -194,7 +197,13 @@ class BullCallSpreadsController < ApplicationController
         max_loss:      r.max_loss,
         breakeven:     r.breakeven,
         risk_reward:   r.risk_reward,
-        warning:       r.warning
+        warning:       r.warning,
+        s_star:            r.s_star,
+        naked_cost:        r.naked_cost,
+        naked_breakeven:   r.naked_breakeven,
+        spread_max_value:  r.spread_max_value,
+        closeout_value:    r.closeout_value,
+        realized_pct:      r.realized_pct
       }
     end
   end

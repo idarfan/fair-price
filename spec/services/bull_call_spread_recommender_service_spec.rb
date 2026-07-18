@@ -64,5 +64,29 @@ RSpec.describe BullCallSpreadRecommenderService do
       expect(conservative.max_profit).not_to be_nil
       expect(conservative.warning).to be_nil
     end
+
+    it "includes S* and naked-buy comparison figures on every tab's result" do
+      tabs = described_class.new(k1: k1, k1_ask: k1_ask, candidates: candidates).call
+      conservative = tabs[:conservative][:result]
+
+      expect(conservative.s_star).to eq(82.0)
+      expect(conservative.naked_cost).to eq(800.0)
+      expect(conservative.naked_breakeven).to eq(78.0)
+      expect(conservative.spread_max_value).to eq(1000.0)
+    end
+
+    it "passes k1_bid through to the calculator so closeout_value can be computed" do
+      tabs = described_class.new(k1: k1, k1_ask: k1_ask, candidates: candidates, k1_bid: 7.80).call
+      conservative = tabs[:conservative][:result]
+
+      # k1_bid=7.80, k2_ask (candidate at 80.0)=2.2 -> closeout = (7.80-2.2)*100
+      expect(conservative.closeout_value).to eq(((7.80 - 2.2) * 100).round(2))
+      expect(conservative.realized_pct).not_to be_nil
+    end
+
+    it "leaves closeout_value nil when k1_bid is not given" do
+      tabs = described_class.new(k1: k1, k1_ask: k1_ask, candidates: candidates).call
+      expect(tabs[:conservative][:result].closeout_value).to be_nil
+    end
   end
 end

@@ -17,6 +17,8 @@ class BullCallSpreadCalculatorService
     :k1, :k2,
     :debit, :debit_mid, :width, :cost_per_contract,
     :max_profit, :max_loss, :breakeven, :risk_reward, :warning,
+    :s_star, :naked_cost, :naked_breakeven,
+    :spread_max_value, :closeout_value, :realized_pct,
     keyword_init: true
   )
 
@@ -48,11 +50,47 @@ class BullCallSpreadCalculatorService
       k1: @k1, k2: @k2,
       debit: debit, debit_mid: mid_debit, width: width, cost_per_contract: cost,
       max_profit: max_profit, max_loss: max_loss, breakeven: breakeven,
-      risk_reward: risk_reward, warning: warning
+      risk_reward: risk_reward, warning: warning,
+      s_star: s_star, naked_cost: naked_cost, naked_breakeven: naked_breakeven,
+      spread_max_value: spread_max_value(width), closeout_value: closeout_value,
+      realized_pct: realized_pct(width)
     )
   end
 
   private
+
+  # bcvs.md §為什麼不直接裸買：到期損益交叉價 S* = K2 ＋ K2 bid（短腳收到的
+  # 權利金）。到期價 < S* 時價差策略勝出，> S* 時裸買勝出。
+  def s_star
+    (@k2 + @k2_bid).round(4)
+  end
+
+  def naked_cost
+    (@k1_ask * 100).round(2)
+  end
+
+  def naked_breakeven
+    (@k1 + @k1_ask).round(4)
+  end
+
+  def spread_max_value(width)
+    (width * 100).round(2)
+  end
+
+  # bcvs.md §提前平倉指引：判斷基準＝價差現值佔最大價值的比例，現值以快取
+  # chain 保守估（K1 bid − K2 ask，賣出長腳、買回短腳的淨收回金額）。缺任一
+  # 報價則回 nil，不得造值。
+  def closeout_value
+    return nil if @k1_bid.nil? || @k2_ask.nil?
+    ((@k1_bid - @k2_ask) * 100).round(2)
+  end
+
+  def realized_pct(width)
+    value = closeout_value
+    max_value = spread_max_value(width)
+    return nil if value.nil? || max_value.nil? || max_value.zero?
+    ((value / max_value) * 100).round(1)
+  end
 
   # 另示 mid 供參（bcvs.md §策略定義：「另示 mid 供參」），需要雙腳的 bid/ask
   # 才能算 mid−mid，缺任一則回 nil，不得造值。
@@ -76,7 +114,9 @@ class BullCallSpreadCalculatorService
       k1: @k1, k2: @k2,
       debit: nil, debit_mid: nil, width: width, cost_per_contract: nil,
       max_profit: nil, max_loss: nil, breakeven: nil, risk_reward: nil,
-      warning: :invalid_width
+      warning: :invalid_width,
+      s_star: nil, naked_cost: nil, naked_breakeven: nil,
+      spread_max_value: nil, closeout_value: nil, realized_pct: nil
     )
   end
 end

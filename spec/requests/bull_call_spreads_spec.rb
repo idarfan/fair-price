@@ -163,7 +163,7 @@ RSpec.describe "Bull Call Vertical Spread (BCVS)", type: :request do
       BcvsCacheService.upsert_chain!(symbol, expiration, strikes: strikes, underlying_price: 75.0)
 
       expect(BullCallSpreadRecommenderService).to receive(:new).with(
-        k1: 70.0, k1_ask: 8.0, candidates: a_kind_of(Array)
+        k1: 70.0, k1_ask: 8.0, candidates: a_kind_of(Array), k1_bid: nil
       ).and_call_original
 
       post "/bcvs/recommend", params: { symbol: symbol, expiration: expiration, k1: "70", k1_ask: "8.0" }, as: :json
@@ -171,6 +171,26 @@ RSpec.describe "Bull Call Vertical Spread (BCVS)", type: :request do
       body = JSON.parse(response.body)
       expect(response).to have_http_status(:ok)
       expect(body["tabs"].keys).to include("conservative", "balanced", "aggressive")
+      conservative = body["tabs"]["conservative"]
+      expect(conservative).to include("s_star", "naked_cost", "naked_breakeven", "spread_max_value")
+    end
+
+    it "passes k1_bid through when given, enabling closeout_value on the response" do
+      strikes = [
+        { "strike" => 80.0, "bid" => 2.0, "ask" => 2.2, "open_interest" => 50 }
+      ]
+      BcvsCacheService.upsert_chain!(symbol, expiration, strikes: strikes, underlying_price: 75.0)
+
+      expect(BullCallSpreadRecommenderService).to receive(:new).with(
+        k1: 70.0, k1_ask: 8.0, candidates: a_kind_of(Array), k1_bid: 7.8
+      ).and_call_original
+
+      post "/bcvs/recommend", params: {
+        symbol: symbol, expiration: expiration, k1: "70", k1_ask: "8.0", k1_bid: "7.8"
+      }, as: :json
+
+      body = JSON.parse(response.body)
+      expect(body["tabs"]["conservative"]["closeout_value"]).not_to be_nil
     end
   end
 

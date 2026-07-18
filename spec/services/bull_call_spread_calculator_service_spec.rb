@@ -16,6 +16,32 @@ RSpec.describe BullCallSpreadCalculatorService do
       expect(result.warning).to be_nil
     end
 
+    it "computes S* (crossover price), naked-buy comparison, and spread max value" do
+      result = described_class.new(k1: 7.0, k1_ask: 4.90, k2: 12.0, k2_bid: 2.96).call
+
+      # S* = K2 + K2_bid
+      expect(result.s_star).to eq(14.96)
+      expect(result.naked_cost).to eq(490.0)
+      expect(result.naked_breakeven).to eq(11.9)
+      expect(result.spread_max_value).to eq(500.0)
+    end
+
+    it "computes closeout_value and realized_pct when k1_bid and k2_ask are given" do
+      result = described_class.new(
+        k1: 7.0, k1_ask: 4.90, k1_bid: 4.70,
+        k2: 12.0, k2_bid: 2.96, k2_ask: 3.10
+      ).call
+
+      expect(result.closeout_value).to eq(((4.70 - 3.10) * 100).round(2))
+      expect(result.realized_pct).to eq((result.closeout_value / result.spread_max_value * 100).round(1))
+    end
+
+    it "returns nil closeout_value and realized_pct when k1_bid or k2_ask are missing" do
+      result = described_class.new(k1: 7.0, k1_ask: 4.90, k2: 12.0, k2_bid: 2.96).call
+      expect(result.closeout_value).to be_nil
+      expect(result.realized_pct).to be_nil
+    end
+
     it "computes debit_mid when both mid inputs are given" do
       result = described_class.new(
         k1: 70.0, k1_ask: 8.00, k1_bid: 7.80,

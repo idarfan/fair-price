@@ -13,9 +13,10 @@
 class BullCallSpreadRecommenderService
   TARGET_RATIOS = { conservative: 0.60, balanced: 0.50, aggressive: 0.35 }.freeze
 
-  def initialize(k1:, k1_ask:, candidates:)
+  def initialize(k1:, k1_ask:, candidates:, k1_bid: nil)
     @k1         = k1.to_f
     @k1_ask     = k1_ask.to_f
+    @k1_bid     = k1_bid&.to_f
     @candidates = build_candidates(candidates)
   end
 
@@ -41,15 +42,19 @@ class BullCallSpreadRecommenderService
   # （bcvs.md §功能流程 步驟3，即使 upstream 已過濾也在此防呆一次）。
   def build_candidates(rows)
     Array(rows).filter_map do |row|
-      strike = (row["strike"] || row[:strike]).to_f
-      bid    = (row["bid"] || row[:bid]).to_f
-      ask    = (row["ask"] || row[:ask]).to_f
-      oi     = (row["open_interest"] || row[:open_interest]).to_f
+      strike     = (row["strike"] || row[:strike]).to_f
+      bid        = (row["bid"] || row[:bid]).to_f
+      oi         = (row["open_interest"] || row[:open_interest]).to_f
+      raw_ask    = row["ask"] || row[:ask]
+      ask        = raw_ask.nil? ? nil : raw_ask.to_f
 
       next if strike <= @k1
       next if bid <= 0 || oi <= 0
 
-      result = BullCallSpreadCalculatorService.new(k1: @k1, k1_ask: @k1_ask, k2: strike, k2_bid: bid).call
+      result = BullCallSpreadCalculatorService.new(
+        k1: @k1, k1_ask: @k1_ask, k2: strike, k2_bid: bid,
+        k1_bid: @k1_bid, k2_ask: ask
+      ).call
       next if result.warning == :invalid_width || result.max_loss.nil? || result.max_loss.zero?
 
       { strike: strike, r: (result.debit / result.width), result: result }
