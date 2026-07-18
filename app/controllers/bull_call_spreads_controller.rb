@@ -203,6 +203,7 @@ class BullCallSpreadsController < ApplicationController
         naked_breakeven:   r.naked_breakeven,
         spread_max_value:  r.spread_max_value,
         closeout_value:    r.closeout_value,
+        closeout_profit:   r.closeout_profit,
         realized_pct:      r.realized_pct
       }
     end

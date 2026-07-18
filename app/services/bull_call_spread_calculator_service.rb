@@ -18,7 +18,7 @@ class BullCallSpreadCalculatorService
     :debit, :debit_mid, :width, :cost_per_contract,
     :max_profit, :max_loss, :breakeven, :risk_reward, :warning,
     :s_star, :naked_cost, :naked_breakeven,
-    :spread_max_value, :closeout_value, :realized_pct,
+    :spread_max_value, :closeout_value, :closeout_profit, :realized_pct,
     keyword_init: true
   )
 
@@ -53,7 +53,7 @@ class BullCallSpreadCalculatorService
       risk_reward: risk_reward, warning: warning,
       s_star: s_star, naked_cost: naked_cost, naked_breakeven: naked_breakeven,
       spread_max_value: spread_max_value(width), closeout_value: closeout_value,
-      realized_pct: realized_pct(width)
+      closeout_profit: closeout_profit(cost), realized_pct: realized_pct(cost, max_profit)
     )
   end
 
@@ -77,19 +77,29 @@ class BullCallSpreadCalculatorService
     (width * 100).round(2)
   end
 
-  # bcvs.md §提前平倉指引：判斷基準＝價差現值佔最大價值的比例，現值以快取
-  # chain 保守估（K1 bid − K2 ask，賣出長腳、買回短腳的淨收回金額）。缺任一
-  # 報價則回 nil，不得造值。
+  # bcvs.md §提前平倉指引：現值（毛額，「現在平倉可收回」）以快取 chain 保守
+  # 估（K1 bid − K2 ask，賣出長腳、買回短腳的淨收回金額）。缺任一報價則回
+  # nil，不得造值。
   def closeout_value
     return nil if @k1_bid.nil? || @k2_ask.nil?
     ((@k1_bid - @k2_ask) * 100).round(2)
   end
 
-  def realized_pct(width)
+  # 淨額（「等於獲利/虧損」）＝現值−成本。兩個口徑必須並列顯示，不可混用
+  # （bcvs.md §提前平倉指引「兩個口徑必須並列顯示、嚴禁混用」）。
+  def closeout_profit(cost)
     value = closeout_value
-    max_value = spread_max_value(width)
-    return nil if value.nil? || max_value.nil? || max_value.zero?
-    ((value / max_value) * 100).round(1)
+    return nil if value.nil? || cost.nil?
+    (value - cost).round(2)
+  end
+
+  # 判斷基準 Y＝已實現獲利比例＝(現值−成本)÷最大獲利，非現值佔最大價值的
+  # 比例——bcvs.md 修訂版明講兩者不同，示範例（成本$194/收回上限$500/獲利
+  # 上限$306，現值$250→獲利$56→Y≈18%）已用此公式反推驗證過。
+  def realized_pct(cost, max_profit)
+    profit = closeout_profit(cost)
+    return nil if profit.nil? || max_profit.nil? || max_profit.zero?
+    ((profit / max_profit) * 100).round(1)
   end
 
   # 另示 mid 供參（bcvs.md §策略定義：「另示 mid 供參」），需要雙腳的 bid/ask
@@ -116,7 +126,7 @@ class BullCallSpreadCalculatorService
       max_profit: nil, max_loss: nil, breakeven: nil, risk_reward: nil,
       warning: :invalid_width,
       s_star: nil, naked_cost: nil, naked_breakeven: nil,
-      spread_max_value: nil, closeout_value: nil, realized_pct: nil
+      spread_max_value: nil, closeout_value: nil, closeout_profit: nil, realized_pct: nil
     )
   end
 end

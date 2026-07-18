@@ -26,19 +26,37 @@ RSpec.describe BullCallSpreadCalculatorService do
       expect(result.spread_max_value).to eq(500.0)
     end
 
-    it "computes closeout_value and realized_pct when k1_bid and k2_ask are given" do
+    it "computes closeout_value, closeout_profit and realized_pct when k1_bid and k2_ask are given" do
       result = described_class.new(
         k1: 7.0, k1_ask: 4.90, k1_bid: 4.70,
         k2: 12.0, k2_bid: 2.96, k2_ask: 3.10
       ).call
 
       expect(result.closeout_value).to eq(((4.70 - 3.10) * 100).round(2))
-      expect(result.realized_pct).to eq((result.closeout_value / result.spread_max_value * 100).round(1))
+      # Y = (現值−成本) ÷ 最大獲利, NOT 現值÷最大價值 (bcvs.md 修訂版公式)
+      expect(result.closeout_profit).to eq((result.closeout_value - result.cost_per_contract).round(2))
+      expect(result.realized_pct).to eq((result.closeout_profit / result.max_profit * 100).round(1))
     end
 
-    it "returns nil closeout_value and realized_pct when k1_bid or k2_ask are missing" do
+    it "matches the bcvs.md worked example: cost $194, max_profit $306, value $250 -> Y ≈ 18%" do
+      # K1=7 (ask 4.90), K2=12 (bid 2.96) -> debit=1.94, cost=$194, max_profit=$306
+      # closeout value ≈ $250 -> k1_bid - k2_ask = 2.50 -> pick k1_bid=4.60, k2_ask=2.10
+      result = described_class.new(
+        k1: 7.0, k1_ask: 4.90, k1_bid: 4.60,
+        k2: 12.0, k2_bid: 2.96, k2_ask: 2.10
+      ).call
+
+      expect(result.cost_per_contract).to eq(194.0)
+      expect(result.max_profit).to eq(306.0)
+      expect(result.closeout_value).to eq(250.0)
+      expect(result.closeout_profit).to eq(56.0)
+      expect(result.realized_pct).to be_within(0.5).of(18.3)
+    end
+
+    it "returns nil closeout_value, closeout_profit and realized_pct when k1_bid or k2_ask are missing" do
       result = described_class.new(k1: 7.0, k1_ask: 4.90, k2: 12.0, k2_bid: 2.96).call
       expect(result.closeout_value).to be_nil
+      expect(result.closeout_profit).to be_nil
       expect(result.realized_pct).to be_nil
     end
 
