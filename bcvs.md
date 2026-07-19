@@ -22,8 +22,8 @@
 |---|---|---|
 | 1 資料層（快取表/sidecar/TTL）| ✅ 已完成 | `spec/services/bcvs_cache_service_spec.rb`（9 例全過）；RKLB 真實 ticker 手動跑過兩支 sidecar，DOM bid/ask 與 Barchart 頁面比對一致 |
 | 2 服務與控制器（K2 建議/request spec）| ✅ 已完成 | `spec/services/bull_call_spread_calculator_service_spec.rb`、`bull_call_spread_recommender_service_spec.rb`、`spec/requests/bull_call_spreads_spec.rb`（26 例全過，含 basis 恰等於分水嶺邊界）|
-| 3 前端 | ✅ 已完成（見下方清單逐項打勾＋證據）| `app/components/bull_call_spreads/page_component.rb` |
-| 4 端到端驗收 | ✅ 已完成 | 見階段 4「驗證 4」段落；NOK K1=$7/K2=$12/2028-01-21 全流程 Playwright 驗證，9 步導覽逐步點擊確認 |
+| 3 前端 | ✅ 已完成（見下方清單逐項打勾＋證據；本輪重讀規格另補上「淨成本/每口成本分開顯示」與「修復模式中間情境」兩個缺漏）| `app/components/bull_call_spreads/page_component.rb` |
+| 4 端到端驗收 | ✅ 已完成 | 見階段 4「驗證 4」段落；NOK K1=$7/K2=$12/2028-01-21 全流程 Playwright 驗證，9 步導覽逐步點擊確認；修復模式三情境（≤K1／中間／≥K2）數字與手算一致（中間情境 $-82/口 = (10.12−7)+2.96−6.90 ×100）|
 
 **階段 3 本輪重做清單**（皆為規格已定案的既有章節，逐項打勾）：
 
@@ -275,7 +275,7 @@ driver.js 依下方「導覽與欄位說明規範」實作；字級以單頁
 **核心用例優先**：以示範例組合（NOK、2028-01-21、K1=$7、K2=$12）走完
 代號 → 到期日 → K1 → 建議 → 損益區間表 → 提前平倉指引全流程至少一次，
 其後才驗修復模式。行情變動屬正常，驗的是**一致性**：區間表五列金額須與
-頁面當下顯示的 debit 換算吻合（±$1），Y% 須與現值/最大價值換算吻合，
+頁面當下顯示的 debit 換算吻合（±$1），Y% 須與(現值−成本)/最大獲利換算吻合，
 對照表的裸買成本/損平須與 K1 ask 換算吻合，S\* 須等於 K2 + K2 bid；
 **切換 K1 或 tab 後所有說明數字須同步變動**（驗證非寫死）；
 Playwright 截圖須可見說明區各卡片之配色與 emoji 標題（與 LEAPS 頁

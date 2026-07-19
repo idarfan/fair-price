@@ -53,6 +53,12 @@ class BullCallSpreadRepairCalculatorService
     ((price.to_f - @k1) + @k2_bid - @basis).round(4)
   end
 
+  # 每口總額版本，供 controller 直接序列化（bcvs.md §修復模式「對照現在直接
+  # 平倉」需與三種到期情境 ≤K1／中間／≥K2 並列，中間情境是本方法補上的缺口）。
+  def mid_pnl_total(price)
+    (mid_pnl(price) * 100).round(2)
+  end
+
   private
 
   def closeout_proceeds

@@ -773,9 +773,14 @@ class BullCallSpreads::PageComponent < ApplicationComponent
           }
 
           var lots = currentLots();
+          // bcvs.md §策略定義／§功能流程 步驟3：淨成本 debit（每股，另示 mid
+          // 供參）與每口成本（×100×口數）是規格明列的兩個獨立欄位，不可合併
+          // 只顯示其中一個。
+          var debitMidHtml = (typeof tab.debit_mid === 'number') ? '（mid 版 $' + fmt(tab.debit_mid) + ' 供參）' : '';
           grid.innerHTML =
             '<div><dt class="text-[24px] text-gray-500">K2</dt><dd class="font-semibold">$' + fmt(tab.k2) + '</dd></div>' +
-            '<div><dt class="text-[24px] text-gray-500">淨成本(debit)</dt><dd class="font-semibold">' + fmtLots(tab.cost_per_contract, lots) + '</dd></div>' +
+            '<div><dt class="text-[24px] text-gray-500">淨成本 debit</dt><dd class="font-semibold">$' + fmt(tab.debit) + debitMidHtml + '</dd></div>' +
+            '<div><dt class="text-[24px] text-gray-500">每口成本</dt><dd class="font-semibold">' + fmtLots(tab.cost_per_contract, lots) + '</dd></div>' +
             '<div><dt class="text-[24px] text-gray-500">最大獲利</dt><dd class="font-semibold text-green-700">' + fmtLots(tab.max_profit, lots) + '</dd></div>' +
             '<div><dt class="text-[24px] text-gray-500">最大損失</dt><dd class="font-semibold text-red-700">' + fmtLots(tab.max_loss, lots) + '</dd></div>' +
             '<div><dt class="text-[24px] text-gray-500">損益兩平</dt><dd class="font-semibold">$' + fmt(tab.breakeven) + '</dd></div>' +
@@ -944,6 +949,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
           var payload = { k1: k1, k2: tab.k2, k2_bid: k2Bid, basis: basis };
           var currentBid = parseFloat(currentBidInput ? currentBidInput.value : '');
           if (!isNaN(currentBid)) payload.k1_current_bid = currentBid;
+          if (typeof CURRENT_PRICE === 'number') payload.current_price = CURRENT_PRICE;
 
           fetch('#{bull_call_spreads_calculate_path}', {
             method: 'POST',
@@ -955,6 +961,9 @@ class BullCallSpreads::PageComponent < ApplicationComponent
           .catch(function () {});
         }
 
+        // bcvs.md §修復模式：三種到期情境（≤K1／中間／≥K2）與「對照現在直接
+        // 平倉」並列顯示——中間情境是連續函數，只在現價落在 K1~K2 之間時
+        // 後端才會回傳數字（否則為 null，不外推造值）。
         function renderRepairResult(d) {
           var resultEl = document.getElementById('bcvs-repair-result');
           if (!resultEl) return;
@@ -965,6 +974,10 @@ class BullCallSpreads::PageComponent < ApplicationComponent
             warningHtml = '<p class="text-red-700 font-semibold">⚠️ 此組合鎖定虧損 $' + fmt(Math.abs(d.locked_result_total)) + '／口（basis 需 ≤ $' + fmt(d.breakeven_basis) + ' 才不虧損）</p>';
           }
 
+          var midHtml = (d.mid_pnl_total !== null && d.mid_pnl_total !== undefined)
+            ? '<p>中間情境（現價 $' + fmt(CURRENT_PRICE) + '）：$' + fmt(d.mid_pnl_total) + '／口</p>'
+            : '';
+
           var closeoutHtml = '';
           if (d.closeout_pnl !== null && d.closeout_pnl !== undefined) {
             closeoutHtml = '<p>對照現在直接平倉：收回 $' + fmt(d.closeout_proceeds) + '（損益 $' + fmt(d.closeout_pnl) + '）</p>';
@@ -972,8 +985,9 @@ class BullCallSpreads::PageComponent < ApplicationComponent
 
           resultEl.innerHTML =
             warningHtml +
-            '<p>≥K2 鎖定結果：$' + fmt(d.locked_result_total) + '／口（分水嶺 basis = $' + fmt(d.breakeven_basis) + '）</p>' +
             '<p>≤K1 情境：$' + fmt(d.below_k1_pnl_total) + '／口</p>' +
+            midHtml +
+            '<p>≥K2 鎖定結果：$' + fmt(d.locked_result_total) + '／口（分水嶺 basis = $' + fmt(d.breakeven_basis) + '）</p>' +
             closeoutHtml;
         }
 

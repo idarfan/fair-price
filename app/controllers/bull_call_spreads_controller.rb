@@ -159,10 +159,23 @@ class BullCallSpreadsController < ApplicationController
     k1_current_bid = params[:k1_current_bid].to_s
     k1_current_bid = k1_current_bid.match?(numeric) ? k1_current_bid.to_f : nil
 
-    result = BullCallSpreadRepairCalculatorService.new(
+    current_price = params[:current_price].to_s
+    current_price = current_price.match?(numeric) ? current_price.to_f : nil
+
+    service = BullCallSpreadRepairCalculatorService.new(
       k1: k1.to_f, k2: k2.to_f, k2_bid: k2_bid.to_f, basis: basis.to_f,
       k1_current_bid: k1_current_bid
-    ).call
+    )
+    result = service.call
+
+    # bcvs.md §修復模式：「對照現在直接平倉」須與三種到期情境（≤K1／中間／
+    # ≥K2）並列——中間情境（K1<股價<K2）是連續函數，只在現價真的落在這個
+    # 區間時才有意義顯示，否則回 nil（不得外推造值）。
+    mid_pnl = mid_pnl_total = nil
+    if current_price && current_price > k1.to_f && current_price < k2.to_f
+      mid_pnl       = service.mid_pnl(current_price)
+      mid_pnl_total = service.mid_pnl_total(current_price)
+    end
 
     render json: {
       k1:                    result.k1,
@@ -175,6 +188,8 @@ class BullCallSpreadsController < ApplicationController
       warning:               result.warning,
       below_k1_pnl:          result.below_k1_pnl,
       below_k1_pnl_total:    result.below_k1_pnl_total,
+      mid_pnl:               mid_pnl,
+      mid_pnl_total:         mid_pnl_total,
       closeout_proceeds:     result.closeout_proceeds,
       closeout_pnl:          result.closeout_pnl
     }

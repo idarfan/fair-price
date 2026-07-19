@@ -236,5 +236,29 @@ RSpec.describe "Bull Call Vertical Spread (BCVS)", type: :request do
       expect(body["closeout_proceeds"]).to eq(210.0)
       expect(body["closeout_pnl"]).to eq(-480.0)
     end
+
+    it "includes the middle (K1<price<K2) scenario when current_price falls between K1 and K2" do
+      post "/bcvs/calculate", params: {
+        k1: "10", k2: "12", k2_bid: "0.6", basis: "6.9", current_price: "11"
+      }, as: :json
+
+      body = JSON.parse(response.body)
+      # mid_pnl = (price-K1) + K2_bid - basis = (11-10) + 0.6 - 6.9 = -5.3 -> $-530/口
+      expect(body["mid_pnl"]).to eq(-5.3)
+      expect(body["mid_pnl_total"]).to eq(-530.0)
+    end
+
+    it "omits the middle scenario when current_price is outside K1..K2 or missing" do
+      post "/bcvs/calculate", params: { k1: "10", k2: "12", k2_bid: "0.6", basis: "6.9" }, as: :json
+      body = JSON.parse(response.body)
+      expect(body["mid_pnl"]).to be_nil
+      expect(body["mid_pnl_total"]).to be_nil
+
+      post "/bcvs/calculate", params: {
+        k1: "10", k2: "12", k2_bid: "0.6", basis: "6.9", current_price: "9"
+      }, as: :json
+      body2 = JSON.parse(response.body)
+      expect(body2["mid_pnl"]).to be_nil
+    end
   end
 end

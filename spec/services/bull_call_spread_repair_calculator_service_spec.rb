@@ -54,4 +54,11 @@ RSpec.describe BullCallSpreadRepairCalculatorService do
       expect(service.mid_pnl(11.0)).to eq(((11.0 - 10.0) + 0.60 - 6.90).round(4))
     end
   end
+
+  describe "#mid_pnl_total" do
+    it "returns the per-contract dollar amount for the intermediate scenario" do
+      service = described_class.new(k1: 10.0, k2: 12.0, k2_bid: 0.60, basis: 6.90)
+      expect(service.mid_pnl_total(11.0)).to eq((service.mid_pnl(11.0) * 100).round(2))
+    end
+  end
 end
