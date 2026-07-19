@@ -25,7 +25,10 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   def view_template
     div(class: "space-y-6") do
       render_level3_banner
-      render_header
+      div(class: "flex items-start justify-between gap-3") do
+        render_header
+        render_tour_button
+      end
       render_symbol_form
       render_progress_bar
       render_symbol_error if @symbol_error
@@ -46,7 +49,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # ---------------------------------------------------------------------------
   # bcvs.md §視覺規範：紅色字＝虧損金額與關鍵警語（如 Level 3、鎖定虧損）。
   def render_level3_banner
-    div(class: "px-4 py-2 bg-[#FDEAEA] border-[1.5px] border-[#F5AAAA] rounded-[10px]") do
+    div(id: "bcvs-level3-banner", class: "px-4 py-2 bg-[#FDEAEA] border-[1.5px] border-[#F5AAAA] rounded-[10px]") do
       span(class: "text-red-600 font-semibold text-xs") do
         plain "⚠️ 本策略含賣出期權腳，需三級（Level 3）期權交易權限方可開設"
       end
@@ -59,6 +62,28 @@ class BullCallSpreads::PageComponent < ApplicationComponent
       p(class: "text-[26px] text-gray-500 mt-0.5") do
         plain "Bull Call Vertical Spread · K1 買、K2 賣，debit 建倉 · 最大損失 = 淨成本 × 100"
       end
+    end
+  end
+
+  # bcvs.md §導覽與欄位說明規範 B：9 步全頁導覽，右上角按鈕啟動。步驟數固定 9，
+  # 與頁面當下狀態無關（元素不存在時 JS 端 filter 掉，不強制報錯，讓使用者
+  # 在任何階段都能點——即使還沒選 K1，仍可看到已存在的步驟）。
+  TOUR_STEPS = [
+    { key: "symbol",   el: "#bcvs-symbol-input",     title: "① 股票代號",       desc: "輸入標的代號，查詢已開設的期權到期日清單。" },
+    { key: "expiration", el: "#bcvs-expiration-section", title: "② 到期日",     desc: "選擇同到期日的 Call chain，K1/K2 必須來自同一個到期日。" },
+    { key: "k1",       el: "#bcvs-k1-select",         title: "③ K1（買進，Long Call）", desc: "選擇履約價較低的買進腳，系統會以此計算 K2 建議。" },
+    { key: "tabs",     el: "#bcvs-recommend-tabs",     title: "④ 三檔 K2 建議",   desc: "保守/平衡/積極三個 tab，依 debit÷價差寬度 比值挑選賣出腳 K2。" },
+    { key: "interval", el: "#bcvs-interval-card",      title: "⑤ 損益區間表",    desc: "到期股價落在哪個區間、賠多少賺多少，一律以即時數字呈現。" },
+    { key: "naked",    el: "#bcvs-naked-card",         title: "⑥ 裸買對照表",    desc: "跟只買 K1 單腳比較成本與獲利，並算出到期損益交叉價 S*。" },
+    { key: "early_close", el: "#bcvs-early-close-card", title: "⑦ 提前平倉指引", desc: "不必等到期，現在平倉可收回多少、已實現獲利比例 Y 是否達 80% 建議了結。" },
+    { key: "repair",   el: "#bcvs-repair-panel",       title: "⑧ 修復模式",      desc: "已持有 K1 長倉（如虧損中的 LEAPS）時，填入實際成本重新試算鎖定結果。" },
+    { key: "level3",   el: "#bcvs-level3-banner",      title: "⑨ Level 3 權限提醒", desc: "本策略含賣出期權腳，下單前務必確認帳戶已有三級期權交易權限。" }
+  ].freeze
+
+  def render_tour_button
+    button(id: "bcvs-tour-btn", type: "button",
+           class: "flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 whitespace-nowrap") do
+      plain "導覽"
     end
   end
 
@@ -93,7 +118,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # Step2：到期日
   # ---------------------------------------------------------------------------
   def render_expiration_section
-    div(class: "space-y-2") do
+    div(id: "bcvs-expiration-section", class: "space-y-2") do
       h2(class: "text-sm font-semibold text-gray-700") { plain "Step 2 · 選擇到期日" }
 
       case @scrape_status
@@ -177,53 +202,55 @@ class BullCallSpreads::PageComponent < ApplicationComponent
       title: "履約價（Strike）",
       desc: "選擇權合約約定的履約價格。K1（買進，Long Call）取 Ask、K2（賣出，Short Call）取 Bid，K2−K1 即為價差寬度。"
     },
+    # bcvs.md §導覽與欄位說明規範 A：以下 desc 為規格固定文案（逐字），
+    # 不得改寫；BID/MID/ASK 與 CHANGE/%CHANGE 各自共用同一段文字。
     "moneyness" => {
       title: "Moneyness（價內外程度）",
-      desc: "(現價−履約價)/現價 的百分比。正值代表 Call 為價內(ITM)，負值代表價外(OTM)。"
+      desc: "價內程度：股價相對履約價的位置，越高越深價內"
     },
     "bid" => {
       title: "Bid（買方出價）",
-      desc: "市場上買方目前願意支付的最高價格。K2（賣出腳）以 Bid 掛單可立即成交，本頁「賣方取 bid」即採用這個保守估算。"
+      desc: "買價／中間價／賣價；本工具 K1 以 ask、K2 以 bid 保守計價"
     },
     "mid" => {
       title: "Mid（中價）",
-      desc: "(Bid+Ask)/2，市場中間價。實際下單建議掛 Mid 價、耐心等候撮合成交，通常能拿到比保守估算更好的價格。"
+      desc: "買價／中間價／賣價；本工具 K1 以 ask、K2 以 bid 保守計價"
     },
     "ask" => {
       title: "Ask（賣方要價）",
-      desc: "市場上賣方目前願意賣出的最低價格。K1（買進腳）以 Ask 掛單可立即成交，本頁「買方取 ask」即採用這個保守估算。"
+      desc: "買價／中間價／賣價；本工具 K1 以 ask、K2 以 bid 保守計價"
     },
     "last" => {
       title: "Last（最後成交價）",
-      desc: "這個履約價最近一次實際成交的價格，成交量少的履約價這個數字參考價值較低。"
+      desc: "最近成交價（可能過時，以 bid/ask 為準）"
     },
     "change" => {
       title: "Change（漲跌）",
-      desc: "這個履約價的權利金比前一交易日收盤價變動了多少（絕對金額）。unch 代表今天完全沒有成交。"
+      desc: "當日漲跌（金額／百分比）"
     },
     "pct_change" => {
       title: "%Change（漲跌幅）",
-      desc: "權利金變動的百分比。選擇權基期價格通常很小，建議搭配 Change 絕對金額一起看。"
+      desc: "當日漲跌（金額／百分比）"
     },
     "volume" => {
       title: "Volume（成交量）",
-      desc: "當日這個履約價實際成交的口數。量越大代表流動性越好，成交價越貼近真實市場共識。"
+      desc: "當日成交口數"
     },
     "open_interest" => {
       title: "OI（未平倉量）",
-      desc: "目前市場上尚未平倉的合約總口數。OI 過低代表流動性差，實際成交價可能明顯偏離畫面估算。"
+      desc: "未平倉量：流動性指標，0 代表無人持倉、勿選"
     },
     "oi_change" => {
       title: "OI Chg（未平倉量變化）",
-      desc: "跟前一交易日相比，未平倉量增加或減少了多少。"
+      desc: "未平倉量變化"
     },
     "iv" => {
       title: "IV（隱含波動率）",
-      desc: "市場對這個履約價未來波動幅度的預期，數字越高代表市場預期波動越劇烈、權利金越貴。財報前 IV 通常會墊高，財報後容易 IV crush。"
+      desc: "隱含波動率：越高權利金越貴"
     },
     "delta" => {
       title: "Delta（避險比率）",
-      desc: "股價變動 $1 時，這個 Call 權利金理論上變動多少，也常被當作「到期價內機率」的粗略估計。"
+      desc: "對沖比率：可近似解讀為到期價內機率"
     }
   }.freeze
 
@@ -323,7 +350,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # ——JS 依當前 tab 的 k1/k2/debit/breakeven 與現價即時算出五列文字，
   # 虧損列紅字、損平列灰字、獲利列綠字。
   def render_interval_table
-    div(class: CARD_GREEN) do
+    div(id: "bcvs-interval-card", class: CARD_GREEN) do
       render_card_header("📊", "損益區間表")
       p(class: "text-sm font-mono text-[#2E9E52] font-semibold mb-1") { plain "D = K1 ask − K2 bid" }
       p(id: "bcvs-interval-formula-example", class: "text-xs text-[#7A6555] mb-2")
@@ -333,7 +360,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
 
   # bcvs.md §為什麼不直接裸買 LEAPS Call：對照表 + 到期損益交叉價 S*。
   def render_naked_comparison
-    div(class: CARD_ORANGE) do
+    div(id: "bcvs-naked-card", class: CARD_ORANGE) do
       render_card_header("🧭", "為什麼不直接裸買 LEAPS Call？")
       p(class: "text-sm font-mono text-[#B5651D] font-semibold mb-1") { plain "S* = K2 + K2 bid" }
       p(class: "text-xs text-[#7A6555] mb-2") { plain "到期價 < S* 時價差策略勝出，> S* 時裸買勝出" }
@@ -344,7 +371,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # bcvs.md §提前平倉指引：兩個口徑（毛額現值／淨額獲利）並列，Y=已實現獲利
   # 比例=(現值−成本)÷最大獲利。
   def render_early_close_panel
-    div(class: CARD_GOLD) do
+    div(id: "bcvs-early-close-card", class: CARD_GOLD) do
       render_card_header("⏳", "提前平倉指引（不必等到期）")
       p(class: "text-sm font-mono text-[#D4900A] font-semibold mb-1") { plain "Y = (現值 − 成本) ÷ 最大獲利" }
       p(class: "text-xs text-[#7A6555] mb-2") { plain "現值以快取 chain 保守估（K1 bid − K2 ask）；Y ≥ 80% 建議考慮獲利了結" }
@@ -356,7 +383,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # 修復模式（bcvs.md §修復模式，選配輸入）
   # ---------------------------------------------------------------------------
   def render_repair_panel
-    details(class: "border border-gray-200 rounded-lg") do
+    details(id: "bcvs-repair-panel", class: "border border-gray-200 rounded-lg") do
       summary(class: "px-4 py-2 text-sm font-medium text-gray-700 cursor-pointer") { plain "修復模式（已持有 K1 長倉，選配）" }
       div(class: "p-4 space-y-3 border-t border-gray-100") do
         p(class: "text-[26px] text-gray-500") { plain "已持有 K1 長倉（如虧損中的 LEAPS）時填入實際進場成本，計算改用此成本取代 K1 ask" }
@@ -485,6 +512,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
     <<~JS
       (function () {
         var BCVS_COL_EXPLAIN = #{bcvs_col_explain_json};
+        var BCVS_TOUR_STEPS = #{bcvs_tour_steps_json};
 
         var tip = document.createElement('div');
         tip.id = 'bcvs-col-tip';
@@ -523,6 +551,21 @@ class BullCallSpreads::PageComponent < ApplicationComponent
             tip.style.opacity = '0';
             drv()({ animate: true, allowClose: true, overlayOpacity: 0.35,
                     steps: [{ element: el, popover: { title: d.title, description: d.desc, side: 'bottom', align: 'center' } }] }).drive();
+            return;
+          }
+
+          // bcvs.md §導覽與欄位說明規範 B：9 步全頁導覽——步驟數固定 9，
+          // 頁面當下不存在的元素直接 filter 掉（不強制報錯），任何階段都能點。
+          var tourBtn = e.target.closest('#bcvs-tour-btn');
+          if (tourBtn && drv()) {
+            var steps = BCVS_TOUR_STEPS
+              .filter(function (s) { return document.querySelector(s.el); })
+              .map(function (s) {
+                return { element: s.el, popover: { title: s.title, description: s.desc, side: 'bottom', align: 'center' } };
+              });
+            if (steps.length) {
+              drv()({ animate: true, allowClose: true, overlayOpacity: 0.4, showProgress: true, steps: steps }).drive();
+            }
           }
         });
       })();
@@ -531,6 +574,10 @@ class BullCallSpreads::PageComponent < ApplicationComponent
 
   def bcvs_col_explain_json
     COLUMN_EXPLAIN.transform_values { |v| { title: v[:title], desc: v[:desc] } }.to_json
+  end
+
+  def bcvs_tour_steps_json
+    TOUR_STEPS.map { |s| { el: s[:el], title: s[:title], desc: s[:desc] } }.to_json
   end
 
   # ---------------------------------------------------------------------------

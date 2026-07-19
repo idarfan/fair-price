@@ -48,6 +48,10 @@
       <%= javascript_include_tag "driver-1.6.0.iife" %>
       <%= stylesheet_link_tag "driver-1.6.0" %>
     <% end %>
+    <% if controller_name == 'bull_call_spreads' %>
+      <%= javascript_include_tag "driver-1.6.0.iife" %>
+      <%= stylesheet_link_tag "driver-1.6.0" %>
+    <% end %>
     <% if controller_name == 'ownership' %>
       <%= vite_javascript_tag 'ownership.tsx' %>
     <% end %>
