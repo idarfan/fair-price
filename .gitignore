@@ -48,6 +48,9 @@ docs/*.pdf
 # 開發過程產生的暫時檔案
 *.png
 *.jpg
+# 例外：app/assets 下的 PNG/JPG 是實際部署資產，不是暫存截圖
+!app/assets/**/*.png
+!app/assets/**/*.jpg
 .playwright-mcp/
 mcp_temp_picture/
 public/tech_prototype.html
