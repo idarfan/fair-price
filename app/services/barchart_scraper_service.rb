@@ -321,7 +321,8 @@ class BarchartScraperService
 
     if BcvsCacheService.fresh_expirations?(@symbol)
       cached = BcvsCacheService.read_expirations(@symbol)
-      return { status: "success", expirations: cached[:expirations], underlying_price: cached[:underlying_price] }
+      return { status: "success", expirations: cached[:expirations], underlying_price: cached[:underlying_price],
+               summary: cached[:summary] }
     end
 
     fetch_result = run_scraper("bcvs_expirations")
@@ -334,13 +335,20 @@ class BarchartScraperService
       log_fetch("bcvs_expirations", "no_candidates", nil)
       { status: "no_candidates" }
     when "success"
-      data = fetch_result[:data]
+      data    = fetch_result[:data]
+      summary = data["summary"] || {}
       Rails.logger.info("[bcvs] expirations fetched url=#{data["debug_url"]} symbol=#{@symbol}")
-      BcvsCacheService.upsert_expirations!(
-        @symbol, expirations: data["expirations"], underlying_price: data["underlying_price"]
+      snapshot = BcvsCacheService.upsert_expirations!(
+        @symbol, expirations: data["expirations"], underlying_price: data["underlying_price"],
+        price_change: summary["price_change"], iv_atm: summary["iv_atm"], hv: summary["hv"],
+        iv_rank: summary["iv_rank"], latest_earnings: summary["latest_earnings"]
       )
       log_fetch("bcvs_expirations", "success", "count=#{Array(data["expirations"]).length}")
-      { status: "success", expirations: data["expirations"], underlying_price: data["underlying_price"] }
+      { status: "success", expirations: data["expirations"], underlying_price: data["underlying_price"],
+        summary: {
+          price_change: snapshot.price_change&.to_f, iv_atm: snapshot.iv_atm&.to_f, hv: snapshot.hv&.to_f,
+          iv_rank: snapshot.iv_rank&.to_f, latest_earnings: snapshot.latest_earnings
+        } }
     else
       log_fetch("bcvs_expirations", "error", fetch_result[:error])
       { status: "error", errors: [ fetch_result[:error].to_s ] }

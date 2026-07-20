@@ -24,6 +24,7 @@ class BullCallSpreadsController < ApplicationController
         @scrape_status     = :cached
         @expirations       = build_expiration_options(cached[:expirations])
         @underlying_price  = cached[:underlying_price]
+        @summary           = cached[:summary]
       elsif params[:job_status].present?
         @scrape_status = job_status_symbol(params[:job_status])
       else
@@ -52,6 +53,7 @@ class BullCallSpreadsController < ApplicationController
       scrape_status:     @scrape_status,
       expirations:       @expirations,
       underlying_price:  @underlying_price,
+      summary:           @summary,
       expiration:        @expiration,
       chain_status:      @chain_status,
       call_chain:        @call_chain,

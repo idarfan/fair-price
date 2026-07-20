@@ -17,15 +17,25 @@ class BcvsCacheService
 
       {
         expirations:      snapshot.expirations,
-        underlying_price: snapshot.underlying_price&.to_f
+        underlying_price: snapshot.underlying_price&.to_f,
+        summary:          summary_of(snapshot)
       }
     end
 
-    def upsert_expirations!(symbol, expirations:, underlying_price:)
+    # bcvs.md §功能流程 步驟1（v4）：標的摘要五值（現價與漲跌／Latest Earnings／
+    # IV ATM／HV／IV Rank）隨到期日清單同快取，皆為選配（DOM 抓不到就是 nil，
+    # 不得造值）。
+    def upsert_expirations!(symbol, expirations:, underlying_price:, price_change: nil,
+                             iv_atm: nil, hv: nil, iv_rank: nil, latest_earnings: nil)
       snapshot = BcvsExpirationSnapshot.find_or_initialize_by(symbol: symbol.upcase)
       snapshot.update!(
         expirations:       Array(expirations),
         underlying_price:  underlying_price,
+        price_change:      price_change,
+        iv_atm:            iv_atm,
+        hv:                hv,
+        iv_rank:           iv_rank,
+        latest_earnings:   latest_earnings,
         scraped_at:        Time.current
       )
       snapshot
@@ -58,6 +68,16 @@ class BcvsCacheService
     end
 
     private
+
+    def summary_of(snapshot)
+      {
+        price_change:    snapshot.price_change&.to_f,
+        iv_atm:          snapshot.iv_atm&.to_f,
+        hv:              snapshot.hv&.to_f,
+        iv_rank:         snapshot.iv_rank&.to_f,
+        latest_earnings: snapshot.latest_earnings
+      }
+    end
 
     # bid 與 ask 皆為 null/0 的 strike 剔除（bcvs.md §3.2 沿用 bpus 分工）。
     def filter_quotable(strikes)

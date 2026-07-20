@@ -10,12 +10,14 @@ end
 # 同步 fetch，不整頁重載。
 class BullCallSpreads::PageComponent < ApplicationComponent
   def initialize(symbol: nil, symbol_error: nil, scrape_status: nil, expirations: nil,
-                 underlying_price: nil, expiration: nil, chain_status: nil, call_chain: nil, k1: nil)
+                 underlying_price: nil, summary: nil, expiration: nil, chain_status: nil,
+                 call_chain: nil, k1: nil)
     @symbol           = symbol
     @symbol_error     = symbol_error
     @scrape_status    = scrape_status
     @expirations      = Array(expirations)
     @underlying_price = underlying_price
+    @summary          = summary || {}
     @expiration       = expiration
     @chain_status     = chain_status
     @call_chain       = Array(call_chain).sort_by { |r| r["strike"].to_f }
@@ -51,7 +53,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # bcvs.md §視覺規範：紅色字＝虧損金額與關鍵警語（如 Level 3、鎖定虧損）。
   def render_level3_banner
     div(id: "bcvs-level3-banner", class: "px-4 py-2 bg-[#FDEAEA] border-[1.5px] border-[#F5AAAA] rounded-[10px]") do
-      span(class: "text-red-600 font-semibold text-xs") do
+      span(class: "text-red-600 font-semibold text-[20px]") do
         plain "⚠️ 本策略含賣出期權腳，需三級（Level 3）期權交易權限方可開設"
       end
     end
@@ -59,8 +61,8 @@ class BullCallSpreads::PageComponent < ApplicationComponent
 
   def render_header
     div do
-      h1(class: "text-xl font-bold text-gray-900") { plain "牛市看漲價差試算" }
-      p(class: "text-[26px] text-gray-500 mt-0.5") do
+      h1(class: "text-[24px] font-bold text-gray-900") { plain "牛市看漲價差試算" }
+      p(class: "text-[20px] text-gray-500 mt-0.5") do
         plain "Bull Call Vertical Spread · K1 買、K2 賣，debit 建倉 · 最大損失 = 淨成本 × 100"
       end
     end
@@ -83,7 +85,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
 
   def render_tour_button
     button(id: "bcvs-tour-btn", type: "button",
-           class: "flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 whitespace-nowrap") do
+           class: "flex-shrink-0 px-3 py-1.5 text-[20px] font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 whitespace-nowrap") do
       plain "導覽"
     end
   end
@@ -94,12 +96,12 @@ class BullCallSpreads::PageComponent < ApplicationComponent
       input(type: "text", id: "bcvs-symbol-input", name: "symbol",
             value: @symbol.to_s, placeholder: "股票代號，例如 NOK",
             maxlength: 6, autocomplete: "off",
-            class: "px-3 py-2 border border-gray-300 rounded-lg text-sm w-48 uppercase")
+            class: "px-3 py-2 border border-gray-300 rounded-lg text-[20px] w-48 uppercase")
       button(type: "submit", id: "bcvs-submit-btn",
-             class: "px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700") do
+             class: "px-4 py-2 bg-blue-600 text-white text-[20px] font-medium rounded-lg hover:bg-blue-700") do
         plain "查詢到期日"
       end
-      span(id: "bcvs-loading", class: "hidden text-xs text-blue-600 animate-pulse") { plain "抓取中…" }
+      span(id: "bcvs-loading", class: "hidden text-[20px] text-blue-600 animate-pulse") { plain "抓取中…" }
     end
   end
 
@@ -110,7 +112,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   end
 
   def render_symbol_error
-    div(class: "px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg") do
+    div(class: "px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-[20px] rounded-lg") do
       plain "⚠️ #{@symbol_error}"
     end
   end
@@ -120,28 +122,33 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # ---------------------------------------------------------------------------
   def render_expiration_section
     div(id: "bcvs-expiration-section", class: "space-y-2") do
-      h2(class: "text-sm font-semibold text-gray-700") { plain "Step 2 · 選擇到期日" }
+      h2(class: "text-[20px] font-semibold text-gray-700") { plain "Step 2 · 選擇到期日" }
 
       case @scrape_status
       when :cached
-        if @underlying_price
-          p(class: "text-xs text-gray-500") { plain "現價 $#{sprintf("%.2f", @underlying_price.to_f)}" }
-        end
-        div(class: "flex flex-wrap gap-2") do
-          @expirations.each do |exp|
-            active = exp[:value] == @expiration
-            btn_class = active ?
-              "px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 text-white" :
-              "px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:border-blue-400"
-            button(type: "button", class: btn_class, data: { exp: exp[:value], "bcvs-expiration-btn": "" }) do
-              plain exp[:label]
+        div(class: "flex flex-col sm:flex-row sm:items-start gap-3") do
+          div(class: "flex-1 space-y-2") do
+            if @underlying_price
+              p(class: "text-[20px] text-gray-500") { plain "現價 $#{sprintf("%.2f", @underlying_price.to_f)}" }
+            end
+            div(class: "flex flex-wrap gap-2") do
+              @expirations.each do |exp|
+                active = exp[:value] == @expiration
+                btn_class = active ?
+                  "px-3 py-1.5 rounded-lg text-[20px] font-medium bg-blue-600 text-white" :
+                  "px-3 py-1.5 rounded-lg text-[20px] font-medium bg-white border border-gray-300 text-gray-700 hover:border-blue-400"
+                button(type: "button", class: btn_class, data: { exp: exp[:value], "bcvs-expiration-btn": "" }) do
+                  plain exp[:label]
+                end
+              end
             end
           end
+          render_underlying_summary_card
         end
       when :ready_to_fetch
-        p(class: "text-sm text-gray-500") { plain "尚未抓取，請按下方按鈕從 Barchart 讀取到期日清單" }
+        p(class: "text-[20px] text-gray-500") { plain "尚未抓取，請按下方按鈕從 Barchart 讀取到期日清單" }
         button(type: "button", id: "bcvs-fetch-expirations-btn",
-               class: "px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700") do
+               class: "px-3 py-1.5 bg-blue-600 text-white text-[20px] font-medium rounded-lg hover:bg-blue-700") do
           plain "抓取到期日"
         end
       when :session_expired
@@ -157,7 +164,47 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   end
 
   def render_status_alert(msg)
-    div(class: "px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg") { plain "⚠️ #{msg}" }
+    div(class: "px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-[20px] rounded-lg") { plain "⚠️ #{msg}" }
+  end
+
+  # bcvs.md §功能流程 步驟1（v4）：標的摘要五值，顯示於到期日選單右側，
+  # v3 卡片樣式（沿用同一套圓角/邊框語彙，中性色—不佔用三張分析卡的固定
+  # 色碼）。Latest Earnings／IV Rank 各附一則 tooltip（規格固定文案）。
+  def render_underlying_summary_card
+    return if @summary.blank?
+
+    div(class: "w-full sm:w-72 flex-shrink-0 rounded-xl overflow-hidden border bcvs-notosans",
+        style: "border-color:#D1D5DB;") do
+      div(class: "flex items-center gap-2 px-4 py-2.5", style: "background:#374151;") do
+        span(style: "color:#F3F4F6; font-size:22px; font-weight:500;") { plain "標的摘要" }
+      end
+      div(class: "p-4 space-y-1.5", style: "background:#F9FAFB; font-size:20px; color:#2A1A0E;") do
+        render_summary_row("現價", price_change_text)
+        render_summary_row("Latest Earnings", @summary[:latest_earnings] || "—", tip_key: "summary_earnings")
+        render_summary_row("IV (ATM)", pct_text(@summary[:iv_atm]))
+        render_summary_row("HV", pct_text(@summary[:hv]))
+        render_summary_row("IV Rank", pct_text(@summary[:iv_rank]), tip_key: "summary_iv_rank")
+      end
+    end
+  end
+
+  def render_summary_row(label, value, tip_key: nil)
+    div(class: "flex items-center justify-between gap-2") do
+      span(class: "text-gray-500", data_tip_key: tip_key) { plain label }
+      span(class: "font-semibold") { plain value }
+    end
+  end
+
+  def price_change_text
+    return "—" if @underlying_price.blank?
+    text = "$#{sprintf("%.2f", @underlying_price.to_f)}"
+    change = @summary[:price_change]
+    text += " (#{change >= 0 ? "+" : ""}#{sprintf("%.2f", change)})" if change.present?
+    text
+  end
+
+  def pct_text(value)
+    value.present? ? "#{sprintf("%.1f", value)}%" : "—"
   end
 
   # ---------------------------------------------------------------------------
@@ -175,7 +222,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
       when :no_candidates
         render_status_alert("此到期日無可用的 Call 報價")
       when :ready_to_fetch
-        p(class: "text-sm text-gray-500") { plain "正在抓取 #{@expiration} 的 Call 鏈…" }
+        p(class: "text-[20px] text-gray-500") { plain "正在抓取 #{@expiration} 的 Call 鏈…" }
       else
         render_status_alert("抓取失敗，請稍後重試")
       end
@@ -252,19 +299,28 @@ class BullCallSpreads::PageComponent < ApplicationComponent
     "delta" => {
       title: "Delta（避險比率）",
       desc: "對沖比率：可近似解讀為到期價內機率"
+    },
+    # bcvs.md §功能流程 步驟1（v4）：標的摘要表 tooltip 兩則，文案固定。
+    "summary_earnings" => {
+      title: "Latest Earnings",
+      desc: "BMO＝Before Market Open（盤前公布）；AMC＝After Market Close（盤後公布）。財報日前 IV 通常走高、公布後常見 IV crush，建倉時點宜避開財報前的高權利金"
+    },
+    "summary_iv_rank" => {
+      title: "IV Rank",
+      desc: "IV Rank 高＝權利金貴，debit 價差成本升高"
     }
   }.freeze
 
   def render_chain_block
     div(class: "space-y-2") do
-      h2(class: "text-sm font-semibold text-gray-700") { plain "Step 3 · 選擇 K1（買進，Long Call）" }
-      p(class: "text-[26px] text-gray-500") do
+      h2(class: "text-[20px] font-semibold text-gray-700") { plain "Step 3 · 選擇 K1（買進，Long Call）" }
+      p(class: "text-[20px] text-gray-500") do
         plain "保守計價：K1 取 ask、K2 取 bid，以最不利成交價估算，實際可用 mid 價掛單"
       end
       render_k1_select
       render_recommend_tabs
       div(class: "w-full overflow-x-auto border border-gray-200 rounded-lg") do
-        table(id: "bcvs-chain-table", class: "min-w-full text-xs whitespace-nowrap") do
+        table(id: "bcvs-chain-table", class: "min-w-full text-[20px] whitespace-nowrap") do
           thead(class: "bg-gray-50 text-gray-500 uppercase") do
             tr do
               COLUMNS.each do |col|
@@ -283,8 +339,8 @@ class BullCallSpreads::PageComponent < ApplicationComponent
 
   def render_k1_select
     div(class: "flex items-center gap-2") do
-      label(class: "text-[24px] text-gray-600", for: "bcvs-k1-select") { plain "K1 履約價" }
-      select(id: "bcvs-k1-select", class: "border border-gray-300 rounded px-2 py-1.5 text-sm") do
+      label(class: "text-[20px] text-gray-600", for: "bcvs-k1-select") { plain "K1 履約價" }
+      select(id: "bcvs-k1-select", class: "border border-gray-300 rounded px-2 py-1.5 text-[20px]") do
         option(value: "") { plain "請選擇" }
         @call_chain.each do |row|
           next if row["ask"].nil?
@@ -301,14 +357,14 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   def render_recommend_tabs
     div(id: "bcvs-recommend-tabs", class: "hidden space-y-3") do
       div(class: "flex items-center gap-2 mt-2") do
-        button(type: "button", class: "px-3 py-1.5 rounded-lg text-[24px] font-medium bg-white border border-gray-300 text-gray-700 hover:border-blue-400",
+        button(type: "button", class: "px-3 py-1.5 rounded-lg text-[20px] font-medium bg-white border border-gray-300 text-gray-700 hover:border-blue-400",
                data: { "bcvs-recommend-tab": "conservative" }) { plain "保守" }
-        button(type: "button", class: "px-3 py-1.5 rounded-lg text-[24px] font-medium bg-blue-600 text-white border border-blue-600",
+        button(type: "button", class: "px-3 py-1.5 rounded-lg text-[20px] font-medium bg-blue-600 text-white border border-blue-600",
                data: { "bcvs-recommend-tab": "balanced" }) { plain "平衡" }
-        button(type: "button", class: "px-3 py-1.5 rounded-lg text-[24px] font-medium bg-white border border-gray-300 text-gray-700 hover:border-blue-400",
+        button(type: "button", class: "px-3 py-1.5 rounded-lg text-[20px] font-medium bg-white border border-gray-300 text-gray-700 hover:border-blue-400",
                data: { "bcvs-recommend-tab": "aggressive" }) { plain "積極" }
       end
-      div(id: "bcvs-recommend-error", class: "hidden px-3 py-2 bg-red-50 border border-red-200 text-red-700 text-[24px] rounded-lg")
+      div(id: "bcvs-recommend-error", class: "hidden px-3 py-2 bg-red-50 border border-red-200 text-red-700 text-[20px] rounded-lg")
       render_calc_panel
       render_interval_table
       render_naked_comparison
@@ -316,18 +372,19 @@ class BullCallSpreads::PageComponent < ApplicationComponent
     end
   end
 
+  # bcvs.md §字級鐵則 v4：Step 5 主數字 24px 粗體，標籤 20px。
   def render_calc_panel
     div(id: "bcvs-calc-panel", class: "space-y-3 p-4 bg-white border border-gray-200 rounded-lg") do
       div(class: "flex items-center justify-between") do
-        h2(class: "text-sm font-semibold text-gray-700") { plain "Step 5 · 計算結果" }
-        label(class: "flex items-center gap-2 text-[24px] text-gray-600") do
+        h2(class: "text-[20px] font-semibold text-gray-700") { plain "Step 5 · 計算結果" }
+        label(class: "flex items-center gap-2 text-[20px] text-gray-600") do
           plain "口數"
           input(type: "number", id: "bcvs-lots-input", value: "1", min: "1", step: "1",
-                class: "w-16 border border-gray-300 rounded px-2 py-1 text-right")
+                class: "w-16 border border-gray-300 rounded px-2 py-1 text-[20px] text-right")
         end
       end
-      div(id: "bcvs-calc-warning", class: "hidden px-3 py-2 bg-red-50 border border-red-300 text-red-800 text-[24px] rounded-lg")
-      dl(id: "bcvs-calc-grid", class: "grid grid-cols-2 sm:grid-cols-4 gap-3 text-[24px]")
+      div(id: "bcvs-calc-warning", class: "hidden px-3 py-2 bg-red-50 border border-red-300 text-red-800 text-[20px] rounded-lg")
+      dl(id: "bcvs-calc-grid", class: "grid grid-cols-2 sm:grid-cols-4 gap-3")
     end
   end
 
@@ -351,16 +408,17 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   }.freeze
 
   # bcvs.md §視覺規範 v3「卡片結構」：radius 12px、overflow hidden，頂部深色
-  # 標題色帶（15px/500 淺色字＋24px 3D 圖示靠左）＋淺色卡身（14px 內文/表格）。
+  # 標題色帶（22px/500 淺色字＋24px 3D 圖示靠左）＋淺色卡身（20px 內文/表格，
+  # v4 字級鐵則取代舊制 15/14px）。
   def render_v3_card(key, body_id:)
     spec = CARD_SPECS.fetch(key)
     div(id: "bcvs-#{key.to_s.tr("_", "-")}-card",
         class: "rounded-xl overflow-hidden border bcvs-notosans", style: "border-color:#{spec[:border]}") do
       div(class: "flex items-center gap-2 px-4 py-2.5", style: "background:#{spec[:band_bg]}") do
         img(src: helpers.asset_path("bcvs/#{spec[:icon]}"), class: "w-6 h-6", alt: "")
-        span(style: "color:#{spec[:band_text]}; font-size:15px; font-weight:500;") { plain spec[:title] }
+        span(style: "color:#{spec[:band_text]}; font-size:22px; font-weight:500;") { plain spec[:title] }
       end
-      div(id: body_id, class: "p-4 space-y-2", style: "background:#{spec[:body_bg]}; font-size:14px; color:#2A1A0E;") do
+      div(id: body_id, class: "p-4 space-y-2", style: "background:#{spec[:body_bg]}; font-size:20px; color:#2A1A0E;") do
         yield
       end
     end
@@ -372,7 +430,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   def render_interval_table
     render_v3_card(:interval, body_id: "bcvs-interval-body") do
       p(class: "font-mono font-semibold", style: "color:#3B6D11;") { plain "D = K1 ask − K2 bid" }
-      p(id: "bcvs-interval-formula-example", style: "color:#5F5E5A; font-size:12px;")
+      p(id: "bcvs-interval-formula-example", style: "color:#5F5E5A; font-size:20px;")
       div(id: "bcvs-interval-table")
     end
   end
@@ -381,7 +439,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   def render_naked_comparison
     render_v3_card(:naked, body_id: "bcvs-naked-body") do
       p(class: "font-mono font-semibold", style: "color:#993C1D;") { plain "S* = K2 + K2 bid" }
-      p(style: "color:#5F5E5A; font-size:12px;") { plain "到期價 < S* 時價差策略勝出，> S* 時裸買勝出" }
+      p(style: "color:#5F5E5A; font-size:20px;") { plain "到期價 < S* 時價差策略勝出，> S* 時裸買勝出" }
       div(id: "bcvs-naked-comparison")
     end
   end
@@ -391,7 +449,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   def render_early_close_panel
     render_v3_card(:early_close, body_id: "bcvs-early-close-body") do
       p(class: "font-mono font-semibold", style: "color:#854F0B;") { plain "Y = (現值 − 成本) ÷ 最大獲利" }
-      p(style: "color:#5F5E5A; font-size:12px;") { plain "現值以快取 chain 保守估（K1 bid − K2 ask）；Y ≥ 80% 建議考慮獲利了結" }
+      p(style: "color:#5F5E5A; font-size:20px;") { plain "現值以快取 chain 保守估（K1 bid − K2 ask）；Y ≥ 80% 建議考慮獲利了結" }
       div(id: "bcvs-early-close")
     end
   end
@@ -401,22 +459,22 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # ---------------------------------------------------------------------------
   def render_repair_panel
     details(id: "bcvs-repair-panel", class: "border border-gray-200 rounded-lg") do
-      summary(class: "px-4 py-2 text-sm font-medium text-gray-700 cursor-pointer") { plain "修復模式（已持有 K1 長倉，選配）" }
+      summary(class: "px-4 py-2 text-[20px] font-medium text-gray-700 cursor-pointer") { plain "修復模式（已持有 K1 長倉，選配）" }
       div(class: "p-4 space-y-3 border-t border-gray-100") do
-        p(class: "text-[26px] text-gray-500") { plain "已持有 K1 長倉（如虧損中的 LEAPS）時填入實際進場成本，計算改用此成本取代 K1 ask" }
+        p(class: "text-[20px] text-gray-500") { plain "已持有 K1 長倉（如虧損中的 LEAPS）時填入實際進場成本，計算改用此成本取代 K1 ask" }
         div(class: "flex flex-wrap items-center gap-3") do
-          label(class: "flex items-center gap-2 text-[24px]") do
+          label(class: "flex items-center gap-2 text-[20px]") do
             plain "第一腳成本覆寫（basis）"
             input(type: "number", id: "bcvs-repair-basis-input", step: "0.01", min: "0",
-                  class: "w-24 border border-gray-300 rounded px-2 py-1 text-right")
+                  class: "w-24 border border-gray-300 rounded px-2 py-1 text-[20px] text-right")
           end
-          label(class: "flex items-center gap-2 text-[24px]") do
+          label(class: "flex items-center gap-2 text-[20px]") do
             plain "K1 現價 bid（選配，用於對照平倉）"
             input(type: "number", id: "bcvs-repair-current-bid-input", step: "0.01", min: "0",
-                  class: "w-24 border border-gray-300 rounded px-2 py-1 text-right")
+                  class: "w-24 border border-gray-300 rounded px-2 py-1 text-[20px] text-right")
           end
         end
-        div(id: "bcvs-repair-result", class: "hidden space-y-1 text-[24px]")
+        div(id: "bcvs-repair-result", class: "hidden space-y-1 text-[20px]")
       end
     end
   end
@@ -491,10 +549,10 @@ class BullCallSpreads::PageComponent < ApplicationComponent
     div(class: "space-y-4") do
       div(class: "rounded-xl overflow-hidden border bcvs-notosans", style: "border-color:#97C459;") do
         div(class: "flex items-center gap-2 px-4 py-2.5", style: "background:#3B6D11;") do
-          span(class: "text-lg") { plain "✅" }
-          span(style: "color:#EAF3DE; font-size:15px; font-weight:500;") { plain "好處" }
+          span(class: "text-[22px]") { plain "✅" }
+          span(style: "color:#EAF3DE; font-size:22px; font-weight:500;") { plain "好處" }
         end
-        div(class: "p-4", style: "background:#EAF3DE; font-size:14px; color:#2A1A0E;") do
+        div(class: "p-4", style: "background:#EAF3DE; font-size:20px; color:#2A1A0E;") do
           p do
             plain "成本低於裸買 call、最大損失封頂於淨成本、賣腳權利金部分對沖 theta、修復模式可壓縮虧損 LEAPS 在橫盤～小漲區間的損失。"
           end
@@ -502,10 +560,10 @@ class BullCallSpreads::PageComponent < ApplicationComponent
       end
       div(class: "rounded-xl overflow-hidden border bcvs-notosans", style: "border-color:#EF9F27;") do
         div(class: "flex items-center gap-2 px-4 py-2.5", style: "background:#854F0B;") do
-          span(class: "text-lg") { plain "⚠️" }
-          span(style: "color:#FAEEDA; font-size:15px; font-weight:500;") { plain "注意事項" }
+          span(class: "text-[22px]") { plain "⚠️" }
+          span(style: "color:#FAEEDA; font-size:22px; font-weight:500;") { plain "注意事項" }
         end
-        div(class: "p-4 space-y-1", style: "background:#FAEEDA; font-size:14px; color:#2A1A0E;") do
+        div(class: "p-4 space-y-1", style: "background:#FAEEDA; font-size:20px; color:#2A1A0E;") do
           NOTES.each { |n| p { plain n } }
         end
       end
@@ -839,14 +897,18 @@ class BullCallSpreads::PageComponent < ApplicationComponent
           // 供參）與每口成本（×100×口數）是規格明列的兩個獨立欄位，不可合併
           // 只顯示其中一個。
           var debitMidHtml = (typeof tab.debit_mid === 'number') ? '（mid 版 $' + fmt(tab.debit_mid) + ' 供參）' : '';
+          // bcvs.md §字級鐵則 v4：Step 5 標籤 20px、主數字 24px 粗體。
+          // K2 徽章（v4 待辦）：橘色邊框 #EF9F27 1.5px、圓角 8px、淡紅底
+          // #FDE8E8、紅字 #A32D2D，內距 4px 12px，字級維持 24px 粗體。
+          var k2Badge = '<span style="display:inline-block; border:1.5px solid #EF9F27; border-radius:8px; background:#FDE8E8; color:#A32D2D; padding:4px 12px; font-size:24px; font-weight:700;">$' + fmt(tab.k2) + '</span>';
           grid.innerHTML =
-            '<div><dt class="text-[24px] text-gray-500">K2</dt><dd class="font-semibold">$' + fmt(tab.k2) + '</dd></div>' +
-            '<div><dt class="text-[24px] text-gray-500">淨成本 debit</dt><dd class="font-semibold">$' + fmt(tab.debit) + debitMidHtml + '</dd></div>' +
-            '<div><dt class="text-[24px] text-gray-500">每口成本</dt><dd class="font-semibold">' + fmtLots(tab.cost_per_contract, lots) + '</dd></div>' +
-            '<div><dt class="text-[24px] text-gray-500">最大獲利</dt><dd class="font-semibold text-green-700">' + fmtLots(tab.max_profit, lots) + '</dd></div>' +
-            '<div><dt class="text-[24px] text-gray-500">最大損失</dt><dd class="font-semibold text-red-700">' + fmtLots(tab.max_loss, lots) + '</dd></div>' +
-            '<div><dt class="text-[24px] text-gray-500">損益兩平</dt><dd class="font-semibold">$' + fmt(tab.breakeven) + '</dd></div>' +
-            '<div><dt class="text-[24px] text-gray-500">報酬風險比</dt><dd class="font-semibold text-yellow-700">' + (tab.risk_reward === null ? '—' : tab.risk_reward) + '</dd></div>';
+            '<div><dt class="text-[20px] text-gray-500">K2</dt><dd class="mt-1">' + k2Badge + '</dd></div>' +
+            '<div><dt class="text-[20px] text-gray-500">淨成本 debit</dt><dd class="text-[24px] font-bold">$' + fmt(tab.debit) + '<span class="text-[20px] font-normal">' + debitMidHtml + '</span></dd></div>' +
+            '<div><dt class="text-[20px] text-gray-500">每口成本</dt><dd class="text-[24px] font-bold">' + fmtLots(tab.cost_per_contract, lots) + '</dd></div>' +
+            '<div><dt class="text-[20px] text-gray-500">最大獲利</dt><dd class="text-[24px] font-bold text-green-700">' + fmtLots(tab.max_profit, lots) + '</dd></div>' +
+            '<div><dt class="text-[20px] text-gray-500">最大損失</dt><dd class="text-[24px] font-bold text-red-700">' + fmtLots(tab.max_loss, lots) + '</dd></div>' +
+            '<div><dt class="text-[20px] text-gray-500">損益兩平</dt><dd class="text-[24px] font-bold">$' + fmt(tab.breakeven) + '</dd></div>' +
+            '<div><dt class="text-[20px] text-gray-500">報酬風險比</dt><dd class="text-[24px] font-bold text-yellow-700">' + (tab.risk_reward === null ? '—' : tab.risk_reward) + '</dd></div>';
 
           renderIntervalTable(tab, lots);
           renderNakedComparison(tab, lots);
@@ -921,7 +983,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
             '<tr><td>損益兩平</td><td class="text-right">$' + fmt(tab.naked_breakeven) + '</td><td class="text-right" style="color:#3B6D11">$' + fmt(tab.breakeven) + '（低得多）</td></tr>' +
             '<tr><td>最大獲利</td><td class="text-right" style="color:#3B6D11">無上限</td><td class="text-right">' + fmtLots(tab.max_profit, lots) + '（封頂）</td></tr>' +
             '</tbody></table>' +
-            '<p class="mt-2" style="color:#5F5E5A; font-size:12px;">本次範例：S* = $' + fmt(tab.k2) + ' + $' + fmt(tab.s_star - tab.k2) + ' = $' + fmt(tab.s_star) + '</p>' +
+            '<p class="mt-2" style="color:#5F5E5A; font-size:20px;">本次範例：S* = $' + fmt(tab.k2) + ' + $' + fmt(tab.s_star - tab.k2) + ' = $' + fmt(tab.s_star) + '</p>' +
             '<p class="mt-1">' + priceNote + '</p>';
         }
 
@@ -946,7 +1008,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
             '<p>現在平倉可收回（毛額） <strong>' + fmtLots(tab.closeout_value, lots) + '</strong>（收回上限 ' + fmtLots(tab.spread_max_value, lots) + '）</p>' +
             '<p>等於獲利（淨額，收回−成本） <strong style="color:' + (tab.closeout_profit >= 0 ? '#3B6D11' : '#A32D2D') + '">' + fmtLots(tab.closeout_profit, lots) + '</strong>（獲利上限 ' + fmtLots(tab.max_profit, lots) + '）</p>' +
             '<p>已實現獲利比例 Y = <strong>' + (typeof pct === 'number' ? pct + '%' : '—') + '</strong></p>' +
-            '<p class="mt-1" style="color:#5F5E5A; font-size:12px;">本次範例：Y = ($' + fmt(tab.closeout_value) + ' − $' + fmt(tab.cost_per_contract) + ') ÷ $' + fmt(tab.max_profit) + ' = ' + (typeof pct === 'number' ? pct + '%' : '—') + '</p>' +
+            '<p class="mt-1" style="color:#5F5E5A; font-size:20px;">本次範例：Y = ($' + fmt(tab.closeout_value) + ' − $' + fmt(tab.cost_per_contract) + ') ÷ $' + fmt(tab.max_profit) + ' = ' + (typeof pct === 'number' ? pct + '%' : '—') + '</p>' +
             suggestHtml +
             '<p class="mt-2" style="color:#5F5E5A">平倉一律組合單兩腳同出。</p>';
         }

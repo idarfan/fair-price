@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_18_044101) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_20_093103) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -28,6 +28,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_18_044101) do
   create_table "bcvs_expiration_snapshots", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.jsonb "expirations", default: [], null: false
+    t.decimal "hv", precision: 8, scale: 4
+    t.decimal "iv_atm", precision: 8, scale: 4
+    t.decimal "iv_rank", precision: 8, scale: 4
+    t.string "latest_earnings"
+    t.decimal "price_change", precision: 10, scale: 4
     t.datetime "scraped_at", null: false
     t.string "symbol", null: false
     t.decimal "underlying_price", precision: 10, scale: 4

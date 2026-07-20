@@ -28,6 +28,27 @@ RSpec.describe BcvsCacheService do
       expect(described_class.read_expirations(symbol)[:expirations]).to eq([ "2026-08-21-m", "2026-09-18-m" ])
       expect(described_class.read_expirations(symbol)[:underlying_price]).to eq(43.0)
     end
+
+    it "stores and returns the v4 underlying summary fields" do
+      described_class.upsert_expirations!(
+        symbol, expirations: [ "2026-08-21-m" ], underlying_price: 42.5,
+        price_change: 1.23, iv_atm: 80.76, hv: 75.23, iv_rank: 72.48,
+        latest_earnings: "07/23/26 [BMO]"
+      )
+
+      summary = described_class.read_expirations(symbol)[:summary]
+      expect(summary).to eq(
+        price_change: 1.23, iv_atm: 80.76, hv: 75.23, iv_rank: 72.48,
+        latest_earnings: "07/23/26 [BMO]"
+      )
+    end
+
+    it "leaves the v4 summary fields nil when not provided (does not fabricate values)" do
+      described_class.upsert_expirations!(symbol, expirations: [ "2026-08-21-m" ], underlying_price: 42.5)
+
+      summary = described_class.read_expirations(symbol)[:summary]
+      expect(summary).to eq(price_change: nil, iv_atm: nil, hv: nil, iv_rank: nil, latest_earnings: nil)
+    end
   end
 
   describe ".fresh_chain? / .upsert_chain!" do

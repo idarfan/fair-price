@@ -161,21 +161,23 @@ th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 #bcvs-col-tip {
   position: fixed;
   z-index: 99999;
-  max-width: 300px;
-  min-width: 200px;
+  max-width: 360px;
+  min-width: 220px;
   background: #1a2535;
   color: #d8e6f3;
   border: 1.5px solid #D4900A;
   border-radius: 11px;
   padding: 12px 15px;
-  font-size: 12.5px;
+  font-size: 20px;
   line-height: 1.65;
   pointer-events: none;
   opacity: 0;
   transition: opacity .18s ease;
   box-shadow: 0 6px 28px rgba(0,0,0,.5);
 }
-#bcvs-col-tip .tip-t { font-weight: 700; color: #D4900A; margin-bottom: 6px; font-size: 13px; }
+/* bcvs.md §字級鐵則 v4：全頁禁止 <20px（含 tooltip）——20/22/24 三級制，
+   tooltip 標題比照卡帶標題 22px、內文 20px。 */
+#bcvs-col-tip .tip-t { font-weight: 700; color: #D4900A; margin-bottom: 6px; font-size: 22px; }
 
 /* 抓取進度條（bcvs.md §快取機制）：不確定進度，沿用 bpus 同款跑動動畫。 */
 .bcvs-progress-anim { animation: bcvs-progress-slide 1.1s ease-in-out infinite; }
