@@ -37,6 +37,7 @@ class BullCallSpreads::PageComponent < ApplicationComponent
       render_notes
       render_repair_panel if @expiration && @chain_status
     end
+    render_font_face_style
     render_hover_style
     render_tooltips_script
     render_script
@@ -330,52 +331,68 @@ class BullCallSpreads::PageComponent < ApplicationComponent
     end
   end
 
-  # bcvs.md §視覺規範：卡片系統沿用 LEAPS/PMCC 黃金法則頁既有 CSS token（見
-  # leaps_recommendations/page_component.rb#render_pmcc_edu_golden_rule 等，
-  # 色票取自 option-basics-lesson9.html :root，不得另創配色）。
-  CARD_GREEN  = "bg-[#F0FAF0] border-[1.5px] border-[#8ED4A8] rounded-[10px] p-4"
-  CARD_GOLD   = "bg-[#FFF7C0] border-[1.5px] border-[#E8B840] rounded-[10px] p-4"
-  # 橙色（規範類）：lesson9 :root 未定義獨立橙色 token，沿用同一套卡片語彙
-  # （圓角/邊框寬度/留白皆與既有卡片一致）延伸一組暖橙色，與黃/綠明顯區隔。
-  CARD_ORANGE = "bg-[#FFE8D1] border-[1.5px] border-[#E8935A] rounded-[10px] p-4"
+  # bcvs.md §視覺規範 v3（經使用者樣稿確認，固定色碼＋3D 圖示，不得另創配色）。
+  # 圖示來源：Microsoft Fluent Emoji 3D（MIT License，
+  # github.com/microsoft/fluentui-emoji），PNG 已下載進
+  # app/assets/images/bcvs/，不熱連 CDN。
+  CARD_SPECS = {
+    interval: {
+      band_bg: "#3B6D11", band_text: "#EAF3DE", body_bg: "#EAF3DE", border: "#97C459",
+      icon: "chart_increasing_3d.png", title: "損益區間表"
+    },
+    naked: {
+      band_bg: "#993C1D", band_text: "#FAECE7", body_bg: "#FAECE7", border: "#F0997B",
+      icon: "compass_3d.png", title: "為什麼不直接裸買 LEAPS Call？"
+    },
+    early_close: {
+      band_bg: "#854F0B", band_text: "#FAEEDA", body_bg: "#FAEEDA", border: "#EF9F27",
+      icon: "hourglass_not_done_3d.png", title: "提前平倉指引（不必等到期）"
+    }
+  }.freeze
 
-  def render_card_header(emoji, title)
-    div(class: "flex items-center gap-2 mb-2") do
-      span(class: "text-lg") { plain emoji }
-      h3(class: "text-sm font-semibold text-[#2A1A0E]") { plain title }
+  # bcvs.md §視覺規範 v3「卡片結構」：radius 12px、overflow hidden，頂部深色
+  # 標題色帶（15px/500 淺色字＋24px 3D 圖示靠左）＋淺色卡身（14px 內文/表格）。
+  def render_v3_card(key, body_id:)
+    spec = CARD_SPECS.fetch(key)
+    div(id: "bcvs-#{key.to_s.tr("_", "-")}-card",
+        class: "rounded-xl overflow-hidden border bcvs-notosans", style: "border-color:#{spec[:border]}") do
+      div(class: "flex items-center gap-2 px-4 py-2.5", style: "background:#{spec[:band_bg]}") do
+        img(src: helpers.asset_path("bcvs/#{spec[:icon]}"), class: "w-6 h-6", alt: "")
+        span(style: "color:#{spec[:band_text]}; font-size:15px; font-weight:500;") { plain spec[:title] }
+      end
+      div(id: body_id, class: "p-4 space-y-2", style: "background:#{spec[:body_bg]}; font-size:14px; color:#2A1A0E;") do
+        yield
+      end
     end
   end
 
   # bcvs.md §損益區間表：動態，D=淨成本 debit。以實際數字渲染，不得只顯示公式
-  # ——JS 依當前 tab 的 k1/k2/debit/breakeven 與現價即時算出五列文字，
-  # 虧損列紅字、損平列灰字、獲利列綠字。
+  # ——JS 依當前 tab 的 k1/k2/debit/breakeven 與現價即時算出表格內容，
+  # 虧損列紅字(#A32D2D)、損平列灰字(#5F5E5A)、獲利列綠字(#3B6D11)。
   def render_interval_table
-    div(id: "bcvs-interval-card", class: CARD_GREEN) do
-      render_card_header("📊", "損益區間表")
-      p(class: "text-sm font-mono text-[#2E9E52] font-semibold mb-1") { plain "D = K1 ask − K2 bid" }
-      p(id: "bcvs-interval-formula-example", class: "text-xs text-[#7A6555] mb-2")
-      div(id: "bcvs-interval-table", class: "text-[24px] space-y-1 text-[#2A1A0E]")
+    render_v3_card(:interval, body_id: "bcvs-interval-body") do
+      p(class: "font-mono font-semibold", style: "color:#3B6D11;") { plain "D = K1 ask − K2 bid" }
+      p(id: "bcvs-interval-formula-example", style: "color:#5F5E5A; font-size:12px;")
+      div(id: "bcvs-interval-table")
     end
   end
 
   # bcvs.md §為什麼不直接裸買 LEAPS Call：對照表 + 到期損益交叉價 S*。
   def render_naked_comparison
-    div(id: "bcvs-naked-card", class: CARD_ORANGE) do
-      render_card_header("🧭", "為什麼不直接裸買 LEAPS Call？")
-      p(class: "text-sm font-mono text-[#B5651D] font-semibold mb-1") { plain "S* = K2 + K2 bid" }
-      p(class: "text-xs text-[#7A6555] mb-2") { plain "到期價 < S* 時價差策略勝出，> S* 時裸買勝出" }
-      div(id: "bcvs-naked-comparison", class: "text-[24px] space-y-1 text-[#2A1A0E]")
+    render_v3_card(:naked, body_id: "bcvs-naked-body") do
+      p(class: "font-mono font-semibold", style: "color:#993C1D;") { plain "S* = K2 + K2 bid" }
+      p(style: "color:#5F5E5A; font-size:12px;") { plain "到期價 < S* 時價差策略勝出，> S* 時裸買勝出" }
+      div(id: "bcvs-naked-comparison")
     end
   end
 
   # bcvs.md §提前平倉指引：兩個口徑（毛額現值／淨額獲利）並列，Y=已實現獲利
   # 比例=(現值−成本)÷最大獲利。
   def render_early_close_panel
-    div(id: "bcvs-early-close-card", class: CARD_GOLD) do
-      render_card_header("⏳", "提前平倉指引（不必等到期）")
-      p(class: "text-sm font-mono text-[#D4900A] font-semibold mb-1") { plain "Y = (現值 − 成本) ÷ 最大獲利" }
-      p(class: "text-xs text-[#7A6555] mb-2") { plain "現值以快取 chain 保守估（K1 bid − K2 ask）；Y ≥ 80% 建議考慮獲利了結" }
-      div(id: "bcvs-early-close", class: "text-[24px] space-y-1 text-[#2A1A0E]")
+    render_v3_card(:early_close, body_id: "bcvs-early-close-body") do
+      p(class: "font-mono font-semibold", style: "color:#854F0B;") { plain "Y = (現值 − 成本) ÷ 最大獲利" }
+      p(style: "color:#5F5E5A; font-size:12px;") { plain "現值以快取 chain 保守估（K1 bid − K2 ask）；Y ≥ 80% 建議考慮獲利了結" }
+      div(id: "bcvs-early-close")
     end
   end
 
@@ -468,19 +485,29 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # ---------------------------------------------------------------------------
   # §說明表格（固定顯示）
   # ---------------------------------------------------------------------------
-  # bcvs.md §視覺規範：綠色＝獲利與公式類（含好處），黃色＝決策與警示類（含
-  # 注意事項）。
+  # bcvs.md §視覺規範 v3 只為三張分析卡固定色碼；好處/注意事項沿用同一色系
+  # （綠＝獲利類、金＝決策警示類）維持卡片視覺，但不強制 3D 圖示與嚴格結構。
   def render_notes
     div(class: "space-y-4") do
-      div(class: CARD_GREEN) do
-        render_card_header("✅", "好處")
-        p(class: "text-[26px] text-[#2A1A0E]") do
-          plain "成本低於裸買 call、最大損失封頂於淨成本、賣腳權利金部分對沖 theta、修復模式可壓縮虧損 LEAPS 在橫盤～小漲區間的損失。"
+      div(class: "rounded-xl overflow-hidden border bcvs-notosans", style: "border-color:#97C459;") do
+        div(class: "flex items-center gap-2 px-4 py-2.5", style: "background:#3B6D11;") do
+          span(class: "text-lg") { plain "✅" }
+          span(style: "color:#EAF3DE; font-size:15px; font-weight:500;") { plain "好處" }
+        end
+        div(class: "p-4", style: "background:#EAF3DE; font-size:14px; color:#2A1A0E;") do
+          p do
+            plain "成本低於裸買 call、最大損失封頂於淨成本、賣腳權利金部分對沖 theta、修復模式可壓縮虧損 LEAPS 在橫盤～小漲區間的損失。"
+          end
         end
       end
-      div(class: CARD_GOLD) do
-        render_card_header("⚠️", "注意事項")
-        NOTES.each { |n| p(class: "text-[26px] text-[#2A1A0E]") { plain n } }
+      div(class: "rounded-xl overflow-hidden border bcvs-notosans", style: "border-color:#EF9F27;") do
+        div(class: "flex items-center gap-2 px-4 py-2.5", style: "background:#854F0B;") do
+          span(class: "text-lg") { plain "⚠️" }
+          span(style: "color:#FAEEDA; font-size:15px; font-weight:500;") { plain "注意事項" }
+        end
+        div(class: "p-4 space-y-1", style: "background:#FAEEDA; font-size:14px; color:#2A1A0E;") do
+          NOTES.each { |n| p { plain n } }
+        end
       end
     end
   end
@@ -493,6 +520,26 @@ class BullCallSpreads::PageComponent < ApplicationComponent
     "5. 財報前 IV 變化影響成交價。"
   ].freeze
 
+  # bcvs.md §視覺規範 v3「字體」：Noto Sans TC self-host 進 repo（禁 Google
+  # Fonts 熱連），fallback "PingFang TC","Microsoft JhengHei"。字型檔沿用
+  # LEAPS PDF 匯出已 vendor 進 vendor/assets/fonts/ 的同一份，不重新下載——
+  # @font-face 的 src url 需要 Propshaft 算出的 digest 路徑，只能在
+  # Ruby 端用 helpers.asset_path 產生，不能寫死在 Tailwind CLI 編譯的
+  # application.css 裡（那份沒有 Rails asset pipeline 可用）。
+  def render_font_face_style
+    style { raw <<~CSS.html_safe }
+      @font-face {
+        font-family: 'Noto Sans TC';
+        src: url('#{helpers.asset_path("NotoSansTC-Regular-subset-v39.ttf")}') format('truetype');
+        font-weight: 400;
+        font-display: swap;
+      }
+      .bcvs-notosans, .bcvs-notosans * {
+        font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+      }
+    CSS
+  end
+
   # ---------------------------------------------------------------------------
   # 選 K1 hover 高亮（沿用 bpus 的 phase class 機制，這裡只有一個選取階段）
   # ---------------------------------------------------------------------------
@@ -500,6 +547,21 @@ class BullCallSpreads::PageComponent < ApplicationComponent
     style { raw <<~CSS.html_safe }
       #bcvs-chain-table tr:hover {
         background-color: #dbeafe;
+      }
+      /* bcvs.md §視覺規範 v3「表格」：資料列 hover 淡紫 #EEEDFE，transition 0.12s。 */
+      .bcvs-v3-table tbody tr {
+        transition: background-color 0.12s ease;
+      }
+      .bcvs-v3-table tbody tr:hover {
+        background-color: #EEEDFE;
+      }
+      .bcvs-v3-table th {
+        border-bottom: 1px solid rgba(0,0,0,0.15);
+        text-align: left;
+        font-weight: 500;
+      }
+      .bcvs-v3-table td, .bcvs-v3-table th {
+        padding: 4px 8px;
       }
     CSS
   end
@@ -820,12 +882,23 @@ class BullCallSpreads::PageComponent < ApplicationComponent
             exampleHtml2 = '（如以現價 $' + fmt(price) + ' 到期 → +$' + fmt(pnl2) + '）';
           }
 
+          // bcvs.md §視覺規範 v3：損益區間表列色——虧損 #A32D2D、損平 #5F5E5A、
+          // 獲利 #3B6D11，三欄（到期股價區間／結果／金額每口）。
+          var rows = [
+            { color: '#A32D2D', range: '≤ $' + fmt(k1), result: '賠掉全部成本', amount: '−' + fmtLots(maxLoss, lots) },
+            { color: '#A32D2D', range: '$' + fmt(k1) + ' ~ $' + fmt(be), result: '部分虧損，隨股價遞減 ' + exampleHtml, amount: '' },
+            { color: '#5F5E5A', range: '= $' + fmt(be), result: '損益兩平', amount: '$0' },
+            { color: '#3B6D11', range: '$' + fmt(be) + ' ~ $' + fmt(k2), result: '開始獲利，隨股價遞增 ' + exampleHtml2, amount: '' },
+            { color: '#3B6D11', range: '≥ $' + fmt(k2), result: '最大獲利（封頂）', amount: '+' + fmtLots(maxProfit, lots) }
+          ];
           el.innerHTML =
-            '<p class="text-red-600 font-medium">≤ $' + fmt(k1) + '：賠掉全部成本 −' + fmtLots(maxLoss, lots) + '</p>' +
-            '<p class="text-red-600">$' + fmt(k1) + ' ~ $' + fmt(be) + '：部分虧損，隨股價遞減 ' + exampleHtml + '</p>' +
-            '<p class="text-gray-500">= $' + fmt(be) + '：損益兩平 $0</p>' +
-            '<p class="text-green-700">$' + fmt(be) + ' ~ $' + fmt(k2) + '：開始獲利，隨股價遞增 ' + exampleHtml2 + '</p>' +
-            '<p class="text-green-700 font-medium">≥ $' + fmt(k2) + '：最大獲利（封頂）+' + fmtLots(maxProfit, lots) + '</p>';
+            '<table class="bcvs-v3-table w-full"><thead><tr>' +
+            '<th>到期股價區間</th><th>結果</th><th class="text-right">金額（每口）</th>' +
+            '</tr></thead><tbody>' +
+            rows.map(function (r) {
+              return '<tr style="color:' + r.color + '"><td>' + r.range + '</td><td>' + r.result + '</td><td class="text-right">' + r.amount + '</td></tr>';
+            }).join('') +
+            '</tbody></table>';
         }
 
         // ── 裸買 LEAPS 對照表（bcvs.md §為什麼不直接裸買）─────────────────────
@@ -841,14 +914,14 @@ class BullCallSpreads::PageComponent < ApplicationComponent
           }
 
           el.innerHTML =
-            '<table class="w-full text-[24px]"><thead><tr class="text-gray-500 text-left">' +
-            '<th class="py-1">項目</th><th class="py-1 text-right">裸買 K1 Call</th><th class="py-1 text-right">價差（K1/K2）</th></tr></thead><tbody>' +
-            '<tr><td class="py-1">每口成本</td><td class="py-1 text-right">' + fmtLots(tab.naked_cost, lots) + '</td><td class="py-1 text-right">' + fmtLots(tab.cost_per_contract, lots) + '</td></tr>' +
-            '<tr><td class="py-1">最大損失</td><td class="py-1 text-right text-red-600">' + fmtLots(tab.naked_cost, lots) + '</td><td class="py-1 text-right text-green-700">' + fmtLots(tab.max_loss, lots) + '（金額小得多）</td></tr>' +
-            '<tr><td class="py-1">損益兩平</td><td class="py-1 text-right">$' + fmt(tab.naked_breakeven) + '</td><td class="py-1 text-right text-green-700">$' + fmt(tab.breakeven) + '（低得多）</td></tr>' +
-            '<tr><td class="py-1">最大獲利</td><td class="py-1 text-right text-green-700">無上限</td><td class="py-1 text-right">' + fmtLots(tab.max_profit, lots) + '（封頂）</td></tr>' +
+            '<table class="bcvs-v3-table w-full"><thead><tr>' +
+            '<th>項目</th><th class="text-right">裸買 K1 Call</th><th class="text-right">價差（K1/K2）</th></tr></thead><tbody>' +
+            '<tr><td>每口成本</td><td class="text-right">' + fmtLots(tab.naked_cost, lots) + '</td><td class="text-right">' + fmtLots(tab.cost_per_contract, lots) + '</td></tr>' +
+            '<tr><td>最大損失</td><td class="text-right" style="color:#A32D2D">' + fmtLots(tab.naked_cost, lots) + '</td><td class="text-right" style="color:#3B6D11">' + fmtLots(tab.max_loss, lots) + '（金額小得多）</td></tr>' +
+            '<tr><td>損益兩平</td><td class="text-right">$' + fmt(tab.naked_breakeven) + '</td><td class="text-right" style="color:#3B6D11">$' + fmt(tab.breakeven) + '（低得多）</td></tr>' +
+            '<tr><td>最大獲利</td><td class="text-right" style="color:#3B6D11">無上限</td><td class="text-right">' + fmtLots(tab.max_profit, lots) + '（封頂）</td></tr>' +
             '</tbody></table>' +
-            '<p class="mt-2 text-xs text-[#7A6555]">本次範例：S* = $' + fmt(tab.k2) + ' + $' + fmt(tab.s_star - tab.k2) + ' = $' + fmt(tab.s_star) + '</p>' +
+            '<p class="mt-2" style="color:#5F5E5A; font-size:12px;">本次範例：S* = $' + fmt(tab.k2) + ' + $' + fmt(tab.s_star - tab.k2) + ' = $' + fmt(tab.s_star) + '</p>' +
             '<p class="mt-1">' + priceNote + '</p>';
         }
 
@@ -860,22 +933,22 @@ class BullCallSpreads::PageComponent < ApplicationComponent
           if (!el || tab.warning === 'invalid_width') { if (el) el.innerHTML = ''; return; }
 
           if (tab.closeout_value === null || tab.closeout_value === undefined) {
-            el.innerHTML = '<p class="text-gray-500">需要 K1 現價 bid 才能估算平倉可收回金額。</p>';
+            el.innerHTML = '<p style="color:#5F5E5A">需要 K1 現價 bid 才能估算平倉可收回金額。</p>';
             return;
           }
 
           var pct = tab.realized_pct;
           var suggestHtml = (typeof pct === 'number' && pct >= 80)
-            ? '<p class="text-green-700 font-semibold mt-2">✅ 已實現 ' + pct + '%，達 80% 閾值，建議考慮獲利了結——剩餘部分要再抱數月，報酬/時間比會急遽變差，還多扛提前指派與回檔風險。</p>'
+            ? '<p class="font-semibold mt-2" style="color:#3B6D11">✅ 已實現 ' + pct + '%，達 80% 閾值，建議考慮獲利了結——剩餘部分要再抱數月，報酬/時間比會急遽變差，還多扛提前指派與回檔風險。</p>'
             : '';
 
           el.innerHTML =
             '<p>現在平倉可收回（毛額） <strong>' + fmtLots(tab.closeout_value, lots) + '</strong>（收回上限 ' + fmtLots(tab.spread_max_value, lots) + '）</p>' +
-            '<p>等於獲利（淨額，收回−成本） <strong class="' + (tab.closeout_profit >= 0 ? 'text-green-700' : 'text-red-600') + '">' + fmtLots(tab.closeout_profit, lots) + '</strong>（獲利上限 ' + fmtLots(tab.max_profit, lots) + '）</p>' +
+            '<p>等於獲利（淨額，收回−成本） <strong style="color:' + (tab.closeout_profit >= 0 ? '#3B6D11' : '#A32D2D') + '">' + fmtLots(tab.closeout_profit, lots) + '</strong>（獲利上限 ' + fmtLots(tab.max_profit, lots) + '）</p>' +
             '<p>已實現獲利比例 Y = <strong>' + (typeof pct === 'number' ? pct + '%' : '—') + '</strong></p>' +
-            '<p class="text-xs text-[#7A6555] mt-1">本次範例：Y = ($' + fmt(tab.closeout_value) + ' − $' + fmt(tab.cost_per_contract) + ') ÷ $' + fmt(tab.max_profit) + ' = ' + (typeof pct === 'number' ? pct + '%' : '—') + '</p>' +
+            '<p class="mt-1" style="color:#5F5E5A; font-size:12px;">本次範例：Y = ($' + fmt(tab.closeout_value) + ' − $' + fmt(tab.cost_per_contract) + ') ÷ $' + fmt(tab.max_profit) + ' = ' + (typeof pct === 'number' ? pct + '%' : '—') + '</p>' +
             suggestHtml +
-            '<p class="text-gray-500 mt-2">平倉一律組合單兩腳同出。</p>';
+            '<p class="mt-2" style="color:#5F5E5A">平倉一律組合單兩腳同出。</p>';
         }
 
         document.querySelectorAll('[data-bcvs-recommend-tab]').forEach(function (btn) {
