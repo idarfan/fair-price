@@ -126,24 +126,22 @@ class BullCallSpreads::PageComponent < ApplicationComponent
 
       case @scrape_status
       when :cached
-        div(class: "flex flex-col sm:flex-row sm:items-start gap-3") do
-          div(class: "flex-1 space-y-2") do
-            if @underlying_price
-              p(class: "text-[20px] text-gray-500") { plain "現價 $#{sprintf("%.2f", @underlying_price.to_f)}" }
-            end
-            div(class: "flex flex-wrap gap-2") do
-              @expirations.each do |exp|
-                active = exp[:value] == @expiration
-                btn_class = active ?
-                  "px-3 py-1.5 rounded-lg text-[20px] font-medium bg-blue-600 text-white" :
-                  "px-3 py-1.5 rounded-lg text-[20px] font-medium bg-white border border-gray-300 text-gray-700 hover:border-blue-400"
-                button(type: "button", class: btn_class, data: { exp: exp[:value], "bcvs-expiration-btn": "" }) do
-                  plain exp[:label]
-                end
+        div(class: "space-y-3") do
+          if @underlying_price
+            p(class: "text-[20px] text-gray-500") { plain "現價 $#{sprintf("%.2f", @underlying_price.to_f)}" }
+          end
+          div(class: "flex justify-center") { render_underlying_summary_card }
+          div(class: "flex flex-wrap gap-2") do
+            @expirations.each do |exp|
+              active = exp[:value] == @expiration
+              btn_class = active ?
+                "px-3 py-1.5 rounded-lg text-[20px] font-medium bg-blue-600 text-white" :
+                "px-3 py-1.5 rounded-lg text-[20px] font-medium bg-white border border-gray-300 text-gray-700 hover:border-blue-400"
+              button(type: "button", class: btn_class, data: { exp: exp[:value], "bcvs-expiration-btn": "" }) do
+                plain exp[:label]
               end
             end
           end
-          render_underlying_summary_card
         end
       when :ready_to_fetch
         p(class: "text-[20px] text-gray-500") { plain "尚未抓取，請按下方按鈕從 Barchart 讀取到期日清單" }
@@ -167,13 +165,13 @@ class BullCallSpreads::PageComponent < ApplicationComponent
     div(class: "px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-[20px] rounded-lg") { plain "⚠️ #{msg}" }
   end
 
-  # bcvs.md §功能流程 步驟1（v4）：標的摘要五值，顯示於到期日選單右側，
-  # v3 卡片樣式（沿用同一套圓角/邊框語彙，中性色—不佔用三張分析卡的固定
-  # 色碼）。Latest Earnings／IV Rank 各附一則 tooltip（規格固定文案）。
+  # bcvs.md §功能流程 步驟1（v4）：標的摘要五值，顯示於「現價」與到期日
+  # 按鈕之間（v4.1 依使用者截圖回饋，從側邊改置中），v3 卡片樣式（沿用同一套
+  # 圓角/邊框語彙，中性色—不佔用三張分析卡的固定色碼）。五列皆附 tooltip。
   def render_underlying_summary_card
     return if @summary.blank?
 
-    div(class: "w-full sm:w-72 flex-shrink-0 rounded-xl overflow-hidden border bcvs-notosans",
+    div(class: "w-full sm:w-96 rounded-xl overflow-hidden border bcvs-notosans",
         style: "border-color:#D1D5DB;") do
       div(class: "flex items-center gap-2 px-4 py-2.5", style: "background:#374151;") do
         span(style: "color:#F3F4F6; font-size:22px; font-weight:500;") { plain "標的摘要" }
@@ -181,8 +179,8 @@ class BullCallSpreads::PageComponent < ApplicationComponent
       div(class: "p-4 space-y-1.5", style: "background:#F9FAFB; font-size:20px; color:#2A1A0E;") do
         render_summary_row("現價", price_change_text)
         render_summary_row("Latest Earnings", @summary[:latest_earnings] || "—", tip_key: "summary_earnings")
-        render_summary_row("IV (ATM)", pct_text(@summary[:iv_atm]))
-        render_summary_row("HV", pct_text(@summary[:hv]))
+        render_summary_row("IV (ATM)", pct_text(@summary[:iv_atm]), tip_key: "summary_iv_atm")
+        render_summary_row("HV", pct_text(@summary[:hv]), tip_key: "summary_hv")
         render_summary_row("IV Rank", pct_text(@summary[:iv_rank]), tip_key: "summary_iv_rank")
       end
     end
@@ -300,10 +298,19 @@ class BullCallSpreads::PageComponent < ApplicationComponent
       title: "Delta（避險比率）",
       desc: "對沖比率：可近似解讀為到期價內機率"
     },
-    # bcvs.md §功能流程 步驟1（v4）：標的摘要表 tooltip 兩則，文案固定。
+    # bcvs.md §功能流程 步驟1（v4）：標的摘要表 tooltip，Latest Earnings／
+    # IV Rank 為規格固定文案，IV(ATM)／HV 為後續使用者回饋補上（同一套語感）。
     "summary_earnings" => {
       title: "Latest Earnings",
       desc: "BMO＝Before Market Open（盤前公布）；AMC＝After Market Close（盤後公布）。財報日前 IV 通常走高、公布後常見 IV crush，建倉時點宜避開財報前的高權利金"
+    },
+    "summary_iv_atm" => {
+      title: "IV (ATM)",
+      desc: "價平（At-The-Money）隱含波動率：市場對這檔標的近期波動幅度的預期，數字越高權利金越貴，debit 價差建倉成本越高"
+    },
+    "summary_hv" => {
+      title: "HV（歷史波動率）",
+      desc: "這檔標的近期實際股價波動幅度。IV 明顯高於 HV 代表市場預期波動即將放大（如財報前），此時買方腳（K1）成本偏貴"
     },
     "summary_iv_rank" => {
       title: "IV Rank",
