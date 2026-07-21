@@ -89,6 +89,11 @@ Dump 現行兩法合成公允價低/高估的規則，將 DCF 併入為第三法
 
 驗收：核心用例無 override、預設路徑，UI 對 NOK 端到端跑一次，截圖含估值判斷卡與「分析方法」欄新註記。
 
+**✅ 已完成**（`fairprice-rails` 重啟後，`http://localhost:3003/valuations/NOK` 實測，`nok_valuation_after_upgrade.png`）：
+- DCF 方法標籤顯示「DCF（估算）」，說明含「（估算）」字樣
+- P/E 說明欄顯示「EPS $0.16 × 32.72x（原28x）」——前瞻成長溢價的原始值註記正確呈現
+- 估值判斷卡：公允價 $2.71–$5.25，全套 rspec 40/40 綠燈
+
 ## S5 結果
 
 `tmp/fv_upgrade_regression.json` 已產出（8 檔前後值、`dcf_status`、`model_growth_rate_used`）。
