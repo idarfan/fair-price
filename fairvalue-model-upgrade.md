@@ -8,7 +8,7 @@
 
 | 階段 | 狀態 | 驗證結果 |
 |---|---|---|
-| S1 回歸基準集建立 | 未開始 | |
+| S1 回歸基準集建立 | ⛔ 停止（候選不足額） | industry_pe 來源：硬編碼常數 `Valuation::INDUSTRY_PE`（`app/models/valuation/fair_value.rb`），11 產業＋`default=>25`，非外部 API；`pe_method` 用 `INDUSTRY_PE[sector] \|\| INDUSTRY_PE["default"]`。選檔結果：高成長 0/3、價值股 2/3（XOM、SHOP）、ADR 1/1（UMC）、NOK 固定 1；F/WULF 因 EPS 為負無 growth_ttm 無法分類。詳見下方「S1 選檔結果」，等待使用者指定補充標的 |
 | S2 P/E 前瞻溢價調整 | 未開始 | |
 | S3 DCF FCF fallback | 未開始 | |
 | S4 三法合成與權重 | 未開始 | |
@@ -25,6 +25,32 @@
 對每檔記錄：目前模型公允價低/高估、輸入數據、外部參考區間（分析師目標價低/高，來源 Finnhub price target endpoint；取不到者記 null 並註明）。寫入 `tmp/fv_upgrade_baseline.json`。
 
 驗證：檔案存在，8 檔各含 keys `ticker, fv_low_before, fv_high_before, growth_ttm, analyst_low, analyst_high`，前三值非 null。
+
+### S1 選檔規則（patch v1，已作廢——DB 無公允價值計算紀錄表，前提不成立）
+
+- ~~從 DB 近 30 天有完整公允價值計算紀錄的標的中選。~~
+- ~~價值股 3 檔：`growth_ttm < 0.05` 且 `P/E < 產業均值`，取市值最大前 3。~~
+
+### S1 選檔規則（patch v2，現行）
+
+- 選檔池改為 `watchlist_items` / `tracked_tickers` / `watched_tickers` 實際清單，即時呼叫 `StockDataService` 抓 `growth_ttm` 分類。
+- 高成長 3 檔：`growth_ttm > 0.15`，取最高前 3。
+- 價值股 3 檔：`growth_ttm < 0.05`，取市值最大前 3（暫免 `P/E < 產業均值` 條件，因 `fundamentals` 表 `sector` 全為 null、產業均值來源待釐清，此條件無法可靠套用）。
+- ADR 1 檔：`exchange` 欄位非美國本土掛牌者任選 1（NOK 除外）。
+- 任一類不足額 → 停在 S1，回報實際清單與各檔 `growth_ttm`，等使用者指定。
+
+### S1 選檔結果（候選池：F, NOK, SHOP, UMC, WULF, XOM；SQQQ 為槓桿 ETF 已排除）
+
+| Ticker | growth_ttm | 市值（USD） | 掛牌 | 分類 |
+|---|---|---|---|---|
+| NOK | 0.1687 | 57.9B | Helsinki（財報）／NYSE（股價） | 固定 1 檔 |
+| UMC | 0.1258 | 255.3B | 台灣證交所 | ADR 候選 ✓ |
+| XOM | -0.2159 | 614.9B | NYSE | 價值股候選 |
+| SHOP | -0.1739 | 161.5B | NASDAQ | 價值股候選 |
+| F | null（EPS 為負，Finnhub 無成長率） | 55.7B | NYSE | 無法分類 |
+| WULF | null（同上） | 9.3B | NASDAQ | 無法分類 |
+
+**缺口**：高成長 0/3（候選池無任何非 NOK 標的 growth_ttm > 0.15）、價值股 2/3（已有 XOM、SHOP，缺 1）。ADR、NOK 已滿足。
 
 ## S2 P/E 前瞻溢價調整
 
