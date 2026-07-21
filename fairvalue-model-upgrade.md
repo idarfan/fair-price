@@ -103,6 +103,10 @@ Dump 現行兩法合成公允價低/高估的規則，將 DCF 併入為第三法
 
 S1 選檔用 `earnings_growth`（TTM 盈餘成長，SHOP = −17.4%）判定為價值股，但 `pe_method`/`dcf_method` 實際使用的 `growth_rate` 來自 `Classifier#estimate_growth_rate`——取「盈餘成長／營收成長／季度盈餘成長／FwdEPS 推算」多來源的**中位數**，SHOP 中位數為 **31.85%**（其他來源蓋過負的 TTM 盈餘成長）。以模型自身邏輯，SHOP 本來就不是低成長股，S2 溢價調整依此正確反應。此為選檔失誤，不是 S2 公式錯誤。
 
+**已換檔**：改用 TSLA（`model_growth_rate_used=0.03`，watchlist 池中 <0.05 候選市值最大者）取代 SHOP。`tmp/fv_upgrade_baseline.json` 已更新。
+
+**換檔後發現新問題**：TSLA 的 `stock_type` 為「週期股」（Consumer Cyclical + EPS 為負觸發），實際方法為 `[EV/EBITDA, P/B, DCF]`，完全不經過 P/E/PEG，因此不受 S2 影響。修改前基準（EV/EBITDA=$25.34、P/B=$26.88，皆不受本次升級影響）：low=$25.34, high=$26.88。修改後 S3 新增 DCF（ni_proxy=$14.49）成為新低點：low=$14.49, high=$26.88（不變）。**low 變動 42.8%，仍未通過 <15% 門檻**，但成因是 S3「新增 DCF 為第三法」的結構性效果，與成長率高低無關（TSLA growth_rate 僅 0.03，S2 溢價機制未觸發）——代表驗收條件 3 原始設計（針對 S2 溢價不應擾動低成長股）沒有涵蓋 S3 新增方法本身就會位移 min/max 的效果。此為**驗收條件設計缺口**，非實作錯誤，等待使用者裁示如何處理。
+
 ### NOK 失敗根因：`growth_cap` 未被觸發，公式結構天花板，非參數可調
 
 NOK `growth_rate=16.9%`，遠低於 `growth_cap=0.5`，調整 `growth_cap` 不會改變結果（cap 未生效）。要讓 $0.16 EPS 對應 $8.5，PE 需達 ~53x（較基準 28x 溢價 +89%），但現行公式 `industry_pe × (1+min(g, cap))` 在 g=16.9% 時上限僅 +16.9%（32.7x）。這是公式本身的結構限制，需要不同公式（如非線性溢價、或改用 forward P/E 直接倍數）才能觸及，超出本規格「不新設權重邏輯、不改動範圍外估值邏輯」的授權範圍。
