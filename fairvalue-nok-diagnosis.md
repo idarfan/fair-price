@@ -8,11 +8,54 @@
 
 | 階段 | 狀態 | 驗證結果 |
 |---|---|---|
-| S1 輸入數據 dump | 未開始 | |
-| S2 幣別/listing 判定 | 未開始 | |
-| S3 EPS 正規化檢查 | 未開始 | |
-| S4 模型公式檢查 | 未開始 | |
-| S5 修正與回歸 | 未開始 | |
+| S1 輸入數據 dump | ✅ 完成 | `tmp/fv_diag_nok.json` 已產出，見下 |
+| S2 幣別/listing 判定 | ✅ 完成 | `mismatch:price_currency_vs_metric_currency`，見下 |
+| S3 EPS 正規化檢查 | ✅ 完成 | `ttm_normalized`（excl extra items），非一次性減損污染 |
+| S4 模型公式檢查 | ✅ 完成 | 手算重現 $2.37 / $3.94 誤差 < $0.01 |
+| S5 修正與回歸 | ⚠️ 部分完成 | 幣別 bug 已修正，但公允價仍未達 $7–$16，見下方「S5 缺口」 |
+
+## S1 結果
+
+`tmp/fv_diag_nok.json`：source=Finnhub、exchange="NASDAQ OMX HELSINKI LTD."、eps_ttm=0.1406、eps_fwd=null、revenue=20,063,960,784、growth=0.1687、currency=EUR、price=10.08。
+
+`eps_fwd` 為 null：非 bug，Finnhub `/stock/metric`（免費層）完全不提供前瞻 EPS 欄位（已列出全部 eps* 欄位確認），此限制記錄於下方待辦。
+
+## S2 結果：currency_verdict = `mismatch:price_currency_vs_metric_currency`
+
+**verdict_basis**：以 stockanalysis.com（NYSE: NOK 即時報價）交叉驗證：
+- `current_price` 10.08 與外部 USD ADR 報價完全吻合（quote 端點正確）。
+- 但 `eps_ttm`（0.1406）、`total_revenue`（20.06B）、`book_value`（3.7873）、52週高低（3.419/14.995）與外部 USD 數字（EPS $0.16、營收 $23.06B、52週 4.00–17.45）不符，換算成 EUR（÷ FX 0.8758）後幾乎完全吻合。
+
+**根因**：Finnhub 對雙掛牌 ADR（如 NOK）：`/quote` 端點回傳掛牌交易所價格（美股 ticker 恆為 USD），但 `/stock/profile2`、`/stock/metric` 回傳公司財報原始幣別（Nokia 為 EUR，因主要上市地為 Helsinki OMX）。`StockDataService` 原本把兩者未經換算直接混用，造成「USD 股價 ÷ EUR 每股盈餘」的貨幣錯位，是 $2.37–$3.94 偏低的**主因**。
+
+## S3 結果：eps_basis = `ttm_normalized`
+
+`epsBasicExclExtraItemsTTM` = `epsExclExtraItemsTTM` = `epsTTM` = 0.1406（三者相同），已排除一次性項目，非減損污染問題。
+
+## S4 結果：公式重現
+
+一般股模型：`[DCF, P/E, PEG]`。DCF 因 `free_cashflow` 為 nil（Finnhub 未提供 NOK 的 FCF/股）被 `compact` 跳過，僅剩：
+- P/E：`EPS(EUR) 0.1406 × Communication Services 平均 P/E 28x = $3.94`
+- PEG：`PEG=1 時公允P/E=17x → 0.1406 × 17 = $2.37`
+
+手算重現誤差 < $0.01，確認理解正確。
+
+## S5：已修正 + 剩餘缺口
+
+**已修正**（`app/services/stock_data_service.rb`、`app/services/exchange_rate_service.rb`）：新增 `ExchangeRateService.rate_to_usd(currency)`，`StockDataService#parse` 於 `financial_currency != "USD"` 時，將 EPS/淨值/股利/營收/EBITDA/52週高低換算為 USD 後再回傳，並在 `currency_note` 標註換算依據。修正後 NOK 數字與外部驗證幾乎完全吻合（EPS $0.1605 vs 外部 $0.16、營收 $22.91B vs $23.06B）。
+
+**修正後結果**：`fair_value_low: 2.71, fair_value_high: 4.50` — **仍未達驗收標準 $7–$16**。
+
+**剩餘缺口為模型方法論限制，非資料 bug**：
+1. DCF 因 Finnhub 無 NOK 的 FCF/股資料而完全跳過，一般股模型少了核心估值法。
+2. P/E 法用「產業平均 28x」，但市場實際給 NOK 的本益比是 62x（因 AI 網通建設題材的前瞻成長溢價），PEG 法用 TTM 歷史成長率（16.87%）亦偏保守。這類「本益比遠高於產業均值、市場賭未來成長」的個股，用現行方法論會系統性低估。
+
+**待決策**（需使用者選擇方向，超出本次資料層 bug 修正範圍）：
+- (a) DCF 無 FCF 資料時的 fallback（例如用 EBITDA 或淨利估算現金流）？
+- (b) P/E 法是否納入前瞻成長溢價調整，或改用 forward P/E（但 Finnhub 免費層無 forward EPS）？
+- (c) 或接受此為模型已知限制，僅修資料層 bug，不擴大範圍？
+
+## 回歸測試：待辦（需先決定上述方向再執行，避免重工）
 
 ## S1 輸入數據 dump
 

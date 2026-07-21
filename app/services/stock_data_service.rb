@@ -93,13 +93,24 @@ class StockDataService
     m        = (metrics_resp || {})["metric"] || {}
     currency = (profile["currency"] || "USD").upcase
 
+    # Finnhub 對雙掛牌 ADR（如 NOK）：/quote 回傳掛牌交易所的價格（美股 ticker 恆為 USD），
+    # 但 /stock/profile2、/stock/metric 回傳公司財報原始幣別（如 Nokia 用 EUR）。
+    # 若不换算，會出現「USD 股價 ÷ EUR 每股盈餘」的幣別混用，公允價值嚴重失真。
+    fx = currency == "USD" ? 1.0 : ExchangeRateService.rate_to_usd(currency)
+    currency_note = nil
+    if currency != "USD"
+      currency_note = fx ? "原始財報幣別 #{currency}，已依匯率 1 USD ≈ #{fx.round(4)} #{currency} 換算為 USD" :
+                            "原始財報幣別 #{currency}，查無即時匯率，數值未換算，可能與 USD 股價不一致"
+      fx ||= 1.0
+    end
+
     # shareOutstanding is in millions
     shares = safe_float(profile["shareOutstanding"])&.*(1_000_000)
 
-    # Per-share metrics × shares = totals (units are safe this way)
-    rev_ps  = safe_float(m["revenuePerShareTTM"])
-    fcf_ps  = safe_float(m["freeCashFlowPerShareTTM"])
-    ebitd_ps = safe_float(m["ebitdPerShareTTM"])
+    # Per-share metrics × shares = totals（先換算成 USD 再乘股數）
+    rev_ps   = conv(safe_float(m["revenuePerShareTTM"]), fx)
+    fcf_ps   = conv(safe_float(m["freeCashFlowPerShareTTM"]), fx)
+    ebitd_ps = conv(safe_float(m["ebitdPerShareTTM"]), fx)
 
     # ROE & growth: Finnhub returns as percentage (e.g., 120.5 means 120.5%)
     roe            = pct_to_ratio(m["roeTTM"])
@@ -115,18 +126,18 @@ class StockDataService
       sector:                    map_sector(industry),
       industry:                  industry.presence,
       exchange:                  profile["exchange"],
-      currency:                  currency,
+      currency:                  "USD",
       financial_currency:        currency,
-      currency_note:             nil,
+      currency_note:             currency_note,
       current_price:             safe_float(quote["c"]),
       shares_outstanding:        shares,
-      eps_ttm:                   safe_float(m["epsTTM"]),
+      eps_ttm:                   conv(safe_float(m["epsTTM"]), fx),
       forward_eps:               nil,
-      book_value:                safe_float(m["bookValuePerShareQuarterly"]) ||
-                                 safe_float(m["bookValuePerShareAnnual"]),
+      book_value:                conv(safe_float(m["bookValuePerShareQuarterly"]) ||
+                                 safe_float(m["bookValuePerShareAnnual"]), fx),
       roe:                       roe,
-      dividend_rate:             safe_float(m["dividendPerShareTTM"]) ||
-                                 safe_float(m["dividendPerShareAnnual"]),
+      dividend_rate:             conv(safe_float(m["dividendPerShareTTM"]) ||
+                                 safe_float(m["dividendPerShareAnnual"]), fx),
       free_cashflow:             mul(fcf_ps, shares),
       total_revenue:             mul(rev_ps, shares),
       ebitda:                    mul(ebitd_ps, shares),
@@ -137,8 +148,8 @@ class StockDataService
       earnings_quarterly_growth: eps_q_growth,
       day_low:                   safe_float(quote["l"]),
       day_high:                  safe_float(quote["h"]),
-      fifty_two_week_low:        safe_float(m["52WeekLow"]),
-      fifty_two_week_high:       safe_float(m["52WeekHigh"]),
+      fifty_two_week_low:        conv(safe_float(m["52WeekLow"]), fx),
+      fifty_two_week_high:       conv(safe_float(m["52WeekHigh"]), fx),
       analyst_consensus:         parse_recommendations(recommend_resp)
     }
   end
@@ -161,6 +172,13 @@ class StockDataService
 
   def mul(a, b)
     (a && b) ? a * b : nil
+  end
+
+  # 將原始財報幣別數值換算為 USD：amount(原幣別) / (1 USD 兌原幣別匯率)
+  def conv(value, fx)
+    return nil if value.nil?
+
+    value / fx
   end
 
   def pct_to_ratio(value)
