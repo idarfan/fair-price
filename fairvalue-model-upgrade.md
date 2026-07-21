@@ -12,7 +12,7 @@
 | S2 P/E 前瞻溢價調整 | ✅ 完成 | 參數移至 `config/valuation.yml`（`growth_cap: 0.5`），`pe_method(g=nil)` 僅一般股呼叫時傳入 g（其餘股票類型呼叫維持原行為不變）。3 組單元測試通過：(a) g=0.169→32.73 (b) g=0.8→cap生效42.0 (c) g=-0.1→28.0（不調整）。全套 spec 36/36 綠燈 |
 | S3 DCF FCF fallback | ✅ 完成 | `resolve_fcf_ps` 實作 native→ni_proxy→ebitda_proxy→unavailable 鏈，`dcf_method` 回傳 `dcf_status` 並在 proxy 來源時於 `method`/`note` 標註「（估算）」。4 組單元測試通過。全套 spec 40/40 綠燈 |
 | S4 三法合成與權重 | ✅ 完成 | 合成規則沿用現行架構（`values.min`/`values.max`），DCF 已於 `apply_methods` 同等地位加入一般股陣列，未新設權重邏輯。真實 S1 標的因 Finnhub 免費層皆無 FCF/股資料，全數落 `ni_proxy`（native 實際不可達，已記錄），改用合成資料（`free_cashflow` 有值）驗證 native 情境：手算三法合成結果與程式輸出誤差 = 0.0，見 `tmp/fv_upgrade_s4_check.json` |
-| S5 回歸與驗收 | 未開始 | |
+| S5 回歸與驗收 | ⛔ 停止（2 檔未過，非設定檔參數可解） | 見下方「S5 結果」，等待使用者指定方向 |
 
 ## S1 回歸基準集建立
 
@@ -88,6 +88,24 @@ Dump 現行兩法合成公允價低/高估的規則，將 DCF 併入為第三法
 5. 任一檔不過 → 回 S2/S3 調參數（僅限設定檔內參數），重跑全集。
 
 驗收：核心用例無 override、預設路徑，UI 對 NOK 端到端跑一次，截圖含估值判斷卡與「分析方法」欄新註記。
+
+## S5 結果
+
+`tmp/fv_upgrade_regression.json` 已產出（8 檔前後值、`dcf_status`、`model_growth_rate_used`）。
+
+驗收 1（NVDA/PLTR/AVGO 新值≥舊值）：✅ 全過。
+驗收 2（XOM/VZ 變動 <15%）：✅ 過。
+驗收 3（SHOP 變動 <15%）：❌ 未過，high $35.62→$46.97（+31.9%）。
+驗收 4（NOK 落入 $8.5–$15）：❌ 未過，$2.71→$5.25（仍偏低）。
+驗收 5（全 8 檔更貼近分析師區間）：N/A，Finnhub price-target 端點免費層無權限，全為 null（S1 已註明）。
+
+### SHOP 失敗根因：選檔代理指標與模型內部成長率不一致（選檔失誤，非公式 bug）
+
+S1 選檔用 `earnings_growth`（TTM 盈餘成長，SHOP = −17.4%）判定為價值股，但 `pe_method`/`dcf_method` 實際使用的 `growth_rate` 來自 `Classifier#estimate_growth_rate`——取「盈餘成長／營收成長／季度盈餘成長／FwdEPS 推算」多來源的**中位數**，SHOP 中位數為 **31.85%**（其他來源蓋過負的 TTM 盈餘成長）。以模型自身邏輯，SHOP 本來就不是低成長股，S2 溢價調整依此正確反應。此為選檔失誤，不是 S2 公式錯誤。
+
+### NOK 失敗根因：`growth_cap` 未被觸發，公式結構天花板，非參數可調
+
+NOK `growth_rate=16.9%`，遠低於 `growth_cap=0.5`，調整 `growth_cap` 不會改變結果（cap 未生效）。要讓 $0.16 EPS 對應 $8.5，PE 需達 ~53x（較基準 28x 溢價 +89%），但現行公式 `industry_pe × (1+min(g, cap))` 在 g=16.9% 時上限僅 +16.9%（32.7x）。這是公式本身的結構限制，需要不同公式（如非線性溢價、或改用 forward P/E 直接倍數）才能觸及，超出本規格「不新設權重邏輯、不改動範圍外估值邏輯」的授權範圍。
 
 ## 附註
 
