@@ -24,20 +24,33 @@ module Valuation
       }
     end
 
-    def pe_method
+    # g 有值時套用 S2 前瞻成長溢價（僅一般股呼叫時傳入；其餘股票類型呼叫時 g 為 nil，行為不變）
+    def pe_method(g = nil)
       eps    = @d[:eps_ttm]
       sector = @d[:sector].to_s
       return nil unless eps&.positive?
 
-      pe    = INDUSTRY_PE[sector] || INDUSTRY_PE["default"]
-      value = eps * pe
+      base_pe = INDUSTRY_PE[sector] || INDUSTRY_PE["default"]
+      pe      = growth_adjusted_pe(base_pe, g)
+      value   = eps * pe
+
+      formula = "Trailing EPS $#{eps.round(2)} × #{sector.presence || '產業'}平均 P/E #{base_pe}x"
+      formula += " × 前瞻成長溢價(1+min(g,#{pct(GROWTH_CAP)}))=#{pe.round(2)}x" if pe != base_pe
+      formula += " = $#{value.round(2)}"
+
       {
         method:    "P/E",
         value:     value.round(2),
-        note:      "EPS $#{eps.round(2)} × #{pe}x",
-        formula:   "Trailing EPS $#{eps.round(2)} × #{sector.presence || '產業'}平均 P/E #{pe}x = $#{value.round(2)}",
+        note:      "EPS $#{eps.round(2)} × #{pe.round(2)}x#{"（原#{base_pe}x）" if pe != base_pe}",
+        formula:   formula,
         rationale: METHOD_RATIONALE["P/E"]
       }
+    end
+
+    def growth_adjusted_pe(base_pe, g)
+      return base_pe if g.nil? || g <= 0
+
+      base_pe * (1 + [ g, GROWTH_CAP ].min)
     end
 
     def peg_method(g)

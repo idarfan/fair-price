@@ -9,6 +9,12 @@ module Valuation
   TERMINAL_GROWTH = 0.03
   FORECAST_YEARS  = 5
 
+  # 參數集中於 config/valuation.yml，調參不動程式碼（見 fairvalue-model-upgrade.md）
+  VALUATION_CONFIG = YAML.load_file(Rails.root.join("config/valuation.yml")).freeze
+  GROWTH_CAP       = VALUATION_CONFIG.fetch("growth_cap")
+  FCF_CONVERSION   = VALUATION_CONFIG.fetch("fcf_conversion")
+  EBITDA_RATIO     = VALUATION_CONFIG.fetch("ebitda_ratio")
+
   INDUSTRY_PE = {
     "Technology" => 35, "Communication Services" => 28,
     "Consumer Cyclical" => 20, "Consumer Defensive" => 22,
@@ -125,7 +131,7 @@ module Valuation
 
     def apply_methods(stock_type, g)
       case stock_type
-      when "一般股"     then [ dcf_method(g), pe_method, peg_method(g) ]
+      when "一般股"     then [ dcf_method(g), pe_method(g), peg_method(g) ]
       when "金融股"     then [ excess_returns_method, pe_method, pb_method ]
       when "REITs"      then [ ddm_method(0.03), dcf_method(0.04), pb_method ]
       when "公用事業"   then [ ddm_method(0.025), dcf_method(0.04), pe_method ]

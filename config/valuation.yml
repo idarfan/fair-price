@@ -1,0 +1,14 @@
+# 公允價值模型參數（fairvalue-model-upgrade.md）
+# 日後調參請改這裡，不要動程式碼。
+
+# S2 一般股 P/E 前瞻溢價調整
+# adjusted_pe = industry_pe × (1 + min(growth_ttm, growth_cap))
+# growth_ttm 為負時不調整（用原 industry_pe，不下修——下修屬另案）
+growth_cap: 0.5
+
+# S3 DCF FCF fallback（Finnhub 無 FCF/股時）
+# 第一層：FCF ≈ 淨利 × fcf_conversion
+fcf_conversion: 0.9
+
+# 第二層：淨利也缺 → FCF ≈ EBITDA × ebitda_ratio
+ebitda_ratio: 0.5

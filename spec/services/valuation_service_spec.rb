@@ -341,4 +341,26 @@ RSpec.describe ValuationService do
       expect(result[:valuation_methods]).not_to be_empty
     end
   end
+
+  # ── P/E 前瞻溢價調整（S2, fairvalue-model-upgrade.md） ─────────────────────
+
+  describe "P/E 前瞻溢價調整" do
+    subject(:instance) { described_class.new(base_stock, 0.10) }
+
+    def adjusted_pe(base_pe, g)
+      instance.send(:growth_adjusted_pe, base_pe, g)
+    end
+
+    it "growth 0.169、industry_pe 28 → adjusted_pe ≈ 32.73" do
+      expect(adjusted_pe(28, 0.169)).to be_within(0.01).of(32.73)
+    end
+
+    it "growth 0.8（超過 growth_cap 0.5）→ cap 生效，adjusted_pe = 42.0" do
+      expect(adjusted_pe(28, 0.8)).to eq(42.0)
+    end
+
+    it "growth −0.1（負成長）→ 不調整，adjusted_pe = 28.0" do
+      expect(adjusted_pe(28, -0.1)).to eq(28.0)
+    end
+  end
 end
