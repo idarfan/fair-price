@@ -10,7 +10,7 @@
 |---|---|---|
 | S1 回歸基準集建立 | ✅ 完成 | industry_pe 來源：硬編碼常數 `Valuation::INDUSTRY_PE`（`app/models/valuation/fair_value.rb`），11 產業＋`default=>25`，非外部 API。最終 8 檔：高成長 NVDA/PLTR/AVGO、價值股 XOM/SHOP/VZ、ADR SAP（原選 UMC，因 ADR 換股比例 bug 改選）、NOK。`tmp/fv_upgrade_baseline.json` 已產出，`analyst_low/high` 因 Finnhub price-target 為付費端點而為 null（已註明）。UMC 已知問題記入 `known_issues`，本任務不修 |
 | S2 P/E 前瞻溢價調整 | ✅ 完成 | 參數移至 `config/valuation.yml`（`growth_cap: 0.5`），`pe_method(g=nil)` 僅一般股呼叫時傳入 g（其餘股票類型呼叫維持原行為不變）。3 組單元測試通過：(a) g=0.169→32.73 (b) g=0.8→cap生效42.0 (c) g=-0.1→28.0（不調整）。全套 spec 36/36 綠燈 |
-| S3 DCF FCF fallback | 未開始 | |
+| S3 DCF FCF fallback | ✅ 完成 | `resolve_fcf_ps` 實作 native→ni_proxy→ebitda_proxy→unavailable 鏈，`dcf_method` 回傳 `dcf_status` 並在 proxy 來源時於 `method`/`note` 標註「（估算）」。4 組單元測試通過。全套 spec 40/40 綠燈 |
 | S4 三法合成與權重 | 未開始 | |
 | S5 回歸與驗收 | 未開始 | |
 

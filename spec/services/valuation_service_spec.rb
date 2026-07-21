@@ -363,4 +363,39 @@ RSpec.describe ValuationService do
       expect(adjusted_pe(28, -0.1)).to eq(28.0)
     end
   end
+
+  # ── DCF FCF fallback（S3, fairvalue-model-upgrade.md） ──────────────────────
+
+  describe "DCF FCF fallback" do
+    def resolve_fcf(overrides)
+      described_class.new(base_stock(overrides), 0.10).send(:resolve_fcf_ps)
+    end
+
+    it "native：Finnhub 有 FCF/股時直接用" do
+      fcf_ps, status = resolve_fcf(free_cashflow: 10_000_000_000, shares_outstanding: 100_000_000, eps_ttm: 5.0)
+      expect(status).to eq("native")
+      expect(fcf_ps).to eq(100.0)
+    end
+
+    it "ni_proxy：無 FCF、淨利為正 → FCF ≈ 淨利/股 × 0.9" do
+      fcf_ps, status = resolve_fcf(free_cashflow: nil, eps_ttm: 5.0)
+      expect(status).to eq("ni_proxy")
+      expect(fcf_ps).to be_within(0.001).of(5.0 * 0.9)
+    end
+
+    it "ebitda_proxy：無 FCF、淨利 ≤ 0 或缺 → FCF ≈ EBITDA/股 × 0.5" do
+      fcf_ps, status = resolve_fcf(
+        free_cashflow: nil, eps_ttm: nil,
+        ebitda: 2_000_000_000, shares_outstanding: 100_000_000
+      )
+      expect(status).to eq("ebitda_proxy")
+      expect(fcf_ps).to be_within(0.001).of(20.0 * 0.5)
+    end
+
+    it "unavailable：FCF、淨利、EBITDA 皆缺 → DCF 缺法" do
+      fcf_ps, status = resolve_fcf(free_cashflow: nil, eps_ttm: nil, ebitda: nil)
+      expect(status).to eq("unavailable")
+      expect(fcf_ps).to be_nil
+    end
+  end
 end

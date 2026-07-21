@@ -8,20 +8,43 @@ module Valuation
     private
 
     def dcf_method(g, label: "DCF")
-      fcf_ps = per_share(@d[:free_cashflow], @d[:shares_outstanding])
-      fcf_ps = adjust_fcf(fcf_ps)
+      fcf_ps, dcf_status = resolve_fcf_ps
       return nil unless fcf_ps&.positive?
 
       value = dcf(fcf_ps, g)
       return nil unless value&.positive?
 
+      proxy_suffix = dcf_status == "native" ? "" : "（估算）"
+      fcf_source   = {
+        "native"       => "FCF/股",
+        "ni_proxy"     => "淨利/股 × #{FCF_CONVERSION}（FCF 估算）",
+        "ebitda_proxy" => "EBITDA/股 × #{EBITDA_RATIO}（FCF 估算）"
+      }.fetch(dcf_status)
+
       {
-        method:    label,
-        value:     value.round(2),
-        note:      "FCF r=#{pct(@r)} g=#{pct(g)}",
-        formula:   "FCF/股=$#{fcf_ps.round(2)} → 預測#{FORECAST_YEARS}年(g=#{pct(g)}) + 終端價值(gt=#{pct(TERMINAL_GROWTH)}) → 折現(r=#{pct(@r)})",
-        rationale: METHOD_RATIONALE["DCF"]
+        method:     "#{label}#{proxy_suffix}",
+        value:      value.round(2),
+        dcf_status: dcf_status,
+        note:       "FCF r=#{pct(@r)} g=#{pct(g)}#{proxy_suffix}",
+        formula:    "#{fcf_source}=$#{fcf_ps.round(2)} → 預測#{FORECAST_YEARS}年(g=#{pct(g)}) + 終端價值(gt=#{pct(TERMINAL_GROWTH)}) → 折現(r=#{pct(@r)})",
+        rationale:  METHOD_RATIONALE["DCF"]
       }
+    end
+
+    # S3 DCF FCF fallback（fairvalue-model-upgrade.md）：
+    # native（Finnhub 原生 FCF/股）→ ni_proxy（淨利/股 × fcf_conversion）
+    # → ebitda_proxy（EBITDA/股 × ebitda_ratio）→ unavailable（皆缺）
+    def resolve_fcf_ps
+      native = per_share(@d[:free_cashflow], @d[:shares_outstanding])
+      return [ adjust_fcf(native), "native" ] if native&.positive?
+
+      ni_ps = @d[:eps_ttm]
+      return [ ni_ps * FCF_CONVERSION, "ni_proxy" ] if ni_ps&.positive?
+
+      ebitda_ps = per_share(@d[:ebitda], @d[:shares_outstanding])
+      return [ ebitda_ps * EBITDA_RATIO, "ebitda_proxy" ] if ebitda_ps&.positive?
+
+      [ nil, "unavailable" ]
     end
 
     # g 有值時套用 S2 前瞻成長溢價（僅一般股呼叫時傳入；其餘股票類型呼叫時 g 為 nil，行為不變）
