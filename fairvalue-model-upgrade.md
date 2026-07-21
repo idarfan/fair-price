@@ -8,7 +8,7 @@
 
 | 階段 | 狀態 | 驗證結果 |
 |---|---|---|
-| S1 回歸基準集建立 | ⛔ 停止（候選不足額） | industry_pe 來源：硬編碼常數 `Valuation::INDUSTRY_PE`（`app/models/valuation/fair_value.rb`），11 產業＋`default=>25`，非外部 API；`pe_method` 用 `INDUSTRY_PE[sector] \|\| INDUSTRY_PE["default"]`。選檔結果：高成長 0/3、價值股 2/3（XOM、SHOP）、ADR 1/1（UMC）、NOK 固定 1；F/WULF 因 EPS 為負無 growth_ttm 無法分類。詳見下方「S1 選檔結果」，等待使用者指定補充標的 |
+| S1 回歸基準集建立 | ✅ 完成 | industry_pe 來源：硬編碼常數 `Valuation::INDUSTRY_PE`（`app/models/valuation/fair_value.rb`），11 產業＋`default=>25`，非外部 API。最終 8 檔：高成長 NVDA/PLTR/AVGO、價值股 XOM/SHOP/VZ、ADR SAP（原選 UMC，因 ADR 換股比例 bug 改選）、NOK。`tmp/fv_upgrade_baseline.json` 已產出，`analyst_low/high` 因 Finnhub price-target 為付費端點而為 null（已註明）。UMC 已知問題記入 `known_issues`，本任務不修 |
 | S2 P/E 前瞻溢價調整 | 未開始 | |
 | S3 DCF FCF fallback | 未開始 | |
 | S4 三法合成與權重 | 未開始 | |
