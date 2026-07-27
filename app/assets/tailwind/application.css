@@ -135,7 +135,7 @@
 th[data-tip-key] { cursor: help; }
 th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 
-/* hover tooltip（#bpus-col-tip）——樣式對齊 /home/idarfan/csp/option-basics-lesson8.html
+/* hover tooltip（#bpus-col-tip）——樣式對齊 /home/idarfan/fairprice/public/csp/option-basics-lesson8.html
    的 #col-tip（深藍底＋金色邊框/標題），bpus-fix.md 項目2 要求「完全一致」。 */
 #bpus-col-tip {
   position: fixed;
@@ -156,7 +156,7 @@ th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 }
 #bpus-col-tip .tip-t { font-weight: 700; color: #D4900A; margin-bottom: 6px; font-size: 13px; }
 
-/* hover tooltip（#bcvs-col-tip）——樣式對齊 /home/idarfan/csp/option-basics-lesson8.html
+/* hover tooltip（#bcvs-col-tip）——樣式對齊 /home/idarfan/fairprice/public/csp/option-basics-lesson8.html
    的 #col-tip（深藍底＋金色邊框/標題），bcvs.md §導覽與欄位說明規範 B 要求「一致」。 */
 #bcvs-col-tip {
   position: fixed;
