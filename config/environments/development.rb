@@ -50,4 +50,5 @@ Rails.application.configure do
   # config.generators.apply_rubocop_autocorrect_after_generate!
 
   config.hosts << /.*\.trycloudflare\.com/
+  config.hosts << "fairprice-ohmy.com"
 end
