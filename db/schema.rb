@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_20_093103) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_28_104937) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -543,6 +543,38 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_093103) do
     t.index ["symbol"], name: "index_tracked_tickers_on_symbol", unique: true
   end
 
+  create_table "user_activities", force: :cascade do |t|
+    t.string "action_name"
+    t.string "activity_token"
+    t.datetime "created_at", null: false
+    t.integer "duration_ms"
+    t.datetime "ended_at"
+    t.integer "kind", null: false
+    t.jsonb "metadata", default: {}
+    t.string "path"
+    t.datetime "started_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["user_id", "kind", "started_at"], name: "index_user_activities_on_user_id_and_kind_and_started_at"
+    t.index ["user_id"], name: "index_user_activities_on_user_id"
+  end
+
+  create_table "users", force: :cascade do |t|
+    t.boolean "admin", default: false, null: false
+    t.datetime "approved_at"
+    t.text "backup_codes"
+    t.datetime "created_at", null: false
+    t.string "email", null: false
+    t.string "google_uid", null: false
+    t.integer "session_version", default: 0, null: false
+    t.integer "status", default: 0, null: false
+    t.boolean "totp_enabled", default: false, null: false
+    t.string "totp_secret"
+    t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["google_uid"], name: "index_users_on_google_uid", unique: true
+  end
+
   create_table "watched_tickers", force: :cascade do |t|
     t.boolean "active", default: true, null: false
     t.datetime "added_at", null: false
@@ -565,4 +597,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_093103) do
 
   add_foreign_key "option_snapshots", "tracked_tickers"
   add_foreign_key "ownership_holders", "ownership_snapshots"
+  add_foreign_key "user_activities", "users"
 end
