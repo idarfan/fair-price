@@ -16,6 +16,12 @@ gem "kramdown-parser-gfm", "~> 1.1"
 gem "tailwindcss-rails", "~> 4.0"
 gem "vite_rails",        "~> 3.0"
 
+# Auth: Google OAuth 登入 + TOTP 雙因子
+gem "omniauth-google-oauth2"
+gem "omniauth-rails_csrf_protection"
+gem "rotp"
+gem "rqrcode"
+
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 # gem "bcrypt", "~> 3.1.7"
 
