@@ -1,0 +1,1728 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>期權小學堂第二課 · Bull Put Spread</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #FAF3E8;
+  --page-bg:    #FFF9F2;
+  --panel-bg:   #FFFCF7;
+  --ink:        #2A1A0E;
+  --muted:      #7A6555;
+  --border:     #E2D4C2;
+  --gold:       #D4900A;
+  --gold-bg:    #FEF4D8;
+  --gold-bdr:   #E8B840;
+  --green:      #2E9E52;
+  --green-bg:   #E8F8EE;
+  --green-bdr:  #8ED4A8;
+  --red:        #D04040;
+  --red-bg:     #FDEAEA;
+  --red-bdr:    #F5AAAA;
+  --blue:       #3A70C0;
+  --blue-bg:    #EBF2FF;
+  --blue-bdr:   #9ABCE8;
+  --purple:     #7050C0;
+  --purple-bg:  #F0EAFF;
+  --r-lg: 16px;
+  --r-md: 10px;
+  --r-sm: 6px;
+}
+
+body {
+  background: var(--bg);
+  font-family: "PingFang TC", "Microsoft JhengHei", "Heiti TC", system-ui, sans-serif;
+  padding: 0; margin: 0;
+}
+
+.page {
+  background: var(--page-bg);
+  max-width: 100%; width: 100%;
+  padding: 32px 40px 36px;
+}
+
+.course-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--ink); color: #FFF9F0;
+  font-size: 12px; font-weight: 700;
+  padding: 5px 14px; border-radius: 100px;
+  letter-spacing: 1px; margin-bottom: 18px;
+}
+
+.page-header {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 20px; align-items: start; margin-bottom: 28px;
+}
+
+.page-title { font-size: 32px; font-weight: 900; color: var(--ink); line-height: 1.2; }
+.page-subtitle { font-size: 14px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+.page-desc { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+
+/* ── Spread contract box ── */
+.spread-box { display: flex; flex-direction: column; gap: 8px; min-width: 270px; }
+
+.spread-leg { border: 2px solid; border-radius: var(--r-md); padding: 10px 14px; }
+.spread-leg.sell { background: var(--red-bg);  border-color: var(--red-bdr); }
+.spread-leg.buy  { background: var(--blue-bg); border-color: var(--blue-bdr); }
+
+.leg-title { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+.leg-title.sell { color: var(--red); }
+.leg-title.buy  { color: var(--blue); }
+
+.leg-main { font-size: 17px; font-weight: 900; color: var(--ink); margin-bottom: 4px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.leg-sub  { font-size: 11px; color: var(--muted); }
+
+/* ── Inputs inside contract box ── */
+.leg-input {
+  display: inline-block; width: 56px;
+  font-size: 18px; font-weight: 900; color: var(--ink);
+  border: none; border-bottom: 2.5px solid;
+  background: transparent; text-align: center;
+  padding: 0 2px; font-family: inherit;
+  -moz-appearance: textfield;
+}
+.leg-input::-webkit-inner-spin-button,
+.leg-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.spread-leg.sell .leg-input { border-color: #F5AAAA; }
+.spread-leg.buy  .leg-input { border-color: #9ABCE8; }
+.leg-input:focus { outline: none; border-color: var(--gold); }
+
+.net-bar {
+  background: var(--gold-bg); border: 1.5px solid var(--gold-bdr);
+  border-radius: var(--r-sm); padding: 6px 14px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px; font-weight: 700;
+}
+.net-bar .nl { color: var(--muted); }
+.net-bar .nv { font-size: 15px; }
+.nv.credit { color: var(--green); }
+.nv.debit  { color: var(--red); }
+
+/* ── Panel grid ── */
+.panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+.panel {
+  background: var(--panel-bg); border: 2px solid var(--border);
+  border-radius: var(--r-lg); padding: 20px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+
+.tag-row { display: flex; align-items: center; justify-content: space-between; }
+
+.step-badge {
+  width: 26px; height: 26px; background: var(--ink); color: #FFFDF8;
+  border-radius: 100px; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; flex-shrink: 0;
+}
+
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 100px;
+}
+.pill-outline {
+  background: transparent; border: 1.5px solid;
+  font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+}
+.pill.setup,   .pill-outline.setup   { color: #7A6555; background: #F0E8DC; border-color: #C4B49A; }
+.pill.win,     .pill-outline.win     { color: var(--green);  background: var(--green-bg);  border-color: var(--green-bdr); }
+.pill.partial, .pill-outline.partial { color: var(--gold);   background: var(--gold-bg);   border-color: var(--gold-bdr); }
+.pill.loss,    .pill-outline.loss    { color: var(--red);    background: var(--red-bg);    border-color: var(--red-bdr); }
+.pill.chart,   .pill-outline.chart   { color: var(--blue);   background: var(--blue-bg);   border-color: var(--blue-bdr); }
+.pill.bonus,   .pill-outline.bonus   { color: var(--purple); background: var(--purple-bg); border-color: #C0A8F0; }
+
+.ptitle { font-size: 18px; font-weight: 800; color: var(--ink); line-height: 1.35; }
+
+/* ── Two-leg visual ── */
+.legs-visual { display: flex; align-items: center; gap: 8px; }
+
+.leg-block { flex: 1; border-radius: var(--r-md); padding: 10px 12px; text-align: center; }
+.leg-block.sell-block { background: var(--red-bg);  border: 1.5px solid var(--red-bdr); }
+.leg-block.buy-block  { background: var(--blue-bg); border: 1.5px solid var(--blue-bdr); }
+
+.lb-action { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 3px; }
+.leg-block.sell-block .lb-action { color: var(--red); }
+.leg-block.buy-block  .lb-action { color: var(--blue); }
+
+.lb-strike { font-size: 20px; font-weight: 900; color: var(--ink); line-height: 1.1; }
+.lb-prem   { font-size: 12px; font-weight: 600; margin-top: 2px; }
+.leg-block.sell-block .lb-prem { color: var(--green); }
+.leg-block.buy-block  .lb-prem { color: var(--red); }
+
+.leg-arrow { font-size: 18px; color: var(--muted); flex-shrink: 0; }
+
+.leg-result {
+  flex: 0 0 auto; background: var(--gold-bg);
+  border: 1.5px solid var(--gold-bdr); border-radius: var(--r-md);
+  padding: 8px 12px; text-align: center;
+}
+.leg-result .lr-lbl { font-size: 9px; color: var(--muted); font-weight: 600; }
+.leg-result .lr-val { font-size: 16px; font-weight: 900; }
+.lr-val.credit { color: var(--green); }
+.lr-val.debit  { color: var(--red); }
+
+/* ── Zone bar ── */
+.zone-bar {
+  display: flex; border-radius: var(--r-md); overflow: hidden;
+  border: 1.5px solid var(--border); font-size: 11px; font-weight: 700; text-align: center;
+}
+.zone-bar .zb-seg {
+  padding: 8px 4px; display: flex; flex-direction: column;
+  align-items: center; gap: 2px;
+}
+.zb-seg.loss    { background: var(--red-bg);   color: var(--red);   }
+.zb-seg.partial { background: var(--gold-bg);  color: var(--gold);  }
+.zb-seg.profit  { background: var(--green-bg); color: var(--green); }
+.zb-label { font-size: 9px; font-weight: 600; color: inherit; white-space: nowrap; }
+.zb-val   { font-size: 13px; font-weight: 900; }
+
+/* ── Bullets ── */
+.bullets { display: flex; flex-direction: column; gap: 7px; }
+.bullet { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.bullet-num {
+  width: 20px; height: 20px; background: var(--gold-bg); border: 1.5px solid var(--gold-bdr);
+  border-radius: 100px; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 800; color: var(--gold); flex-shrink: 0; margin-top: 1px;
+}
+
+/* ── Stat pills ── */
+.stat-pills { display: grid; gap: 8px; }
+.stat-pills.cols-2 { grid-template-columns: 1fr 1fr; }
+.stat-pills.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.stat-pills.cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+.spill { background: #F5EFE6; border: 1.5px solid var(--border); border-radius: var(--r-md); padding: 8px 10px; }
+.spill .sl { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+.spill .sv { font-size: 15px; font-weight: 800; color: var(--ink); }
+.spill .sv.green  { color: var(--green); }
+.spill .sv.red    { color: var(--red); }
+.spill .sv.gold   { color: var(--gold); }
+
+/* ── Result box ── */
+.result-box {
+  border-radius: var(--r-md); padding: 10px 14px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.result-box.green { background: var(--green-bg); border: 1.5px solid var(--green-bdr); }
+.result-box.gold  { background: var(--gold-bg);  border: 1.5px solid var(--gold-bdr); }
+.result-box.red   { background: var(--red-bg);   border: 1.5px solid var(--red-bdr); }
+.rb-label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.rb-val   { font-size: 20px; font-weight: 900; }
+.rb-val.green { color: var(--green); }
+.rb-val.gold  { color: var(--gold); }
+.rb-val.red   { color: var(--red); }
+
+/* ── Payoff stats ── */
+.payoff-stats { display: flex; flex-direction: column; gap: 7px; }
+.ps-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.ps-dot { width: 10px; height: 10px; border-radius: 100px; flex-shrink: 0; }
+.ps-dot.green { background: var(--green); }
+.ps-dot.gold  { background: var(--gold); }
+.ps-dot.red   { background: var(--red); }
+.ps-label { color: var(--muted); flex: 1; }
+.ps-val   { font-weight: 800; color: var(--ink); }
+.ps-val.green { color: var(--green); }
+.ps-val.gold  { color: var(--gold); }
+.ps-val.red   { color: var(--red); }
+
+/* ── Bonus panel ── */
+.bonus-panel {
+  background: var(--panel-bg); border: 2px solid var(--border);
+  border-radius: var(--r-lg); padding: 22px;
+}
+.bonus-body { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 16px; }
+
+/* ── Greeks grid ── */
+.greeks-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.greek-card { background: #F5EFE6; border: 1.5px solid var(--border); border-radius: var(--r-md); padding: 8px 10px; }
+.gc-name { font-size: 9px; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 4px; }
+.gc-val  { font-size: 14px; font-weight: 800; }
+.gc-val.green  { color: var(--green); }
+.gc-val.red    { color: var(--red); }
+.gc-val.gold   { color: var(--gold); }
+.gc-desc { font-size: 10px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
+/* ── When-to-use ── */
+.when-list { display: flex; flex-direction: column; gap: 8px; }
+.when-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 12.5px; color: var(--muted); line-height: 1.5;
+  background: var(--purple-bg); border: 1px solid #C0A8F0;
+  border-radius: var(--r-sm); padding: 8px 10px;
+}
+.when-icon { font-size: 16px; flex-shrink: 0; margin-top: -1px; }
+
+.warning {
+  margin-top: 14px; background: #FFF8E8; border: 1.5px solid var(--gold-bdr);
+  border-radius: var(--r-sm); padding: 10px 14px;
+  font-size: 12px; color: #8A6000; line-height: 1.7; display: flex; gap: 8px;
+}
+
+/* ── Edit mode ── */
+#edit-btn {
+  position: fixed; bottom: 28px; right: 28px; z-index: 2000;
+  background: #2A1A0E; color: #FFF9F0; border: none;
+  border-radius: 100px; padding: 10px 20px;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  font-family: "PingFang TC","Microsoft JhengHei",sans-serif;
+  transition: background 0.15s, transform 0.1s;
+}
+#edit-btn:hover { background: #4A3020; transform: scale(1.03); }
+#edit-btn.active { background: #2E7040; }
+
+#edit-toolbar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #FFFCF7; border-top: 2px solid #E2D4C2;
+  padding: 10px 24px 12px; z-index: 1999;
+  display: flex; align-items: center; gap: 0;
+  box-shadow: 0 -4px 24px rgba(80,40,0,0.10);
+  transform: translateY(100%);
+  transition: transform 0.22s cubic-bezier(.4,0,.2,1);
+  font-family: "PingFang TC","Microsoft JhengHei",sans-serif;
+  flex-wrap: wrap; min-height: 56px;
+}
+#edit-toolbar.visible { transform: translateY(0); }
+.et-hint { font-size:13px; color:#A08878; padding:6px 0; font-style:italic; }
+.et-group { display:flex; align-items:center; gap:0; flex-wrap:wrap; width:100%; }
+.et-item { display:flex; flex-direction:column; gap:3px; padding:0 14px; }
+.et-label { font-size:10px; font-weight:600; color:#9A8878; letter-spacing:0.5px; text-transform:uppercase; }
+.et-divider { width:1px; height:36px; background:#E2D4C2; flex-shrink:0; }
+#et-font { font-size:13px; border:1.5px solid #E2D4C2; border-radius:6px; padding:4px 8px; background:white; color:#2A1A0E; cursor:pointer; font-family:inherit; }
+.et-size-ctrl { display:flex; align-items:center; gap:6px; }
+.et-btn-sm { width:24px; height:24px; border:1.5px solid #E2D4C2; border-radius:6px; background:white; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#2A1A0E; line-height:1; }
+.et-btn-sm:hover { background:#F5EFE6; }
+#et-size-val { font-size:14px; font-weight:700; min-width:28px; text-align:center; color:#2A1A0E; }
+.et-fmt-btn { width:30px; height:30px; border:1.5px solid #E2D4C2; border-radius:6px; background:white; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#2A1A0E; }
+.et-fmt-btn:hover { background:#F5EFE6; }
+.et-fmt-btn.on { background:#2A1A0E; color:white; border-color:#2A1A0E; }
+#et-color { width:36px; height:28px; border:1.5px solid #E2D4C2; border-radius:6px; padding:2px; cursor:pointer; background:white; }
+#et-lh { width:80px; accent-color:#D4900A; }
+.et-action-btn { font-size:12px; font-weight:600; padding:5px 12px; border:1.5px solid #E2D4C2; border-radius:6px; background:white; cursor:pointer; color:#2A1A0E; font-family:inherit; }
+.et-action-btn:hover { background:#F5EFE6; }
+.edit-mode .page *:hover { outline:1.5px dashed #E8B840; outline-offset:2px; border-radius:3px; }
+    .edit-mode .page input[type="number"]:hover,
+    .edit-mode .page input[type="number"]:focus { outline:none !important; pointer-events:auto !important; }
+.el-focus { outline:2px solid #3A70C0 !important; outline-offset:3px; border-radius:3px; }
+.edit-mode .page .el-focus * { outline:none !important; }
+
+/* ═══════════════════════════════════════════════
+/* ── Layout wrappers (initial natural layout, JS will convert to absolute) ── */
+.page-header-layout {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 20px; align-items: start; margin-bottom: 28px;
+}
+.panels-layout {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 16px; margin-bottom: 16px;
+}
+
+/* DRAG & RESIZE SYSTEM
+   ═══════════════════════════════════════════════ */
+#drag-canvas {
+  position: relative !important;
+  min-height: 3000px;
+  overflow: visible;
+}
+
+[data-drag-id] {
+  box-sizing: border-box;
+}
+[data-drag-id].positioned {
+  position: absolute;
+}
+
+.edit-mode [data-drag-id]:hover > .drag-handle,
+[data-drag-id].is-dragging > .drag-handle,
+[data-drag-id].is-resizing > .drag-handle {
+  opacity: 1;
+}
+
+.drag-handle {
+  position: absolute;
+  top: -15px; left: 0; right: 0;
+  height: 13px;
+  background: linear-gradient(90deg, #3A70C0, #2255A0);
+  border-radius: 5px 5px 0 0;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.15s;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.drag-handle:active { cursor: grabbing; }
+.drag-handle::before {
+  content: ':::';
+  font-size: 9px; font-weight: 900;
+  color: rgba(255,255,255,0.85);
+  letter-spacing: 4px;
+}
+
+.edit-mode [data-drag-id]:hover,
+[data-drag-id].is-dragging,
+[data-drag-id].is-resizing {
+  outline: 2px dashed rgba(58,112,192,0.45);
+  outline-offset: 3px;
+}
+
+.rh {
+  position: absolute;
+  width: 10px; height: 10px;
+  background: #3A70C0;
+  border: 2px solid #fff;
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 201;
+}
+.edit-mode [data-drag-id]:hover .rh,
+[data-drag-id].is-resizing .rh { opacity: 1; }
+
+.rh-nw { top:-5px;  left:-5px;  cursor:nw-resize; }
+.rh-n  { top:-5px;  left:50%; transform:translateX(-50%); cursor:n-resize; }
+.rh-ne { top:-5px;  right:-5px; cursor:ne-resize; }
+.rh-e  { top:50%;   right:-5px; transform:translateY(-50%); cursor:e-resize; }
+.rh-se { bottom:-5px; right:-5px; cursor:se-resize; }
+.rh-s  { bottom:-5px; left:50%; transform:translateX(-50%); cursor:s-resize; }
+.rh-sw { bottom:-5px; left:-5px; cursor:sw-resize; }
+.rh-w  { top:50%;   left:-5px; transform:translateY(-50%); cursor:w-resize; }
+
+#layout-reset-btn {
+  position: fixed;
+  bottom: 70px; right: 20px;
+  background: #FAF3E8; border: 1.5px solid #E2D4C2;
+  border-radius: 8px; padding: 7px 16px;
+  font-size: 12px; cursor: pointer; z-index: 10001;
+  color: #7A6555; font-family: inherit;
+  transition: background 0.15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+#layout-reset-btn:hover { background: #F0E4D0; }
+
+.page-header-text {
+  display: flex; flex-direction: column; gap: 4px;
+}
+
+/* ── TTS Bar ── */
+#tts-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 3000;
+  background: rgba(42,26,14,0.97); backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 8px 20px; display: flex; align-items: center; gap: 12px;
+  font-family: "PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+.tts-btn {
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+  color: #FFF9F0; border-radius: 100px; padding: 5px 14px; font-size: 12px;
+  cursor: pointer; font-family: inherit; font-weight: 700;
+  transition: background 0.15s; display: flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.tts-btn:hover { background: rgba(255,255,255,0.22); }
+.tts-btn.playing { background: #1E7A3A; border-color: #2E9E52; color: #fff; }
+.tts-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.15); flex-shrink: 0; }
+.tts-dots { display: flex; gap: 5px; align-items: center; }
+.tts-dot {
+  width: 7px; height: 7px; border-radius: 100px;
+  background: rgba(255,255,255,0.2); cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.tts-dot.done    { background: rgba(255,255,255,0.45); }
+.tts-dot.current { background: var(--gold); transform: scale(1.5); }
+.tts-section { font-size: 12px; color: #E8C060; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tts-speed {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #FFF9F0; border-radius: 6px; padding: 3px 7px; font-size: 12px;
+  cursor: pointer; font-family: inherit;
+}
+#tts-subtitle {
+  position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%);
+  max-width: 700px; width: calc(100% - 40px);
+  background: rgba(8,4,1,0.85); backdrop-filter: blur(8px);
+  color: #FFF9F0; border-radius: 10px; padding: 10px 18px;
+  font-size: 14px; line-height: 1.9; z-index: 2500;
+  display: none; pointer-events: none;
+  max-height: 110px; overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+#tts-subtitle.active { display: block; }
+.sub-c       { color: rgba(255,249,240,0.28); }
+.sub-c.done  { color: rgba(255,249,240,0.75); }
+.sub-c.now   { color: #F5C540; background: rgba(245,197,64,0.18); border-radius: 2px; }
+.panel.tts-active, .bonus-panel.tts-active,
+.payoff-card.tts-active, .full-section-card.tts-active { outline: 2px solid var(--gold); outline-offset: 4px; }
+.pron-btn {
+  background: none; border: none; cursor: pointer; padding: 2px 3px;
+  line-height: 1; vertical-align: middle; display: inline-flex;
+  align-items: center; justify-content: center; flex-shrink: 0;
+  transition: transform .1s;
+}
+.pron-btn:hover  { transform: scale(1.25); }
+.pron-btn:active { transform: scale(0.95); }
+.pron-btn.male   { color: #3b82f6; }
+.pron-btn.female { color: #ef4444; }
+body { padding-top: 52px; }
+</style>
+</head>
+<body>
+<!-- ── TTS Bar ── -->
+<div id="tts-bar">
+  <button id="tts-play-btn" class="tts-btn" onclick="ttsToggle()">&#9658; 朗讀全文</button>
+  <button class="tts-btn" onclick="ttsStop()" title="停止並重設">&#9632;</button>
+  <div class="tts-sep"></div>
+  <div class="tts-dots" id="tts-dots"></div>
+  <div class="tts-sep"></div>
+  <span class="tts-section" id="tts-section-name">點擊「朗讀全文」開始</span>
+  <select id="tts-speed" title="語速" onchange="ttsSetRate(this.value)">
+    <option value="0.8">0.8x</option>
+    <option value="0.9" selected>0.9x</option>
+    <option value="1.0">1.0x</option>
+    <option value="1.1">1.1x</option>
+    <option value="1.2">1.2x</option>
+  </select>
+  <div class="tts-sep"></div>
+  <span style="font-size:11px;color:#8A7A5A;">&#128266;</span>
+  <input type="range" id="tts-vol" min="0" max="1" step="0.05" value="1"
+         style="width:60px;accent-color:var(--gold);cursor:pointer;" title="音量">
+  <div class="tts-sep"></div>
+  <button class="tts-btn" onclick="adjustPageFont(-1)" style="padding:4px 9px;font-size:11px;font-weight:900;" title="縮小字體">A-</button>
+  <button class="tts-btn" onclick="adjustPageFont(1)"  style="padding:4px 9px;font-size:11px;font-weight:900;" title="放大字體">A+</button>
+</div>
+<div id="tts-subtitle"></div>
+<div class="page" id="drag-canvas">
+
+  <div data-drag-id="course-tag" class="course-tag">📚 期權小學堂 · 第2課</div>
+
+  <!-- ── Header ── -->
+  <div class="page-header-layout">
+  <div data-drag-id="header-text" class="page-header-text">
+      <div class="page-title">Bull Put Spread<button class="pron-btn male" onclick="pronounce('Bull Put Spread','male')" title="男聲 Bull Put Spread"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('Bull Put Spread','female')" title="女聲 Bull Put Spread"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button> 牛市 Put<button class="pron-btn male" onclick="pronounce('Put','male')" title="男聲 Put"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('Put','female')" title="女聲 Put"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button> 價差</div>
+      <div class="page-subtitle">Credit Spread<button class="pron-btn male" onclick="pronounce('Credit Spread','male')" title="男聲 Credit Spread"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('Credit Spread','female')" title="女聲 Credit Spread"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button> · 看漲策略 · 有限風險有限獲利</div>
+      <div class="page-desc">
+        賣出較高 Strike 的 Put（收 Premium）+ 買入較低 Strike 的 Put（付保護費），<br>
+        形成有上限、有下限的損益空間。比裸賣 Put 風險更小，IV 高時收租首選。
+      </div>
+  </div>
+
+  <!-- ── Interactive contract box ── -->
+  <div data-drag-id="spread-box" class="spread-box">
+      <div class="spread-leg sell">
+        <div class="leg-title sell">🔴 賣出 · Short Put</div>
+        <div class="leg-main">
+          Strike&nbsp;$<input id="inp-sp-strike" class="leg-input" type="number" value="60" min="1" step="0.5" oninput="recalculate()">
+          &nbsp;收&nbsp;$<input id="inp-sp-prem" class="leg-input" type="number" value="5" min="0.01" step="0.05" oninput="recalculate()">
+        </div>
+        <div class="leg-sub">Delta +0.15 · IV 60% · Theta +4.8/日</div>
+      </div>
+      <div class="spread-leg buy">
+        <div class="leg-title buy">🔵 買入 · Long Put</div>
+        <div class="leg-main">
+          Strike&nbsp;$<input id="inp-lp-strike" class="leg-input" type="number" value="50" min="1" step="0.5" oninput="recalculate()">
+          &nbsp;付&nbsp;$<input id="inp-lp-prem" class="leg-input" type="number" value="0.78" min="0.01" step="0.05" oninput="recalculate()">
+        </div>
+        <div class="leg-sub">Delta −0.04 · IV 65% · Theta −3.1/日</div>
+      </div>
+      <div class="net-bar">
+        <span class="nl" id="disp-net-label">淨 Premium（每股）</span>
+        <span class="nv debit" id="disp-net-val">−$0.30</span>
+      </div>
+  </div>
+  </div><!-- end header-layout -->
+
+  <!-- ── 4 Panels ── -->
+  <div class="panels-layout">
+
+  <!-- Panel 1: Setup -->
+  <div data-drag-id="panel-1" id="bps-panel-1" class="panel">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="step-badge">1</div>
+          <div class="pill-outline setup">STEP ONE</div>
+        </div>
+        <div class="pill setup">建倉</div>
+      </div>
+
+      <div class="ptitle">賣出高 Strike<button class="pron-btn male" onclick="pronounce('Strike','male')" title="男聲 Strike"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('Strike','female')" title="女聲 Strike"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button> Put<button class="pron-btn male" onclick="pronounce('Put','male')" title="男聲 Put"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('Put','female')" title="女聲 Put"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button>＋買入低 Strike Put<br>形成有限風險的「夾心層」</div>
+
+      <div class="legs-visual">
+        <div class="leg-block sell-block">
+          <div class="lb-action">賣出 SELL</div>
+          <div class="lb-strike" id="p1-sp-strike">Put $50</div>
+          <div class="lb-prem"   id="p1-sp-prem">收 +$3.85</div>
+        </div>
+        <div class="leg-arrow">➕</div>
+        <div class="leg-block buy-block">
+          <div class="lb-action">買入 BUY</div>
+          <div class="lb-strike" id="p1-lp-strike">Put $45</div>
+          <div class="lb-prem"   id="p1-lp-prem">付 −$4.15</div>
+        </div>
+        <div class="leg-arrow">＝</div>
+        <div class="leg-result">
+          <div class="lr-lbl">淨成本</div>
+          <div class="lr-val debit" id="p1-net-val">−$0.30</div>
+        </div>
+      </div>
+
+      <div class="zone-bar">
+        <div class="zb-seg loss" style="flex:2;">
+          <div class="zb-label">最大虧損</div>
+          <div class="zb-val" id="zb-loss-price">≤$45</div>
+          <div class="zb-label" id="zb-loss-pl">−$5.30/股</div>
+        </div>
+        <div class="zb-seg partial" style="flex:2;">
+          <div class="zb-label">部分虧損</div>
+          <div class="zb-val" id="zb-partial-range">$45↔$50</div>
+          <div class="zb-label">逐漸回收</div>
+        </div>
+        <div class="zb-seg profit" style="flex:3;">
+          <div class="zb-label">最佳結果</div>
+          <div class="zb-val" id="zb-profit-price">≥$50</div>
+          <div class="zb-label" id="zb-profit-pl">全拿 Premium</div>
+        </div>
+      </div>
+
+      <div class="bullets">
+        <div class="bullet"><div class="bullet-num">①</div><span id="p1-b1">賣出 Short Put $50，收 $3.85 權利金，承擔在 $50 以下被行權的義務。</span></div>
+        <div class="bullet"><div class="bullet-num">②</div><span id="p1-b2">買入 Long Put $45，付 $4.15，跌穿 $45 後 Long Put 啟動保護，虧損到此封頂。</span></div>
+        <div class="bullet"><div class="bullet-num">③</div><span id="p1-b3">本例淨成本 $0.30（IV Skew 造成 Debit，正常情況應有淨 Credit）。</span></div>
+      </div>
+    </div>
+
+    <!-- Panel 2: Scenario A (Stock >= SP) -->
+  <div data-drag-id="panel-2" id="bps-panel-2" class="panel">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="step-badge">2</div>
+          <div class="pill-outline win">SCENARIO A</div>
+        </div>
+        <div class="pill win">情境 A · 最佳 🎉</div>
+      </div>
+
+      <div class="ptitle" id="p2-title">到期股價 ≥ $50 🌞<br>兩個 Put 全部廢棄</div>
+
+      <div id="p2-svg-wrap" style="background:#F4FDF7;border:1.5px dashed var(--green-bdr);border-radius:var(--r-md);padding:12px 10px;"></div>
+
+      <div class="stat-pills cols-2">
+        <div class="spill"><div class="sl" id="p2-sp-pill-label">Short Put $50</div><div class="sv">廢棄 🎉</div></div>
+        <div class="spill"><div class="sl" id="p2-lp-pill-label">Long Put $45</div><div class="sv">廢棄 🎉</div></div>
+      </div>
+
+      <div class="result-box green">
+        <span class="rb-label">📋 損益（每股）</span>
+        <span class="rb-val green" id="p2-result-val">+$3.85 − $4.15 = −$0.30</span>
+      </div>
+
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;" id="p2-note">
+        ※ 本例因 IV Skew 為微 Debit，最佳結果仍虧 $0.30/股。正常 Credit 版本可在此情境淨賺。
+      </div>
+    </div>
+
+    <!-- Panel 3: Scenario B (Stock <= LP) -->
+  <div data-drag-id="panel-3" id="bps-panel-3" class="panel">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="step-badge">3</div>
+          <div class="pill-outline loss">SCENARIO B</div>
+        </div>
+        <div class="pill loss">情境 B · 最大虧損 📉</div>
+      </div>
+
+      <div class="ptitle" id="p3-title">到期股價 ≤ $50 🧊<br>Long Put 啟動，虧損封頂</div>
+      <div style="margin:-4px 0 10px;font-size:14px;color:#888;">
+        到期日股價 $<input id="inp-ex-price" type="number" value="42" min="1" step="0.5"
+          style="width:60px;font-size:17px;font-weight:900;color:var(--ink);border:none;border-bottom:2.5px solid var(--red);background:transparent;text-align:center;-moz-appearance:textfield;"
+          oninput="recalculate()">
+      </div>
+
+      <div id="p3-svg-wrap" style="background:#FFF8F8;border:1.5px dashed var(--red-bdr);border-radius:var(--r-md);padding:12px 10px;"></div>
+
+      <div class="stat-pills cols-2">
+        <div class="spill">
+          <div class="sl" id="p3-sp-stat-label">Short Put $50 虧損</div>
+          <div class="sv red" id="p3-sp-stat-val">$50−$41=$9/股</div>
+        </div>
+        <div class="spill">
+          <div class="sl" id="p3-lp-stat-label">Long Put $45 獲利</div>
+          <div class="sv green" id="p3-lp-stat-val">$45−$41=$4/股</div>
+        </div>
+      </div>
+
+      <div class="stat-pills cols-3">
+        <div class="spill"><div class="sl">Strike 差</div><div class="sv" id="p3-strike-w">$5.00</div></div>
+        <div class="spill"><div class="sl">淨 Premium 成本</div><div class="sv red" id="p3-net-cost">+$0.30</div></div>
+        <div class="spill"><div class="sl">最大虧損</div><div class="sv red" id="p3-max-loss">$5.30/股</div></div>
+      </div>
+
+      <div class="result-box red">
+        <span class="rb-label" id="p3-result-label">🛡️ 股價 $41 淨損益（兩腿相消 = 固定上限）</span>
+        <span class="rb-val red" id="p3-result-val">−$5.30 ／ 股</span>
+      </div>
+      <div id="p3-cost-basis" style="margin-top:8px;font-size:12px;color:var(--muted);padding:6px 10px;background:#F5F0E8;border-radius:6px;line-height:1.6;">
+        👉 實際持有每股成本（互抵後）：$50(被行權) − $3.85(已收) − $4(LP互抵) = <strong>$42.15/股</strong>
+      </div>
+    </div>
+
+    <!-- Panel 4: Payoff Chart -->
+  <div data-drag-id="panel-4" id="bps-panel-4" class="panel">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="step-badge">4</div>
+          <div class="pill-outline chart">PAYOFF CHART</div>
+        </div>
+        <div class="pill chart">損益圖 📊</div>
+      </div>
+
+      <div class="ptitle" style="font-size:16px;">
+        一張圖看懂賺賠<br>
+        <span id="p4-detail">最大獲利 −$0.30（本例），最大虧損 −$5.30</span><br>
+        <span id="p4-note" style="font-size:13px;font-weight:500;color:var(--muted)">正常 Credit 版本最大獲利為正值</span>
+      </div>
+
+      <div id="p4-svg-wrap"></div>
+
+      <div class="payoff-stats">
+        <div class="ps-row"><div class="ps-dot green"></div><span class="ps-label" id="p4-stat-a-label">最大獲利（股價 ≥ $50）</span><span class="ps-val red" id="p4-stat-profit">−$0.30 ／ 股</span></div>
+        <div class="ps-row"><div class="ps-dot gold"></div><span class="ps-label">部分虧損區</span><span class="ps-val" id="p4-stat-range">$45 ↔ $50</span></div>
+        <div class="ps-row"><div class="ps-dot red"></div><span class="ps-label" id="p4-stat-b-label">最大虧損（股價 ≤ $45）</span><span class="ps-val red" id="p4-stat-loss">−$5.30 ／ 股</span></div>
+      </div>
+    </div>
+
+  </div><!-- end panels-layout -->
+
+  <!-- ── Bonus Panel 5 ── -->
+  <div data-drag-id="bonus-panel" id="bps-bonus-panel" class="bonus-panel">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge" style="background:var(--purple);">5</div>
+        <div class="pill-outline bonus">BONUS</div>
+      </div>
+      <div class="pill bonus">進階：何時用？ + Greeks 解讀 📐</div>
+    </div>
+
+    <div class="ptitle" style="margin-top:14px;" id="b5-title">中間情境（$45 &lt; 股價 &lt; $50）+ 策略判斷框架</div>
+    <div style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.65;">
+      跌進兩 Strike 之間為部分虧損，Short Put 被行權、Long Put 尚未生效。<br>
+      以下為 Greeks 淨值（Short + Long 合計）及何時適合使用此策略。
+    </div>
+
+    <div class="bonus-body">
+
+      <!-- Left: Greeks + mid example -->
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px;">📐 Greeks 淨值（整組策略）</div>
+        <div class="greeks-grid">
+          <div class="greek-card">
+            <div class="gc-name">Delta（方向性）</div>
+            <div class="gc-val green">+0.11</div>
+            <div class="gc-desc">偏多方向，股價漲對你有利</div>
+          </div>
+          <div class="greek-card">
+            <div class="gc-name">Theta（時間損耗）</div>
+            <div class="gc-val green">+1.7/日</div>
+            <div class="gc-desc">每天自動收租，時間流逝對你有利</div>
+          </div>
+          <div class="greek-card">
+            <div class="gc-name">Vega（波動率）</div>
+            <div class="gc-val red">負向</div>
+            <div class="gc-desc">IV 上升對此策略不利，適合高 IV 時賣出</div>
+          </div>
+          <div class="greek-card">
+            <div class="gc-name">Gamma（加速度）</div>
+            <div class="gc-val gold">中性偏低</div>
+            <div class="gc-desc">接近到期日時 Gamma 風險上升</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;background:var(--gold-bg);border:1.5px solid var(--gold-bdr);border-radius:var(--r-md);padding:12px;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <div style="font-size:11px;font-weight:700;color:var(--gold);letter-spacing:0.5px;" id="b5-mid-title">⚡ 中間地帶示例：到期股價 $</div>
+            <input id="inp-mid-price" type="number" value="55" min="1" step="0.5"
+              style="display:inline-block;width:56px;font-size:14px;font-weight:900;color:var(--ink);border:none;border-bottom:2px solid var(--gold);background:transparent;text-align:center;-moz-appearance:textfield;padding:0;"
+              oninput="recalculate()">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <div class="spill"><div class="sl" id="b5-sp-stat-label">Short Put $50 損益</div><div class="sv red" id="b5-sp-stat-val">−$2.5/股</div></div>
+            <div class="spill"><div class="sl" id="b5-lp-stat-label">Long Put $45 未行權</div><div class="sv red" id="b5-lp-stat-val">−$0.78/股</div></div>
+            <div class="spill"><div class="sl">淨損益</div><div class="sv red" id="b5-net-stat-val">−$2.8/股</div></div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px;" id="b5-mid-desc">（Short Put 虧損 $2.5 − 淨 Premium 已付 $0.30 = 總虧損 $2.80/股）</div>
+        </div>
+      </div>
+
+      <!-- Right: When to use + warning -->
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px;">🎯 何時使用 Bull Put Spread？</div>
+        <div class="when-list">
+          <div class="when-item"><span class="when-icon">📈</span><span><strong>看漲但不想裸賣 Put：</strong>看好股票不會跌破某支撐位，但不願承擔無限下行風險。</span></div>
+          <div class="when-item"><span class="when-icon">💰</span><span><strong>IV 高時收租（Theta 正）：</strong>高波動率使權利金偏貴，賣出 Put 並用低 Strike 保護，兩邊收差額。</span></div>
+          <div class="when-item"><span class="when-icon">🏦</span><span><strong>資金有限、保證金受限：</strong>Long Put 把最大損失限定，保證金需求遠低於裸賣 Put。</span></div>
+          <div class="when-item"><span class="when-icon">🛡️</span><span id="when-delta"><strong>Strike 上方概率高：</strong>股價留在 Short Put 上方的概率 &gt; 80%（Delta 15%），收租勝算大。</span></div>
+        </div>
+        <div class="warning">⚠️ <span id="b5-warning">本例 Short Put $45 比 Long Put $50 貴（IV Skew 65% vs 60%），造成微 Debit。正常狀況 Short Put 的 Strike 更高（更貴），應收到淨 Credit。建倉前務必確認 Net Premium 為正（Credit），否則不如改用 Bull Call Spread。</span></div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ EDIT MODE UI ════════════════════════════════════ -->
+<button id="edit-btn" onclick="toggleEditMode()" title="Ctrl+E">
+  <span id="edit-icon">✏️</span>
+  <span id="edit-label">編輯模式</span>
+</button>
+
+<div id="edit-toolbar">
+  <div class="et-hint" id="et-hint">← 點擊頁面任意文字開始編輯</div>
+  <div class="et-group" id="et-controls" style="display:none;">
+    <div class="et-item">
+      <div class="et-label">字體</div>
+      <select id="et-font" onchange="applyStyle('fontFamily', this.value)">
+        <option value='"PingFang TC","Microsoft JhengHei",sans-serif'>PingFang TC</option>
+        <option value='Georgia,"Times New Roman",serif'>Georgia (serif)</option>
+        <option value='system-ui,sans-serif'>System UI</option>
+        <option value='"Courier New",monospace'>等寬字體</option>
+      </select>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">大小</div>
+      <div class="et-size-ctrl">
+        <button class="et-btn-sm" onclick="adjustSize(-1)">−</button>
+        <span id="et-size-val">16</span>
+        <button class="et-btn-sm" onclick="adjustSize(1)">+</button>
+      </div>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button id="et-bold"   class="et-fmt-btn" onclick="toggleBold()"><b>B</b></button>
+      <button id="et-italic" class="et-fmt-btn" onclick="toggleItalic()"><i>I</i></button>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">顏色</div>
+      <input type="color" id="et-color" oninput="applyStyle('color', this.value)">
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">行距</div>
+      <input type="range" id="et-lh" min="1" max="3" step="0.05" value="1.4"
+             oninput="applyStyle('lineHeight', this.value); document.getElementById('et-lh-val').textContent = parseFloat(this.value).toFixed(1);">
+      <span id="et-lh-val" style="font-size:11px;min-width:22px;">1.4</span>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button class="et-action-btn" onclick="resetElement()">重設</button>
+      <button class="et-action-btn" id="et-copy-btn" onclick="copyHtml()">複製 HTML</button>
+      <button class="et-action-btn" onclick="clearSavedState()" title="清除所有儲存的設定並重新載入" style="color:#D04040;">🗑 重設</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   RECALCULATE — reads inputs, updates all DOM + SVG
+   ══════════════════════════════════════════════════════ */
+function recalculate() {
+  var SP   = parseFloat(document.getElementById('inp-sp-strike').value);
+  var SP_p = parseFloat(document.getElementById('inp-sp-prem').value);
+  var LP   = parseFloat(document.getElementById('inp-lp-strike').value);
+  var LP_p = parseFloat(document.getElementById('inp-lp-prem').value);
+
+  if (isNaN(SP) || isNaN(SP_p) || isNaN(LP) || isNaN(LP_p)) return;
+  if (LP >= SP) return; // guard: LP must be below SP
+
+  var net      = +((SP_p - LP_p).toFixed(2));  // positive = credit, negative = debit
+  var W        = +(SP - LP).toFixed(2);         // strike width
+  var maxLoss  = +(W - net).toFixed(2);         // always positive
+  var isCredit = net >= 0;
+
+  function fmtVal(v) {
+    var abs = Math.abs(v).toFixed(2);
+    return v >= 0 ? '+$' + abs : '-$' + abs;
+  }
+  function fmtPrice(p) { return '$' + (+p).toFixed(p % 1 === 0 ? 0 : 2); }
+
+  /* ── Contract box ─────────────────────────────── */
+  var netEl = document.getElementById('disp-net-val');
+  netEl.textContent = fmtVal(net) + '/股';
+  netEl.className = 'nv ' + (isCredit ? 'credit' : 'debit');
+  document.getElementById('disp-net-label').textContent = isCredit
+    ? '淨 Premium（每股）收 Credit'
+    : '淨 Premium（每股）付 Debit';
+
+  /* ── Panel 1 leg blocks ───────────────────────── */
+  document.getElementById('p1-sp-strike').textContent = 'Put $' + SP;
+  document.getElementById('p1-sp-prem').textContent   = '收 +$' + SP_p.toFixed(2);
+  document.getElementById('p1-lp-strike').textContent = 'Put $' + LP;
+  document.getElementById('p1-lp-prem').textContent   = '付 −$' + LP_p.toFixed(2);
+
+  var netValEl = document.getElementById('p1-net-val');
+  netValEl.textContent = fmtVal(net);
+  netValEl.className = 'lr-val ' + (isCredit ? 'credit' : 'debit');
+
+  /* Zone bar */
+  document.getElementById('zb-loss-price').textContent   = '≤$' + LP;
+  document.getElementById('zb-loss-pl').textContent      = '-$' + maxLoss.toFixed(2) + '/股';
+  document.getElementById('zb-partial-range').textContent = '$' + LP + '↔$' + SP;
+  document.getElementById('zb-profit-price').textContent  = '≥$' + SP;
+  document.getElementById('zb-profit-pl').textContent     = isCredit
+    ? '收 $' + net.toFixed(2) + '/股'
+    : '最佳結果';
+
+  /* Bullets */
+  document.getElementById('p1-b1').textContent = '賣出 Short Put $' + SP + '，收 $' + SP_p.toFixed(2) + ' 權利金，承擔在 $' + SP + ' 以下被行權的義務。';
+  document.getElementById('p1-b2').textContent = '買入 Long Put $' + LP + '，付 $' + LP_p.toFixed(2) + '，跌穿 $' + LP + ' 後 Long Put 啟動保護，虧損到此封頂。';
+  document.getElementById('p1-b3').textContent = isCredit
+    ? '淨收 $' + net.toFixed(2) + '/股（Credit Spread）。股價留在 $' + SP + ' 上方即可獲最大利潤。'
+    : '本例淨成本 $' + Math.abs(net).toFixed(2) + '（IV Skew 造成 Debit，正常情況應有淨 Credit）。';
+
+  /* ── Panel 2 ──────────────────────────────────── */
+  var exHigh = +(SP + 4).toFixed(0);
+  document.getElementById('p2-title').innerHTML = '到期股價 ≥ $' + SP + ' 🌞<br>兩個 Put 全部廢棄';
+  document.getElementById('p2-svg-wrap').innerHTML = genP2Svg(SP, LP, exHigh);
+  document.getElementById('p2-sp-pill-label').textContent = 'Short Put $' + SP;
+  document.getElementById('p2-lp-pill-label').textContent = 'Long Put $' + LP;
+  document.getElementById('p2-result-val').textContent =
+    '+$' + SP_p.toFixed(2) + ' − $' + LP_p.toFixed(2) + ' = ' + fmtVal(net) + '/股';
+  document.getElementById('p2-note').innerHTML = isCredit
+    ? '✅ 此為 Credit Spread 最佳情境：兩 Put 全廢，淨收 $' + net.toFixed(2) + '/股全數入袋。'
+    : '※ 本例因 IV Skew 為微 Debit，最佳結果仍虧 $' + Math.abs(net).toFixed(2) + '/股。正常 Credit 版本可在此情境淨賺。';
+
+  /* ── Panel 3 ──────────────────────────────────── */
+  var exDropAuto  = +(LP - Math.max(3, Math.round(W * 0.8))).toFixed(0);
+  var exDropEl    = document.getElementById('inp-ex-price');
+  var exDrop      = parseFloat(exDropEl.value);
+  if (isNaN(exDrop) || exDrop >= LP || exDrop <= 0) { exDrop = exDropAuto; }
+  exDrop = +exDrop.toFixed(1);
+  var spIntrinsic = +(SP - exDrop).toFixed(2);           // 被行權 intrinsic
+  var lpIntrinsic = +(LP - exDrop).toFixed(2);           // Long Put 行權收益
+  var spNetPL     = +(SP_p - spIntrinsic).toFixed(2);    // 含 Premium：收SP_p − 被行權
+  var lpNetPL     = +(lpIntrinsic - LP_p).toFixed(2);    // 含 Premium：行權 − 付LP_p
+
+  document.getElementById('p3-title').innerHTML = '到期股價 ≤ $' + LP + ' 🧊<br>Long Put 啟動，虧損封頂';
+  document.getElementById('p3-svg-wrap').innerHTML = genP3Svg(SP, LP, exDrop);
+  setupSvgTexts('p3-svg-wrap');
+  document.getElementById('p3-sp-stat-label').textContent = 'Short Put $' + SP + ' 損益';
+  var spNetLoss = +(SP - SP_p - exDrop).toFixed(2);   // Strike − Premium − 股價
+  var lpNetGain = +(LP - LP_p - exDrop).toFixed(2);   // Strike − Premium − 股價
+  document.getElementById('p3-sp-stat-val').textContent =
+    '$' + SP + ' − $' + SP_p.toFixed(2) + ' − $' + exDrop + ' = ' +
+    (spNetPL >= 0 ? '+$' : '-$') + spNetLoss.toFixed(2) + '/股';
+  document.getElementById('p3-lp-stat-label').textContent = 'Long Put $' + LP + ' 損益';
+  document.getElementById('p3-lp-stat-val').textContent =
+    '$' + LP + ' − $' + LP_p.toFixed(2) + ' − $' + exDrop + ' = ' +
+    (lpNetPL >= 0 ? '+$' : '-$') + lpNetGain.toFixed(2) + '/股';
+  var netAtPrice = +(spNetPL + lpNetPL).toFixed(2);  // always equals -maxLoss when exDrop < LP
+  document.getElementById('p3-strike-w').textContent    = '$' + W.toFixed(2);
+  document.getElementById('p3-net-cost').textContent    = isCredit ? '-$' + net.toFixed(2) : '+$' + Math.abs(net).toFixed(2);
+  document.getElementById('p3-max-loss').textContent    = '$' + maxLoss.toFixed(2) + '/股';
+  var costBasis = +(SP - SP_p - lpNetPL).toFixed(2);  // = exDrop + maxLoss
+  document.getElementById('p3-result-label').textContent =
+    '🛡️ 股價 $' + exDrop + ' 淨損益（' + spNetPL.toFixed(2) + ' + ' + lpNetPL.toFixed(2) + ' = 固定上限）';
+  document.getElementById('p3-result-val').textContent  = '-$' + Math.abs(netAtPrice).toFixed(2) + ' ／ 股';
+  document.getElementById('p3-cost-basis').innerHTML =
+    '👉 實際持有每股成本（互抵後）：$' + SP + '(被行權) − $' + SP_p.toFixed(2) + '(已收) − $' + lpNetPL.toFixed(2) + '(LP互抵) = <strong>$' + costBasis.toFixed(2) + '/股</strong>（市價 $' + exDrop + '，虧損固定 $' + maxLoss.toFixed(2) + '）';
+
+  /* ── Panel 4 ──────────────────────────────────── */
+  document.getElementById('p4-svg-wrap').innerHTML = genP4Svg(SP, LP, net, W, maxLoss);
+  document.getElementById('p4-detail').textContent =
+    '最大獲利 ' + fmtVal(net) + '（' + (isCredit ? 'Credit 收入' : '本例 Debit') + '），最大虧損 -$' + maxLoss.toFixed(2);
+  document.getElementById('p4-note').textContent = isCredit
+    ? 'Credit Spread：股價 ≥ $' + SP + ' 即全拿 $' + net.toFixed(2) + '，最大虧損 $' + maxLoss.toFixed(2) + '。'
+    : '正常 Credit 版本最大獲利為正值。';
+
+  var profitColor = isCredit ? 'green' : 'red';
+  document.getElementById('p4-stat-a-label').textContent = '最大獲利（股價 ≥ $' + SP + '）';
+  var profEl = document.getElementById('p4-stat-profit');
+  profEl.textContent = fmtVal(net) + ' ／ 股';
+  profEl.className = 'ps-val ' + profitColor;
+  document.getElementById('p4-stat-range').textContent = '$' + LP + ' ↔ $' + SP;
+  document.getElementById('p4-stat-b-label').textContent = '最大虧損（股價 ≤ $' + LP + '）';
+  document.getElementById('p4-stat-loss').textContent = '-$' + maxLoss.toFixed(2) + ' ／ 股';
+
+  /* ── Bonus Panel 5 ───────────────────────────── */
+  var midAuto   = +((SP + LP) / 2).toFixed(1);
+  var midEl     = document.getElementById('inp-mid-price');
+  var exMid     = parseFloat(midEl.value);
+  if (isNaN(exMid) || exMid <= 0) { exMid = midAuto; }
+
+  var spNetPL, lpNetPL, totalPL, b5SpLabel, b5SpVal, b5LpLabel, b5LpVal, b5Desc;
+  if (exMid >= SP) {
+    spNetPL  = +SP_p.toFixed(2);
+    lpNetPL  = +(-LP_p).toFixed(2);
+    totalPL  = +(spNetPL + lpNetPL).toFixed(2);
+    b5SpLabel = 'Short Put $' + SP + ' 到期廢棄';
+    b5SpVal   = '收$' + SP_p.toFixed(2) + '（Put 廢棄，全收） = +$' + SP_p.toFixed(2) + '/股';
+    b5LpLabel = 'Long Put $' + LP + ' 到期廢棄';
+    b5LpVal   = '-$' + LP_p.toFixed(2) + '/股（已付 Premium）';
+    b5Desc    = '（股價 ≥ $' + SP + '：兩 Put 全廢；SP 收 +$' + SP_p.toFixed(2) + '，LP 虧 -$' + LP_p.toFixed(2) + '；合計 ' + (totalPL >= 0 ? '+$' : '-$') + Math.abs(totalPL).toFixed(2) + '/股）';
+  } else if (exMid <= LP) {
+    var spExercise2 = +(SP - exMid).toFixed(2);
+    var lpGain2     = +(LP - exMid).toFixed(2);
+    spNetPL  = +(SP_p - spExercise2).toFixed(2);
+    lpNetPL  = +(lpGain2 - LP_p).toFixed(2);
+    totalPL  = +(spNetPL + lpNetPL).toFixed(2);
+    b5SpLabel = 'Short Put $' + SP + ' 被行權';
+    b5SpVal   = '收$' + SP_p.toFixed(2) + ' − 行權$' + spExercise2.toFixed(2) + ' = ' + (spNetPL >= 0 ? '+$' : '-$') + Math.abs(spNetPL).toFixed(2) + '/股';
+    b5LpLabel = 'Long Put $' + LP + ' 啟動（保護）';
+    b5LpVal   = '行權$' + lpGain2.toFixed(2) + ' − 付$' + LP_p.toFixed(2) + ' = ' + (lpNetPL >= 0 ? '+$' : '-$') + Math.abs(lpNetPL).toFixed(2) + '/股';
+    b5Desc    = '（股價 ≤ $' + LP + '：兩 Put 都行權；合計固定虧損 -$' + maxLoss.toFixed(2) + '/股）';
+  } else {
+    var spExercise3 = +(SP - exMid).toFixed(2);
+    spNetPL  = +(SP_p - spExercise3).toFixed(2);
+    lpNetPL  = +(-LP_p).toFixed(2);
+    totalPL  = +(spNetPL + lpNetPL).toFixed(2);
+    b5SpLabel = 'Short Put $' + SP + ' 損益';
+    b5SpVal   = '收$' + SP_p.toFixed(2) + ' − 行權$' + spExercise3.toFixed(2) + ' = ' + (spNetPL >= 0 ? '+$' : '-$') + Math.abs(spNetPL).toFixed(2) + '/股';
+    b5LpLabel = 'Long Put $' + LP + ' 未行權';
+    b5LpVal   = '-$' + LP_p.toFixed(2) + '/股（已付 Premium）';
+    b5Desc    = '（SP：收 $' + SP_p.toFixed(2) + ' − 行權 $' + spExercise3.toFixed(2) + ' = ' + (spNetPL >= 0 ? '+$' : '-$') + Math.abs(spNetPL).toFixed(2) + '；LP：未行權 -$' + LP_p.toFixed(2) + '；合計 ' + (totalPL >= 0 ? '+$' : '-$') + Math.abs(totalPL).toFixed(2) + '/股）';
+  }
+
+  document.getElementById('b5-title').innerHTML =
+    '模擬到期損益（$' + LP + ' ↔ $' + SP + '）+ 策略判斷框架';
+  document.getElementById('b5-sp-stat-label').textContent = b5SpLabel;
+  document.getElementById('b5-sp-stat-val').textContent   = b5SpVal;
+  document.getElementById('b5-lp-stat-label').textContent = b5LpLabel;
+  document.getElementById('b5-lp-stat-val').textContent   = b5LpVal;
+  document.getElementById('b5-net-stat-val').textContent  = (totalPL >= 0 ? '+$' : '-$') + Math.abs(totalPL).toFixed(2) + '/股';
+  var netEl = document.getElementById('b5-net-stat-val');
+  netEl.className = 'sv ' + (totalPL >= 0 ? 'green' : 'red');
+
+  document.getElementById('b5-mid-desc').textContent = b5Desc;
+  document.getElementById('b5-warning').textContent = isCredit
+    ? '此為 Credit Spread，淨收 $' + net.toFixed(2) + '/股，Strike 差 $' + W + '，最大獲利 $' + net.toFixed(2) + '，最大虧損 $' + maxLoss.toFixed(2) + '，損益比 ' + (net / maxLoss * 100).toFixed(1) + '%。'
+    : '本例 Long Put $' + LP + ' 比 Short Put $' + SP + ' 貴（IV Skew 造成 Debit $' + Math.abs(net).toFixed(2) + '）。正常狀況應收到淨 Credit。建倉前務必確認 Net Premium 為正（Credit），否則不如改用 Bull Call Spread。';
+  saveInputs();
+}
+
+/* ══ SVG Generators ══════════════════════════════════ */
+
+function genP2Svg(SP, LP, exHigh) {
+  return '<svg width="100%" viewBox="0 0 260 96" style="display:block;overflow:visible;">'
+    + '<defs><marker id="aA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">'
+    + '<path d="M1 1.5L8 5L1 8.5" fill="none" stroke="#AAAAAA" stroke-width="1.5" stroke-linecap="round"/></marker></defs>'
+    + '<line x1="28" y1="5" x2="28" y2="88" stroke="#CCCCCC" stroke-width="1.2" marker-end="url(#aA)"/>'
+    + '<line x1="28" y1="84" x2="255" y2="84" stroke="#CCCCCC" stroke-width="1.2" marker-end="url(#aA)"/>'
+    + '<line x1="28" y1="48" x2="250" y2="48" stroke="#D04040" stroke-width="1" stroke-dasharray="4,3"/>'
+    + '<text x="30" y="43" font-size="9.5" fill="#D04040" font-family="sans-serif" font-weight="700">Short Put $' + SP + '</text>'
+    + '<line x1="28" y1="64" x2="250" y2="64" stroke="#3A70C0" stroke-width="1" stroke-dasharray="3,3"/>'
+    + '<text x="30" y="76" font-size="9.5" fill="#3A70C0" font-family="sans-serif" font-weight="700">Long Put $' + LP + '</text>'
+    + '<polyline points="28,68 60,60 95,50 130,42 175,34 215,26 248,18" fill="none" stroke="#2E9E52" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    + '<circle cx="248" cy="18" r="10" fill="#FEF4D8" stroke="#E8B840" stroke-width="1.5"/>'
+    + '<text x="248" y="22" font-size="11" text-anchor="middle" dominant-baseline="central">🌞</text>'
+    + '<text x="185" y="14" font-size="9.5" fill="#2E9E52" font-family="sans-serif" font-weight="700">到期 $' + exHigh + '+</text>'
+    + '<text x="3" y="87" font-size="9" fill="#AAAAAA" font-family="sans-serif">今天</text>'
+    + '<text x="208" y="93" font-size="9" fill="#AAAAAA" font-family="sans-serif">到期日</text>'
+    + '</svg>';
+}
+
+function genP3Svg(SP, LP, exDrop) {
+  return '<svg width="100%" viewBox="0 0 260 96" style="display:block;overflow:visible;">'
+    + '<defs><marker id="aB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">'
+    + '<path d="M1 1.5L8 5L1 8.5" fill="none" stroke="#AAAAAA" stroke-width="1.5" stroke-linecap="round"/></marker></defs>'
+    + '<line x1="28" y1="5" x2="28" y2="88" stroke="#CCCCCC" stroke-width="1.2" marker-end="url(#aB)"/>'
+    + '<line x1="28" y1="84" x2="255" y2="84" stroke="#CCCCCC" stroke-width="1.2" marker-end="url(#aB)"/>'
+    + '<line x1="28" y1="28" x2="250" y2="28" stroke="#D04040" stroke-width="1" stroke-dasharray="4,3"/>'
+    + '<text data-svg-drag-id="p3-sp-text" x="30" y="23" font-size="9.5" fill="#D04040" font-family="sans-serif" font-weight="700" style="cursor:grab">Short Put $' + SP + ' — 被行權</text>'
+    + '<line x1="28" y1="52" x2="250" y2="52" stroke="#3A70C0" stroke-width="1.5" stroke-dasharray="3,3"/>'
+    + '<text x="30" y="47" font-size="9.5" fill="#3A70C0" font-family="sans-serif" font-weight="700">Long Put $' + LP + ' — 啟動保護</text>'
+    + '<rect x="28" y="52" width="222" height="32" fill="#3A70C0" opacity="0.07" rx="3"/>'
+    + '<polyline points="28,18 65,20 100,26 145,44 190,64 230,72 250,74" fill="none" stroke="#D04040" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    + '<text x="30" y="82" font-size="9" fill="#D04040" font-family="sans-serif" font-weight="700">到期 $' + exDrop + '</text>'
+    + '<text x="3" y="87" font-size="9" fill="#AAAAAA" font-family="sans-serif">今天</text>'
+    + '<text x="208" y="93" font-size="9" fill="#AAAAAA" font-family="sans-serif">到期日</text>'
+    + '</svg>';
+}
+
+function genP4Svg(SP, LP, net, W, maxLoss) {
+  /* ── coordinate system ── */
+  var VW = 260, VH = 140;
+  var xL = 38, xR = 252;
+  var pad = Math.max(5, +(W * 0.8).toFixed(1));
+  var pMin = LP - pad, pMax = SP + pad;
+  var pRange = pMax - pMin;
+  var xRange = xR - xL;
+
+  function px(p) { return +(xL + (p - pMin) / pRange * xRange).toFixed(1); }
+  var LP_x = px(LP), SP_x = px(SP);
+  var p1 = Math.round(pMin + pRange * 0.2);
+  var p2 = Math.round(pMin + pRange * 0.8);
+
+  /* ── Y axis: distribute pixels proportionally ── */
+  var yAvail = 106; var yBase = 124; var bufFrac = 0.12;
+  var profitAmt = net;   // may be negative (debit)
+  var lossAmt   = maxLoss; // always positive
+  var totalRange = Math.abs(profitAmt) + lossAmt;
+  var inner = yAvail * (1 - 2 * bufFrac);
+  var topBuf = yAvail * bufFrac;
+
+  var zeroY, topLineY, bottomLineY;
+
+  if (net >= 0) {
+    // Credit: profit above zero, loss below
+    topLineY   = +(16 + topBuf).toFixed(1);
+    zeroY      = +(topLineY + (net / totalRange) * inner).toFixed(1);
+    bottomLineY= +(zeroY + (lossAmt / totalRange) * inner).toFixed(1);
+  } else {
+    // Debit: zero near top, "best" line slightly below zero
+    zeroY      = +(16 + topBuf).toFixed(1);
+    topLineY   = +(zeroY + (Math.abs(net) / totalRange) * inner).toFixed(1);
+    bottomLineY= +(zeroY + (1 - bufFrac * 2) * yAvail).toFixed(1);
+  }
+
+  var isCredit = net >= 0;
+  var profColor = isCredit ? '#2E9E52' : '#D04040';
+  var netLabel = (net >= 0 ? '+$' : '-$') + Math.abs(net).toFixed(2);
+  var lossLabel = '-$' + lossAmt.toFixed(2);
+
+  /* ── profit zone (only if credit) ── */
+  var profZoneH = isCredit ? +(zeroY - topLineY).toFixed(1) : '1';
+
+  /* ── break-even (credit only: SP - net) ── */
+  var beHtml = '';
+  if (isCredit) {
+    var BE = +(SP - net).toFixed(2);
+    var BE_x = px(BE);
+    if (BE_x > xL && BE_x < xR) {
+      beHtml = '<line x1="' + BE_x + '" y1="' + (zeroY - 2) + '" x2="' + BE_x + '" y2="' + (zeroY + 2) + '" stroke="#D4900A" stroke-width="1.5"/>'
+             + '<text x="' + BE_x + '" y="' + (VH - 12) + '" font-size="9" fill="#D4900A" text-anchor="middle" font-family="sans-serif" font-weight="700">$' + BE + ' BE</text>';
+    }
+  }
+
+  /* ── label x position: avoid clipping at right edge ── */
+  var profLabelX = Math.min(SP_x + 6, xR - 70);
+
+  return '<svg width="100%" viewBox="0 0 ' + VW + ' ' + VH + '" style="display:block;overflow:visible;">'
+    + '<defs>'
+    + '<marker id="p4ax" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M1 1.5L8 5L1 8.5" fill="none" stroke="#888" stroke-width="1.5" stroke-linecap="round"/></marker>'
+    + '<marker id="p4ay" viewBox="0 0 10 10" refX="5" refY="9" markerWidth="5" markerHeight="5" orient="auto"><path d="M1 9L5 1L9 9" fill="none" stroke="#888" stroke-width="1.5" stroke-linecap="round"/></marker>'
+    + '</defs>'
+    /* zones */
+    + '<rect x="' + xL + '" y="' + zeroY + '" width="' + (LP_x - xL) + '" height="' + (bottomLineY - zeroY) + '" fill="#D04040" opacity="0.10" rx="3"/>'
+    + '<rect x="' + SP_x + '" y="' + topLineY + '" width="' + (xR - SP_x) + '" height="' + profZoneH + '" fill="#2E9E52" opacity="0.10" rx="3"/>'
+    + '<rect x="' + LP_x + '" y="' + topLineY + '" width="' + (SP_x - LP_x) + '" height="' + (bottomLineY - topLineY) + '" fill="#D4900A" opacity="0.07" rx="3"/>'
+    /* axes */
+    + '<line x1="' + xL + '" y1="' + (VH - 10) + '" x2="' + xR + '" y2="' + (VH - 10) + '" stroke="#AAAAAA" stroke-width="1.5" marker-end="url(#p4ax)"/>'
+    + '<line x1="' + xL + '" y1="' + (VH - 7) + '" x2="' + xL + '" y2="12" stroke="#AAAAAA" stroke-width="1.5" marker-end="url(#p4ay)"/>'
+    /* zero dashed */
+    + '<line x1="' + xL + '" y1="' + zeroY + '" x2="' + xR + '" y2="' + zeroY + '" stroke="#CCCCCC" stroke-width="1" stroke-dasharray="3,3"/>'
+    /* $LP tick */
+    + '<line x1="' + LP_x + '" y1="' + (zeroY - 2) + '" x2="' + LP_x + '" y2="' + (zeroY + 2) + '" stroke="#3A70C0" stroke-width="1.5"/>'
+    + '<text x="' + LP_x + '" y="' + (VH - 12) + '" font-size="9" fill="#3A70C0" text-anchor="middle" font-family="sans-serif" font-weight="700">$' + LP + ' LP</text>'
+    /* $SP tick */
+    + '<line x1="' + SP_x + '" y1="' + (zeroY - 2) + '" x2="' + SP_x + '" y2="' + (zeroY + 2) + '" stroke="#D04040" stroke-width="1.5"/>'
+    + '<text x="' + SP_x + '" y="' + (VH - 12) + '" font-size="9" fill="#D04040" text-anchor="middle" font-family="sans-serif" font-weight="700">$' + SP + ' SP</text>'
+    + beHtml
+    /* side price labels */
+    + '<text x="' + px(p1) + '" y="' + (VH - 12) + '" font-size="9" fill="#AAAAAA" text-anchor="middle" font-family="sans-serif">$' + p1 + '</text>'
+    + '<text x="' + px(p2) + '" y="' + (VH - 12) + '" font-size="9" fill="#AAAAAA" text-anchor="middle" font-family="sans-serif">$' + p2 + '</text>'
+    /* y-axis labels */
+    + '<text x="1" y="' + (+topLineY + 4) + '" font-size="8" fill="' + profColor + '" font-family="sans-serif" font-weight="600">最大獲利 ' + netLabel + '</text>'
+    + '<text x="14" y="' + (+zeroY + 4) + '" font-size="8" fill="#AAAAAA" font-family="sans-serif">0</text>'
+    + '<text x="2" y="' + (+bottomLineY - 2) + '" font-size="8" fill="#D04040" font-family="sans-serif" font-weight="600">' + lossLabel + '</text>'
+    /* payoff polyline */
+    + '<polyline points="' + xL + ',' + bottomLineY + ' ' + LP_x + ',' + bottomLineY + ' ' + SP_x + ',' + topLineY + ' ' + xR + ',' + topLineY + '" fill="none" stroke="#2E9E52" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    /* kink dots */
+    + '<circle cx="' + LP_x + '" cy="' + bottomLineY + '" r="4.5" fill="#3A70C0" stroke="#FFF9F2" stroke-width="1.5"/>'
+    + '<circle cx="' + SP_x + '" cy="' + topLineY + '" r="5" fill="#2E9E52" stroke="#FFF9F2" stroke-width="1.5"/>'
+    /* labels on chart */
+
+    + '<text x="' + (+xL + 3) + '" y="' + (+bottomLineY - 10) + '" font-size="8" fill="#D04040" font-family="sans-serif" font-weight="600">最大虧損</text>'
+    + '<text x="' + (+xL + 3) + '" y="' + ((+topLineY + +bottomLineY) / 2 + 4) + '" font-size="8" fill="#D4900A" font-family="sans-serif" font-weight="700">部分虧損</text>'
+    + '</svg>';
+}
+
+/* ── Persistence (localStorage) ─────────────────── */
+var BPSKEY = 'bps-state-v1';
+var BPSINPUTS = ['inp-sp-strike','inp-sp-prem','inp-lp-strike','inp-lp-prem','inp-ex-price','inp-mid-price'];
+
+function saveInputs() {
+  try {
+    var s = JSON.parse(localStorage.getItem(BPSKEY) || '{}');
+    BPSINPUTS.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) s['i:' + id] = el.value;
+    });
+    localStorage.setItem(BPSKEY, JSON.stringify(s));
+  } catch(e) {}
+}
+
+function restoreInputs() {
+  try {
+    var s = JSON.parse(localStorage.getItem(BPSKEY) || '{}');
+    BPSINPUTS.forEach(function(id) {
+      var v = s['i:' + id];
+      if (v !== undefined) { var el = document.getElementById(id); if (el) el.value = v; }
+    });
+  } catch(e) {}
+}
+
+function saveTextEdit(el) {
+  if (!el || !el.id) return;
+  try {
+    var s = JSON.parse(localStorage.getItem(BPSKEY) || '{}');
+    s['t:' + el.id] = { html: el.innerHTML, style: el.getAttribute('style') || '' };
+    localStorage.setItem(BPSKEY, JSON.stringify(s));
+  } catch(e) {}
+}
+
+function restoreTextEdits() {
+  try {
+    var s = JSON.parse(localStorage.getItem(BPSKEY) || '{}');
+    Object.keys(s).forEach(function(k) {
+      if (k.indexOf('t:') !== 0) return;
+      var el = document.getElementById(k.slice(2));
+      if (!el) return;
+      if (s[k].html !== undefined) el.innerHTML = s[k].html;
+      if (s[k].style) el.setAttribute('style', s[k].style);
+    });
+  } catch(e) {}
+}
+
+window.clearSavedState = function() { localStorage.removeItem(BPSKEY); location.reload(); };
+
+/* Run on load */
+window.addEventListener('load', function() {
+  restoreInputs();
+  recalculate();
+  restoreTextEdits();
+});
+
+/* ══════════════════════════════════════════════════════
+   EDIT MODE
+   ══════════════════════════════════════════════════════ */
+(function() {
+  var editMode = false;
+  var focused = null;
+  var originalStyles = new WeakMap();
+
+  window.toggleEditMode = function() {
+    editMode = !editMode;
+    document.body.classList.toggle('edit-mode', editMode);
+    document.getElementById('edit-btn').classList.toggle('active', editMode);
+    document.getElementById('edit-label').textContent = editMode ? '退出編輯' : '編輯模式';
+    document.getElementById('edit-icon').textContent  = editMode ? '✕' : '✏️';
+    document.getElementById('edit-toolbar').classList.toggle('visible', editMode);
+    if (!editMode) blurCurrent();
+  };
+
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); window.toggleEditMode(); }
+    if (e.key === 'Escape' && editMode) blurCurrent();
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!editMode) return;
+    var btn = document.getElementById('edit-btn');
+    var tb  = document.getElementById('edit-toolbar');
+    if (btn.contains(e.target) || tb.contains(e.target)) return;
+    /* skip number inputs */
+    if (e.target.tagName === 'INPUT') return;
+
+    blurCurrent();
+    var el = e.target;
+    var allowed = ['div','p','span','h1','h2','h3','h4','label','td','th','li','small','b','strong'];
+    while (el && el !== document.body) {
+      if (allowed.indexOf(el.tagName.toLowerCase()) !== -1) break;
+      el = el.parentElement;
+    }
+    if (!el || el === document.body) return;
+    /* skip any element that contains a number input — editing it would break the input */
+    if (el.querySelector('input[type="number"]')) return;
+    /* also skip the direct parents of number inputs */
+    if (el.closest && el.closest('[id^="inp-"]')) return;
+
+    focused = el;
+    if (!originalStyles.has(el)) originalStyles.set(el, el.getAttribute('style') || '');
+    el.contentEditable = 'true';
+    el.classList.add('el-focus');
+    el.focus();
+    updateToolbar(el);
+    document.getElementById('et-hint').style.display = 'none';
+    document.getElementById('et-controls').style.display = 'flex';
+  });
+
+  function blurCurrent() {
+    if (focused) {
+      saveTextEdit(focused);
+      focused.contentEditable = 'false';
+      focused.classList.remove('el-focus');
+      focused = null;
+      document.getElementById('et-hint').style.display = '';
+      document.getElementById('et-controls').style.display = 'none';
+    }
+  }
+
+  function updateToolbar(el) {
+    var cs = window.getComputedStyle(el);
+    var ff = (el.style.fontFamily || cs.fontFamily || '').replace(/"/g,'');
+    var sel = document.getElementById('et-font');
+    var matched = false;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value.replace(/"/g,'').split(',')[0].trim() === ff.split(',')[0].trim()) {
+        sel.selectedIndex = i; matched = true; break;
+      }
+    }
+    if (!matched) sel.selectedIndex = 0;
+    var fs = parseFloat(cs.fontSize) || 14;
+    document.getElementById('et-size-val').textContent = Math.round(fs);
+    document.getElementById('et-bold').classList.toggle('on', parseInt(cs.fontWeight) >= 600);
+    document.getElementById('et-italic').classList.toggle('on', cs.fontStyle === 'italic');
+    document.getElementById('et-color').value = rgbToHex(cs.color);
+    var lhRaw = cs.lineHeight;
+    var lhNum = lhRaw === 'normal' ? 1.4 : parseFloat(lhRaw) / fs;
+    var lhSlider = document.getElementById('et-lh');
+    lhSlider.value = isNaN(lhNum) ? 1.4 : Math.min(3, Math.max(1, lhNum));
+    document.getElementById('et-lh-val').textContent = parseFloat(lhSlider.value).toFixed(1);
+  }
+
+  window.applyStyle = function(prop, val) { if (focused) focused.style[prop] = val; };
+
+  window.adjustSize = function(delta) {
+    if (!focused) return;
+    var cur = Math.round(parseFloat(window.getComputedStyle(focused).fontSize) || 14);
+    var next = Math.max(8, Math.min(72, cur + delta));
+    focused.style.fontSize = next + 'px';
+    document.getElementById('et-size-val').textContent = next;
+  };
+
+  window.toggleBold = function() {
+    if (!focused) return;
+    var isBold = parseInt(window.getComputedStyle(focused).fontWeight) >= 600;
+    focused.style.fontWeight = isBold ? '400' : '800';
+    document.getElementById('et-bold').classList.toggle('on', !isBold);
+  };
+
+  window.toggleItalic = function() {
+    if (!focused) return;
+    var isItalic = window.getComputedStyle(focused).fontStyle === 'italic';
+    focused.style.fontStyle = isItalic ? 'normal' : 'italic';
+    document.getElementById('et-italic').classList.toggle('on', !isItalic);
+  };
+
+  window.resetElement = function() {
+    if (!focused) return;
+    focused.style.cssText = originalStyles.get(focused) || '';
+    updateToolbar(focused);
+  };
+
+  window.copyHtml = function() {
+    var html = document.querySelector('.page').outerHTML;
+    navigator.clipboard.writeText(html).then(function() {
+      var btn = document.getElementById('et-copy-btn');
+      btn.textContent = '已複製 ✓';
+      setTimeout(function() { btn.textContent = '複製 HTML'; }, 2000);
+    });
+  };
+
+  function rgbToHex(rgb) {
+    var m = rgb.match(/\d+/g);
+    if (!m || m.length < 3) return '#000000';
+    return '#' + [m[0],m[1],m[2]].map(function(x) {
+      return ('0' + parseInt(x).toString(16)).slice(-2);
+    }).join('');
+  }
+})();
+</script>
+
+<script>
+(function () {
+  var _fontZoom = parseFloat(localStorage.getItem('bps-font-zoom') || '1');
+  var _fontBaseMap = new WeakMap();
+  function applyFontZoom() {
+    document.querySelectorAll('#drag-canvas .panel *, #drag-canvas .bonus-panel *, #drag-canvas .spread-box *, #drag-canvas .page-header-text *, #drag-canvas .course-tag *').forEach(function(el) {
+      if (!_fontBaseMap.has(el)) _fontBaseMap.set(el, parseFloat(window.getComputedStyle(el).fontSize) || 14);
+      el.style.fontSize = (_fontBaseMap.get(el) * _fontZoom) + 'px';
+    });
+  }
+
+  function relayoutAfterZoom() {
+    var canvas = document.getElementById('drag-canvas');
+    if (!canvas) return;
+    var panels = Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    if (!panels.length) return;
+    panels.sort(function(a,b){ return (parseFloat(a.style.top)||0)-(parseFloat(b.style.top)||0); });
+    var GAP=16, y=GAP;
+    panels.forEach(function(el){ el.style.top=y+'px'; y+=el.getBoundingClientRect().height+GAP; });
+    try { localStorage.removeItem('bps-layout-v4'); } catch(e) {}
+  }
+  window.adjustPageFont = function(delta) {
+    _fontZoom = Math.max(0.7, Math.min(2.0, parseFloat((_fontZoom+delta*0.1).toFixed(2))));
+    applyFontZoom();
+    localStorage.setItem('bps-font-zoom', _fontZoom);
+    requestAnimationFrame(function(){ requestAnimationFrame(relayoutAfterZoom); });
+  };
+  window.addEventListener('load', function() {
+    if (_fontZoom !== 1) { applyFontZoom(); requestAnimationFrame(function(){ requestAnimationFrame(relayoutAfterZoom); }); }
+  });
+
+  function pronounce(text, gender) {
+    var voice = gender === 'female' ? 'af_sarah' : 'am_michael';
+    var vol = parseFloat((document.getElementById('tts-vol') || {value:'1'}).value);
+    var audio = new Audio('http://127.0.0.1:5051/tts?text=' + encodeURIComponent(text) + '&voice=' + encodeURIComponent(voice));
+    audio.volume = vol;
+    audio.play().catch(function(e){ console.warn('Kokoro TTS:', e.message); });
+  }
+  window.pronounce = pronounce;
+
+  var SCRIPT = [
+    { id: null, label: '策略總覽',
+      text: '歡迎來到期權小學堂第二課。今天學習 Bull Put Spread，牛市 Put 價差策略。這是一個信用收款策略：賣出較高履約價的 Put 收取 Premium，同時買入較低履約價的 Put 作為保護傘，限制最大虧損。淨信用就是你的最大獲利，有限風險、有限獲利的夾心層結構。' },
+    { id: 'bps-panel-1', label: '建倉結構',
+      text: '建倉時同時操作兩腿。賣出高 Strike 的 Put 收取 Premium，這是主要獲利來源。買入低 Strike 的 Put 支付保護費，限制最大虧損。淨信用等於兩腿 Premium 之差，Spread 寬度等於兩個 Strike 之差，最大虧損等於 Spread 寬度減去淨信用。' },
+    { id: 'bps-panel-2', label: 'Scenario A：全部獲利',
+      text: '情境 A：到期股價收在賣出 Strike 以上，兩個 Put 全部廢棄，保留全部淨信用，這是最大獲利情境。不管股票漲多高，你的獲利都是固定的，就是最初收到的淨信用。' },
+    { id: 'bps-panel-3', label: 'Scenario B：最大虧損',
+      text: '情境 B：到期股價跌到買入 Strike 以下，Long Put 啟動，虧損封頂。最大虧損等於 Spread 寬度減去淨信用。有了買入 Put 的保護，即使股票跌到零，你的虧損也不會超過這個上限。' },
+    { id: 'bps-panel-4', label: 'Payoff Chart',
+      text: '損益圖是有頂有底的平坦結構。右側是最大獲利區，股價在賣出 Strike 以上時收全額信用。中間是過渡區，從損益兩平點往下逐漸虧損。左側是最大虧損區，股價跌到買入 Strike 以下後，虧損不再增加，形成水平底部。' },
+    { id: 'bps-bonus-panel', label: 'Bonus：Greeks 與時機',
+      text: '進階分析。Bull Put Spread 的 Theta 為正，時間是你的朋友，每天自動累積。Delta 為正代表看漲偏好。建議在 IV 高、股票有支撐位時使用，例如財報後 IV 高企時。選擇 Strike 時，賣出 Delta 30 到 35，買入 Delta 10 到 15，保持良好的損益比。' }
+  ];
+  var ttsIdx=0, ttsPlaying=false, ttsPaused=false, ttsRate=0.9, activePanelId=null;
+
+  function initDots() {
+    var c = document.getElementById('tts-dots'); c.innerHTML = '';
+    SCRIPT.forEach(function(s,i) {
+      var d = document.createElement('div');
+      d.className='tts-dot'; d.id='tts-dot-'+i; d.title=s.label;
+      d.onclick = function(){ ttsJumpTo(i); }; c.appendChild(d);
+    });
+  }
+  function updateDots() {
+    SCRIPT.forEach(function(_,i) {
+      var d=document.getElementById('tts-dot-'+i); if(!d) return;
+      d.className='tts-dot'+(i<ttsIdx?' done':i===ttsIdx?' current':'');
+    });
+  }
+  function setActivePanel(id) {
+    if (activePanelId) { var p=document.getElementById(activePanelId); if(p) p.classList.remove('tts-active'); }
+    activePanelId=id;
+    if (id) { var el=document.getElementById(id); if(el){ el.classList.add('tts-active'); el.scrollIntoView({behavior:'smooth',block:'nearest'}); } }
+  }
+  function updateUI() {
+    var btn=document.getElementById('tts-play-btn'), sec=document.getElementById('tts-section-name');
+    if (ttsPlaying&&!ttsPaused){ btn.textContent='| | 暫停'; btn.className='tts-btn playing'; }
+    else if (ttsPaused){ btn.textContent='&#9658; 繼續'; btn.className='tts-btn'; }
+    else if (ttsIdx>=SCRIPT.length){ btn.textContent='&#8635; 重新朗讀'; btn.className='tts-btn'; }
+    else { btn.textContent=ttsIdx===0?'&#9658; 朗讀全文':'&#9658; 繼續朗讀'; btn.className='tts-btn'; }
+    sec.textContent=ttsIdx<SCRIPT.length?'&#9658; '+SCRIPT[ttsIdx].label:'&#10003; 朗讀完畢';
+    setActivePanel(ttsIdx<SCRIPT.length?SCRIPT[ttsIdx].id:null); updateDots();
+  }
+  function showSubtitle(text) {
+    var el=document.getElementById('tts-subtitle'); if(!el) return;
+    el.innerHTML=text.split('').map(function(ch,i){
+      var s=ch==='<'?'&lt;':ch==='>'?'&gt;':ch==='&'?'&amp;':ch;
+      return '<span class="sub-c" id="sc-'+i+'">'+s+'</span>';
+    }).join(''); el.scrollTop=0; el.classList.add('active');
+  }
+  function clearSubtitle() { var el=document.getElementById('tts-subtitle'); if(el){ el.innerHTML=''; el.classList.remove('active'); } }
+  function speakSection() {
+    if (!ttsPlaying) return;
+    if (ttsIdx>=SCRIPT.length){ ttsPlaying=false; ttsIdx=0; updateUI(); return; }
+    updateUI();
+    var item=SCRIPT[ttsIdx];
+    var utt=new SpeechSynthesisUtterance(item.text);
+    utt.lang='zh-TW'; utt.rate=ttsRate; utt.pitch=1.0; showSubtitle(item.text);
+    utt.onboundary=function(e){
+      var chars=document.querySelectorAll('#tts-subtitle .sub-c'), len=e.charLength||1;
+      chars.forEach(function(ch,i){ ch.className='sub-c'+(i<e.charIndex?' done':i<e.charIndex+len?' now':''); });
+      var cur=document.getElementById('sc-'+e.charIndex); if(cur) cur.scrollIntoView({block:'nearest'});
+    };
+    utt.onend=function(){ if(!ttsPlaying) return; ttsIdx++; setTimeout(speakSection,350); };
+    utt.onerror=function(e){ if(e.error==='interrupted') return; if(!ttsPlaying) return; ttsIdx++; speakSection(); };
+    setTimeout(function(){ speechSynthesis.speak(utt); },50);
+  }
+  window.ttsToggle=function(){
+    if(speechSynthesis.speaking&&!speechSynthesis.paused){ speechSynthesis.pause(); ttsPlaying=false; ttsPaused=true; updateUI(); }
+    else if(speechSynthesis.paused){ speechSynthesis.resume(); ttsPlaying=true; ttsPaused=false; updateUI(); }
+    else{ if(ttsIdx>=SCRIPT.length) ttsIdx=0; ttsPlaying=true; ttsPaused=false; speakSection(); }
+  };
+  window.ttsStop=function(){
+    speechSynthesis.cancel(); clearSubtitle();
+    ttsPlaying=false; ttsPaused=false; ttsIdx=0; setActivePanel(null);
+    document.getElementById('tts-section-name').textContent='點擊「朗讀全文」開始'; updateDots();
+    document.getElementById('tts-play-btn').textContent='&#9658; 朗讀全文';
+    document.getElementById('tts-play-btn').className='tts-btn';
+  };
+  window.ttsJumpTo=function(i){ speechSynthesis.cancel(); ttsIdx=i; ttsPlaying=true; ttsPaused=false; setTimeout(speakSection,80); };
+  window.ttsSetRate=function(v){ ttsRate=parseFloat(v); };
+  var volEl=document.getElementById('tts-vol');
+  if(volEl) volEl.addEventListener('input',function(){ window._ttsVol=parseFloat(this.value); });
+  initDots();
+}());
+</script>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   DRAG & RESIZE SYSTEM
+   ═══════════════════════════════════════════════════════════ */
+(function() {
+  var LAYOUT_KEY = 'bps-layout-v4';
+  var canvas = null;
+  var dragging = null, resizing = null;
+  var dragOX = 0, dragOY = 0;
+  var rzS = {};
+
+  function getSaved() {
+    try { return JSON.parse(localStorage.getItem(LAYOUT_KEY) || 'null'); }
+    catch(e) { return null; }
+  }
+  function putSaved(s) {
+    try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(s)); }
+    catch(e) {}
+  }
+  function saveItem(id, x, y, w, h) {
+    var s = getSaved() || {};
+    s[id] = { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: h ? Math.round(h) : null };
+    putSaved(s);
+  }
+  function applyPos(el, x, y, w, h) {
+    el.style.position = 'absolute';
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+    el.style.width = w + 'px';
+    if (h) el.style.minHeight = h + 'px';
+  }
+
+  function addHandles(el) {
+    var dh = document.createElement('div');
+    dh.className = 'drag-handle';
+    el.insertBefore(dh, el.firstChild);
+    dh.addEventListener('mousedown', function(e) {
+      if (!document.body.classList.contains('edit-mode')) return;
+      e.preventDefault(); e.stopPropagation();
+      dragging = el;
+      var r = el.getBoundingClientRect();
+      dragOX = e.clientX - r.left;
+      dragOY = e.clientY - r.top;
+      el.classList.add('is-dragging');
+      el.style.zIndex = '1000';
+    });
+    ['nw','n','ne','e','se','s','sw','w'].forEach(function(dir) {
+      var rh = document.createElement('div');
+      rh.className = 'rh rh-' + dir;
+      el.appendChild(rh);
+      rh.addEventListener('mousedown', function(e) {
+        if (!document.body.classList.contains('edit-mode')) return;
+        e.preventDefault(); e.stopPropagation();
+        resizing = { el: el, dir: dir };
+        rzS = {
+          mx: e.clientX, my: e.clientY,
+          w: el.offsetWidth, h: el.offsetHeight,
+          l: parseFloat(el.style.left) || 0,
+          t: parseFloat(el.style.top)  || 0
+        };
+        el.classList.add('is-resizing');
+        el.style.zIndex = '1000';
+      });
+    });
+  }
+
+  document.addEventListener('mousemove', function(e) {
+    if (dragging) {
+      var cr = canvas.getBoundingClientRect();
+      var x = Math.max(0, e.clientX - cr.left - dragOX);
+      var y = Math.max(0, e.clientY - cr.top  - dragOY);
+      dragging.style.left = x + 'px';
+      dragging.style.top  = y + 'px';
+      var bottom = y + dragging.offsetHeight;
+      var curMin = parseInt(canvas.style.minHeight) || 3000;
+      if (bottom + 100 > curMin) canvas.style.minHeight = (bottom + 300) + 'px';
+    }
+    if (resizing) {
+      var el = resizing.el, dir = resizing.dir;
+      var dx = e.clientX - rzS.mx, dy = e.clientY - rzS.my;
+      var w = rzS.w, h = rzS.h, l = rzS.l, t = rzS.t;
+      if (dir.indexOf('e') >= 0) w = Math.max(180, rzS.w + dx);
+      if (dir.indexOf('w') >= 0) { w = Math.max(180, rzS.w - dx); l = rzS.l + (rzS.w - w); }
+      if (dir.indexOf('s') >= 0) h = Math.max(80,  rzS.h + dy);
+      if (dir.indexOf('n') >= 0) { h = Math.max(80,  rzS.h - dy); t = rzS.t + (rzS.h - h); }
+      el.style.width = w + 'px';
+      el.style.minHeight = h + 'px';
+      el.style.left = l + 'px';
+      el.style.top  = t + 'px';
+    }
+  });
+
+  document.addEventListener('mouseup', function() {
+    if (dragging) {
+      dragging.classList.remove('is-dragging');
+      dragging.style.zIndex = '';
+      saveItem(dragging.dataset.dragId,
+        parseFloat(dragging.style.left)||0,
+        parseFloat(dragging.style.top) ||0,
+        dragging.offsetWidth, null);
+      dragging = null;
+    }
+    if (resizing) {
+      var el = resizing.el;
+      el.classList.remove('is-resizing');
+      el.style.zIndex = '';
+      saveItem(el.dataset.dragId,
+        parseFloat(el.style.left)||0,
+        parseFloat(el.style.top) ||0,
+        el.offsetWidth, el.offsetHeight);
+      resizing = null;
+    }
+  });
+
+  window.resetLayout = function() {
+    localStorage.removeItem(LAYOUT_KEY);
+    location.reload();
+  };
+
+  function moveToCanvas(el) {
+    /* Move element to be a direct child of canvas (for absolute positioning) */
+    if (el.parentElement !== canvas) canvas.appendChild(el);
+  }
+
+  function initLayout() {
+    canvas = document.getElementById('drag-canvas');
+    if (!canvas) return;
+    var saved = getSaved();
+    var items = Array.from(canvas.querySelectorAll('[data-drag-id]'));
+
+    /* Add handles immediately */
+    items.forEach(function(el) { addHandles(el); });
+
+    if (saved) {
+      /* Move to canvas + apply saved positions */
+      items.forEach(function(el) {
+        var s = saved[el.dataset.dragId];
+        moveToCanvas(el);
+        if (s) applyPos(el, s.x, s.y, s.w, s.h);
+      });
+      var maxB = 0;
+      items.forEach(function(el) {
+        var b = (parseFloat(el.style.top)||0) + el.offsetHeight;
+        if (b > maxB) maxB = b;
+      });
+      canvas.style.minHeight = Math.max(3000, maxB + 200) + 'px';
+    } else {
+      /* First load: capture natural grid positions, then move + convert */
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          var cr = canvas.getBoundingClientRect();
+          var newSaved = {}, maxB = 0;
+          /* Capture ALL positions before moving anything */
+          var captures = [];
+          items.forEach(function(el) {
+            var r = el.getBoundingClientRect();
+            captures.push({ el: el, x: r.left - cr.left, y: r.top - cr.top, w: r.width, h: r.height });
+          });
+          /* Now move and position each element */
+          captures.forEach(function(p) {
+            moveToCanvas(p.el);
+            applyPos(p.el, p.x, p.y, p.w, null);
+            newSaved[p.el.dataset.dragId] = { x: Math.round(p.x), y: Math.round(p.y), w: Math.round(p.w), h: null };
+            if (p.y + p.h > maxB) maxB = p.y + p.h;
+          });
+          canvas.style.minHeight = Math.max(3000, maxB + 200) + 'px';
+          putSaved(newSaved);
+        });
+      });
+    }
+  }
+
+  window.addEventListener('load', initLayout);
+})();
+
+
+/* ═══════════════════════════════════════════════════════════
+   SVG TEXT DRAG SYSTEM — 編輯模式下可拖動 SVG 文字
+   ═══════════════════════════════════════════════════════════ */
+(function() {
+  var SVG_KEY = 'bps-svg-texts-v1';
+  var svgDragging = null;
+  var svgDragState = {};
+
+  function getSvgSaved() {
+    try { return JSON.parse(localStorage.getItem(SVG_KEY) || '{}'); }
+    catch(e) { return {}; }
+  }
+  function saveSvgPos(id, x, y) {
+    var s = getSvgSaved();
+    s[id] = { x: parseFloat(x.toFixed(2)), y: parseFloat(y.toFixed(2)) };
+    try { localStorage.setItem(SVG_KEY, JSON.stringify(s)); } catch(e) {}
+  }
+
+  window.setupSvgTexts = function(wrapId) {
+    var wrap = document.getElementById(wrapId);
+    if (!wrap) return;
+    var svg = wrap.querySelector('svg');
+    if (!svg) return;
+    var texts = svg.querySelectorAll('[data-svg-drag-id]');
+    var saved = getSvgSaved();
+
+    texts.forEach(function(el) {
+      var id = el.dataset.svgDragId;
+      /* Restore saved position */
+      if (saved[id]) {
+        el.setAttribute('x', saved[id].x);
+        el.setAttribute('y', saved[id].y);
+      }
+      /* Drag handle: grab cursor */
+      el.style.cursor = 'grab';
+      el.addEventListener('mousedown', function(e) {
+        if (!document.body.classList.contains('edit-mode')) return;
+        e.preventDefault(); e.stopPropagation();
+        var pt = svg.createSVGPoint();
+        pt.x = e.clientX; pt.y = e.clientY;
+        var svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+        svgDragging = el;
+        svgDragState = {
+          svg: svg,
+          id: id,
+          startMX: svgPt.x,
+          startMY: svgPt.y,
+          startX: parseFloat(el.getAttribute('x') || 0),
+          startY: parseFloat(el.getAttribute('y') || 0)
+        };
+        el.style.cursor = 'grabbing';
+        el.style.userSelect = 'none';
+      });
+    });
+  };
+
+  document.addEventListener('mousemove', function(e) {
+    if (!svgDragging) return;
+    var s = svgDragState;
+    var pt = s.svg.createSVGPoint();
+    pt.x = e.clientX; pt.y = e.clientY;
+    var svgPt = pt.matrixTransform(s.svg.getScreenCTM().inverse());
+    var newX = s.startX + (svgPt.x - s.startMX);
+    var newY = s.startY + (svgPt.y - s.startMY);
+    svgDragging.setAttribute('x', newX.toFixed(2));
+    svgDragging.setAttribute('y', newY.toFixed(2));
+  });
+
+  document.addEventListener('mouseup', function() {
+    if (!svgDragging) return;
+    svgDragging.style.cursor = 'grab';
+    saveSvgPos(svgDragState.id,
+      parseFloat(svgDragging.getAttribute('x')),
+      parseFloat(svgDragging.getAttribute('y')));
+    svgDragging = null;
+    svgDragState = {};
+  });
+
+  /* Also re-setup after page load in case recalculate ran first */
+  window.addEventListener('load', function() {
+    setTimeout(function() { window.setupSvgTexts && setupSvgTexts('p3-svg-wrap'); }, 100);
+  });
+})();
+
+</script>
+
+<button id="layout-reset-btn" onclick="resetLayout()" title="重設為預設版面">↺ 重設版面</button>
+</body>
+</html>

@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>期權小學堂 · Covered Call 備兌買權完全教學</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #FAF3E8;
+  --page-bg:    #FFF9F2;
+  --panel-bg:   #FFFCF7;
+  --ink:        #2A1A0E;
+  --muted:      #7A6555;
+  --border:     #E2D4C2;
+  --gold:       #D4900A;
+  --gold-bg:    #FEF4D8;
+  --gold-bdr:   #E8B840;
+  --green:      #2E9E52;
+  --green-bg:   #E8F8EE;
+  --green-bdr:  #8ED4A8;
+  --red:        #D04040;
+  --red-bg:     #FDEAEA;
+  --red-bdr:    #F5AAAA;
+  --blue:       #3A70C0;
+  --blue-bg:    #EBF2FF;
+  --blue-bdr:   #9ABCE8;
+  --purple:     #7050C0;
+  --purple-bg:  #F0EAFF;
+  --r-lg: 16px; --r-md: 10px; --r-sm: 6px;
+}
+
+body {
+  background: var(--bg);
+  font-family: "PingFang TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif;
+  padding: 0; margin: 0;
+  padding-top: 52px;   /* TTS bar */
+  padding-bottom: 70px; /* edit toolbar */
+}
+
+.page {
+  background: var(--page-bg);
+  max-width: 100%; width: 100%;
+  padding: 32px 40px 36px;
+}
+
+/* ── course tag ── */
+.course-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--ink); color: #FFF9F0;
+  font-size: 12px; font-weight: 700;
+  padding: 5px 14px; border-radius: 100px;
+  letter-spacing: 1px; margin-bottom: 18px;
+}
+
+/* ── page header ── */
+.page-header {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 20px; align-items: start; margin-bottom: 28px;
+}
+.page-title   { font-size: 32px; font-weight: 900; color: var(--ink); line-height: 1.2; }
+.page-subtitle{ font-size: 14px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+.page-desc    { font-size: 13px; color: var(--muted); margin-top: 6px; }
+
+/* ── contract box ── */
+.contract-box {
+  background: var(--gold-bg); border: 2px solid var(--gold-bdr);
+  border-radius: var(--r-lg); padding: 14px 18px; min-width: 200px;
+}
+.cb-title {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--gold);
+  margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.cb-ticker {
+  font-size: 22px; font-weight: 900; color: var(--ink);
+  margin-bottom: 12px; display: flex; align-items: baseline; gap: 6px;
+}
+.cb-ticker small { font-size: 13px; font-weight: 500; color: var(--muted); }
+.cb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cb-item .ci-l { font-size: 10px; color: var(--muted); margin-bottom: 1px; }
+.cb-item .ci-v { font-size: 16px; font-weight: 700; color: var(--ink); }
+.cb-item .ci-v.green { color: var(--green); }
+.cb-item .ci-v.gold  { color: var(--gold); }
+
+/* ── panels ── */
+.panels {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 16px; margin-bottom: 16px;
+}
+.panel {
+  background: var(--panel-bg); border: 2px solid var(--border);
+  border-radius: var(--r-lg); padding: 20px;
+  display: flex; flex-direction: column; gap: 14px;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.panel.tts-active, .bonus-panel.tts-active {
+  border-color: var(--gold-bdr);
+  box-shadow: 0 0 0 3px rgba(212,144,10,0.18);
+}
+
+.tag-row { display: flex; align-items: center; justify-content: space-between; }
+.step-badge {
+  width: 26px; height: 26px; background: var(--ink); color: #FFFDF8;
+  border-radius: 100px; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; flex-shrink: 0;
+}
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700;
+  padding: 4px 12px; border-radius: 100px; letter-spacing: 0.3px;
+}
+.pill-outline {
+  background: transparent; border: 1.5px solid;
+  font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+}
+.pill.setup,  .pill-outline.setup  { color: #7A6555; background: #F0E8DC; border-color: #C4B49A; }
+.pill.win,    .pill-outline.win    { color: var(--green); background: var(--green-bg); border-color: var(--green-bdr); }
+.pill.chart,  .pill-outline.chart  { color: var(--blue);  background: var(--blue-bg);  border-color: var(--blue-bdr); }
+.pill.gold,   .pill-outline.gold   { color: var(--gold);  background: var(--gold-bg);  border-color: var(--gold-bdr); }
+.pill.bonus,  .pill-outline.bonus  { color: var(--purple); background: var(--purple-bg); border-color: #C0A8F0; }
+
+.ptitle { font-size: 18px; font-weight: 800; color: var(--ink); line-height: 1.35; }
+
+/* ── txn box ── */
+.txn-box {
+  background: #FFFBF4; border: 1.5px dashed var(--border);
+  border-radius: var(--r-md); padding: 14px 12px;
+}
+.actors-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.actor { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+.actor-emoji {
+  width: 62px; height: 62px; border-radius: 100px;
+  background: #F5EDE0; border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; flex-shrink: 0;
+}
+.actor-name { font-size: 11px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.actor-sub  { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.txn-center { flex: 1; display: flex; flex-direction: column; align-items: center; }
+.arr-group  { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.arr-row    { display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 600; }
+.arr-row.fwd { color: var(--muted); }
+.arr-row.rev { color: var(--green); }
+.arr-line   { flex: 1; height: 1.5px; position: relative; }
+.arr-line.fwd { background: var(--muted); }
+.arr-line.rev { background: var(--green); }
+.arr-line.fwd::after {
+  content:''; position:absolute; right:0; top:-4px;
+  border:5px solid transparent; border-left-color:var(--muted); border-right:none;
+}
+.arr-line.rev::before {
+  content:''; position:absolute; left:0; top:-4px;
+  border:5px solid transparent; border-right-color:var(--green); border-left:none;
+}
+
+/* ── bullets ── */
+.bullets { display: flex; flex-direction: column; gap: 7px; }
+.bullet  { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.bullet-num {
+  width: 20px; height: 20px; background: var(--gold-bg);
+  border: 1.5px solid var(--gold-bdr); border-radius: 100px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 800; color: var(--gold);
+  flex-shrink: 0; margin-top: 1px;
+}
+
+/* ── stat pills ── */
+.stat-pills { display: grid; gap: 8px; }
+.stat-pills.cols-2 { grid-template-columns: 1fr 1fr; }
+.stat-pills.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.spill { background: #F5EFE6; border: 1.5px solid var(--border); border-radius: var(--r-md); padding: 8px 10px; }
+.spill .sl { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+.spill .sv { font-size: 15px; font-weight: 800; color: var(--ink); }
+.spill .sv.green { color: var(--green); }
+.spill .sv.red   { color: var(--red); }
+.spill .sv.gold  { color: var(--gold); }
+.spill .sv.blue  { color: var(--blue); }
+
+/* ── result box ── */
+.result-box { border-radius: var(--r-md); padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
+.result-box.green { background: var(--green-bg); border: 1.5px solid var(--green-bdr); }
+.result-box.gold  { background: var(--gold-bg);  border: 1.5px solid var(--gold-bdr); }
+.result-box.blue  { background: var(--blue-bg);  border: 1.5px solid var(--blue-bdr); }
+.rb-label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.rb-val   { font-size: 20px; font-weight: 900; }
+.rb-val.green { color: var(--green); }
+.rb-val.gold  { color: var(--gold); }
+.rb-val.blue  { color: var(--blue); }
+
+/* ── bonus panel ── */
+.bonus-panel {
+  background: var(--panel-bg); border: 2px solid var(--border);
+  border-radius: var(--r-lg); padding: 22px; margin-bottom: 16px;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.bonus-head  { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.bonus-title { font-size: 20px; font-weight: 900; color: var(--ink); }
+
+/* ── CC-specific: strike table ── */
+.strike-table { border: 1.5px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+.st-row { display: grid; grid-template-columns: 130px 1fr 1.4fr; border-bottom: 1px solid var(--border); }
+.st-row:last-child { border-bottom: none; }
+.st-cell { padding: 9px 11px; font-size: 12px; border-right: 1px solid var(--border); line-height: 1.5; }
+.st-cell:last-child { border-right: none; }
+  .st-cell.bold { white-space: nowrap; }
+.st-cell.hd { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--gold); background: var(--gold-bg); }
+.st-cell.bold { font-weight: 700; color: var(--ink); }
+.st-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 100px; margin-right: 4px; }
+.st-badge.itm { background: var(--red-bg);   color: var(--red);   border: 1px solid var(--red-bdr); }
+.st-badge.atm { background: var(--gold-bg);  color: var(--gold);  border: 1px solid var(--gold-bdr); }
+.st-badge.otm { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-bdr); }
+
+/* ── CC-specific: dark order box ── */
+.order-box { background: var(--ink); border-radius: var(--r-md); padding: 13px 15px; }
+.order-box .ob-title { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; color: #A09080; margin-bottom: 9px; text-transform: uppercase; }
+.order-line { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.07); font-size: 12.5px; }
+.order-line:last-child { border-bottom: none; }
+.ol-key { color: #A09080; }
+.ol-val { color: #FFF9F0; font-weight: 700; }
+.ol-val.green { color: #7AE09A; }
+.ol-val.gold  { color: #F0C040; }
+
+/* ── CC-specific: price table ── */
+.price-table { width: 100%; border-collapse: collapse; }
+.price-table th { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); padding: 6px 10px; background: #F5EFE6; border-bottom: 1.5px solid var(--border); text-align: left; }
+.price-table td { font-size: 12.5px; padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--muted); }
+.price-table tr:last-child td { border-bottom: none; }
+.price-table td.bold  { font-weight: 700; color: var(--ink); }
+.price-table td.green { font-weight: 800; color: var(--green); }
+.price-table td.gold  { font-weight: 800; color: var(--gold); }
+.price-table .hl-row td { background: var(--gold-bg); }
+
+/* ── CC-specific: mindset boxes ── */
+.mindset-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mindset-box { border-radius: var(--r-md); padding: 12px 14px; }
+.mindset-box.wrong { background: var(--red-bg);   border: 1.5px solid var(--red-bdr); }
+.mindset-box.right { background: var(--green-bg); border: 1.5px solid var(--green-bdr); }
+.mb-tag { font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+.mindset-box.wrong .mb-tag { color: var(--red); }
+.mindset-box.right .mb-tag { color: var(--green); }
+.mb-text { font-size: 12px; color: var(--muted); line-height: 1.6; }
+.mb-text strong { color: var(--ink); }
+
+/* ── CC-specific: delta calc ── */
+.delta-calc { background: var(--blue-bg); border: 1.5px solid var(--blue-bdr); border-radius: var(--r-md); padding: 14px; }
+.dc-head { font-size: 11px; font-weight: 700; color: var(--blue); margin-bottom: 10px; letter-spacing: 0.5px; text-transform: uppercase; }
+.formula-line { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink); padding: 5px 0; border-bottom: 1px solid rgba(58,112,192,0.15); }
+.formula-line:last-child { border-bottom: none; }
+.fl-eq { color: var(--blue); font-weight: 800; }
+.fl-result { color: var(--green); font-weight: 900; }
+
+/* ── CC-specific: annual calc ── */
+.annual-calc { background: var(--purple-bg); border: 1.5px solid #C0A8F0; border-radius: var(--r-md); padding: 14px; }
+.ac-head { font-size: 11px; font-weight: 700; color: var(--purple); margin-bottom: 10px; letter-spacing: 0.5px; text-transform: uppercase; }
+.ac-line { font-size: 12.5px; color: var(--muted); padding: 3px 0; line-height: 1.7; }
+.ac-line strong { color: var(--ink); }
+.ac-result { font-size: 24px; font-weight: 900; color: var(--purple); margin-top: 8px; }
+
+/* ── CC-specific: scenario cards ── */
+.scenario-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+.sc-card { border-radius: var(--r-md); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.sc-card.below { background: var(--green-bg); border: 1.5px solid var(--green-bdr); }
+.sc-card.equal { background: var(--gold-bg);  border: 1.5px solid var(--gold-bdr); }
+.sc-card.above { background: var(--blue-bg);  border: 1.5px solid var(--blue-bdr); }
+.sc-icon  { font-size: 26px; }
+.sc-cond  { font-size: 13px; font-weight: 800; color: var(--ink); }
+.sc-desc  { font-size: 11.5px; color: var(--muted); line-height: 1.6; }
+.sc-profit { font-size: 20px; font-weight: 900; }
+.sc-profit.green { color: var(--green); }
+.sc-profit.gold  { color: var(--gold); }
+.sc-profit.blue  { color: var(--blue); }
+.sc-sub { font-size: 11px; font-weight: 600; }
+.sc-card.below .sc-sub { color: var(--green); }
+.sc-card.equal .sc-sub { color: var(--gold); }
+.sc-card.above .sc-sub { color: var(--blue); }
+
+/* ── CC-specific: ledger ── */
+.ledger { display: flex; flex-direction: column; gap: 7px; }
+.ledger-head { font-size: 12px; font-weight: 700; color: var(--muted); display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.l-row { display: flex; align-items: baseline; font-size: 13px; color: var(--muted); gap: 6px; }
+.l-desc { flex: 1; }
+.l-val  { font-weight: 700; min-width: 72px; text-align: right; }
+.l-val.green { color: var(--green); }
+.l-val.gold  { color: var(--gold); }
+.l-divider { border: none; border-top: 1.5px solid var(--border); }
+.l-total { display: flex; justify-content: space-between; font-size: 17px; font-weight: 900; color: var(--ink); padding-top: 2px; }
+.l-total .lt-val { color: var(--green); }
+
+/* ── CC-specific: summary pills ── */
+.summary-pills { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 14px; }
+.sum-pill { background: #F5EFE6; border: 1.5px solid var(--border); border-radius: var(--r-md); padding: 10px 12px; }
+.sum-pill.hl-green { background: var(--green-bg); border-color: var(--green-bdr); }
+.sum-pill.hl-gold  { background: var(--gold-bg);  border-color: var(--gold-bdr); }
+.sum-pill.hl-blue  { background: var(--blue-bg);  border-color: var(--blue-bdr); }
+.sum-pill .sl { font-size: 10px; color: var(--muted); margin-bottom: 3px; }
+.sum-pill .sv { font-size: 18px; font-weight: 900; color: var(--ink); }
+.sum-pill.hl-green .sv { color: var(--green); }
+.sum-pill.hl-gold  .sv { color: #B07000; }
+.sum-pill.hl-blue  .sv { color: var(--blue); }
+
+/* ── CC-specific: tip cards ── */
+.tips-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 14px; }
+.tip-card { background: var(--ink); border-radius: var(--r-md); padding: 14px 16px; display: flex; flex-direction: column; gap: 5px; }
+.tc-emoji { font-size: 20px; }
+.tc-text  { font-size: 13px; font-weight: 700; color: #FFF9F0; line-height: 1.5; }
+.tc-sub   { font-size: 11px; color: #A09080; line-height: 1.5; }
+
+/* ── warning ── */
+.warning {
+  margin-top: 14px; background: #FFF8E8;
+  border: 1.5px solid var(--gold-bdr); border-radius: var(--r-sm);
+  padding: 10px 14px; font-size: 12px; color: #8A6000; line-height: 1.7;
+  display: flex; gap: 8px;
+}
+
+/* ── TTS bar (fixed top) ── */
+#tts-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 3000;
+  background: rgba(42,26,14,0.97); backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 8px 20px; display: flex; align-items: center; gap: 12px;
+  font-family: "PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+.tts-btn {
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+  color: #FFF9F0; border-radius: 100px; padding: 5px 14px; font-size: 12px;
+  cursor: pointer; font-family: inherit; font-weight: 700;
+  transition: background 0.15s; display: flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.tts-btn:hover { background: rgba(255,255,255,0.22); }
+.tts-btn.playing { background: #1E7A3A; border-color: #2E9E52; color: #fff; }
+.tts-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.15); flex-shrink: 0; }
+.tts-dots { display: flex; gap: 5px; align-items: center; }
+.tts-dot {
+  width: 7px; height: 7px; border-radius: 100px;
+  background: rgba(255,255,255,0.2); cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.tts-dot.done    { background: rgba(255,255,255,0.45); }
+.tts-dot.current { background: var(--gold); transform: scale(1.5); }
+.tts-section { font-size: 12px; color: #E8C060; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tts-speed {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #FFF9F0; border-radius: 6px; padding: 3px 7px; font-size: 12px;
+  cursor: pointer; font-family: inherit;
+}
+
+/* ── edit mode (same as lesson5) ── */
+#edit-btn {
+  position: fixed; bottom: 28px; right: 28px; z-index: 2000;
+  background: #2A1A0E; color: #FFF9F0; border: none; border-radius: 100px;
+  padding: 10px 20px; cursor: pointer; font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  font-family: "PingFang TC","Microsoft JhengHei",sans-serif;
+  transition: background 0.15s, transform 0.1s;
+}
+#edit-btn:hover { background: #4A3020; transform: scale(1.03); }
+#edit-btn.active { background: #2E7040; }
+
+#edit-toolbar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #FFFCF7; border-top: 2px solid #E2D4C2;
+  padding: 10px 24px 12px; z-index: 1999;
+  display: flex; align-items: center; gap: 0;
+  box-shadow: 0 -4px 24px rgba(80,40,0,0.10);
+  transform: translateY(100%); transition: transform 0.22s cubic-bezier(.4,0,.2,1);
+  font-family: "PingFang TC","Microsoft JhengHei",sans-serif;
+  flex-wrap: wrap; min-height: 56px;
+}
+#edit-toolbar.visible { transform: translateY(0); }
+.et-hint { font-size: 13px; color: #A08878; padding: 6px 0; font-style: italic; }
+.et-group { display: flex; align-items: center; gap: 0; flex-wrap: wrap; width: 100%; }
+.et-item  { display: flex; flex-direction: column; gap: 3px; padding: 0 14px; }
+.et-label { font-size: 10px; font-weight: 600; color: #9A8878; letter-spacing: 0.5px; text-transform: uppercase; }
+.et-divider { width: 1px; height: 36px; background: #E2D4C2; flex-shrink: 0; }
+#et-font { font-size: 13px; border: 1.5px solid #E2D4C2; border-radius: 6px; padding: 4px 8px; background: white; color: #2A1A0E; cursor: pointer; font-family: inherit; }
+.et-size-ctrl { display: flex; align-items: center; gap: 6px; }
+.et-btn-sm {
+  width: 24px; height: 24px; border: 1.5px solid #E2D4C2; border-radius: 6px;
+  background: white; font-size: 14px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: #2A1A0E;
+}
+.et-btn-sm:hover { background: #F5EFE6; }
+#et-size-val { font-size: 14px; font-weight: 700; min-width: 28px; text-align: center; color: #2A1A0E; }
+.et-fmt-btn {
+  width: 30px; height: 30px; border: 1.5px solid #E2D4C2; border-radius: 6px;
+  background: white; font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: #2A1A0E;
+}
+.et-fmt-btn:hover { background: #F5EFE6; }
+.et-fmt-btn.on { background: #2A1A0E; color: white; border-color: #2A1A0E; }
+#et-color { width: 36px; height: 28px; border: 1.5px solid #E2D4C2; border-radius: 6px; padding: 2px; cursor: pointer; background: white; }
+#et-lh { width: 80px; accent-color: #D4900A; }
+.et-action-btn {
+  font-size: 12px; font-weight: 600; padding: 5px 12px;
+  border: 1.5px solid #E2D4C2; border-radius: 6px; background: white;
+  cursor: pointer; color: #2A1A0E; font-family: inherit;
+}
+.et-action-btn:hover { background: #F5EFE6; }
+.edit-mode .page * { cursor: text; }
+.edit-mode .page [contenteditable]:hover,
+.edit-mode .page *:hover { outline: 1.5px dashed #E8B840; outline-offset: 2px; border-radius: 3px; }
+.el-focus { outline: 2px solid #3A70C0 !important; outline-offset: 3px; border-radius: 3px; }
+.edit-mode .page .el-focus * { outline: none !important; }
+
+  .pron-btn {
+    background: none; border: none; cursor: pointer; padding: 2px 3px;
+    line-height: 1; vertical-align: middle; display: inline-flex;
+    align-items: center; justify-content: center; flex-shrink: 0;
+    transition: transform .1s;
+  }
+  .pron-btn:hover  { transform: scale(1.25); }
+  .pron-btn:active { transform: scale(0.95); }
+  .pron-btn.male   { color: #3b82f6; }
+  .pron-btn.female { color: #ef4444; }
+
+  /* ── TTS Subtitle ── */
+  #tts-subtitle {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+    max-width: 700px; width: calc(100% - 40px);
+    background: rgba(8,4,1,0.85); backdrop-filter: blur(8px);
+    color: #FFF9F0; border-radius: 10px; padding: 10px 18px;
+    font-size: 14px; line-height: 1.9; z-index: 2500;
+    display: none; pointer-events: none;
+    max-height: 110px; overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+  #tts-subtitle.active { display: block; }
+  .sub-c { color: rgba(255,249,240,0.28); }
+  .sub-c.done { color: rgba(255,249,240,0.75); }
+  .sub-c.now  { color: #F5C540; background: rgba(245,197,64,0.18); border-radius: 2px; }
+
+  /* ── Drag Layout ── */
+  #drag-canvas{position:relative !important;min-height:3000px;overflow:visible;}
+  [data-drag-id]{box-sizing:border-box;}
+  .edit-mode [data-drag-id]:hover>.drag-handle,[data-drag-id].is-dragging>.drag-handle,[data-drag-id].is-resizing>.drag-handle{opacity:1;}
+  .drag-handle{position:absolute;top:-15px;left:0;right:0;height:13px;background:linear-gradient(90deg,#3A70C0,#2255A0);border-radius:5px 5px 0 0;cursor:grab;opacity:0;transition:opacity .15s;display:flex;align-items:center;justify-content:center;z-index:200;user-select:none;}
+  .drag-handle:active{cursor:grabbing;}
+  .drag-handle::before{content:":::";font-size:9px;font-weight:900;color:rgba(255,255,255,.85);letter-spacing:4px;}
+  .edit-mode [data-drag-id]:hover,[data-drag-id].is-dragging,[data-drag-id].is-resizing{outline:2px dashed rgba(58,112,192,.45);outline-offset:3px;}
+  .rh{position:absolute;width:10px;height:10px;background:#3A70C0;border:2px solid #fff;border-radius:2px;opacity:0;transition:opacity .15s;z-index:201;}
+  .edit-mode [data-drag-id]:hover .rh,[data-drag-id].is-resizing .rh{opacity:1;}
+  .rh-nw{top:-5px;left:-5px;cursor:nw-resize;}.rh-n{top:-5px;left:50%;transform:translateX(-50%);cursor:n-resize;}
+  .rh-ne{top:-5px;right:-5px;cursor:ne-resize;}.rh-e{top:50%;right:-5px;transform:translateY(-50%);cursor:e-resize;}
+  .rh-se{bottom:-5px;right:-5px;cursor:se-resize;}.rh-s{bottom:-5px;left:50%;transform:translateX(-50%);cursor:s-resize;}
+  .rh-sw{bottom:-5px;left:-5px;cursor:sw-resize;}.rh-w{top:50%;left:-5px;transform:translateY(-50%);cursor:w-resize;}
+  #layout-reset-btn{position:fixed;bottom:70px;right:20px;background:#FAF3E8;border:1.5px solid #E2D4C2;border-radius:8px;padding:7px 16px;font-size:12px;cursor:pointer;z-index:10001;color:#7A6555;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,.12);}
+  #layout-reset-btn:hover{background:#F0E4D0;}
+</style>
+</head>
+<body>
+
+<!-- TTS Bar -->
+<div id="tts-bar">
+  <button id="tts-play-btn" class="tts-btn" onclick="ttsToggle()">▶ 朗讀全文</button>
+  <button class="tts-btn" onclick="ttsStop()" title="停止並重設">⏹</button>
+  <div class="tts-sep"></div>
+  <div class="tts-dots" id="tts-dots"></div>
+  <div class="tts-sep"></div>
+  <span class="tts-section" id="tts-section-name">點擊「朗讀全文」開始</span>
+  <select id="tts-speed" title="語速" onchange="ttsSetRate(this.value)">
+    <option value="0.8">0.8×</option>
+    <option value="0.9" selected>0.9×</option>
+    <option value="1.0">1.0×</option>
+    <option value="1.1">1.1×</option>
+    <option value="1.2">1.2×</option>
+  </select>
+  <div class="tts-sep"></div>
+  <span style="font-size:11px;color:#8A7A5A;">🔊</span>
+  <input type="range" id="tts-vol" min="0" max="1" step="0.05" value="1"
+         style="width:60px;accent-color:var(--gold);cursor:pointer;" title="音量">
+  <div class="tts-sep"></div>
+  <button class="tts-btn" onclick="adjustPageFont(-1)" style="padding:4px 9px;font-size:11px;font-weight:900;" title="縮小字體">A−</button>
+  <button class="tts-btn" onclick="adjustPageFont(1)"  style="padding:4px 9px;font-size:11px;font-weight:900;" title="放大字體">A+</button>
+</div>
+
+<button id="layout-reset-btn" onclick="window.resetLayout && window.resetLayout()" title="重設版面排列">↺ 重設版面</button>
+<!-- TTS Subtitle -->
+<div id="tts-subtitle"></div>
+
+<!-- Edit Button -->
+<button id="edit-btn" onclick="toggleEditMode()" title="Ctrl+E">
+  <span id="edit-icon">✏️</span>
+  <span id="edit-label">編輯模式</span>
+</button>
+
+<!-- Edit Toolbar -->
+<div id="edit-toolbar">
+  <div class="et-hint" id="et-hint">← 點擊頁面任意文字開始編輯</div>
+  <div class="et-group" id="et-controls" style="display:none;">
+    <div class="et-item">
+      <div class="et-label">字體</div>
+      <select id="et-font" onchange="applyStyle('fontFamily', this.value)">
+        <option value='"PingFang TC","Microsoft JhengHei",sans-serif'>PingFang TC</option>
+        <option value='Georgia,"Times New Roman",serif'>Georgia</option>
+        <option value='system-ui,sans-serif'>System UI</option>
+        <option value='"Courier New",monospace'>等寬字體</option>
+      </select>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">大小</div>
+      <div class="et-size-ctrl">
+        <button class="et-btn-sm" onclick="adjustSize(-1)">−</button>
+        <span id="et-size-val">16</span>
+        <button class="et-btn-sm" onclick="adjustSize(1)">+</button>
+      </div>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button id="et-bold"   class="et-fmt-btn" onclick="toggleBold()"><b>B</b></button>
+      <button id="et-italic" class="et-fmt-btn" onclick="toggleItalic()"><i>I</i></button>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">顏色</div>
+      <input type="color" id="et-color" oninput="applyStyle('color', this.value)" title="文字顏色">
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">行距</div>
+      <input type="range" id="et-lh" min="1" max="3" step="0.05" value="1.4"
+             oninput="applyStyle('lineHeight', this.value); document.getElementById('et-lh-val').textContent = parseFloat(this.value).toFixed(1);">
+      <span id="et-lh-val" style="font-size:11px;min-width:22px;">1.4</span>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button class="et-action-btn" onclick="resetElement()">重設</button>
+      <button class="et-action-btn" id="et-copy-btn" onclick="copyHtml()">複製</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ MAIN PAGE ═══════════════════════════════════════ -->
+<div class="page" id="drag-canvas">
+
+  <div class="course-tag" data-drag-id="cc-course-tag">📚 期權小學堂 · CC 課</div>
+
+  <!-- Header -->
+  <div class="page-header" data-drag-id="cc-header">
+    <div>
+      <div class="page-title">Covered Call 備兌買權</div>
+      <div class="page-subtitle">Covered Call Complete Guide — 用現股出租，三種到期都是贏</div>
+      <div class="page-desc">持有 TQQQ 現股，賣出 Call 選擇權，讓持股每月自動產生現金流 💰</div>
+    </div>
+    <div class="contract-box">
+      <div class="cb-title">📋 實戰合約</div>
+      <div class="cb-ticker">TQQQ <small>· Covered Call</small></div>
+      <div class="cb-grid">
+        <div class="cb-item"><div class="ci-l">持股成本</div><div class="ci-v">$14.28</div></div>
+        <div class="cb-item"><div class="ci-l">現價</div><div class="ci-v">$75.12</div></div>
+        <div class="cb-item"><div class="ci-l">Strike</div><div class="ci-v">$80</div></div>
+        <div class="cb-item"><div class="ci-l">到期日</div><div class="ci-v">06/26</div></div>
+        <div class="cb-item"><div class="ci-l">掛單 Premium</div><div class="ci-v gold">$6.60</div></div>
+        <div class="cb-item"><div class="ci-l">未實現獲利</div><div class="ci-v green">+426%</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4 Panels -->
+  <div class="panels">
+
+    <!-- Panel 1: CC 是什麼 -->
+    <div id="panel1" class="panel" data-drag-id="cc-panel1">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="step-badge">1</div>
+          <div class="pill-outline setup">COVERED CALL</div>
+        </div>
+        <div class="pill setup">策略定義</div>
+      </div>
+
+      <div class="ptitle">持股 + 賣 Call<br>讓股票每月自動生息 📬</div>
+
+      <div class="txn-box">
+        <div class="actors-row">
+          <div class="actor">
+            <div class="actor-emoji">🐾</div>
+            <div class="actor-name">你（持股者）</div>
+            <div class="actor-sub">持有 100 股 TQQQ</div>
+          </div>
+          <div class="txn-center">
+            <div class="arr-group">
+              <div class="arr-row fwd">
+                <span style="white-space:nowrap">賣出 Call</span>
+                <div class="arr-line fwd"></div>
+              </div>
+              <div class="arr-row rev">
+                <div class="arr-line rev"></div>
+                <span style="white-space:nowrap">Premium ✓</span>
+              </div>
+            </div>
+          </div>
+          <div class="actor">
+            <div class="actor-emoji" style="background:var(--blue-bg);border-color:var(--blue-bdr);">💼</div>
+            <div class="actor-name">Call 買家</div>
+            <div class="actor-sub">支付 Premium</div>
+          </div>
+        </div>
+        <div style="text-align:center;font-size:10.5px;color:var(--blue);background:var(--blue-bg);border-radius:var(--r-sm);padding:5px 10px;border:1px solid var(--blue-bdr);">
+          ⚠️ 賣的是 <strong>Call（買權）</strong>，不是 Put——Put 是 CSP 策略，完全不同
+        </div>
+      </div>
+
+      <div class="bullets">
+        <div class="bullet"><div class="bullet-num">①</div><span>必須先持有 <strong style="color:var(--ink)">100 股現股</strong>——這是「Covered（有擔保）」的意思，賣出的合約背後有真實股票支撐。</span></div>
+        <div class="bullet"><div class="bullet-num">②</div><span>賣出 <strong style="color:var(--ink)">1 口 Call 選擇權</strong>，對應這 100 股，履約價選比現價高的 OTM。</span></div>
+        <div class="bullet"><div class="bullet-num">③</div><span>立即收到買家支付的 <strong style="color:var(--ink)">Premium（權利金）</strong>，無論到期結果如何都不退還，直接入袋。</span></div>
+      </div>
+
+      <div class="result-box gold">
+        <span class="rb-label">下單動作</span>
+        <span class="rb-val gold" style="font-size:15px;">Sell to Open · Call</span>
+      </div>
+    </div>
+
+    <!-- Panel 2: Strike 選擇 -->
+    <div id="panel2" class="panel" data-drag-id="cc-panel2">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="step-badge">2</div>
+          <div class="pill-outline gold">STRIKE CHOICE</div>
+        </div>
+        <div class="pill gold">Strike<button class="pron-btn male" onclick="pronounce('Strike','male')" title="男聲 Strike"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('Strike','female')" title="女聲 Strike"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button> 選擇</div>
+      </div>
+
+      <div class="ptitle">OTM<button class="pron-btn male" onclick="pronounce('OTM','male')" title="男聲 OTM"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('OTM','female')" title="女聲 OTM"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button> / ATM<button class="pron-btn male" onclick="pronounce('ATM','male')" title="男聲 ATM"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('ATM','female')" title="女聲 ATM"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button> / ITM<button class="pron-btn male" onclick="pronounce('ITM','male')" title="男聲 ITM"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('ITM','female')" title="女聲 ITM"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><br>你願意在哪個價位賣股？ 🎯</div>
+
+      <div class="strike-table">
+        <div class="st-row">
+          <div class="st-cell hd">策略</div>
+          <div class="st-cell hd">Strike</div>
+          <div class="st-cell hd">特色</div>
+        </div>
+        <div class="st-row">
+          <div class="st-cell bold"><span class="st-badge itm">ITM</span>積極收租</div>
+          <div class="st-cell" style="color:var(--red);font-weight:700;">$70 價內</div>
+          <div class="st-cell">Premium 最厚，最容易被 Call 走 🚨</div>
+        </div>
+        <div class="st-row" style="background:rgba(254,244,216,0.4);">
+          <div class="st-cell bold"><span class="st-badge atm">ATM</span>平衡</div>
+          <div class="st-cell" style="color:var(--gold);font-weight:700;">$75 平價</div>
+          <div class="st-cell">中等 premium，五五波</div>
+        </div>
+        <div class="st-row">
+          <div class="st-cell bold"><span class="st-badge otm">OTM</span>繼續持股</div>
+          <div class="st-cell" style="color:var(--green);font-weight:700;">$80 價外</div>
+          <div class="st-cell">薄 premium，保留上漲空間 ✅</div>
+        </div>
+      </div>
+
+      <div class="stat-pills cols-3">
+        <div class="spill"><div class="sl">$80 Call · Delta</div><div class="sv blue">0.38</div></div>
+        <div class="spill"><div class="sl">ITM 到期機率</div><div class="sv red">34%</div></div>
+        <div class="spill"><div class="sl">保留股票機率</div><div class="sv green">66%</div></div>
+      </div>
+
+      <div style="background:#FFF8E8;border:1.5px solid var(--gold-bdr);border-radius:var(--r-sm);padding:10px 14px;font-size:12px;color:#8A6000;line-height:1.7;">
+        <strong>🔑 選擇關鍵：</strong>你願不願意在這個價位把股票賣掉？<br>
+        在 Barchart.com 可查 Delta 與 ITM Probability。
+      </div>
+    </div>
+
+    <!-- Panel 3: 聰明掛單 -->
+    <div id="panel3" class="panel" data-drag-id="cc-panel3">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="step-badge">3</div>
+          <div class="pill-outline gold">ORDER STRATEGY</div>
+        </div>
+        <div class="pill gold">掛單技巧</div>
+      </div>
+
+      <div class="ptitle">不要等漲了再掛<br>現在就掛高限價，讓市場來撞 🎯</div>
+
+      <div class="mindset-row">
+        <div class="mindset-box wrong">
+          <div class="mb-tag">❌ 錯誤思維</div>
+          <div class="mb-text">現在掛 <strong>$4.10</strong>，等股價漲到 $79 再重新掛 $5.60——需要盯盤，容易錯過。</div>
+        </div>
+        <div class="mindset-box right">
+          <div class="mb-tag">✅ 正確思維</div>
+          <div class="mb-text"><strong>現在就直接掛 $5.60 限價！</strong>等 TQQQ 自然漲到 $79，Call 自動成交，完全不盯盤。</div>
+        </div>
+      </div>
+
+      <div class="order-box">
+        <div class="ob-title">下單範例</div>
+        <div class="order-line"><span class="ol-key">Action</span><span class="ol-val green">Sell to Open</span></div>
+        <div class="order-line"><span class="ol-key">Type</span><span class="ol-val">Call</span></div>
+        <div class="order-line"><span class="ol-key">Strike</span><span class="ol-val">$80</span></div>
+        <div class="order-line"><span class="ol-key">Expiration</span><span class="ol-val">2026-06-26</span></div>
+        <div class="order-line"><span class="ol-key">Quantity</span><span class="ol-val">1 口（需持 100 股）</span></div>
+        <div class="order-line"><span class="ol-key">Order Type</span><span class="ol-val gold">Limit</span></div>
+        <div class="order-line"><span class="ol-key">Limit Price</span><span class="ol-val gold">$5.60</span></div>
+      </div>
+
+      <div style="border:1.5px solid var(--border);border-radius:var(--r-md);overflow:hidden;">
+        <table class="price-table">
+          <tr>
+            <th>掛單 Premium</th>
+            <th>觸發時股價約</th>
+            <th>實質賣出價</th>
+          </tr>
+          <tr>
+            <td class="bold">$4.10</td>
+            <td>$75（現在）</td>
+            <td class="gold">$84.10</td>
+          </tr>
+          <tr class="hl-row">
+            <td class="bold">$5.60</td>
+            <td>~$79</td>
+            <td class="green">$85.60 ★</td>
+          </tr>
+          <tr>
+            <td class="bold">$6.60</td>
+            <td>~$81–82</td>
+            <td class="green">$86.60</td>
+          </tr>
+        </table>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);text-align:center;">
+        實質賣出價 <strong style="color:var(--ink)">= Strike + Premium</strong>　·　越有耐心，賣越貴
+      </div>
+    </div>
+
+    <!-- Panel 4: Delta + 年化 -->
+    <div id="panel4" class="panel" data-drag-id="cc-panel4">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="step-badge">4</div>
+          <div class="pill-outline chart">ANALYTICS</div>
+        </div>
+        <div class="pill chart">Delta<button class="pron-btn male" onclick="pronounce('Delta','male')" title="男聲 Delta"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('Delta','female')" title="女聲 Delta"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button> 分析</div>
+      </div>
+
+      <div class="ptitle">用 Delta<button class="pron-btn male" onclick="pronounce('Delta','male')" title="男聲 Delta"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('Delta','female')" title="女聲 Delta"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button> 估算未來 Premium<button class="pron-btn male" onclick="pronounce('Premium','male')" title="男聲 Premium"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('Premium','female')" title="女聲 Premium"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><br>年化報酬超過 50% 📊</div>
+
+      <div class="delta-calc">
+        <div class="dc-head">📐 Delta 估算（TQQQ $75 → $79，漲 $4）</div>
+        <div class="formula-line">
+          <span>△Premium</span>
+          <span class="fl-eq">=</span>
+          <span>$4 × 0.38</span>
+          <span class="fl-eq">=</span>
+          <span class="fl-result">+$1.52</span>
+        </div>
+        <div class="formula-line">
+          <span>新 Premium</span>
+          <span class="fl-eq">≈</span>
+          <span>$4.10 + $1.52</span>
+          <span class="fl-eq">=</span>
+          <span class="fl-result">$5.62 ≈ $5.60 ✓</span>
+        </div>
+      </div>
+
+      <div class="annual-calc">
+        <div class="ac-head">📈 年化報酬率（DTE 38 天）</div>
+        <div class="ac-line">年化 = <strong>Premium ÷ 股價</strong> × <strong>365 ÷ DTE<button class="pron-btn male" onclick="pronounce('DTE','male')" title="男聲 DTE"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('DTE','female')" title="女聲 DTE"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button></strong></div>
+        <div class="ac-line">= <strong>$4.10 ÷ $75</strong> × <strong>365 ÷ 38</strong></div>
+        <div class="ac-line">= 5.47% × 9.61</div>
+        <div class="ac-result">≈ 52.5% / 年 🔥</div>
+      </div>
+
+      <div class="stat-pills cols-2">
+        <div class="spill"><div class="sl">查 Delta / IV 工具</div><div class="sv" style="font-size:12px;color:var(--blue);">Barchart.com</div></div>
+        <div class="spill"><div class="sl">最佳進場：IV 高時</div><div class="sv gold">Premium 厚</div></div>
+      </div>
+    </div>
+
+  </div><!-- .panels -->
+
+  <!-- Bonus 1: 三種到期情境 -->
+  <div id="bonus-scenarios" class="bonus-panel" data-drag-id="cc-bonus-scenarios">
+    <div class="bonus-head">
+      <div class="step-badge" style="background:var(--green);">5</div>
+      <div class="bonus-title">三種到期情境——三種都是贏 ✅</div>
+      <div class="pill win" style="margin-left:auto;">EXPIRY SCENARIOS</div>
+    </div>
+    <div style="font-size:12.5px;color:var(--muted);margin-top:4px;">
+      以 TQQQ 成本 <strong style="color:var(--ink)">$14</strong>，賣 <strong style="color:var(--ink)">$80 Call</strong> 收 <strong style="color:var(--ink)">$4.10（$410）</strong> 為例
+    </div>
+
+    <div class="scenario-grid">
+      <div class="sc-card below">
+        <div class="sc-icon">📦</div>
+        <div class="sc-cond">到期時 TQQQ &lt; $80</div>
+        <div class="sc-desc">Call 沒被執行，保留全部 100 股，Premium 完整入袋，繼續賣下一輪。</div>
+        <div class="sc-profit green">+$410</div>
+        <div class="sc-sub">繼續持股 + 收租 ✅</div>
+      </div>
+      <div class="sc-card equal">
+        <div class="sc-icon">⚖️</div>
+        <div class="sc-cond">到期時 TQQQ ≈ $80</div>
+        <div class="sc-desc">剛好在 Strike 邊緣，通常不被執行，同樣保留股票 + Premium 全拿。</div>
+        <div class="sc-profit gold">+$410</div>
+        <div class="sc-sub">最幸運情境 ✅</div>
+      </div>
+      <div class="sc-card above">
+        <div class="sc-icon">🚀</div>
+        <div class="sc-cond">到期時 TQQQ &gt; $80</div>
+        <div class="sc-desc">100 股以 $80 被 Call 走，股票獲利 + Premium 全部一次拿走。</div>
+        <div class="sc-profit blue">+$7,010</div>
+        <div class="sc-sub">(80−14)×100 + 410 ✅</div>
+      </div>
+    </div>
+
+    <div class="warning">
+      ⚠️
+      <div>唯一的「遺憾」：TQQQ 漲到 $100，你只賣到 $80——但那<strong>不是虧損，只是少賺</strong>。成本 $14 的你，早已賺了近 5 倍，遺憾不等於虧損。</div>
+    </div>
+  </div>
+
+  <!-- Bonus 2: 實戰案例 + 重點口訣 -->
+  <div id="bonus-summary" class="bonus-panel" data-drag-id="cc-bonus-summary">
+    <div class="bonus-head">
+      <div class="step-badge" style="background:var(--gold);color:var(--ink);">6</div>
+      <div class="bonus-title">實戰案例總結（TQQQ）＋ 重點口訣 🔑</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:16px;">
+
+      <!-- Left: ledger -->
+      <div>
+        <div class="ledger-head">📋 TQQQ 實戰清單</div>
+        <div class="ledger">
+          <div class="l-row"><span class="l-desc">持股成本</span><span class="l-val">$14.28 / 股</span></div>
+          <div class="l-row"><span class="l-desc">現價</span><span class="l-val">$75.12</span></div>
+          <div class="l-row"><span class="l-desc">未實現獲利</span><span class="l-val green">+426%</span></div>
+          <div class="l-row"><span class="l-desc">賣出合約</span><span class="l-val">$80 Call，06/26</span></div>
+          <div class="l-row"><span class="l-desc">掛單策略</span><span class="l-val gold">限價 $6.60</span></div>
+          <div class="l-row"><span class="l-desc">觸發條件</span><span class="l-val">股價 ~$82 自動成交</span></div>
+          <hr class="l-divider">
+          <div class="l-row"><span class="l-desc">實質賣出價</span><span class="l-val gold">$86.60</span></div>
+          <div class="l-total">
+            <span>若被 Call 走總獲利</span>
+            <span class="lt-val">$7,232</span>
+          </div>
+        </div>
+
+        <div class="summary-pills">
+          <div class="sum-pill hl-green"><div class="sl">年化報酬估算</div><div class="sv">53%</div></div>
+          <div class="sum-pill hl-gold" ><div class="sl">保留股票機率</div><div class="sv">66%</div></div>
+          <div class="sum-pill hl-blue" ><div class="sl">DTE（剩餘天數）</div><div class="sv">38 天</div></div>
+          <div class="sum-pill">         <div class="sl">Strike 距現價</div><div class="sv">+$4.88</div></div>
+        </div>
+      </div>
+
+      <!-- Right: tips -->
+      <div>
+        <div class="ledger-head">🔑 重點口訣</div>
+        <div class="tips-grid">
+          <div class="tip-card">
+            <div class="tc-emoji">📈</div>
+            <div class="tc-text">賣 CC 之前：股價高，Premium 厚</div>
+            <div class="tc-sub">股價越高，同一 Strike 的 Call 越貴，是賣出的好時機。</div>
+          </div>
+          <div class="tip-card">
+            <div class="tc-emoji">⚠️</div>
+            <div class="tc-text">賣後股價繼續漲：遺憾不是虧損</div>
+            <div class="tc-sub">被 Call 走是策略執行成功，立刻找下一個機會，不要後悔。</div>
+          </div>
+          <div class="tip-card">
+            <div class="tc-emoji">🎯</div>
+            <div class="tc-text">現在就掛高限價，讓市場撞上來</div>
+            <div class="tc-sub">不用等漲了再掛，限價單等股價自然到達，完全不需要盯盤。</div>
+          </div>
+          <div class="tip-card">
+            <div class="tc-emoji">💰</div>
+            <div class="tc-text">越有耐心，賣越貴</div>
+            <div class="tc-sub">成本夠低才有本錢等。持股成本 $14 才有資格等 $6.60 的掛單。</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- .page -->
+
+<script>
+// ── Edit Mode ────────────────────────────────────────────────────────────────
+(function () {
+  var editMode = false, focused = null;
+  var originalStyles = new WeakMap();
+
+  window.toggleEditMode = function () {
+    editMode = !editMode;
+    document.body.classList.toggle('edit-mode', editMode);
+    document.getElementById('edit-btn').classList.toggle('active', editMode);
+    document.getElementById('edit-label').textContent = editMode ? '退出編輯' : '編輯模式';
+    document.getElementById('edit-icon').textContent  = editMode ? '✕' : '✏️';
+    document.getElementById('edit-toolbar').classList.toggle('visible', editMode);
+    if (!editMode) {
+      blurCurrent();
+      document.getElementById('et-hint').style.display = '';
+      document.getElementById('et-controls').style.display = 'none';
+    }
+  };
+
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); window.toggleEditMode(); }
+    if (e.key === 'Escape' && editMode) blurCurrent();
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!editMode) return;
+    var skip = ['edit-btn', 'edit-toolbar', 'tts-bar'];
+    for (var i = 0; i < skip.length; i++) {
+      var el = document.getElementById(skip[i]);
+      if (el && el.contains(e.target)) return;
+    }
+    blurCurrent();
+    var el = e.target;
+    var allowed = ['div','p','span','h1','h2','h3','h4','label','td','th','li','small'];
+    while (el && el !== document.body) {
+      if (allowed.includes(el.tagName.toLowerCase())) break;
+      el = el.parentElement;
+    }
+    if (!el || el === document.body) return;
+    focused = el;
+    if (!originalStyles.has(el)) originalStyles.set(el, el.getAttribute('style') || '');
+    el.contentEditable = 'true';
+    el.classList.add('el-focus');
+    el.focus();
+    updateToolbar(el);
+    document.getElementById('et-hint').style.display = 'none';
+    document.getElementById('et-controls').style.display = 'flex';
+  });
+
+  function blurCurrent() {
+    if (focused) { focused.contentEditable = 'false'; focused.classList.remove('el-focus'); focused = null; }
+  }
+
+  function updateToolbar(el) {
+    var cs = window.getComputedStyle(el);
+    var fs = parseFloat(cs.fontSize) || 14;
+    document.getElementById('et-size-val').textContent = Math.round(fs);
+    document.getElementById('et-bold').classList.toggle('on', parseInt(cs.fontWeight) >= 600);
+    document.getElementById('et-italic').classList.toggle('on', cs.fontStyle === 'italic');
+    document.getElementById('et-color').value = rgbToHex(cs.color);
+    var lhRaw = cs.lineHeight;
+    var lhNum = lhRaw === 'normal' ? 1.4 : parseFloat(lhRaw) / fs;
+    var slider = document.getElementById('et-lh');
+    slider.value = isNaN(lhNum) ? 1.4 : Math.min(3, Math.max(1, lhNum));
+    document.getElementById('et-lh-val').textContent = parseFloat(slider.value).toFixed(1);
+  }
+
+  window.applyStyle   = function (p, v) { if (focused) focused.style[p] = v; };
+  window.adjustSize   = function (d) {
+    if (!focused) return;
+    var next = Math.max(8, Math.min(72, Math.round(parseFloat(window.getComputedStyle(focused).fontSize) || 14) + d));
+    focused.style.fontSize = next + 'px';
+    document.getElementById('et-size-val').textContent = next;
+  };
+  window.toggleBold   = function () {
+    if (!focused) return;
+    var bold = parseInt(window.getComputedStyle(focused).fontWeight) >= 600;
+    focused.style.fontWeight = bold ? '400' : '800';
+    document.getElementById('et-bold').classList.toggle('on', !bold);
+  };
+  window.toggleItalic = function () {
+    if (!focused) return;
+    var italic = window.getComputedStyle(focused).fontStyle === 'italic';
+    focused.style.fontStyle = italic ? 'normal' : 'italic';
+    document.getElementById('et-italic').classList.toggle('on', !italic);
+  };
+  window.resetElement = function () {
+    if (!focused) return;
+    focused.style.cssText = originalStyles.get(focused) || '';
+    updateToolbar(focused);
+  };
+  window.copyHtml = function () {
+    navigator.clipboard.writeText(document.querySelector('.page').outerHTML).then(function () {
+      var btn = document.getElementById('et-copy-btn');
+      btn.textContent = '已複製 ✓';
+      setTimeout(function () { btn.textContent = '複製'; }, 2000);
+    });
+  };
+
+  function rgbToHex(rgb) {
+    var m = rgb.match(/\d+/g);
+    if (!m || m.length < 3) return '#000000';
+    return '#' + [m[0], m[1], m[2]].map(function (x) { return ('0' + parseInt(x).toString(16)).slice(-2); }).join('');
+  }
+}());
+
+// ── TTS ──────────────────────────────────────────────────────────────────────
+(function () {
+  var _fontZoom = parseFloat(localStorage.getItem('l6-font-zoom') || '1');
+  var _fontBaseMap = new WeakMap();
+  function applyFontZoom() {
+    document.querySelectorAll('#drag-canvas [data-drag-id] *').forEach(function (el) {
+      if (!_fontBaseMap.has(el)) {
+        _fontBaseMap.set(el, parseFloat(window.getComputedStyle(el).fontSize) || 14);
+      }
+      el.style.fontSize = (_fontBaseMap.get(el) * _fontZoom) + 'px';
+    });
+  }
+  function relayoutAfterZoom() {
+    var canvas = document.getElementById('drag-canvas');
+    if (!canvas) return;
+    var panels = Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    if (!panels.length) return;
+    panels.sort(function (a, b) { return (parseFloat(a.style.top) || 0) - (parseFloat(b.style.top) || 0); });
+    var GAP = 16, y = GAP;
+    panels.forEach(function (el) {
+      el.style.top = y + 'px';
+      y += el.getBoundingClientRect().height + GAP;
+    });
+    try { localStorage.removeItem('l6-layout-v5'); } catch (e) {}
+  }
+  window.adjustPageFont = function (delta) {
+    _fontZoom = Math.max(0.7, Math.min(2.0, parseFloat((_fontZoom + delta * 0.1).toFixed(2))));
+    applyFontZoom();
+    localStorage.setItem('l6-font-zoom', _fontZoom);
+    requestAnimationFrame(function () { requestAnimationFrame(relayoutAfterZoom); });
+  };
+  window.addEventListener('load', function () {
+    if (_fontZoom !== 1) {
+      applyFontZoom();
+      requestAnimationFrame(function () { requestAnimationFrame(relayoutAfterZoom); });
+    }
+  });
+
+  function pronounce(text, gender) {
+    var voice = gender === 'female' ? 'af_sarah' : 'am_michael';
+    var vol = parseFloat((document.getElementById('tts-vol') || {value:'1'}).value);
+    var audio = new Audio('http://127.0.0.1:5051/tts?text=' + encodeURIComponent(text) + '&voice=' + encodeURIComponent(voice));
+    audio.volume = vol;
+    audio.play().catch(function(e){ console.warn('Kokoro TTS:', e.message); });
+  }
+
+    var SCRIPT = [
+    {
+      id: null, label: '開場白',
+      text: '歡迎來到期權小學堂。今天我們學習 Covered Call，中文叫做備兌買權。這是在持有現股的前提下，賣出 Call 選擇權來收取權利金的策略，讓你的股票每個月自動生息。'
+    },
+    {
+      id: 'panel1', label: 'CC 是什麼',
+      text: 'Covered Call 由三個核心要素組成。第一，你必須持有一百股現股，例如 TQQQ。這就是 Covered，有擔保的意思，你的賣單背後有真正的股票支撐。第二，你賣出一口 Call 選擇權，注意，賣的是 Call，不是 Put。Put 是完全不同的 CSP 策略。第三，你立即收到買家支付的 Premium，也就是權利金，無論到期結果如何，這筆錢都不退還，直接入袋。'
+    },
+    {
+      id: 'panel2', label: 'Strike 選擇',
+      text: 'Strike 的選擇，關鍵在於你願不願意在這個價位把股票賣掉。以 TQQQ 現價七十五元為例，有三種選擇。積極收租選七十元的價內選擇權，權利金最厚，但最容易被執行，股票最容易被賣走。平衡選擇是七十五元的平價選擇權，中等 premium，五五波。繼續持股則選八十元的價外選擇權，premium 薄，但能保留大部分上漲空間。以八十元的 Call 為例，Delta 是零點三八，被執行的機率只有百分之三十四，也就是說有百分之六十六的機率你能繼續保留股票。'
+    },
+    {
+      id: 'panel3', label: '聰明掛單',
+      text: '很多人的錯誤思維是：現在掛四塊一，等股價漲到七十九元再重新掛五塊六。這種做法需要一直盯盤，可能還會錯過最佳時機。正確的做法是：現在就直接掛五塊六的限價單！等 TQQQ 自然漲到七十九元，你賣出的 Call 市價自動到達五塊六，限價單自動成交，完全不需要盯盤。這就是讓市場撞上你的掛單，而不是你去追市場。記住，實質賣出價等於履約價加上你收到的 premium。掛單金額越高，實質出場價越好，越有耐心，賣越貴。'
+    },
+    {
+      id: 'panel4', label: 'Delta 分析',
+      text: '利用 Delta 可以估算未來的 premium 變化。以 TQQQ 從七十五元漲到七十九元，漲了四塊為例。Delta 是零點三八，所以 premium 增加大約一塊五二，新的 premium 約為五塊六二，這正好驗證了我們掛五塊六的合理性。年化報酬率的計算方法是：premium 除以股票現價，再乘以三百六十五除以剩餘天數。以這個案例計算，年化報酬率高達百分之五十二點五，相當可觀。查詢 Delta 和隱含波動率，可以去 Barchart 網站。'
+    },
+    {
+      id: 'bonus-scenarios', label: '三種到期情境',
+      text: '到期時有三種情境，三種結果都是正面的。第一種，股價低於履約價八十元，Call 沒被執行，你保留全部一百股，同時四百一十元的 premium 完整入袋，可以繼續賣下一輪。第二種，股價剛好等於履約價，通常也不會被執行，同樣保留股票加上全部 premium。第三種，股價超過八十元，一百股以八十元被賣出，加上 premium，成本只有十四塊的你，總獲利高達七千零一十元。唯一的遺憾是股票漲到一百塊，你只賣到八十，但那不是虧損，只是少賺。成本十四塊的你，早已賺了近五倍。'
+    },
+    {
+      id: 'bonus-summary', label: '實戰總結',
+      text: '這次 TQQQ 的實戰案例，持股成本十四塊二八，現價七十五塊一二，未實現獲利高達四百二十六個百分點。我們賣出八十元 Call，六月二十六日到期，掛六塊六的限價單，等股價自然漲到約八十二元自動成交。實質賣出價是八十六塊六，若被 Call 走，總獲利七千兩百三十二元。最後記住四條口訣：第一，賣 CC 之前，股價高，premium 厚，是最佳時機。第二，賣後股價繼續漲，是遺憾不是虧損。第三，不要等漲了再掛，現在就掛高限價，讓市場自己撞上來。第四，越有耐心，賣越貴，成本夠低才有本錢等待好價格。'
+    }
+  ];
+
+  var ttsIdx = 0, ttsPlaying = false, ttsPaused = false, ttsRate = 0.9;
+  var activePanelId = null;
+
+  function initDots() {
+    var c = document.getElementById('tts-dots');
+    c.innerHTML = '';
+    SCRIPT.forEach(function (s, i) {
+      var d = document.createElement('div');
+      d.className = 'tts-dot';
+      d.id = 'tts-dot-' + i;
+      d.title = s.label;
+      d.style.cursor = 'pointer';
+      d.onclick = function () { ttsJumpTo(i); };
+      c.appendChild(d);
+    });
+  }
+
+  function updateDots() {
+    SCRIPT.forEach(function (_, i) {
+      var d = document.getElementById('tts-dot-' + i);
+      if (!d) return;
+      d.className = 'tts-dot' + (i < ttsIdx ? ' done' : i === ttsIdx ? ' current' : '');
+    });
+  }
+
+  function setActivePanel(id) {
+    if (activePanelId) {
+      var prev = document.getElementById(activePanelId);
+      if (prev) prev.classList.remove('tts-active');
+    }
+    activePanelId = id;
+    if (id) {
+      var el = document.getElementById(id);
+      if (el) { el.classList.add('tts-active'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+    }
+  }
+
+  function updateUI() {
+    var btn = document.getElementById('tts-play-btn');
+    var sec = document.getElementById('tts-section-name');
+    if (ttsPlaying && !ttsPaused) {
+      btn.textContent = '⏸ 暫停';
+      btn.className = 'tts-btn playing';
+    } else if (ttsPaused) {
+      btn.textContent = '▶ 繼續';
+      btn.className = 'tts-btn';
+    } else if (ttsIdx >= SCRIPT.length) {
+      btn.textContent = '↺ 重新朗讀';
+      btn.className = 'tts-btn';
+    } else {
+      btn.textContent = ttsIdx === 0 ? '▶ 朗讀全文' : '▶ 繼續朗讀';
+      btn.className = 'tts-btn';
+    }
+    if (ttsIdx < SCRIPT.length) {
+      sec.textContent = '▸ ' + SCRIPT[ttsIdx].label;
+      setActivePanel(SCRIPT[ttsIdx].id);
+    } else {
+      sec.textContent = '✓ 朗讀完畢';
+      setActivePanel(null);
+    }
+    updateDots();
+  }
+
+  function showSubtitle(text) {
+    var el = document.getElementById('tts-subtitle');
+    if (!el) return;
+    el.innerHTML = text.split('').map(function(c, i) {
+      var s = c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '&' ? '&amp;' : c;
+      return '<span class="sub-c" id="sc-' + i + '">' + s + '</span>';
+    }).join('');
+    el.scrollTop = 0;
+    el.classList.add('active');
+  }
+
+  function clearSubtitle() {
+    var el = document.getElementById('tts-subtitle');
+    if (el) { el.innerHTML = ''; el.classList.remove('active'); }
+  }
+
+  function speakSection() {
+    if (!ttsPlaying) return;
+    if (ttsIdx >= SCRIPT.length) {
+      ttsPlaying = false;
+      ttsIdx = 0;
+      updateUI();
+      return;
+    }
+    updateUI();
+    var item = SCRIPT[ttsIdx];
+    var utt = new SpeechSynthesisUtterance(item.text);
+    utt.lang = 'zh-TW';
+    utt.rate = ttsRate;
+    utt.pitch = 1.0;
+    showSubtitle(item.text);
+    utt.onboundary = function(e) {
+      var chars = document.querySelectorAll('#tts-subtitle .sub-c');
+      var len = e.charLength || 1;
+      chars.forEach(function(c, i) {
+        c.className = 'sub-c' + (i < e.charIndex ? ' done' : i < e.charIndex + len ? ' now' : '');
+      });
+      var cur = document.getElementById('sc-' + e.charIndex);
+      if (cur) cur.scrollIntoView({ block: 'nearest' });
+    };
+    utt.onend = function () {
+      if (!ttsPlaying) return;
+      ttsIdx++;
+      setTimeout(speakSection, 350);
+    };
+    utt.onerror = function (e) {
+      if (e.error === 'interrupted') return;
+      if (!ttsPlaying) return;
+      ttsIdx++;
+      speakSection();
+    };
+    setTimeout(function() { speechSynthesis.speak(utt); }, 50);
+  }
+
+  window.ttsToggle = function () {
+    if (speechSynthesis.speaking && !speechSynthesis.paused) {
+      speechSynthesis.pause();
+      ttsPlaying = false; ttsPaused = true;
+      updateUI();
+    } else if (speechSynthesis.paused) {
+      speechSynthesis.resume();
+      ttsPlaying = true; ttsPaused = false;
+      updateUI();
+    } else {
+      if (ttsIdx >= SCRIPT.length) ttsIdx = 0;
+      ttsPlaying = true; ttsPaused = false;
+      speakSection();
+    }
+  };
+
+  window.ttsStop = function () {
+    speechSynthesis.cancel();
+    clearSubtitle();
+    ttsPlaying = false; ttsPaused = false; ttsIdx = 0;
+    setActivePanel(null);
+    document.getElementById('tts-section-name').textContent = '點擊「朗讀全文」開始';
+    updateDots();
+    document.getElementById('tts-play-btn').textContent = '▶ 朗讀全文';
+    document.getElementById('tts-play-btn').className = 'tts-btn';
+  };
+
+  window.ttsJumpTo = function (i) {
+    speechSynthesis.cancel();
+    ttsIdx = i; ttsPlaying = true; ttsPaused = false;
+    setTimeout(speakSection, 80);
+  };
+
+  window.ttsSetRate = function (v) { ttsRate = parseFloat(v); };
+
+  initDots();
+}());
+</script>
+
+
+<script>
+// ── Drag Layout ──────────────────────────────────────────────────────────────
+(function(){
+  var L6_LAY='l6-layout-v5';
+  var canvas=null,dragging=null,resizing=null,dragOX=0,dragOY=0,rzS={};
+  function getSL(){try{return JSON.parse(localStorage.getItem(L6_LAY)||'null');}catch(e){return null;}}
+  function putSL(s){try{localStorage.setItem(L6_LAY,JSON.stringify(s));}catch(e){}}
+  function saveItem(id,x,y,w,h){var s=getSL()||{};s[id]={x:Math.round(x),y:Math.round(y),w:Math.round(w),h:h?Math.round(h):null};putSL(s);}
+  function applyPos(el,x,y,w,h){el.style.position='absolute';el.style.left=x+'px';el.style.top=y+'px';el.style.width=w+'px';if(h)el.style.minHeight=h+'px';}
+  function addHandles(el){
+    var dh=document.createElement('div');dh.className='drag-handle';el.insertBefore(dh,el.firstChild);
+    dh.addEventListener('mousedown',function(e){if(!document.body.classList.contains('edit-mode'))return;e.preventDefault();e.stopPropagation();dragging=el;var r=el.getBoundingClientRect();dragOX=e.clientX-r.left;dragOY=e.clientY-r.top;el.classList.add('is-dragging');el.style.zIndex='1000';});
+    ['nw','n','ne','e','se','s','sw','w'].forEach(function(dir){var rh=document.createElement('div');rh.className='rh rh-'+dir;el.appendChild(rh);rh.addEventListener('mousedown',function(e){if(!document.body.classList.contains('edit-mode'))return;e.preventDefault();e.stopPropagation();resizing={el:el,dir:dir};rzS={mx:e.clientX,my:e.clientY,w:el.offsetWidth,h:el.offsetHeight,l:parseFloat(el.style.left)||0,t:parseFloat(el.style.top)||0};el.classList.add('is-resizing');el.style.zIndex='1000';});});
+  }
+  document.addEventListener('mousemove',function(e){
+    if(dragging){var cr=canvas.getBoundingClientRect(),x=Math.max(0,e.clientX-cr.left-dragOX),y=Math.max(0,e.clientY-cr.top-dragOY);dragging.style.left=x+'px';dragging.style.top=y+'px';var bot=y+dragging.offsetHeight,cm=parseInt(canvas.style.minHeight)||3000;if(bot+100>cm)canvas.style.minHeight=(bot+300)+'px';}
+    if(resizing){var el=resizing.el,dir=resizing.dir,dx=e.clientX-rzS.mx,dy=e.clientY-rzS.my,w=rzS.w,h=rzS.h,l=rzS.l,t=rzS.t;if(dir.indexOf('e')>=0)w=Math.max(180,rzS.w+dx);if(dir.indexOf('w')>=0){w=Math.max(180,rzS.w-dx);l=rzS.l+(rzS.w-w);}if(dir.indexOf('s')>=0)h=Math.max(80,rzS.h+dy);if(dir.indexOf('n')>=0){h=Math.max(80,rzS.h-dy);t=rzS.t+(rzS.h-h);}el.style.width=w+'px';el.style.minHeight=h+'px';el.style.left=l+'px';el.style.top=t+'px';}
+  });
+  document.addEventListener('mouseup',function(){
+    if(dragging){dragging.classList.remove('is-dragging');dragging.style.zIndex='';saveItem(dragging.dataset.dragId,parseFloat(dragging.style.left)||0,parseFloat(dragging.style.top)||0,dragging.offsetWidth,null);dragging=null;}
+    if(resizing){var el=resizing.el;el.classList.remove('is-resizing');el.style.zIndex='';saveItem(el.dataset.dragId,parseFloat(el.style.left)||0,parseFloat(el.style.top)||0,el.offsetWidth,el.offsetHeight);resizing=null;}
+  });
+  window.resetLayout=function(){localStorage.removeItem(L6_LAY);location.reload();};
+  function initLayout(){
+    canvas=document.getElementById('drag-canvas');if(!canvas)return;
+    var saved=getSL();
+    var items=Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    items.forEach(function(el){addHandles(el);});
+    var _REQ=['cc-panel1','cc-panel2','cc-panel3','cc-panel4','cc-bonus-scenarios','cc-bonus-summary'];
+    if(saved){
+      var _miss=_REQ.some(function(id){return !saved[id];});
+      if(_miss){saved=null;localStorage.removeItem(L6_LAY);}
+    }
+    // 合理性檢查：bonus 區塊必須在四個 panel 的 y + 200px 以下
+    if(saved){
+      var _pmaxY=Math.max(saved['cc-panel1'].y,saved['cc-panel2'].y,saved['cc-panel3'].y,saved['cc-panel4'].y);
+      var _b5y=saved['cc-bonus-scenarios'].y;
+      var _b6y=saved['cc-bonus-summary'].y;
+      if(_b5y<_pmaxY+40||_b6y<_b5y+40){saved=null;localStorage.removeItem(L6_LAY);}
+    }
+    if(saved){
+      items.forEach(function(el){var s=saved[el.dataset.dragId];if(el.parentElement!==canvas)canvas.appendChild(el);if(s)applyPos(el,s.x,s.y,s.w,s.h);});
+      var maxB=0;items.forEach(function(el){var b=(parseFloat(el.style.top)||0)+el.offsetHeight;if(b>maxB)maxB=b;});
+      canvas.style.minHeight=Math.max(3000,maxB+200)+'px';
+    }else{
+      var _W=canvas.offsetWidth||1280,_px=40,_gap=16;
+      var _half=Math.max(200,Math.floor((_W-2*_px-_gap)/2));
+      var _full=_W-2*_px,_col2=_px+_half+_gap;
+      var _def={
+        'cc-course-tag'     :{x:_px,      y:32,   w:180},
+        'cc-header'         :{x:_px,      y:80,   w:_full},
+        'cc-panel1'         :{x:_px,      y:300,  w:_half},
+        'cc-panel2'         :{x:_col2,    y:300,  w:_half},
+        'cc-panel3'         :{x:_px,      y:820,  w:_half},
+        'cc-panel4'         :{x:_col2,    y:820,  w:_half},
+        'cc-bonus-scenarios':{x:_px,      y:1540, w:_full},
+        'cc-bonus-summary'  :{x:_px,      y:2050, w:_full}
+      };
+      var _ns={};
+      items.forEach(function(el){
+        var _d=_def[el.dataset.dragId];if(!_d)return;
+        if(el.parentElement!==canvas)canvas.appendChild(el);
+        applyPos(el,_d.x,_d.y,_d.w,null);
+        _ns[el.dataset.dragId]={x:_d.x,y:_d.y,w:_d.w,h:null};
+      });
+      canvas.style.minHeight='3200px';
+      putSL(_ns);
+    }
+  }
+  window.addEventListener('load',initLayout);
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,69 @@
+direction: right
+
+title: Bull Put Spread\n牛市 Put 價差（Credit Spread）
+
+建倉: 建倉 Setup {
+  direction: down
+  style: {stroke: "#8ED4A8"; fill: "#0e1f14"}
+
+  短倉: 賣出 Short Put\nStrike \$60\n收 Premium +\$5.00 {
+    style: {stroke: "#ff6b6b"; fill: "#3a1414"; font-color: "#ffdede"}
+  }
+
+  多倉: 買入 Long Put\nStrike \$50\n付 Premium −\$0.78 {
+    style: {stroke: "#5b9bff"; fill: "#122238"; font-color: "#dcebff"}
+  }
+
+  淨值: 淨 Premium\nCredit +\$4.22/股\nStrike 寬 \$10 {
+    style: {stroke: "#f4b64e"; fill: "#3a2c0e"; font-color: "#ffe9bf"}
+  }
+
+  短倉 -> 淨值: {style: {animated: true; stroke: "#ff6b6b"}}
+  多倉 -> 淨值: {style: {animated: true; stroke: "#5b9bff"}}
+}
+
+到期判斷: 到期日\n股價落在哪一區？ {
+  shape: diamond
+  style: {stroke: "#c58cff"; fill: "#241a38"; font-color: "#f0e6ff"}
+}
+
+情境群: 到期結算 {
+  direction: down
+  style: {stroke: "#6a5a8a"; fill: "#141020"}
+
+  情境A: 情境 A・最佳\n股價 ≥ \$60\n兩腿全部廢棄\n淨賺 +\$4.22/股 {
+    style: {stroke: "#8ED4A8"; fill: "#0e2a17"; font-color: "#d7ffe4"}
+  }
+
+  部分區: 部分虧損區\n\$50 ↔ \$60 之間\nShort Put 被行權\nLong Put 尚未啟動\n獲利逐步遭侵蝕 {
+    style: {stroke: "#f4b64e"; fill: "#3a2c0e"; font-color: "#ffe9bf"}
+  }
+
+  情境B: 情境 B・最大虧損\n股價 ≤ \$50\nLong Put 啟動封頂\n固定虧損 −\$5.78/股 {
+    style: {stroke: "#ff6b6b"; fill: "#3a1414"; font-color: "#ffdede"}
+  }
+}
+
+策略判斷: 策略判斷 Greeks {
+  direction: down
+  style: {stroke: "#9ec2ff"; fill: "#0f1a2e"}
+
+  greeks: Greeks 淨值\nDelta 偏多方向\nTheta 正值（收租）\nVega 負向（怕IV漲） {
+    style: {stroke: "#5b9bff"; fill: "#122238"; font-color: "#dcebff"}
+  }
+
+  適用情境: 何時用\n看漲但不裸賣 Put\nIV 高時收租\n資金/保證金有限\n損益比約 73% {
+    style: {stroke: "#c58cff"; fill: "#241a38"; font-color: "#f0e6ff"}
+  }
+
+  greeks -> 適用情境: {style: {animated: true}}
+}
+
+建倉.淨值 -> 到期判斷: {style: {animated: true}}
+到期判斷 -> 情境群.情境A: {label: "≥ \$60"; style: {stroke: "#8ED4A8"}}
+到期判斷 -> 情境群.部分區: {label: "\$50~\$60"; style: {stroke: "#f4b64e"}}
+到期判斷 -> 情境群.情境B: {label: "≤ \$50"; style: {stroke: "#ff6b6b"}}
+
+情境群.情境A -> 策略判斷.greeks: {style: {stroke: "#8ED4A8"}}
+情境群.部分區 -> 策略判斷.greeks: {style: {stroke: "#f4b64e"}}
+情境群.情境B -> 策略判斷.greeks: {style: {stroke: "#ff6b6b"}}

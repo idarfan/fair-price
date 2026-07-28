@@ -1,0 +1,1862 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>期權小學堂 · 第9課 · PMCC 黃金法則與建倉試算</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #FAF3E8;
+  --page-bg:    #FFF9F2;
+  --panel-bg:   #FFFCF7;
+  --ink:        #2A1A0E;
+  --muted:      #7A6555;
+  --border:     #E2D4C2;
+  --gold:       #D4900A;
+  --gold-bg:    #FEF4D8;
+  --gold-bdr:   #E8B840;
+  --green:      #2E9E52;
+  --green-bg:   #E8F8EE;
+  --green-bdr:  #8ED4A8;
+  --red:        #D04040;
+  --red-bg:     #FDEAEA;
+  --red-bdr:    #F5AAAA;
+  --blue:       #3A70C0;
+  --blue-bg:    #EBF2FF;
+  --blue-bdr:   #9ABCE8;
+  --r-lg: 16px; --r-md: 10px; --r-sm: 6px;
+}
+
+body {
+  background: var(--bg);
+  font-family: "PingFang TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif;
+  padding: 0; margin: 0;
+  padding-top: 52px;
+  padding-bottom: 70px;
+}
+
+.page {
+  background: var(--page-bg);
+  max-width: 100%; width: 100%;
+  padding: 20px 8px 36px;
+}
+
+.course-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--ink); color: #FFF9F0;
+  font-size: 12px; font-weight: 700;
+  padding: 5px 14px; border-radius: 100px;
+  letter-spacing: 1px; margin-bottom: 18px;
+}
+
+.page-header {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 20px; align-items: start; margin-bottom: 28px;
+}
+.page-title   { font-size: 32px; font-weight: 900; color: var(--ink); line-height: 1.2; }
+.page-subtitle{ font-size: 14px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+.page-desc    { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+.hfb { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.hfb-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  border-radius: var(--r-md); padding: 10px 14px;
+}
+.hfb-row.gold-row { background: #FFF7C0; border: 1.5px solid var(--gold-bdr); }
+.hfb-row.green-row { background: #F0FAF0; border: 1.5px solid var(--green-bdr); }
+.hfb-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.hfb-title { font-size: 13px; font-weight: 800; color: var(--ink); margin-bottom: 4px; }
+.hfb-formula { font-size: 13px; font-weight: 700; color: var(--gold); margin-bottom: 4px; }
+.hfb-formula.green { color: var(--green); }
+.hfb-note { font-size: 12px; color: var(--ink); line-height: 1.6; }
+.hfb-detail { font-size: 11.5px; color: var(--muted); line-height: 1.75; }
+
+.contract-box {
+  background: var(--gold-bg); border: 2px solid var(--gold-bdr);
+  border-radius: var(--r-lg); padding: 14px 16px; min-width: 240px; max-width: 290px;
+}
+.cb-rule-box {
+  background: #FFF7C0; border: 1.5px solid var(--gold-bdr);
+  border-radius: var(--r-md); padding: 10px 12px; margin: 8px 0;
+}
+.cb-rule-formula {
+  font-size: 15px; font-weight: 900; color: var(--gold); letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+.cb-rule-desc {
+  font-size: 11px; color: var(--ink); line-height: 1.6;
+}
+.cb-rule-desc .var { font-weight: 700; color: var(--gold); }
+.cb-rule-desc .hint { color: var(--red); font-weight: 700; }
+.cb-profit-box {
+  background: #F0FAF0; border: 1.5px solid var(--green-bdr);
+  border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 8px;
+}
+.cb-profit-formula {
+  font-size: 13px; font-weight: 900; color: var(--green);
+  margin-bottom: 4px;
+}
+.cb-profit-desc {
+  font-size: 11px; color: var(--ink); line-height: 1.6;
+}
+.cb-struct { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.cb-struct-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; padding: 3px 0; border-bottom: 1px solid var(--border);
+}
+.cb-struct-row:last-child { border-bottom: none; }
+.cb-struct-row .sr-label { color: var(--muted); }
+.cb-struct-row .sr-val { font-weight: 700; font-size: 11px; text-align: right; }
+.cb-struct-row .sr-val.blue { color: var(--blue); }
+.cb-struct-row .sr-val.red  { color: var(--red); }
+.cb-title {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--gold);
+  margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.cb-ticker {
+  font-size: 20px; font-weight: 900; color: var(--ink);
+  margin-bottom: 10px; display: flex; align-items: baseline; gap: 6px;
+}
+.cb-ticker small { font-size: 12px; font-weight: 500; color: var(--muted); }
+.cb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cb-item .ci-l { font-size: 10px; color: var(--muted); margin-bottom: 1px; }
+.cb-item .ci-v { font-size: 14px; font-weight: 700; color: var(--ink); }
+.cb-item .ci-v.green { color: var(--green); }
+.cb-item .ci-v.gold  { color: var(--gold); }
+.cb-item .ci-v.blue  { color: var(--blue); }
+.cb-item .ci-v.red   { color: var(--red); }
+
+.panels {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 16px; margin-bottom: 16px;
+}
+.panel {
+  background: var(--panel-bg); border: 2px solid var(--border);
+  border-radius: var(--r-lg); padding: 20px;
+  display: flex; flex-direction: column; gap: 14px;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.panel.tts-active, .full-card.tts-active {
+  background: #FFF7C0 !important;
+  border-color: var(--gold-bdr) !important;
+  box-shadow: 0 0 0 4px rgba(212,144,10,0.32), 0 2px 20px rgba(212,144,10,0.18) !important;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.full-card {
+  background: var(--panel-bg); border: 2px solid var(--border);
+  border-radius: var(--r-lg); padding: 20px;
+  display: flex; flex-direction: column; gap: 14px;
+  transition: border-color 0.25s, box-shadow 0.25s;
+  margin-bottom: 16px;
+}
+
+.tag-row { display: flex; align-items: center; justify-content: space-between; }
+.step-badge {
+  width: 26px; height: 26px; background: var(--ink); color: #FFFDF8;
+  border-radius: 100px; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; flex-shrink: 0;
+}
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700;
+  padding: 4px 12px; border-radius: 100px; letter-spacing: 0.3px;
+}
+.pill-outline {
+  background: transparent; border: 1.5px solid;
+  font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+}
+.pill.setup,  .pill-outline.setup  { color: #7A6555; background: #F0E8DC; border-color: #C4B49A; }
+.pill.win,    .pill-outline.win    { color: var(--green); background: var(--green-bg); border-color: var(--green-bdr); }
+.pill.chart,  .pill-outline.chart  { color: var(--blue);  background: var(--blue-bg);  border-color: var(--blue-bdr); }
+.pill.gold,   .pill-outline.gold   { color: var(--gold);  background: var(--gold-bg);  border-color: var(--gold-bdr); }
+.pill.red,    .pill-outline.red    { color: var(--red);   background: var(--red-bg);   border-color: var(--red-bdr); }
+
+
+/* ── LEAPS inline tooltip ── */
+.leaps-tip { position: relative; display: inline-flex; align-items: center; }
+.leaps-q {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; background: var(--blue); color: #fff;
+  border-radius: 100px; font-size: 9px; font-weight: 900;
+  cursor: pointer; margin-left: 3px; flex-shrink: 0;
+  border: none; vertical-align: middle; line-height: 1;
+}
+.leaps-q-box {
+  display: none; position: absolute; top: 22px; left: 0; z-index: 200;
+  background: #FFFCF7; border: 2px solid var(--blue-bdr);
+  border-radius: 10px; padding: 12px 14px; width: 300px;
+  font-size: 12px; line-height: 1.75; color: var(--ink);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15); font-weight: 400;
+}
+.leaps-tip:hover .leaps-q-box,
+.leaps-q:focus .leaps-q-box { display: block; }
+
+/* ── Hover row highlight (淺紫色) ── */
+.full-card, .panel {
+  transition: background 0.2s ease, border-color 0.2s, box-shadow 0.25s;
+}
+.bullet { border-radius: 6px; transition: background 0.15s; }
+.bullet:hover { background: #EEE8FF; }
+.cmp-table tbody tr { transition: background 0.15s; }
+.cmp-table tbody tr:hover td { background: #EEE8FF !important; }
+.scenario-card { transition: background 0.15s, border-color 0.15s; }
+.scenario-card:hover { filter: brightness(0.95); outline: 2px solid #C4B0F0; outline-offset: -2px; }
+.hint-note { border-radius: 6px; transition: background 0.15s; }
+.hint-note:hover { background: #EEE8FF; }
+.ptitle { font-size: 18px; font-weight: 800; color: var(--ink); line-height: 1.35; }
+
+/* ── Bullets ── */
+.bullets { display: flex; flex-direction: column; gap: 8px; }
+.bullet { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--ink); line-height: 1.65; }
+.bullet-num {
+  width: 22px; height: 22px; background: var(--gold-bg); border: 1.5px solid var(--gold-bdr);
+  border-radius: 100px; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; color: var(--gold); flex-shrink: 0;
+}
+
+/* ── Comparison Table ── */
+.cmp-table-wrap { overflow-x: auto; border: 1.5px solid var(--border); border-radius: var(--r-md); }
+.cmp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cmp-table th {
+  background: #F5EDE0; color: var(--muted);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+  padding: 9px 14px; border-bottom: 1.5px solid var(--border); text-align: left; white-space: nowrap;
+}
+.cmp-table td { padding: 10px 14px; border-bottom: 1px solid #F0E8DC; color: var(--ink); vertical-align: middle; }
+.cmp-table tr:last-child td { border-bottom: none; }
+.cmp-table td.col-green { color: var(--green); font-weight: 700; }
+.cmp-table td.col-red   { color: var(--red);   font-weight: 700; }
+.cmp-table td.col-gold  { color: var(--gold);  font-weight: 700; }
+.cmp-table td.col-muted { color: var(--muted); font-size: 12px; }
+.cmp-table td.label-col { font-weight: 700; color: var(--ink); }
+.cmp-table tr.highlight-row td { background: var(--gold-bg); }
+
+/* ── Scenarios ── */
+.scenario-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.scenario-card {
+  border-radius: var(--r-md); padding: 16px; display: flex; flex-direction: column; gap: 8px;
+}
+.scenario-card.good  { background: var(--green-bg); border: 2px solid var(--green-bdr); }
+.scenario-card.bad   { background: var(--red-bg);   border: 2px solid var(--red-bdr); }
+.scenario-card.warn  { background: var(--gold-bg);  border: 2px solid var(--gold-bdr); }
+.sc-icon { font-size: 22px; }
+.sc-title { font-size: 13px; font-weight: 800; color: var(--ink); }
+.sc-desc  { font-size: 12px; color: var(--muted); line-height: 1.6; }
+.sc-result { font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: var(--r-sm); }
+.scenario-card.good  .sc-result { background: rgba(46,158,82,0.15); color: #1A7A3A; }
+.scenario-card.bad   .sc-result { background: rgba(208,64,64,0.12); color: #A02020; }
+.scenario-card.warn  .sc-result { background: rgba(212,144,10,0.15); color: #8A6000; }
+
+/* ── PMCC Calculator ── */
+.calc-section {
+  border: 2px solid var(--border); border-radius: var(--r-md);
+  overflow: hidden; margin-bottom: 4px;
+}
+.calc-section-header {
+  padding: 10px 16px; font-size: 12px; font-weight: 800;
+  letter-spacing: 1px; text-transform: uppercase; display: flex; align-items: center; gap: 8px;
+}
+.calc-section-header.long-hdr  { background: var(--blue-bg);  color: var(--blue);  border-bottom: 2px solid var(--blue-bdr); }
+.calc-section-header.short-hdr { background: var(--red-bg);   color: var(--red);   border-bottom: 2px solid var(--red-bdr); }
+.calc-section-body { padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+
+.field-grp { display: flex; flex-direction: column; gap: 4px; }
+.field-grp label {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 4px;
+}
+.field-grp label .req {
+  color: var(--red); font-size: 12px; font-weight: 900; line-height: 1;
+}
+.field-grp input {
+  border: 1.5px solid var(--border); border-radius: var(--r-sm);
+  padding: 7px 10px; font-size: 13px; color: var(--ink);
+  background: white; font-family: inherit; outline: none;
+  transition: border-color 0.15s;
+}
+.field-grp input:focus { border-color: var(--gold-bdr); }
+.field-grp input.required-field { border-color: var(--blue-bdr); background: var(--blue-bg); }
+.field-grp input.required-field:focus { border-color: var(--blue); }
+.field-grp input.missing { border-color: var(--red-bdr) !important; background: var(--red-bg) !important; }
+.field-grp.w-ticker input { width: 72px; text-transform: uppercase; font-weight: 700; }
+.field-grp.w-k      input { width: 88px; }
+.field-grp.w-pr     input { width: 88px; }
+.field-grp.w-dte    input { width: 72px; }
+.field-grp.w-delta  input { width: 94px; }
+.field-grp.w-itm    input { width: 88px; }
+
+.btn-calc {
+  background: var(--ink); color: #FFF9F0;
+  border: none; border-radius: var(--r-sm);
+  padding: 10px 24px; font-size: 14px; font-weight: 800;
+  cursor: pointer; font-family: inherit;
+  transition: background 0.15s; white-space: nowrap;
+}
+.btn-calc:hover { background: #4A3020; }
+.btn-reset {
+  background: transparent; color: var(--muted);
+  border: 1.5px solid var(--border); border-radius: var(--r-sm);
+  padding: 10px 16px; font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.btn-reset:hover { border-color: var(--red-bdr); color: var(--red); }
+
+/* ── Golden Rule Result ── */
+.golden-rule-box {
+  border-radius: var(--r-md); padding: 20px 24px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.golden-rule-box.pass { background: var(--green-bg); border: 2.5px solid var(--green-bdr); }
+.golden-rule-box.fail { background: var(--red-bg);   border: 2.5px solid var(--red-bdr); }
+.golden-rule-box.idle { background: #F5EDE0; border: 2px dashed var(--border); }
+
+.gr-formula {
+  font-family: "Courier New", monospace;
+  font-size: 15px; font-weight: 700; color: var(--ink);
+  background: rgba(255,255,255,0.7); border-radius: var(--r-sm);
+  padding: 12px 16px; line-height: 2; text-align: center;
+}
+.gr-formula .val { color: var(--blue); font-weight: 900; }
+.gr-formula .val.red { color: var(--red); }
+.gr-formula .val.green { color: var(--green); }
+.gr-formula .op { color: var(--muted); margin: 0 4px; }
+.gr-verdict {
+  text-align: center; font-size: 20px; font-weight: 900;
+  padding: 8px 0 4px;
+}
+.gr-verdict.pass { color: var(--green); }
+.gr-verdict.fail { color: var(--red); }
+
+.result-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 4px; }
+.metric-card {
+  background: var(--panel-bg); border: 1.5px solid var(--border);
+  border-radius: var(--r-md); padding: 12px 14px; text-align: center;
+}
+.mc-sub  { font-size:10px; color:var(--muted); margin-top:2px; }
+  .mc-label { font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: 0.5px; white-space: nowrap; }
+.mc-value { font-size: 20px; font-weight: 900; color: var(--ink); margin-top: 4px; }
+.mc-value.green { color: var(--green); }
+.mc-value.red   { color: var(--red); }
+.mc-value.gold  { color: var(--gold); }
+.mc-value.blue  { color: var(--blue); }
+
+.warn-box {
+  background: #FFF8E8; border: 1.5px solid var(--gold-bdr);
+  border-radius: var(--r-sm); padding: 10px 14px;
+  font-size: 12px; color: #8A6000; line-height: 1.7;
+}
+.warn-box.red-warn {
+  background: var(--red-bg); border-color: var(--red-bdr); color: var(--red);
+}
+.result-placeholder {
+  text-align: center; padding: 36px; color: var(--muted); font-size: 13px;
+}
+
+/* ── Exit strategy ── */
+.exit-grid { display: flex; flex-direction: column; gap: 12px; }
+.exit-card {
+  border-radius: var(--r-md); padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.exit-card.a-card { background: var(--green-bg); border: 2px solid var(--green-bdr); }
+.exit-card.b-card { background: var(--blue-bg);  border: 2px solid var(--blue-bdr); }
+.exit-card.c-card { background: var(--red-bg);   border: 2px solid var(--red-bdr); }
+.exit-title { font-size: 14px; font-weight: 800; color: var(--ink); }
+.exit-desc  { font-size: 12px; color: var(--muted); line-height: 1.65; }
+.code-snippet {
+  background: rgba(0,0,0,0.06); border-radius: 6px; padding: 10px 14px;
+  font-family: "Courier New", monospace; font-size: 12px; color: var(--ink);
+  line-height: 1.8; white-space: pre-wrap;
+}
+
+/* ── Roll methods ── */
+.roll-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.roll-card {
+  background: var(--panel-bg); border: 1.5px solid var(--border);
+  border-radius: var(--r-md); padding: 14px; display: flex; flex-direction: column; gap: 6px;
+}
+.roll-title { font-size: 13px; font-weight: 800; color: var(--blue); }
+.roll-desc  { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+.hint-note {
+  font-size: 12px; color: var(--muted); line-height: 1.7;
+  background: #F5EDE0; border-radius: var(--r-sm); padding: 10px 14px;
+}
+
+/* ── TTS Bar (fixed top) ── */
+#tts-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 3000;
+  background: rgba(42,26,14,0.97); backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 8px 20px; display: flex; align-items: center; gap: 12px;
+  font-family: "PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+.tts-btn {
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+  color: #FFF9F0; border-radius: 100px; padding: 5px 14px; font-size: 12px;
+  cursor: pointer; font-family: inherit; font-weight: 700;
+  transition: background 0.15s; display: flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.tts-btn:hover { background: rgba(255,255,255,0.22); }
+.tts-btn.playing { background: #1E7A3A; border-color: #2E9E52; color: #fff; }
+.tts-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.15); flex-shrink: 0; }
+.tts-dots { display: flex; gap: 5px; align-items: center; }
+.tts-dot {
+  width: 7px; height: 7px; border-radius: 100px;
+  background: rgba(255,255,255,0.2); cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.tts-dot.done    { background: rgba(255,255,255,0.45); }
+.tts-dot.current { background: var(--gold); transform: scale(1.5); }
+.tts-section { font-size: 12px; color: #E8C060; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tts-speed {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #FFF9F0; border-radius: 6px; padding: 3px 7px; font-size: 12px;
+  cursor: pointer; font-family: inherit;
+}
+
+/* ── Edit mode ── */
+#edit-btn {
+  position: fixed; bottom: 28px; right: 28px; z-index: 2000;
+  background: #2A1A0E; color: #FFF9F0; border: none; border-radius: 100px;
+  padding: 10px 20px; cursor: pointer; font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  font-family: "PingFang TC","Microsoft JhengHei",sans-serif;
+  transition: background 0.15s, transform 0.1s;
+}
+#edit-btn:hover { background: #4A3020; transform: scale(1.03); }
+#edit-btn.active { background: #2E7040; }
+
+#edit-toolbar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #FFFCF7; border-top: 2px solid #E2D4C2;
+  padding: 10px 24px 12px; z-index: 1999;
+  display: flex; align-items: center; gap: 0;
+  box-shadow: 0 -4px 24px rgba(80,40,0,0.10);
+  transform: translateY(100%); transition: transform 0.22s cubic-bezier(.4,0,.2,1);
+  font-family: "PingFang TC","Microsoft JhengHei",sans-serif;
+  flex-wrap: wrap; min-height: 56px;
+}
+#edit-toolbar.visible { transform: translateY(0); }
+.et-hint { font-size: 13px; color: #A08878; padding: 6px 0; font-style: italic; }
+.et-group { display: flex; align-items: center; gap: 0; flex-wrap: wrap; width: 100%; }
+.et-item  { display: flex; flex-direction: column; gap: 3px; padding: 0 14px; }
+.et-label { font-size: 10px; font-weight: 600; color: #9A8878; letter-spacing: 0.5px; text-transform: uppercase; }
+.et-divider { width: 1px; height: 36px; background: #E2D4C2; flex-shrink: 0; }
+#et-font { font-size: 13px; border: 1.5px solid #E2D4C2; border-radius: 6px; padding: 4px 8px; background: white; color: #2A1A0E; cursor: pointer; font-family: inherit; }
+.et-size-ctrl { display: flex; align-items: center; gap: 6px; }
+.et-btn-sm {
+  width: 24px; height: 24px; border: 1.5px solid #E2D4C2; border-radius: 6px;
+  background: white; font-size: 14px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: #2A1A0E;
+}
+.et-btn-sm:hover { background: #F5EFE6; }
+#et-size-val { font-size: 14px; font-weight: 700; min-width: 28px; text-align: center; color: #2A1A0E; }
+.et-fmt-btn {
+  width: 30px; height: 30px; border: 1.5px solid #E2D4C2; border-radius: 6px;
+  background: white; font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: #2A1A0E;
+}
+.et-fmt-btn:hover { background: #F5EFE6; }
+.et-fmt-btn.on { background: #2A1A0E; color: white; border-color: #2A1A0E; }
+#et-color { width: 36px; height: 28px; border: 1.5px solid #E2D4C2; border-radius: 6px; padding: 2px; cursor: pointer; background: white; }
+#et-lh { width: 80px; accent-color: #D4900A; }
+.et-action-btn {
+  font-size: 12px; font-weight: 600; padding: 5px 12px;
+  border: 1.5px solid #E2D4C2; border-radius: 6px; background: white;
+  cursor: pointer; color: #2A1A0E; font-family: inherit;
+}
+.et-action-btn:hover { background: #F5EFE6; }
+.edit-mode .page * { cursor: text; }
+.edit-mode .page [contenteditable]:hover,
+.edit-mode .page *:hover { outline: 1.5px dashed #E8B840; outline-offset: 2px; border-radius: 3px; }
+.el-focus { outline: 2px solid #3A70C0 !important; outline-offset: 3px; border-radius: 3px; }
+.edit-mode .page .el-focus * { outline: none !important; }
+
+/* ── TTS Subtitle ── */
+#tts-subtitle {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  max-width: 700px; width: calc(100% - 40px);
+  background: rgba(8,4,1,0.85); backdrop-filter: blur(8px);
+  color: #FFF9F0; border-radius: 10px; padding: 10px 18px;
+  font-size: 14px; line-height: 1.9; z-index: 2500;
+  display: none; pointer-events: none;
+  max-height: 110px; overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+#tts-subtitle.active { display: block; }
+.sub-c       { color: rgba(255,249,240,0.28); }
+.sub-c.done  { color: rgba(255,249,240,0.75); }
+.sub-c.now   { color: #F5C540; background: rgba(245,197,64,0.18); border-radius: 2px; }
+
+/* ── Drag Layout ── */
+#drag-canvas { position: relative !important; min-height: 3600px; overflow: visible; }
+[data-drag-id] { box-sizing: border-box; }
+.edit-mode [data-drag-id]:hover > .drag-handle,
+[data-drag-id].is-dragging > .drag-handle,
+[data-drag-id].is-resizing > .drag-handle { opacity: 1; }
+.drag-handle {
+  position: absolute; top: -15px; left: 0; right: 0; height: 13px;
+  background: linear-gradient(90deg,#3A70C0,#2255A0);
+  border-radius: 5px 5px 0 0; cursor: grab; opacity: 0;
+  transition: opacity .15s; display: flex; align-items: center;
+  justify-content: center; z-index: 200; user-select: none;
+}
+.drag-handle:active { cursor: grabbing; }
+.drag-handle::before { content: ":::"; font-size: 9px; font-weight: 900; color: rgba(255,255,255,.85); letter-spacing: 4px; }
+.edit-mode [data-drag-id]:hover,
+[data-drag-id].is-dragging,
+[data-drag-id].is-resizing { outline: 2px dashed rgba(58,112,192,.45); outline-offset: 3px; }
+.rh { position: absolute; width: 10px; height: 10px; background: #3A70C0; border: 2px solid #fff; border-radius: 2px; opacity: 0; transition: opacity .15s; z-index: 201; }
+.edit-mode [data-drag-id]:hover .rh, [data-drag-id].is-resizing .rh { opacity: 1; }
+.rh-nw { top:-5px; left:-5px; cursor:nw-resize; } .rh-n  { top:-5px; left:50%; transform:translateX(-50%); cursor:n-resize; }
+.rh-ne { top:-5px; right:-5px; cursor:ne-resize; } .rh-e  { top:50%; right:-5px; transform:translateY(-50%); cursor:e-resize; }
+.rh-se { bottom:-5px; right:-5px; cursor:se-resize; } .rh-s { bottom:-5px; left:50%; transform:translateX(-50%); cursor:s-resize; }
+.rh-sw { bottom:-5px; left:-5px; cursor:sw-resize; } .rh-w { top:50%; left:-5px; transform:translateY(-50%); cursor:w-resize; }
+#layout-reset-btn {
+  position: fixed; bottom: 70px; right: 20px;
+  background: #FAF3E8; border: 1.5px solid #E2D4C2; border-radius: 8px;
+  padding: 7px 16px; font-size: 12px; cursor: pointer; z-index: 10001;
+  color: #7A6555; font-family: inherit; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+#layout-reset-btn:hover { background: #F0E4D0; }
+</style>
+<style id="driver-css">
+.driver-active .driver-overlay,.driver-active *{pointer-events:none}.driver-active .driver-active-element,.driver-active .driver-active-element *,.driver-popover,.driver-popover *{pointer-events:auto}@keyframes animate-fade-in{0%{opacity:0}to{opacity:1}}.driver-fade .driver-overlay{animation:animate-fade-in .2s ease-in-out}.driver-fade .leaps-popover{max-width:60vw!important;width:60vw!important;box-sizing:border-box;}.driver-popover{animation:animate-fade-in .2s}.driver-popover{all:unset;box-sizing:border-box;color:#2d2d2d;margin:0;padding:15px;border-radius:5px;min-width:250px;max-width:300px;box-shadow:0 1px 10px #0006;z-index:1000000000;position:fixed;top:0;right:0;background-color:#fff}.driver-popover *{font-family:Helvetica Neue,Inter,ui-sans-serif,"Apple Color Emoji",Helvetica,Arial,sans-serif}.driver-popover-title{font:28px/normal sans-serif;font-weight:700;display:block;position:relative;line-height:1.5;zoom:1;margin:0}.driver-popover-close-btn{all:unset;position:absolute;top:0;right:0;width:32px;height:28px;cursor:pointer;font-size:18px;font-weight:500;color:#d2d2d2;z-index:1;text-align:center;transition:color;transition-duration:.2s}.driver-popover-close-btn:hover,.driver-popover-close-btn:focus{color:#2d2d2d}.driver-popover-title[style*=block]+.driver-popover-description{margin-top:5px}.driver-popover-description{margin-bottom:0;font:22px/normal sans-serif;line-height:1.5;font-weight:400;zoom:1}.driver-popover-footer{margin-top:15px;text-align:right;zoom:1;display:flex;align-items:center;justify-content:space-between}.driver-popover-progress-text{font-size:13px;font-weight:400;color:#727272;zoom:1}.driver-popover-footer button{all:unset;display:inline-block;box-sizing:border-box;padding:3px 7px;text-decoration:none;text-shadow:1px 1px 0 #fff;background-color:#fff;color:#2d2d2d;font:12px/normal sans-serif;cursor:pointer;outline:0;zoom:1;line-height:1.3;border:1px solid #ccc;border-radius:3px}.driver-popover-footer .driver-popover-btn-disabled{opacity:.5;pointer-events:none}:not(body):has(>.driver-active-element){overflow:hidden!important}.driver-no-interaction,.driver-no-interaction *{pointer-events:none!important}.driver-popover-footer button:hover,.driver-popover-footer button:focus{background-color:#f7f7f7}.driver-popover-navigation-btns{display:flex;flex-grow:1;justify-content:flex-end}.driver-popover-navigation-btns button+button{margin-left:4px}.driver-popover-arrow{content:"";position:absolute;border:5px solid #fff}.driver-popover-arrow-side-over{display:none}.driver-popover-arrow-side-left{left:100%;border-right-color:transparent;border-bottom-color:transparent;border-top-color:transparent}.driver-popover-arrow-side-right{right:100%;border-left-color:transparent;border-bottom-color:transparent;border-top-color:transparent}.driver-popover-arrow-side-top{top:100%;border-right-color:transparent;border-bottom-color:transparent;border-left-color:transparent}.driver-popover-arrow-side-bottom{bottom:100%;border-left-color:transparent;border-top-color:transparent;border-right-color:transparent}.driver-popover-arrow-side-center{display:none}.driver-popover-arrow-side-left.driver-popover-arrow-align-start,.driver-popover-arrow-side-right.driver-popover-arrow-align-start{top:15px}.driver-popover-arrow-side-top.driver-popover-arrow-align-start,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-start{left:15px}.driver-popover-arrow-align-end.driver-popover-arrow-side-left,.driver-popover-arrow-align-end.driver-popover-arrow-side-right{bottom:15px}.driver-popover-arrow-side-top.driver-popover-arrow-align-end,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-end{right:15px}.driver-popover-arrow-side-left.driver-popover-arrow-align-center,.driver-popover-arrow-side-right.driver-popover-arrow-align-center{top:50%;margin-top:-5px}.driver-popover-arrow-side-top.driver-popover-arrow-align-center,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-center{left:50%;margin-left:-5px}.driver-popover-arrow-none{display:none}
+.driver-popover {
+  background-color: #FFFCF7 !important;
+  border: 2px solid #E8B840 !important;
+  border-radius: 12px !important;
+  max-width: 360px !important;
+  font-family: "PingFang TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15) !important;
+}
+.driver-popover-title {
+  color: #2A1A0E !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+}
+.driver-popover-description {
+  color: #2A1A0E !important;
+  font-size: 13px !important;
+  line-height: 1.8 !important;
+}
+.driver-popover-footer button {
+  background: #D4900A !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 5px 14px !important;
+  font-weight: 700 !important;
+}
+.driver-popover-footer button:hover {
+  background: #b87a08 !important;
+}
+</style>
+<script id="driver-js">this.driver=this.driver||{};this.driver.js=function(F){"use strict";let z={},q;function V(e={}){z={animate:!0,allowClose:!0,overlayClickBehavior:"close",overlayOpacity:.7,smoothScroll:!1,disableActiveInteraction:!1,showProgress:!1,stagePadding:10,stageRadius:5,popoverOffset:10,showButtons:["next","previous","close"],disableButtons:[],overlayColor:"#000",...e}}function s(e){return e?z[e]:z}function le(e){q=e}function k(){return q}let A={};function N(e,o){A[e]=o}function T(e){var o;(o=A[e])==null||o.call(A)}function de(){A={}}function O(e,o,t,i){return(e/=i/2)<1?t/2*e*e+o:-t/2*(--e*(e-2)-1)+o}function K(e){const o='a[href]:not([disabled]), button:not([disabled]), textarea:not([disabled]), input[type="text"]:not([disabled]), input[type="radio"]:not([disabled]), input[type="checkbox"]:not([disabled]), select:not([disabled])';return e.flatMap(t=>{const i=t.matches(o),d=Array.from(t.querySelectorAll(o));return[...i?[t]:[],...d]}).filter(t=>getComputedStyle(t).pointerEvents!=="none"&&ve(t))}function Y(e){if(!e||ue(e))return;const o=s("smoothScroll"),t=e.offsetHeight>window.innerHeight;e.scrollIntoView({behavior:!o||pe(e)?"auto":"smooth",inline:"center",block:t?"start":"center"})}function pe(e){if(!e||!e.parentElement)return;const o=e.parentElement;return o.scrollHeight>o.clientHeight}function ue(e){const o=e.getBoundingClientRect();return o.top>=0&&o.left>=0&&o.bottom<=(window.innerHeight||document.documentElement.clientHeight)&&o.right<=(window.innerWidth||document.documentElement.clientWidth)}function ve(e){return!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)}let D={};function S(e,o){D[e]=o}function l(e){return e?D[e]:D}function X(){D={}}function fe(e,o,t,i){let d=l("__activeStagePosition");const n=d||t.getBoundingClientRect(),f=i.getBoundingClientRect(),w=O(e,n.x,f.x-n.x,o),r=O(e,n.y,f.y-n.y,o),v=O(e,n.width,f.width-n.width,o),g=O(e,n.height,f.height-n.height,o);d={x:w,y:r,width:v,height:g},Q(d),S("__activeStagePosition",d)}function j(e){if(!e)return;const o=e.getBoundingClientRect(),t={x:o.x,y:o.y,width:o.width,height:o.height};S("__activeStagePosition",t),Q(t)}function he(){const e=l("__activeStagePosition"),o=l("__overlaySvg");if(!e)return;if(!o){console.warn("No stage svg found.");return}const t=window.innerWidth,i=window.innerHeight;o.setAttribute("viewBox",`0 0 ${t} ${i}`)}function ge(e){const o=we(e);document.body.appendChild(o),U(o,t=>{t.target.tagName==="path"&&T("overlayClick")}),S("__overlaySvg",o)}function Q(e){const o=l("__overlaySvg");if(!o){ge(e);return}const t=o.firstElementChild;if((t==null?void 0:t.tagName)!=="path")throw new Error("no path element found in stage svg");t.setAttribute("d",Z(e))}function we(e){const o=window.innerWidth,t=window.innerHeight,i=document.createElementNS("http://www.w3.org/2000/svg","svg");i.classList.add("driver-overlay","driver-overlay-animated"),i.setAttribute("viewBox",`0 0 ${o} ${t}`),i.setAttribute("xmlSpace","preserve"),i.setAttribute("xmlnsXlink","http://www.w3.org/1999/xlink"),i.setAttribute("version","1.1"),i.setAttribute("preserveAspectRatio","xMinYMin slice"),i.style.fillRule="evenodd",i.style.clipRule="evenodd",i.style.strokeLinejoin="round",i.style.strokeMiterlimit="2",i.style.zIndex="10000",i.style.position="fixed",i.style.top="0",i.style.left="0",i.style.width="100%",i.style.height="100%";const d=document.createElementNS("http://www.w3.org/2000/svg","path");return d.setAttribute("d",Z(e)),d.style.fill=s("overlayColor")||"rgb(0,0,0)",d.style.opacity=`${s("overlayOpacity")}`,d.style.pointerEvents="auto",d.style.cursor="auto",i.appendChild(d),i}function Z(e){const o=window.innerWidth,t=window.innerHeight,i=s("stagePadding")||0,d=s("stageRadius")||0,n=e.width+i*2,f=e.height+i*2,w=Math.min(d,n/2,f/2),r=Math.floor(Math.max(w,0)),v=e.x-i+r,g=e.y-i,y=n-r*2,a=f-r*2;return`M${o},0L0,0L0,${t}L${o},${t}L${o},0Z
+    M${v},${g} h${y} a${r},${r} 0 0 1 ${r},${r} v${a} a${r},${r} 0 0 1 -${r},${r} h-${y} a${r},${r} 0 0 1 -${r},-${r} v-${a} a${r},${r} 0 0 1 ${r},-${r} z`}function me(){const e=l("__overlaySvg");e&&e.remove()}function ye(){const e=document.getElementById("driver-dummy-element");if(e)return e;let o=document.createElement("div");return o.id="driver-dummy-element",o.style.width="0",o.style.height="0",o.style.pointerEvents="none",o.style.opacity="0",o.style.position="fixed",o.style.top="50%",o.style.left="50%",document.body.appendChild(o),o}function G(e){const{element:o}=e;let t=typeof o=="function"?o():typeof o=="string"?document.querySelector(o):o;t||(t=ye()),xe(t,e)}function be(){const e=l("__activeElement"),o=l("__activeStep");e&&(j(e),he(),ne(e,o))}function xe(e,o){var C;const i=Date.now(),d=l("__activeStep"),n=l("__activeElement")||e,f=!n||n===e,w=e.id==="driver-dummy-element",r=n.id==="driver-dummy-element",v=s("animate"),g=o.onHighlightStarted||s("onHighlightStarted"),y=(o==null?void 0:o.onHighlighted)||s("onHighlighted"),a=(d==null?void 0:d.onDeselected)||s("onDeselected"),p=s(),c=l();!f&&a&&a(r?void 0:n,d,{config:p,state:c,driver:k()}),g&&g(w?void 0:e,o,{config:p,state:c,driver:k()});const u=!f&&v;let h=!1;_e(),S("previousStep",d),S("previousElement",n),S("activeStep",o),S("activeElement",e);const m=()=>{if(l("__transitionCallback")!==m)return;const x=Date.now()-i,E=400-x<=400/2;o.popover&&E&&!h&&u&&(ee(e,o),h=!0),s("animate")&&x<400?fe(x,400,n,e):(j(e),y&&y(w?void 0:e,o,{config:s(),state:l(),driver:k()}),S("__transitionCallback",void 0),S("__previousStep",d),S("__previousElement",n),S("__activeStep",o),S("__activeElement",e)),window.requestAnimationFrame(m)};S("__transitionCallback",m),window.requestAnimationFrame(m),Y(e),!u&&o.popover&&ee(e,o),n.classList.remove("driver-active-element","driver-no-interaction"),n.removeAttribute("aria-haspopup"),n.removeAttribute("aria-expanded"),n.removeAttribute("aria-controls"),((C=o.disableActiveInteraction)!=null?C:s("disableActiveInteraction"))&&e.classList.add("driver-no-interaction"),e.classList.add("driver-active-element"),e.setAttribute("aria-haspopup","dialog"),e.setAttribute("aria-expanded","true"),e.setAttribute("aria-controls","driver-popover-content")}function Ce(){var e;(e=document.getElementById("driver-dummy-element"))==null||e.remove(),document.querySelectorAll(".driver-active-element").forEach(o=>{o.classList.remove("driver-active-element","driver-no-interaction"),o.removeAttribute("aria-haspopup"),o.removeAttribute("aria-expanded"),o.removeAttribute("aria-controls")})}function H(){const e=l("__resizeTimeout");e&&window.cancelAnimationFrame(e),S("__resizeTimeout",window.requestAnimationFrame(be))}function Pe(e){var r;if(!l("isInitialized")||!(e.key==="Tab"||e.keyCode===9))return;const i=l("__activeElement"),d=(r=l("popover"))==null?void 0:r.wrapper,n=K([...d?[d]:[],...i?[i]:[]]),f=n[0],w=n[n.length-1];if(e.preventDefault(),e.shiftKey){const v=n[n.indexOf(document.activeElement)-1]||w;v==null||v.focus()}else{const v=n[n.indexOf(document.activeElement)+1]||f;v==null||v.focus()}}function J(e){var t;((t=s("allowKeyboardControl"))==null||t)&&(e.key==="Escape"?T("escapePress"):e.key==="ArrowRight"?T("arrowRightPress"):e.key==="ArrowLeft"&&T("arrowLeftPress"))}function U(e,o,t){const i=(n,f)=>{const w=n.target;e.contains(w)&&((!t||t(w))&&(n.preventDefault(),n.stopPropagation(),n.stopImmediatePropagation()),f==null||f(n))};document.addEventListener("pointerdown",i,!0),document.addEventListener("mousedown",i,!0),document.addEventListener("pointerup",i,!0),document.addEventListener("mouseup",i,!0),document.addEventListener("click",n=>{i(n,o)},!0)}function Se(){window.addEventListener("keyup",J,!1),window.addEventListener("keydown",Pe,!1),window.addEventListener("resize",H),window.addEventListener("scroll",H)}function ke(){window.removeEventListener("keyup",J),window.removeEventListener("resize",H),window.removeEventListener("scroll",H)}function _e(){const e=l("popover");e&&(e.wrapper.style.display="none")}function ee(e,o){var x,P;let t=l("popover");t&&document.body.removeChild(t.wrapper),t=Te(),document.body.appendChild(t.wrapper);const{title:i,description:d,showButtons:n,disableButtons:f,showProgress:w,nextBtnText:r=s("nextBtnText")||"Next &rarr;",prevBtnText:v=s("prevBtnText")||"&larr; Previous",progressText:g=s("progressText")||"{current} of {total}"}=o.popover||{};t.nextButton.innerHTML=r,t.previousButton.innerHTML=v,t.progress.innerHTML=g,i?(t.title.innerHTML=i,t.title.style.display="block"):t.title.style.display="none",d?(t.description.innerHTML=d,t.description.style.display="block"):t.description.style.display="none";const y=n||s("showButtons"),a=w||s("showProgress")||!1,p=(y==null?void 0:y.includes("next"))||(y==null?void 0:y.includes("previous"))||a;t.closeButton.style.display=y.includes("close")?"block":"none",p?(t.footer.style.display="flex",t.progress.style.display=a?"block":"none",t.nextButton.style.display=y.includes("next")?"block":"none",t.previousButton.style.display=y.includes("previous")?"block":"none"):t.footer.style.display="none";const c=f||s("disableButtons")||[];c!=null&&c.includes("next")&&(t.nextButton.disabled=!0,t.nextButton.classList.add("driver-popover-btn-disabled")),c!=null&&c.includes("previous")&&(t.previousButton.disabled=!0,t.previousButton.classList.add("driver-popover-btn-disabled")),c!=null&&c.includes("close")&&(t.closeButton.disabled=!0,t.closeButton.classList.add("driver-popover-btn-disabled"));const u=t.wrapper;u.style.display="block",u.style.left="",u.style.top="",u.style.bottom="",u.style.right="",u.id="driver-popover-content",u.setAttribute("role","dialog"),u.setAttribute("aria-labelledby","driver-popover-title"),u.setAttribute("aria-describedby","driver-popover-description");const h=t.arrow;h.className="driver-popover-arrow";const m=((x=o.popover)==null?void 0:x.popoverClass)||s("popoverClass")||"";u.className=`driver-popover ${m}`.trim(),U(t.wrapper,E=>{var W,I,M;const L=E.target,$=((W=o.popover)==null?void 0:W.onNextClick)||s("onNextClick"),B=((I=o.popover)==null?void 0:I.onPrevClick)||s("onPrevClick"),R=((M=o.popover)==null?void 0:M.onCloseClick)||s("onCloseClick");if(L.closest(".driver-popover-next-btn"))return $?$(e,o,{config:s(),state:l(),driver:k()}):T("nextClick");if(L.closest(".driver-popover-prev-btn"))return B?B(e,o,{config:s(),state:l(),driver:k()}):T("prevClick");if(L.closest(".driver-popover-close-btn"))return R?R(e,o,{config:s(),state:l(),driver:k()}):T("closeClick")},E=>!(t!=null&&t.description.contains(E))&&!(t!=null&&t.title.contains(E))&&typeof E.className=="string"&&E.className.includes("driver-popover")),S("popover",t);const b=((P=o.popover)==null?void 0:P.onPopoverRender)||s("onPopoverRender");b&&b(t,{config:s(),state:l(),driver:k()}),ne(e,o),Y(u);const C=e.classList.contains("driver-dummy-element"),_=K([u,...C?[]:[e]]);_.length>0&&_[0].focus()}function te(){const e=l("popover");if(!(e!=null&&e.wrapper))return;const o=e.wrapper.getBoundingClientRect(),t=s("stagePadding")||0,i=s("popoverOffset")||0;return{width:o.width+t+i,height:o.height+t+i,realWidth:o.width,realHeight:o.height}}function oe(e,o){const{elementDimensions:t,popoverDimensions:i,popoverPadding:d,popoverArrowDimensions:n}=o;return e==="start"?Math.max(Math.min(t.top-d,window.innerHeight-i.realHeight-n.width),n.width):e==="end"?Math.max(Math.min(t.top-(i==null?void 0:i.realHeight)+t.height+d,window.innerHeight-(i==null?void 0:i.realHeight)-n.width),n.width):e==="center"?Math.max(Math.min(t.top+t.height/2-(i==null?void 0:i.realHeight)/2,window.innerHeight-(i==null?void 0:i.realHeight)-n.width),n.width):0}function ie(e,o){const{elementDimensions:t,popoverDimensions:i,popoverPadding:d,popoverArrowDimensions:n}=o;return e==="start"?Math.max(Math.min(t.left-d,window.innerWidth-i.realWidth-n.width),n.width):e==="end"?Math.max(Math.min(t.left-(i==null?void 0:i.realWidth)+t.width+d,window.innerWidth-(i==null?void 0:i.realWidth)-n.width),n.width):e==="center"?Math.max(Math.min(t.left+t.width/2-(i==null?void 0:i.realWidth)/2,window.innerWidth-(i==null?void 0:i.realWidth)-n.width),n.width):0}function ne(e,o){const t=l("popover");if(!t)return;const{align:i="start",side:d="left"}=(o==null?void 0:o.popover)||{},n=i,f=e.id==="driver-dummy-element"?"over":d,w=s("stagePadding")||0,r=te(),v=t.arrow.getBoundingClientRect(),g=e.getBoundingClientRect(),y=g.top-r.height;let a=y>=0;const p=window.innerHeight-(g.bottom+r.height);let c=p>=0;const u=g.left-r.width;let h=u>=0;const m=window.innerWidth-(g.right+r.width);let b=m>=0;const C=!a&&!c&&!h&&!b;let _=f;if(f==="top"&&a?b=h=c=!1:f==="bottom"&&c?b=h=a=!1:f==="left"&&h?b=a=c=!1:f==="right"&&b&&(h=a=c=!1),f==="over"){const x=window.innerWidth/2-r.realWidth/2,P=window.innerHeight/2-r.realHeight/2;t.wrapper.style.left=`${x}px`,t.wrapper.style.right="auto",t.wrapper.style.top=`${P}px`,t.wrapper.style.bottom="auto"}else if(C){const x=window.innerWidth/2-(r==null?void 0:r.realWidth)/2,P=10;t.wrapper.style.left=`${x}px`,t.wrapper.style.right="auto",t.wrapper.style.bottom=`${P}px`,t.wrapper.style.top="auto"}else if(h){const x=Math.min(u,window.innerWidth-(r==null?void 0:r.realWidth)-v.width),P=oe(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.left=`${x}px`,t.wrapper.style.top=`${P}px`,t.wrapper.style.bottom="auto",t.wrapper.style.right="auto",_="left"}else if(b){const x=Math.min(m,window.innerWidth-(r==null?void 0:r.realWidth)-v.width),P=oe(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.right=`${x}px`,t.wrapper.style.top=`${P}px`,t.wrapper.style.bottom="auto",t.wrapper.style.left="auto",_="right"}else if(a){const x=Math.min(y,window.innerHeight-r.realHeight-v.width);let P=ie(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.top=`${x}px`,t.wrapper.style.left=`${P}px`,t.wrapper.style.bottom="auto",t.wrapper.style.right="auto",_="top"}else if(c){const x=Math.min(p,window.innerHeight-(r==null?void 0:r.realHeight)-v.width);let P=ie(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.left=`${P}px`,t.wrapper.style.bottom=`${x}px`,t.wrapper.style.top="auto",t.wrapper.style.right="auto",_="bottom"}C?t.arrow.classList.add("driver-popover-arrow-none"):Ee(n,_,e)}function Ee(e,o,t){const i=l("popover");if(!i)return;const d=t.getBoundingClientRect(),n=te(),f=i.arrow,w=n.width,r=window.innerWidth,v=d.width,g=d.left,y=n.height,a=window.innerHeight,p=d.top,c=d.height;f.className="driver-popover-arrow";let u=o,h=e;if(o==="top"?(g+v<=0?(u="right",h="end"):g+v-w<=0&&(u="top",h="start"),g>=r?(u="left",h="end"):g+w>=r&&(u="top",h="end")):o==="bottom"?(g+v<=0?(u="right",h="start"):g+v-w<=0&&(u="bottom",h="start"),g>=r?(u="left",h="start"):g+w>=r&&(u="bottom",h="end")):o==="left"?(p+c<=0?(u="bottom",h="end"):p+c-y<=0&&(u="left",h="start"),p>=a?(u="top",h="end"):p+y>=a&&(u="left",h="end")):o==="right"&&(p+c<=0?(u="bottom",h="start"):p+c-y<=0&&(u="right",h="start"),p>=a?(u="top",h="start"):p+y>=a&&(u="right",h="end")),!u)f.classList.add("driver-popover-arrow-none");else{f.classList.add(`driver-popover-arrow-side-${u}`),f.classList.add(`driver-popover-arrow-align-${h}`);const m=t.getBoundingClientRect(),b=f.getBoundingClientRect(),C=s("stagePadding")||0,_=m.left-C<window.innerWidth&&m.right+C>0&&m.top-C<window.innerHeight&&m.bottom+C>0;o==="bottom"&&_&&(b.x>m.x&&b.x+b.width<m.x+m.width?i.wrapper.style.transform="translateY(0)":(f.classList.remove(`driver-popover-arrow-align-${h}`),f.classList.add("driver-popover-arrow-none"),i.wrapper.style.transform=`translateY(-${C/2}px)`))}}function Te(){const e=document.createElement("div");e.classList.add("driver-popover");const o=document.createElement("div");o.classList.add("driver-popover-arrow");const t=document.createElement("header");t.id="driver-popover-title",t.classList.add("driver-popover-title"),t.style.display="none",t.innerText="Popover Title";const i=document.createElement("div");i.id="driver-popover-description",i.classList.add("driver-popover-description"),i.style.display="none",i.innerText="Popover description is here";const d=document.createElement("button");d.type="button",d.classList.add("driver-popover-close-btn"),d.setAttribute("aria-label","Close"),d.innerHTML="&times;";const n=document.createElement("footer");n.classList.add("driver-popover-footer");const f=document.createElement("span");f.classList.add("driver-popover-progress-text"),f.innerText="";const w=document.createElement("span");w.classList.add("driver-popover-navigation-btns");const r=document.createElement("button");r.type="button",r.classList.add("driver-popover-prev-btn"),r.innerHTML="&larr; Previous";const v=document.createElement("button");return v.type="button",v.classList.add("driver-popover-next-btn"),v.innerHTML="Next &rarr;",w.appendChild(r),w.appendChild(v),n.appendChild(f),n.appendChild(w),e.appendChild(d),e.appendChild(o),e.appendChild(t),e.appendChild(i),e.appendChild(n),{wrapper:e,arrow:o,title:t,description:i,footer:n,previousButton:r,nextButton:v,closeButton:d,footerButtons:w,progress:f}}function Le(){var o;const e=l("popover");e&&((o=e.wrapper.parentElement)==null||o.removeChild(e.wrapper))}const $e="";function Ae(e={}){V(e);function o(){s("allowClose")&&g()}function t(){const a=s("overlayClickBehavior");if(s("allowClose")&&a==="close"){g();return}if(typeof a=="function"){const p=l("__activeStep"),c=l("__activeElement");a(c,p,{config:s(),state:l(),driver:k()});return}a==="nextStep"&&i()}function i(){const a=l("activeIndex"),p=s("steps")||[];if(typeof a=="undefined")return;const c=a+1;p[c]?v(c):g()}function d(){const a=l("activeIndex"),p=s("steps")||[];if(typeof a=="undefined")return;const c=a-1;p[c]?v(c):g()}function n(a){(s("steps")||[])[a]?v(a):g()}function f(){var b;if(l("__transitionCallback"))return;const p=l("activeIndex"),c=l("__activeStep"),u=l("__activeElement");if(typeof p=="undefined"||typeof c=="undefined"||typeof l("activeIndex")=="undefined")return;const m=((b=c.popover)==null?void 0:b.onPrevClick)||s("onPrevClick");if(m)return m(u,c,{config:s(),state:l(),driver:k()});d()}function w(){var m;if(l("__transitionCallback"))return;const p=l("activeIndex"),c=l("__activeStep"),u=l("__activeElement");if(typeof p=="undefined"||typeof c=="undefined")return;const h=((m=c.popover)==null?void 0:m.onNextClick)||s("onNextClick");if(h)return h(u,c,{config:s(),state:l(),driver:k()});i()}function r(){l("isInitialized")||(S("isInitialized",!0),document.body.classList.add("driver-active",s("animate")?"driver-fade":"driver-simple"),Se(),N("overlayClick",t),N("escapePress",o),N("arrowLeftPress",f),N("arrowRightPress",w))}function v(a=0){var R,W,I,M,re,se,ae,ce;const p=s("steps");if(!p){console.error("No steps to drive through"),g();return}if(!p[a]){g();return}S("__activeOnDestroyed",document.activeElement),S("activeIndex",a);const c=p[a],u=p[a+1],h=p[a-1],m=((R=c.popover)==null?void 0:R.doneBtnText)||s("doneBtnText")||"Done",b=s("allowClose"),C=typeof((W=c.popover)==null?void 0:W.showProgress)!="undefined"?(I=c.popover)==null?void 0:I.showProgress:s("showProgress"),x=(((M=c.popover)==null?void 0:M.progressText)||s("progressText")||"{{current}} of {{total}}").replace("{{current}}",`${a+1}`).replace("{{total}}",`${p.length}`),P=((re=c.popover)==null?void 0:re.showButtons)||s("showButtons"),E=["next","previous",...b?["close"]:[]].filter(He=>!(P!=null&&P.length)||P.includes(He)),L=((se=c.popover)==null?void 0:se.onNextClick)||s("onNextClick"),$=((ae=c.popover)==null?void 0:ae.onPrevClick)||s("onPrevClick"),B=((ce=c.popover)==null?void 0:ce.onCloseClick)||s("onCloseClick");G({...c,popover:{showButtons:E,nextBtnText:u?void 0:m,disableButtons:[...h?[]:["previous"]],showProgress:C,progressText:x,onNextClick:L||(()=>{u?v(a+1):g()}),onPrevClick:$||(()=>{v(a-1)}),onCloseClick:B||(()=>{g()}),...(c==null?void 0:c.popover)||{}}})}function g(a=!0){const p=l("__activeElement"),c=l("__activeStep"),u=l("__activeOnDestroyed"),h=s("onDestroyStarted");if(a&&h){const C=!p||(p==null?void 0:p.id)==="driver-dummy-element";h(C?void 0:p,c,{config:s(),state:l(),driver:k()});return}const m=(c==null?void 0:c.onDeselected)||s("onDeselected"),b=s("onDestroyed");if(document.body.classList.remove("driver-active","driver-fade","driver-simple"),ke(),Le(),Ce(),me(),de(),X(),p&&c){const C=p.id==="driver-dummy-element";m&&m(C?void 0:p,c,{config:s(),state:l(),driver:k()}),b&&b(C?void 0:p,c,{config:s(),state:l(),driver:k()})}u&&u.focus()}const y={isActive:()=>l("isInitialized")||!1,refresh:H,drive:(a=0)=>{r(),v(a)},setConfig:V,setSteps:a=>{X(),V({...s(),steps:a})},getConfig:s,getState:l,getActiveIndex:()=>l("activeIndex"),isFirstStep:()=>l("activeIndex")===0,isLastStep:()=>{const a=s("steps")||[],p=l("activeIndex");return p!==void 0&&p===a.length-1},getActiveStep:()=>l("activeStep"),getActiveElement:()=>l("activeElement"),getPreviousElement:()=>l("previousElement"),getPreviousStep:()=>l("previousStep"),moveNext:i,movePrevious:d,moveTo:n,hasNextStep:()=>{const a=s("steps")||[],p=l("activeIndex");return p!==void 0&&!!a[p+1]},hasPreviousStep:()=>{const a=s("steps")||[],p=l("activeIndex");return p!==void 0&&!!a[p-1]},highlight:a=>{r(),G({...a,popover:a.popover?{showButtons:[],showProgress:!1,progressText:"",...a.popover}:void 0})},destroy:()=>{g(!1)}};return le(y),y}return F.driver=Ae,Object.defineProperty(F,Symbol.toStringTag,{value:"Module"}),F}({});</script>
+</head>
+<body>
+
+<!-- TTS Bar -->
+<div id="tts-bar">
+  <button id="tts-play-btn" class="tts-btn" onclick="ttsToggle()">▶ 朗讀全文</button>
+  <button class="tts-btn" onclick="ttsStop()" title="停止並重設">⏹</button>
+  <div class="tts-sep"></div>
+  <div class="tts-dots" id="tts-dots"></div>
+  <div class="tts-sep"></div>
+  <span class="tts-section" id="tts-section-name">點擊「朗讀全文」開始</span>
+  <select id="tts-speed" title="語速" onchange="ttsSetRate(this.value)">
+    <option value="0.8">0.8×</option>
+    <option value="0.9" selected>0.9×</option>
+    <option value="1.0">1.0×</option>
+    <option value="1.1">1.1×</option>
+    <option value="1.2">1.2×</option>
+  </select>
+  <div class="tts-sep"></div>
+  <span style="font-size:11px;color:#8A7A5A;">🔊</span>
+  <input type="range" id="tts-vol" min="0" max="1" step="0.05" value="1"
+         style="width:60px;accent-color:var(--gold);cursor:pointer;" title="音量">
+  <div class="tts-sep"></div>
+  <button class="tts-btn" onclick="adjustPageFont(-1)" style="padding:4px 9px;font-size:11px;font-weight:900;" title="縮小字體">A−</button>
+  <button class="tts-btn" onclick="adjustPageFont(1)"  style="padding:4px 9px;font-size:11px;font-weight:900;" title="放大字體">A+</button>
+  <div class="tts-sep"></div>
+  <button class="tts-btn" onclick="showLeapsExplain()" style="padding:4px 10px;font-size:11px;font-weight:700;color:#3A6FC4;" title="LEAPS 策略說明導覽">📘 LEAPS說明</button>
+</div>
+
+<button id="layout-reset-btn" onclick="window.resetLayout && window.resetLayout()" title="重設版面排列">↺ 重設版面</button>
+<div id="tts-subtitle"></div>
+
+<!-- Edit Button -->
+<button id="edit-btn" onclick="toggleEditMode()" title="Ctrl+E">
+  <span id="edit-icon">✏️</span>
+  <span id="edit-label">編輯模式</span>
+</button>
+
+<!-- Edit Toolbar -->
+<div id="edit-toolbar">
+  <div class="et-hint" id="et-hint">← 點擊頁面任意文字開始編輯</div>
+  <div class="et-group" id="et-controls" style="display:none;">
+    <div class="et-item">
+      <div class="et-label">字體</div>
+      <select id="et-font" onchange="applyStyle('fontFamily', this.value)">
+        <option value='"PingFang TC","Microsoft JhengHei",sans-serif'>PingFang TC</option>
+        <option value='Georgia,"Times New Roman",serif'>Georgia</option>
+        <option value='system-ui,sans-serif'>System UI</option>
+        <option value='"Courier New",monospace'>等寬字體</option>
+      </select>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">大小</div>
+      <div class="et-size-ctrl">
+        <button class="et-btn-sm" onclick="adjustSize(-1)">−</button>
+        <span id="et-size-val">16</span>
+        <button class="et-btn-sm" onclick="adjustSize(1)">+</button>
+      </div>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button id="et-bold"   class="et-fmt-btn" onclick="toggleBold()"><b>B</b></button>
+      <button id="et-italic" class="et-fmt-btn" onclick="toggleItalic()"><i>I</i></button>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">顏色</div>
+      <input type="color" id="et-color" oninput="applyStyle('color', this.value)" title="文字顏色">
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">行距</div>
+      <input type="range" id="et-lh" min="1" max="3" step="0.05" value="1.4"
+             oninput="applyStyle('lineHeight', this.value); document.getElementById('et-lh-val').textContent = parseFloat(this.value).toFixed(1);">
+      <span id="et-lh-val" style="font-size:11px;min-width:22px;">1.4</span>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button class="et-action-btn" onclick="resetElement()">重設</button>
+      <button class="et-action-btn" id="et-copy-btn" onclick="copyHtml()">複製</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ MAIN PAGE ═══════════════════ -->
+<div class="page" id="drag-canvas">
+
+  <!-- Course Tag -->
+  <div class="course-tag" data-drag-id="l9-course-tag">📚 期權小學堂 · 第9課</div>
+
+  <!-- Header -->
+  <div data-drag-id="l9-header">
+    <div class="page-header">
+      <div>
+        <div class="page-title">PMCC 黃金法則 ⚖️</div>
+        <div class="page-subtitle">Poor Man\'s Covered Call <span style='font-size:0.75em;font-weight:700;color:var(--gold);background:#FFF7C0;border:1px solid var(--gold-bdr);border-radius:6px;padding:2px 8px;margin-left:6px;vertical-align:middle;'>窮人版備兌買權</span> — 建倉前必做的驗算</div>
+        <div class="page-desc">用 LEAPS（長期深價內 Call）取代 100 股正股，搭配短期虛值 Short Call 收取權利金。建倉前必須驗算黃金法則，Delta 與 ITM 機率為必填欄位。</div>
+
+        <div class="hfb">
+          <!-- 黃金法則 -->
+          <div class="hfb-row gold-row">
+            <div class="hfb-icon">⚖</div>
+            <div>
+              <div class="hfb-title">黃金法則（建倉前必驗算）</div>
+              <div class="hfb-formula"><span class="leaps-tip">LEAPS<button class="leaps-q" tabindex="0" onclick="showLeapsExplain()">?</button><div class="leaps-q-box"><strong>LEAPS（長天期看漲期權）</strong><br>Long-term Equity AnticiPation Securities<br><br>• 到期日 <strong>≥ 180 天</strong>的遠期 Call 期權<br>• 選深度價內（Delta ≥ 0.80），走勢貼近正股<br>• 用 ~39% 資金取代持有 100 股正股<br>• ITM Prob 越高越好（≥ 75%），確保底倉不歸零<br><br><em style="color:var(--blue);">點擊 ? 開啟完整 5 步驟說明導覽</em></div></span> 買入成本 &lt; Short Call 履約價 − LEAPS 履約價</div>
+              <div class="hfb-note">
+                「差價」= Short Call 履約價 − LEAPS 履約價，代表你<strong>最多能賺多少</strong>。<br>
+                你付的 LEAPS 費用一旦超過差價，即使股票漲方向正確，整組部位<strong style="color:var(--red);">仍保證虧損</strong>。
+              </div>
+            </div>
+          </div>
+          <!-- 最大獲利 -->
+          <div class="hfb-row green-row">
+            <div class="hfb-icon">✅</div>
+            <div>
+              <div class="hfb-title">最大獲利 = 差價 − 淨成本</div>
+              <div class="hfb-formula green">（Short Call 履約價 − LEAPS 履約價）−（LEAPS 費用 − Short Call 保費收入）</div>
+              <div class="hfb-detail">
+                股票到期漲至 <strong>Short Call 履約價以上</strong>時，最大獲利實現。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="contract-box">
+        <div class="cb-title">📐 建倉規範</div>
+        <div class="cb-ticker">PMCC <small>· 黃金法則</small></div>
+        <div class="cb-grid">
+          <div class="cb-item"><div class="ci-l">Long LEAPS Delta</div><div class="ci-v blue">≥ 0.80</div></div>
+          <div class="cb-item"><div class="ci-l">Long LEAPS DTE</div><div class="ci-v blue">≥ 180 天</div></div>
+          <div class="cb-item"><div class="ci-l">Short Call Delta</div><div class="ci-v red">0.20–0.35</div></div>
+          <div class="cb-item"><div class="ci-l">Short Call DTE</div><div class="ci-v red">19–45 天</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 1: 什麼是 PMCC -->
+  <div class="full-card" data-drag-id="l9-what" id="l9-what">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge">1</div>
+        <div class="pill-outline setup">WHAT IS PMCC</div>
+      </div>
+      <div class="pill setup">窮人版備兌買權</div>
+    </div>
+    <div class="ptitle">PMCC = LEAPS Long Call + Short Call</div>
+    <div class="bullets">
+      <div class="bullet"><div class="bullet-num">①</div><div>傳統備兌（Covered Call）需先買 100 股正股，資金壓力大（如 NOK 需 $1,480）。</div></div>
+      <div class="bullet"><div class="bullet-num">②</div><div>PMCC 改用一張<strong>遠期深度價內 LEAPS Long Call</strong>（Delta ≥ 0.80）取代正股，只需一小部分資金（如 NOK LEAPS 僅需 $575）。</div></div>
+      <div class="bullet"><div class="bullet-num">③</div><div>再搭配賣出一張<strong>近期虛值 Short Call</strong>（19–45 DTE，Delta 約 0.20–0.35），穩定收取權利金。</div></div>
+      <div class="bullet"><div class="bullet-num">④</div><div>PMCC 只需 39% 的資金，報酬率卻可高達傳統備兌的兩倍以上，最大損失也更低。</div></div>
+    </div>
+
+    <div class="hint-note">📌 以 NOK 2026/06/12 實際市場數據為例：股價 $14.80，LEAPS $10 Call（2027-12-17，552 DTE）Ask $5.75，Short Call $17（2026-07-02，19 DTE）Ask $0.42。</div>
+    <div class="cmp-table-wrap">
+      <table class="cmp-table">
+        <thead>
+          <tr>
+            <th>比較項目</th>
+            <th>傳統備兌（Covered Call）</th>
+            <th>PMCC（窮人版備兌）</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="label-col">抵押品</td><td>100 股正股</td><td class="col-green">1 張 LEAPS Long Call</td></tr>
+          <tr><td class="label-col">資金需求</td><td>$1,480（NOK 100 股）</td><td class="col-green">$575（LEAPS 權利金）</td></tr>
+          <tr><td class="label-col">Short Call 收入</td><td>~$42 / 月</td><td>~$42 / 月（相同）</td></tr>
+          <tr><td class="label-col">最大損失</td><td class="col-red">$1,480（股歸零）</td><td class="col-green">$575（LEAPS 歸零）</td></tr>
+          <tr class="highlight-row"><td class="label-col">資金報酬率</td><td>較低</td><td class="col-gold">較高（槓桿效率佳）</td></tr>
+          <tr><td class="label-col">需要期權等級</td><td>無需（持正股即可）</td><td class="col-red">需期權三級以上</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Section 2: 建倉結構 -->
+  <div class="panels" id="l9-structure-row">
+    <div class="panel" data-drag-id="l9-long-leg" id="l9-long-leg">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="step-badge" style="background:var(--blue);">L</div>
+          <div class="pill-outline chart">LONG LEG</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button type="button" id="leaps-guide-btn" onclick="showLeapsExplain()"
+            style="background:var(--blue-bg);border:1.5px solid var(--blue-bdr);color:var(--blue);
+            border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;">？說明導覽</button>
+          <div class="pill chart">LEAPS</div>
+        </div>
+      </div>
+      <div class="ptitle" id="leaps-ptitle">買進買權（Long Call）</div>
+      <div class="bullets">
+        <div class="bullet" id="leaps-b1"><div class="bullet-num" style="background:var(--blue-bg);border-color:var(--blue-bdr);color:var(--blue);">①</div><div>到期日距今<strong>至少 180 天以上</strong>（建議 LEAPS 500+ DTE）</div></div>
+        <div class="bullet" id="leaps-b2"><div class="bullet-num" style="background:var(--blue-bg);border-color:var(--blue-bdr);color:var(--blue);">②</div><div>選擇深度價內履約價，<strong>Delta ≥ 0.80</strong>（走勢貼近正股）</div></div>
+        <div class="bullet" id="leaps-b3"><div class="bullet-num" style="background:var(--blue-bg);border-color:var(--blue-bdr);color:var(--blue);">③</div><div>範例：NOK $10 Call，2027-12-17，Ask <strong>$5.75</strong>，Delta ≈ 0.90</div></div>
+      </div>
+      <div id="leaps-criteria" style="background:var(--blue-bg);border:1.5px solid var(--blue-bdr);border-radius:var(--r-sm);padding:10px 14px;">
+        <div style="font-size:11px;font-weight:700;color:var(--blue);letter-spacing:0.5px;margin-bottom:4px;">LEAPS 選股標準</div>
+        <div style="font-size:12px;color:var(--ink);line-height:1.7;">DTE ≥ 180 天 &nbsp;|&nbsp; Delta ≥ 0.80 &nbsp;|&nbsp; 深度 ITM<br>ITM Prob（N(d2)）越高越好，代表到期時仍有內在價值</div>
+      </div>
+    </div>
+
+    <div class="panel" data-drag-id="l9-short-leg" id="l9-short-leg">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="step-badge" style="background:var(--red);">S</div>
+          <div class="pill-outline red">SHORT LEG</div>
+        </div>
+        <div class="pill red">Short Call</div>
+      </div>
+      <div class="ptitle">賣出買權（Short Call）</div>
+      <div class="bullets">
+        <div class="bullet"><div class="bullet-num" style="background:var(--red-bg);border-color:var(--red-bdr);color:var(--red);">①</div><div>選擇 <strong>19～45 天</strong>到期的近期期權</div></div>
+        <div class="bullet"><div class="bullet-num" style="background:var(--red-bg);border-color:var(--red-bdr);color:var(--red);">②</div><div>選擇虛值履約價，<strong>Delta 約 0.20～0.35</strong>（被指派機率低）</div></div>
+        <div class="bullet"><div class="bullet-num" style="background:var(--red-bg);border-color:var(--red-bdr);color:var(--red);">③</div><div>範例：NOK $17 Call，2026-07-02（19 DTE），Ask <strong>$0.42</strong>，Delta 0.27</div></div>
+      </div>
+      <div class="cmp-table-wrap">
+        <table class="cmp-table">
+          <thead><tr><th>履約價</th><th>權利金</th><th>Delta</th><th>被指派機率</th><th>建議</th></tr></thead>
+          <tbody>
+            <tr><td>$16.00</td><td class="col-green">$0.66</td><td>0.3774</td><td class="col-red">33.95%</td><td>收入高但風險高</td></tr>
+            <tr><td>$17.00</td><td>$0.42</td><td>0.2672</td><td>23.45%</td><td class="col-gold">✅ 推薦</td></tr>
+            <tr><td>$18.00</td><td class="col-red">$0.26</td><td>0.1895</td><td class="col-green">16.21%</td><td>過於保守</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div><!-- .panels -->
+
+  <!-- Section 3: 黃金法則計算器 -->
+  <div class="full-card" data-drag-id="l9-calculator" id="l9-calculator">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge" style="background:var(--gold);">⚖</div>
+        <div class="pill-outline gold">GOLDEN RULE</div>
+      </div>
+      <div class="pill gold">黃金法則試算</div>
+    </div>
+    <div class="ptitle">建倉前驗算 — Delta 與 ITM Prob 為必填</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.6;">
+      黃金法則：<strong>Long Call 權利金 (P<sub>L</sub>) &lt; Short Call 履約價 (K<sub>S</sub>) − Long Call 履約價 (K<sub>L</sub>)</strong><br>
+      違反此法則則即使股票漲方向正確，整組部位仍可能虧損。
+      <span style="color:var(--red);font-weight:700;"> ★ 標記為必填欄位。</span>
+    </div>
+
+    <!-- Long LEAPS Inputs -->
+    <div class="calc-section">
+      <div class="calc-section-header long-hdr">📈 Long LEAPS（買進買權）</div>
+      <div class="calc-section-body">
+        <div class="field-grp w-ticker">
+          <label>股票代號</label>
+          <input type="text" id="in-ticker" placeholder="NOK" maxlength="8" style="text-transform:uppercase;">
+        </div>
+        <div class="field-grp w-k">
+          <label>LEAPS 履約價 K<sub style="font-size:9px;">L</sub> *</label>
+          <input type="number" id="in-kl" placeholder="10.00" step="0.5" min="0.01">
+        </div>
+        <div class="field-grp w-pr">
+          <label>LEAPS 權利金 P<sub style="font-size:9px;">L</sub> *</label>
+          <input type="number" id="in-pl" placeholder="5.75" step="0.01" min="0.01">
+        </div>
+        <div class="field-grp w-dte">
+          <label>LEAPS DTE</label>
+          <input type="number" id="in-leaps-dte" placeholder="552" min="1">
+        </div>
+        <div class="field-grp w-delta">
+          <label>LEAPS Delta <span class="req">★</span></label>
+          <input type="number" id="in-leaps-delta" placeholder="0.90" step="0.0001" min="0" max="1" class="required-field">
+        </div>
+        <div class="field-grp w-itm">
+          <label>LEAPS ITM Prob % <span class="req">★</span> <button type="button" id="leaps-itm-info-btn" onclick="showLeapsITMExplain()" style="background:var(--gold-bg);border:1.5px solid var(--gold-bdr);color:var(--gold);border-radius:100px;width:18px;height:18px;font-size:10px;font-weight:900;cursor:pointer;line-height:1;padding:0;vertical-align:middle;margin-left:3px;">?</button></label>
+          <input type="number" id="in-leaps-itm" placeholder="85.50" step="0.01" min="0" max="100" class="required-field">
+        </div>
+      </div>
+    </div>
+
+    <!-- Short Call Inputs -->
+    <div class="calc-section">
+      <div class="calc-section-header short-hdr">📉 Short Call（賣出買權）</div>
+      <div class="calc-section-body">
+        <div class="field-grp w-k">
+          <label>Short Call 履約價 K<sub style="font-size:9px;">S</sub> *</label>
+          <input type="number" id="in-ks" placeholder="17.00" step="0.5" min="0.01">
+        </div>
+        <div class="field-grp w-pr">
+          <label>Short Call 權利金 P<sub style="font-size:9px;">S</sub></label>
+          <input type="number" id="in-ps" placeholder="0.42" step="0.01" min="0">
+        </div>
+        <div class="field-grp w-dte">
+          <label>Short Call DTE</label>
+          <input type="number" id="in-sc-dte" placeholder="19" min="1">
+        </div>
+        <div class="field-grp w-delta">
+          <label>Short Call Delta <span class="req">★</span></label>
+          <input type="number" id="in-sc-delta" placeholder="0.27" step="0.0001" min="0" max="1" class="required-field">
+        </div>
+        <div class="field-grp w-itm">
+          <label>Short Call ITM Prob % <span class="req">★</span> <button type="button" id="sc-itm-info-btn" onclick="showSCITMExplain()" style="background:var(--gold-bg);border:1.5px solid var(--gold-bdr);color:var(--gold);border-radius:100px;width:18px;height:18px;font-size:10px;font-weight:900;cursor:pointer;line-height:1;padding:0;vertical-align:middle;margin-left:3px;">?</button></label>
+          <input type="number" id="in-sc-itm" placeholder="23.45" step="0.01" min="0" max="100" class="required-field">
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-end;">
+          <button class="btn-calc" onclick="calcGoldenRule()">⚖ 驗算黃金法則</button>
+          <button class="btn-reset" onclick="resetCalc()">重設</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div id="l9-calc-result">
+      <div class="result-placeholder">填入上方欄位並按「驗算黃金法則」，結果將顯示於此。<br><span style="color:var(--red);">★ Delta 與 ITM Prob 為必填欄位，不可省略。</span></div>
+    </div>
+  </div>
+
+  <!-- Section 4: 三種市場情境 -->
+  <div class="full-card" data-drag-id="l9-scenarios" id="l9-scenarios">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge">4</div>
+        <div class="pill-outline chart">SCENARIOS</div>
+      </div>
+      <div class="pill chart">三種市場情境</div>
+    </div>
+    <div class="ptitle">建倉後的三種結果</div>
+    <div class="scenario-grid">
+      <div class="scenario-card good">
+        <div class="sc-icon">😊</div>
+        <div class="sc-title">情境 A：股價橫盤或微跌（最理想）</div>
+        <div class="sc-desc">Short Call 到期歸零，穩收全部權利金。LEAPS 小幅縮水但仍持有。繼續賣下一張 Short Call。</div>
+        <div class="sc-result" id="sc-result-a">✅ 每月穩定收取 $42，持續滾動</div>
+      </div>
+      <div class="scenario-card bad">
+        <div class="sc-icon">😨</div>
+        <div class="sc-title">情境 B：股價大跌（最大風險）</div>
+        <div class="sc-desc">Short Call 歸零收 $42，但 LEAPS 大幅縮水。最大損失 = LEAPS 成本 − 歷次 Short Call 總收入。</div>
+        <div class="sc-result" id="sc-result-b">⚠️ 最大損失 = $575 − 累計收入</div>
+      </div>
+      <div class="scenario-card warn">
+        <div class="sc-icon">🚨</div>
+        <div class="sc-title">情境 C：股價暴漲破履約價（需主動處理）</div>
+        <div class="sc-desc">Short Call 面臨被指派壓力。必須在到期前主動平倉整組。只要符合黃金法則，整體仍獲利。</div>
+        <div class="sc-result">⚖️ 符合黃金法則 → 整體獲利</div>
+      </div>
+    </div>
+    <div class="hint-note">⚠️ <strong>PMCC 最大的陷阱</strong>：持有者沒有正股！若 Short Call 被指派，帳戶將出現「裸空部位」，風險極高。必須在到期前主動平倉。</div>
+  </div>
+
+  <!-- Section 5: 平倉策略 -->
+  <div class="full-card" data-drag-id="l9-exit" id="l9-exit">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge">5</div>
+        <div class="pill-outline win">EXIT</div>
+      </div>
+      <div class="pill win">平倉與滾倉策略</div>
+    </div>
+    <div class="ptitle">三種平倉情境與操作方式</div>
+
+    <div class="exit-grid">
+      <div class="exit-card a-card">
+        <div class="exit-title">情境 A — Short Call 到期歸零（最常見）</div>
+        <div class="exit-desc">Short Call 跌至近 $0，自動落袋。無需操作，繼續持有 LEAPS，賣出下一個月的 Short Call。</div>
+        <div class="code-snippet" id="exit-snippet-a">Short Call $17 賣出收 $42 → 到期歸零
+→ $42 淨利直接落袋
+→ LEAPS 繼續持有，下月再賣新 Short Call</div>
+      </div>
+
+      <div class="exit-card b-card">
+        <div class="exit-title">情境 B — 股價上漲，提前主動平倉獲利</div>
+        <div class="exit-desc">Stock 漲，Short Call 虧損，但 LEAPS 同步大漲，整體仍獲利。步驟：① Buy to Close Short Call → ② Sell to Close LEAPS。</div>
+        <div class="code-snippet" id="exit-snippet-b">股價 $14.80 → $18 時：
+LEAPS $10：買入 $5.75，現值 $8.20 → 獲利 +$2.45
+Short $17：賣收 $0.42，買回 $1.30 → 虧損 −$0.88
+整體獲利 = $2.45 − $0.88 = $1.57/股 = $157/張</div>
+      </div>
+
+      <!-- 停損教學 -->
+      <div class="exit-card" style="background:var(--gold-bg);border:2px solid var(--gold-bdr);">
+        <div class="exit-title" style="color:var(--gold);">⛔ 短腿停損規則（主動平倉訊號）</div>
+        <div class="exit-desc">短腿買回成本漲到賣出價 <strong>1.5 倍</strong>時，通常意味著股價已明顯靠近或穿越 Short Call 履約價。<br>
+          此時停損並非在「怕短腿虧錢」，而是以短腿損失作為<strong>收割長腿獲利的觸發訊號</strong>——
+          因為長腿的 Delta 遠高於短腿，股價上漲時長腿賺的遠超短腿賠的，整體部位大概率仍為正值。</div>
+        <div style="margin-top:8px;font-size:12px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;align-items:center;"><span>現股價：<input type="number" id="in-current-price" placeholder="500" step="0.5" oninput="window.updateTargetRow && window.updateTargetRow()" style="width:80px;border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:12px;"></span><span>長腿目標賣出股價：<input type="number" id="in-target-price" placeholder="534" step="0.5" oninput="window.updateTargetRow && window.updateTargetRow()" style="width:80px;border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:12px;"></span><span>（短腿未突破 KS 則 SC 歸零，保留全部收入）</span></div>
+        <div id="stop-loss-detail">
+          <div class="code-snippet" style="margin-top:6px;color:var(--muted);">填入上方數據並按「驗算黃金法則」後自動計算</div>
+        </div>
+      </div>
+
+      <div class="exit-card c-card">
+        <div class="exit-title">情境 C — 股價暴漲，Short Call 深度 ITM（緊急）</div>
+        <div class="exit-desc">⚠️ 必須在 Short Call 到期前主動平倉，否則被指派後出現裸空，風險極高！當 Short Call 深度 ITM，立即執行 ① + ②，勿拖延。</div>
+        <div class="code-snippet" id="exit-snippet-c">股價大漲，Short Call $17 深度 ITM：
+→ 立即 Buy to Close Short Call（無論多貴）
+→ 立即 Sell to Close LEAPS 鎖定利潤
+⛔ 切勿等到最後一天才處理</div>
+      </div>
+    </div>
+
+    <div class="ptitle" style="margin-top:8px;">短腳滾倉（Rolling the Short Call）</div>
+    <div class="roll-grid">
+      <div class="roll-card">
+        <div class="roll-title">① Roll Up（向上滾）</div>
+        <div class="roll-desc">買回原 Short Call，改賣<strong>更高履約價</strong>，到期日不變。適用：股價上漲，想將封頂點往上移。代價：新 Short Call 收入更少，甚至要倒貼。</div>
+        <div class="code-snippet" style="font-size:11px;" id="roll-snippet-up">買回 $17（花 $1.30）
+改賣 $18（收 $0.75）
+→ 淨支出 $0.55</div>
+      </div>
+      <div class="roll-card">
+        <div class="roll-title">② Roll Out（向外滾）</div>
+        <div class="roll-desc">買回原 Short Call，改賣<strong>更遠到期日</strong>，履約價不變。用時間換空間，問題只是被推遲，仍須注意後續股價走勢。</div>
+        <div class="code-snippet" style="font-size:11px;" id="roll-snippet-out">買回 7/02 $17 Call
+改賣 8/07 $17 Call
+→ 多收一些，問題推遲</div>
+      </div>
+      <div class="roll-card">
+        <div class="roll-title">③ Roll Up &amp; Out（同時向上又向外）</div>
+        <div class="roll-desc">最常見的滾倉方式，兼顧爭取上漲空間與收取權利金。本質上仍是把問題往後推，若股價持續強勢需評估直接認賠出場。</div>
+        <div class="code-snippet" style="font-size:11px;" id="roll-snippet-both">買回舊 Short Call
+改賣更高K + 更遠DTE
+→ 本質：問題往後推</div>
+      </div>
+    </div>
+    <div class="hint-note">⚠️ 滾倉核心風險：若股價持續強勢上漲，每次滾倉能收到的差價越來越少，買回舊 Short Call 的成本卻越來越高。<strong>滾倉是管理手段，不是解決方案。</strong></div>
+  </div>
+
+</div><!-- end #drag-canvas -->
+
+
+<!-- ═══════════════════ Calculator JS ═══════════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  var L9_STATE = 'l9-state-v1';
+
+  function fmtD(v, digits) { return isNaN(v) || v == null ? '—' : parseFloat(v).toFixed(digits != null ? digits : 2); }
+  function fmtMoney(v) { return isNaN(v) || v == null ? '—' : '$' + Math.abs(v).toFixed(2); }
+  function fmt100(v)   { if (isNaN(v) || v == null) return '—';
+    return '$' + (Math.abs(v)*100).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+
+  function markMissing(id, missing) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (missing) el.classList.add('missing'); else el.classList.remove('missing');
+  }
+
+  window.calcGoldenRule = function () {
+    var kl  = parseFloat(document.getElementById('in-kl').value);
+    var pl  = parseFloat(document.getElementById('in-pl').value);
+    var ks  = parseFloat(document.getElementById('in-ks').value);
+    var ps  = parseFloat(document.getElementById('in-ps').value) || 0;
+    var lDelta = parseFloat(document.getElementById('in-leaps-delta').value);
+    var lItm   = parseFloat(document.getElementById('in-leaps-itm').value);
+    var sDelta = parseFloat(document.getElementById('in-sc-delta').value);
+    var sItm   = parseFloat(document.getElementById('in-sc-itm').value);
+
+    var errors = [];
+    markMissing('in-kl', isNaN(kl) || kl <= 0);
+    markMissing('in-pl', isNaN(pl) || pl <= 0);
+    markMissing('in-ks', isNaN(ks) || ks <= 0);
+    markMissing('in-leaps-delta', isNaN(lDelta));
+    markMissing('in-leaps-itm',  isNaN(lItm));
+    markMissing('in-sc-delta',   isNaN(sDelta));
+    markMissing('in-sc-itm',     isNaN(sItm));
+
+    if (isNaN(kl) || kl <= 0)     errors.push('請輸入 LEAPS 履約價 K<sub>L</sub>');
+    if (isNaN(pl) || pl <= 0)     errors.push('請輸入 LEAPS 權利金 P<sub>L</sub>');
+    if (isNaN(ks) || ks <= 0)     errors.push('請輸入 Short Call 履約價 K<sub>S</sub>');
+    if (isNaN(lDelta))            errors.push('★ LEAPS Delta 為必填');
+    if (isNaN(lItm))              errors.push('★ LEAPS ITM Prob % 為必填');
+    if (isNaN(sDelta))            errors.push('★ Short Call Delta 為必填');
+    if (isNaN(sItm))              errors.push('★ Short Call ITM Prob % 為必填');
+
+    var resultEl = document.getElementById('l9-calc-result');
+
+    if (errors.length) {
+      resultEl.innerHTML =
+        '<div class="warn-box red-warn" style="margin-top:4px;">' +
+        '<strong>請填寫以下必填欄位：</strong><ul style="margin-top:6px;padding-left:18px;line-height:2;">' +
+        errors.map(function (e) { return '<li>' + e + '</li>'; }).join('') +
+        '</ul></div>';
+      return;
+    }
+
+    if (ks <= kl) {
+      resultEl.innerHTML = '<div class="warn-box red-warn" style="margin-top:4px;">⚠️ Short Call 履約價 K<sub>S</sub>（$' + ks.toFixed(2) + '）必須大於 LEAPS 履約價 K<sub>L</sub>（$' + kl.toFixed(2) + '）。</div>';
+      return;
+    }
+
+    /* ── Core calculations ── */
+    var spread    = ks - kl;                 /* max spread */
+    var netDebit  = pl - ps;                 /* net cost to enter */
+    var maxProfit = spread - pl;             /* golden rule: pl < spread → maxProfit > 0 */
+    var maxProfitWithSC = spread - netDebit; /* including short call premium already collected */
+    var cashROI   = ps > 0 ? (ps / pl * 100) : null;
+    var passes    = pl < spread;
+
+    /* ── Delta / ITM warnings ── */
+    var warns = [];
+    if (lDelta < 0.80) warns.push('LEAPS Delta（' + lDelta.toFixed(4) + '）低於 0.80，走勢可能未能有效追蹤正股。建議選擇 Delta ≥ 0.80 的深度價內 LEAPS。');
+    if (sDelta < 0.20 || sDelta > 0.35) warns.push('Short Call Delta（' + sDelta.toFixed(4) + '）' + (sDelta < 0.20 ? '低於 0.20，過於保守，權利金可能偏低。' : '高於 0.35，被指派機率較高，需謹慎評估。'));
+    if (sItm > 35) warns.push('Short Call ITM Prob（' + sItm.toFixed(2) + '%）高於 35%，被指派機率偏高，建議考慮更虛值的履約價。');
+
+    var formulaHtml =
+      '<div class="gr-formula">' +
+      '<span>P<sub>L</sub></span>' +
+      '<span class="op">=</span>' +
+      '<span class="val">' + fmtMoney(pl) + '</span>' +
+      '<span class="op">' + (passes ? '&lt;' : '≥') + '</span>' +
+      '<span>K<sub>S</sub> − K<sub>L</sub></span>' +
+      '<span class="op">=</span>' +
+      '<span class="val ' + (passes ? 'green' : 'red') + '">' + fmtMoney(ks) + ' − ' + fmtMoney(kl) + ' = ' + fmtMoney(spread) + '</span>' +
+      '</div>';
+
+    var verdictHtml =
+      '<div class="gr-verdict ' + (passes ? 'pass' : 'fail') + '">' +
+      (passes ? '✅ 黃金法則通過 — 最大獲利空間為正' : '❌ 黃金法則不通過 — 此組合從一開始就必虧') +
+      '</div>';
+
+    var metricsHtml =
+      '<div class="result-metrics">' +
+      '<div class="metric-card"><div class="mc-label">最大差價 (Spread)</div><div class="mc-value gold">' + fmt100(spread) + '</div><div class="mc-sub">每張 ×100</div></div>' +
+      '<div class="metric-card"><div class="mc-label">淨支出 (Net Debit)</div><div class="mc-value ' + (netDebit > 0 ? 'red' : 'green') + '">' + fmt100(netDebit) + '</div><div class="mc-sub">每張 ×100</div></div>' +
+      '<div class="metric-card"><div class="mc-label">最大獲利（含SC收入）</div><div class="mc-value ' + (maxProfitWithSC > 0 ? 'green' : 'red') + '">' + fmt100(maxProfitWithSC) + '</div><div class="mc-sub">每張 ×100</div></div>' +
+      '<div class="metric-card"><div class="mc-label">Short Call 月收益率</div><div class="mc-value ' + (cashROI != null ? 'gold' : '') + '">' + (cashROI != null ? cashROI.toFixed(2) + '%' : '—') + '</div><div class="mc-sub">ps ÷ pl</div></div>' +
+      '</div>';
+
+    var deltaInfoHtml =
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">' +
+      '<div style="background:var(--blue-bg);border:1.5px solid var(--blue-bdr);border-radius:var(--r-sm);padding:12px 14px;">' +
+      '<div style="font-size:10px;font-weight:700;color:var(--blue);letter-spacing:0.5px;margin-bottom:6px;">LONG LEAPS 資訊</div>' +
+      '<div style="font-size:13px;color:var(--ink);line-height:2;">' +
+      'Delta：<strong style="color:var(--blue)">' + lDelta.toFixed(4) + '</strong>' + (lDelta >= 0.80 ? ' ✅' : ' ⚠️') + '<br>' +
+      'ITM Prob：<strong style="color:var(--blue)">' + lItm.toFixed(2) + '%</strong><br>' +
+      '履約價：<strong>$' + kl.toFixed(2) + '</strong> &nbsp;|&nbsp; 權利金：<strong>$' + pl.toFixed(2) + '</strong> &nbsp;|&nbsp; 一口成本：<strong style="color:var(--blue)">' + fmt100(pl) + '</strong>' +
+      '</div></div>' +
+      '<div style="background:var(--red-bg);border:1.5px solid var(--red-bdr);border-radius:var(--r-sm);padding:12px 14px;">' +
+      '<div style="font-size:10px;font-weight:700;color:var(--red);letter-spacing:0.5px;margin-bottom:6px;">SHORT CALL 資訊</div>' +
+      '<div style="font-size:13px;color:var(--ink);line-height:2;">' +
+      'Delta：<strong style="color:var(--red)">' + sDelta.toFixed(4) + '</strong>' + (sDelta >= 0.20 && sDelta <= 0.35 ? ' ✅' : ' ⚠️') + '<br>' +
+      'ITM Prob：<strong style="color:var(--red)">' + sItm.toFixed(2) + '%</strong>' + (sItm <= 35 ? ' ✅' : ' ⚠️') + '<br>' +
+      '履約價：<strong>$' + ks.toFixed(2) + '</strong>' + (ps > 0 ? ' &nbsp;|&nbsp; 收入：<strong>$' + ps.toFixed(2) + '</strong> &nbsp;|&nbsp; 實收：<strong style="color:var(--red)">' + fmt100(ps) + '</strong>' : '') +
+      '</div></div>' +
+      '</div>';
+
+    var warnsHtml = '';
+    if (warns.length) {
+      warnsHtml =
+        '<div class="warn-box" style="margin-top:8px;">' +
+        '<strong>⚠️ 注意事項：</strong>' +
+        '<ul style="margin-top:6px;padding-left:18px;line-height:2;">' +
+        warns.map(function (w) { return '<li>' + w + '</li>'; }).join('') +
+        '</ul></div>';
+    }
+
+    var failNoteHtml = '';
+    if (!passes) {
+      failNoteHtml =
+        '<div class="warn-box red-warn" style="margin-top:8px;">' +
+        '<strong>❌ 違反黃金法則的後果：</strong><br>' +
+        '你花的錢（' + fmtMoney(pl) + '/股，' + fmt100(pl) + '/張）已超過你最多能賺到的差價（' + fmtMoney(spread) + '/股，' + fmt100(spread) + '/張）。' +
+        '即使股票大漲方向做對了，最終結算仍必然虧損 ' + fmt100(pl - spread) + ' / 張。<br>' +
+        '<strong>請更換 Short Call 履約價或改選更便宜的 LEAPS。</strong>' +
+        '</div>';
+    }
+
+    resultEl.innerHTML =
+      '<div class="golden-rule-box ' + (passes ? 'pass' : 'fail') + '" style="margin-top:4px;">' +
+      formulaHtml + verdictHtml + metricsHtml + deltaInfoHtml +
+      '</div>' +
+      failNoteHtml + warnsHtml;
+
+    /* 同步更新 Scenario Cards 與 Exit Card A */
+    var scA = document.getElementById('sc-result-a');
+    if (scA) scA.innerHTML = '✅ 每月穩定收取 <strong>' + fmt100(ps) + '</strong>，持續滾動';
+    var scB = document.getElementById('sc-result-b');
+    if (scB) scB.innerHTML = '⚠️ 最大損失上限 = <strong>' + fmt100(pl) + '</strong> − 累計SC收入';
+    var exB = document.getElementById('exit-snippet-b');
+    if (exB) exB.textContent = [
+      '建倉：LEAPS ' + fmtMoney(kl) + ' 買入 ' + fmtMoney(pl) + '/股 | Short ' + fmtMoney(ks) + ' 賣出收 ' + fmtMoney(ps) + '/股',
+      '（假設股價上漲，LEAPS增值 > Short Call虧損）',
+      'LEAPS ' + fmtMoney(kl) + '：買入 ' + fmtMoney(pl) + '，現值上漲（視平倉時機）',
+      'Short ' + fmtMoney(ks) + '：賣收 ' + fmtMoney(ps) + '，買回時需支付溢價',
+      '整體獲利 = (LEAPS增值 − Short Call虧損) × 100'
+    ].join('\n');
+    var exC = document.getElementById('exit-snippet-c');
+    if (exC) exC.textContent = [
+      '股價大漲，Short Call ' + fmtMoney(ks) + ' 深度 ITM：',
+      '→ 立即 Buy to Close Short Call（無論多貴）',
+      '→ 立即 Sell to Close LEAPS 鎖定利潤',
+      '⛔ 切勿等到最後一天才處理'
+    ].join('\n');
+
+    var exA = document.getElementById('exit-snippet-a');
+    if (exA) exA.textContent = [
+      'Short Call ' + fmtMoney(ks) + ' 賣出收 ' + fmt100(ps) + ' → 到期歸零',
+      '→ ' + fmt100(ps) + ' 淨利直接落袋',
+      '→ LEAPS 繼續持有，下月再賣新 Short Call'
+    ].join('\n');
+
+    /* 停損教學動態更新 */
+    var slDetail = document.getElementById('stop-loss-detail');
+    if (slDetail) {
+      var slTrigger = ps * 1.5;
+      var slLoss    = ps - slTrigger;          /* 每股虧損（負數）*/
+      var slLoss100 = slLoss * 100;            /* 每張虧損 */
+      var deltaRatio = (lDelta / sDelta).toFixed(2);
+      slDetail.innerHTML =
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:12px;margin-top:8px;line-height:2;">' +
+        '<span style="color:var(--muted);">短腿賣出價</span>' +
+        '<span><strong>' + fmtMoney(ps) + '/股</strong>，實收 <strong style="color:var(--gold)">' + fmt100(ps) + '/張</strong></span>' +
+        '<span style="color:var(--muted);">Buy to Close 停損觸發點</span>' +
+        '<span>回購價 &gt; <strong style="color:var(--red)">' + fmtMoney(slTrigger) + '</strong>（賣出價 × 1.5）</span>' +
+        '<span style="color:var(--muted);">停損時短腿單獨損益</span>' +
+        '<span>' + fmtMoney(ps) + ' − ' + fmtMoney(slTrigger) + ' = <strong style="color:var(--red)">−' + fmtMoney(slLoss) + '/股（−' + fmt100(slLoss) + '/張）</strong></span>' +
+        '<span style="color:var(--muted);">Long/Short Delta 比</span>' +
+        '<span>Long <strong>' + lDelta.toFixed(4) + '</strong> ÷ Short <strong>' + sDelta.toFixed(4) + '</strong> = <strong style="color:var(--green)">' + deltaRatio + '×</strong></span>' +
+        '<span style="color:var(--muted);">此時長腿狀況</span>' +
+        '<span>SC溢價漲 <strong>' + fmtMoney(slTrigger - ps) + '/股</strong>（' + fmtMoney(ps) + ' → ' + fmtMoney(slTrigger) + '）；長腿 Delta 是短腿的 <strong>' + deltaRatio + '×</strong><br>長腿增值 ≈ ' + deltaRatio + ' × ' + fmtMoney(slTrigger - ps) + ' × 100 = <strong style="color:var(--green)">+$' + Math.round((lDelta / sDelta) * (slTrigger - ps) * 100) + '/張</strong><br>扣除短腿虧損 −' + fmt100(slTrigger - ps) + ' → 淨賺 <strong style="color:var(--green)">+$' + Math.round(((lDelta / sDelta) - 1) * (slTrigger - ps) * 100) + '/張</strong></span>' +
+        '<span style="color:var(--muted);">整組平倉每口實際獲利<br><small>(未漲破短腿履約價，買回SC＋賣出LEAPS)</small></span>' +
+        '<span>' +
+        'LEAPS 買入 ' + fmtMoney(pl) + ' → 估售 <strong>' + fmtMoney(pl + (lDelta/sDelta)*(slTrigger-ps)) + '</strong>（+' + fmtMoney((lDelta/sDelta)*(slTrigger-ps)) + '/股）<br>' +
+        'SC 原收 ' + fmtMoney(ps) + '，停損買回 ' + fmtMoney(slTrigger) + '（−' + fmtMoney(slTrigger-ps) + '/股）<br>' +
+        '每口淨賺 = <strong style="color:var(--green);font-size:13px;">+$' + Math.round(((lDelta/sDelta)-1)*(slTrigger-ps)*100) + '/張</strong>' +
+        '</span>' +
+        '<span id="target-row" style="grid-column:1/-1;background:rgba(160,120,255,0.13);border-radius:6px;padding:8px 10px;display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-top:4px;"></span>' +
+        '</div>' +
+        '<div style="margin-top:10px;padding:10px 12px;background:rgba(212,144,10,0.12);border-left:3px solid var(--gold);border-radius:4px;font-size:12px;line-height:1.8;">' +
+        '✅ 結論：停損被觸發時（短腿回購 ' + fmtMoney(slTrigger) + '），整體部位大概率仍淨賺。' +
+        '<br><strong style="color:var(--gold);">$7.50 門檻不是在怕短腿虧錢，而是「長腿可以收割」的訊號點。短腿停損只是扣下扳機。</strong>' +
+        '</div>';
+    }
+
+    /* 短腳滾倉三種方式動態更新 */
+    var scDte = parseInt(document.getElementById('in-sc-dte').value) || 0;
+    var ticker = (document.getElementById('in-ticker').value || '').trim().toUpperCase() || 'SC';
+    var rollUp = document.getElementById('roll-snippet-up');
+    if (rollUp) rollUp.textContent = [
+      '現持：Short Call ' + fmtMoney(ks) + '（原收 ' + fmtMoney(ps) + '/股，' + fmt100(ps) + '/張）',
+      '操作：Buy to Close ' + fmtMoney(ks) + ' → Sell to Open 更高K',
+      '目標：新收入 > 買回成本，且新 KS 仍低於你預期的股價上限'
+    ].join('\n');
+    var rollOut = document.getElementById('roll-snippet-out');
+    if (rollOut) rollOut.textContent = [
+      '現持：Short Call ' + fmtMoney(ks) + '（DTE ' + (scDte || '—') + ' 天，原收 ' + fmtMoney(ps) + '/股）',
+      '操作：Buy to Close → Sell to Open 同履約價 ' + fmtMoney(ks) + ' 更遠DTE',
+      '多收時間價值，將壓力往後推延（問題未解，只是延後）'
+    ].join('\n');
+    var rollBoth = document.getElementById('roll-snippet-both');
+    if (rollBoth) rollBoth.textContent = [
+      '現持：Short Call ' + fmtMoney(ks) + '（DTE ' + (scDte || '—') + ' 天，原收 ' + fmtMoney(ps) + '/股）',
+      '操作：Buy to Close → Sell to Open 更高K + 更遠DTE',
+      '理想結果：KS 移高（爭取空間）+ 仍有淨收入（不倒貼）',
+      '⚠️ 注意：新 KS 須低於 LEAPS KL（' + fmtMoney(kl) + '）以維持黃金法則'
+    ].join('\n');
+
+    /* 供 updateTargetRow() 使用 */
+    window._l9 = { pl: pl, ps: ps, lDelta: lDelta, ks: ks };
+    updateTargetRow();
+    saveState();
+  };
+
+  function updateTargetRow() {
+    var d = window._l9;
+    if (!d) return;
+    var tp = parseFloat(document.getElementById('in-target-price').value);
+    var sp = parseFloat(document.getElementById('in-current-price').value);
+    var slDetail = document.getElementById('stop-loss-detail');
+    if (!slDetail || isNaN(tp) || isNaN(sp)) return;
+    var move = tp - sp;
+    var leapsSellEst = d.pl + d.lDelta * move;
+    var cost100 = Math.round(d.pl * 100);
+    var recv100 = Math.round(leapsSellEst * 100) + Math.round(d.ps * 100);
+    var profit100 = recv100 - cost100;
+    var row = slDetail.querySelector('#target-row');
+    if (!row) return;
+    row.innerHTML =
+      '<span style="color:var(--muted);">長腳在股價 $' + tp.toFixed(2) + ' 賣出<br>'
+      + '<small>（現股 $' + sp.toFixed(2) + '，漲 $' + move.toFixed(2) + '；SC未破 KS $' + d.ks.toFixed(2) + ' 歸零）</small></span>'
+      + '<span>LEAPS 估售價：$' + d.pl.toFixed(2) + ' + ' + d.lDelta.toFixed(4) + ' × $' + move.toFixed(2) + ' = <strong>$' + leapsSellEst.toFixed(2) + '/股</strong><br>'
+      + '長腿獲利：$' + leapsSellEst.toFixed(2) + ' × 100 = $' + Math.round(leapsSellEst*100) + '；SC收入 $' + d.ps.toFixed(2) + ' × 100 = $' + Math.round(d.ps*100) + '<br>'
+      + '扣除 LEAPS 成本 $' + d.pl.toFixed(2) + ' × 100 = <strong style="color:var(--red);">−$' + cost100 + '</strong><br>'
+      + '每口實際獲利 = $' + Math.round(leapsSellEst*100) + ' + $' + Math.round(d.ps*100) + ' − $' + cost100 + ' = '
+      + '<strong style="color:var(--green);font-size:13px;">+$' + profit100 + '/張</strong></span>';
+  }
+  window.updateTargetRow = updateTargetRow;
+
+  window.resetCalc = function () {
+    ['in-kl','in-pl','in-ks','in-ps','in-leaps-dte','in-leaps-delta','in-leaps-itm',
+     'in-sc-dte','in-sc-delta','in-sc-itm','in-ticker'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) { el.value = ''; el.classList.remove('missing'); }
+    });
+    document.getElementById('l9-calc-result').innerHTML =
+      '<div class="result-placeholder">填入上方欄位並按「驗算黃金法則」，結果將顯示於此。<br>' +
+      '<span style="color:var(--red);">★ Delta 與 ITM Prob 為必填欄位，不可省略。</span></div>';
+    try { localStorage.removeItem(L9_STATE); } catch (e) {}
+  };
+
+  /* ── Enter key shortcut ── */
+  ['in-kl','in-pl','in-ks','in-ps','in-leaps-delta','in-leaps-itm','in-sc-delta','in-sc-itm'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); window.calcGoldenRule(); } });
+  });
+
+  function saveState() {
+    try {
+      var s = {};
+      ['in-ticker','in-kl','in-pl','in-ks','in-ps','in-leaps-dte','in-leaps-delta',
+       'in-leaps-itm','in-sc-dte','in-sc-delta','in-sc-itm'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) s[id] = el.value;
+      });
+      localStorage.setItem(L9_STATE, JSON.stringify(s));
+    } catch (e) {}
+  }
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(L9_STATE);
+      if (!raw) return;
+      var s = JSON.parse(raw);
+      Object.keys(s).forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.value = s[id];
+      });
+      if (Object.keys(s).length > 0) window.calcGoldenRule();
+    } catch (e) {}
+  }
+
+  loadState();
+}());
+</script>
+
+<!-- ═══════════════════ TTS JS ═══════════════════ -->
+<script>
+(function () {
+  var _fontZoom = parseFloat(localStorage.getItem('l9-font-zoom') || '1');
+  var _fontBaseMap = new WeakMap();
+
+  function applyFontZoom() {
+    document.querySelectorAll('#drag-canvas [data-drag-id] *').forEach(function (el) {
+      if (!_fontBaseMap.has(el)) {
+        _fontBaseMap.set(el, parseFloat(window.getComputedStyle(el).fontSize) || 14);
+      }
+      el.style.fontSize = (_fontBaseMap.get(el) * _fontZoom) + 'px';
+    });
+  }
+  function relayoutAfterZoom() {
+    var canvas = document.getElementById('drag-canvas');
+    if (!canvas) return;
+    var panels = Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    if (!panels.length) return;
+    panels.sort(function (a, b) { return (parseFloat(a.style.top) || 0) - (parseFloat(b.style.top) || 0); });
+    var GAP = 8, y = GAP;
+    panels.forEach(function (el) {
+      el.style.top = y + 'px';
+      y += el.getBoundingClientRect().height + GAP;
+    });
+    try { localStorage.removeItem('l9-layout-v1'); } catch (e) {}
+    canvas.style.minHeight = (y + 40) + 'px';
+  }
+  window.adjustPageFont = function (delta) {
+    _fontZoom = Math.max(0.7, Math.min(2.0, parseFloat((_fontZoom + delta * 0.1).toFixed(2))));
+    applyFontZoom();
+    localStorage.setItem('l9-font-zoom', _fontZoom);
+    requestAnimationFrame(function () { requestAnimationFrame(relayoutAfterZoom); });
+  };
+  window.addEventListener('load', function () {
+    if (_fontZoom !== 1) {
+      applyFontZoom();
+      requestAnimationFrame(function () { requestAnimationFrame(relayoutAfterZoom); });
+    }
+  });
+
+  var SCRIPT = [
+    {
+      id: null, label: '開場白',
+      text: '歡迎來到期權小學堂第九課。這堂課我們要學 PMCC，也就是 Poor Man\'s Covered Call，中文叫做「窮人版備兌買權」。這個策略讓你不需要買一百股正股，只需要一小部分的資金，就能複製備兌策略的現金流。'
+    },
+    {
+      id: 'l9-what', label: 'PMCC 是什麼',
+      text: 'PMCC 的核心概念是：用一張遠期深度價內的 Long Call，也就是 LEAPS，來取代一百股正股。深度價內的 LEAPS Delta 接近一，走勢幾乎和持有正股一樣，但資金需求只有一小部分。再搭配賣出一張近期虛值的 Short Call，穩定收取權利金。以 Nokia 為例，買一百股需要一千四百八十美元，但買 LEAPS 只需要五百七十五美元，卻能達到類似的效果。'
+    },
+    {
+      id: 'l9-long-leg', label: 'Long LEAPS 選擇標準',
+      text: 'Long LEAPS 的選擇有三個重點。第一，到期日要在一百八十天以上，建議五百天以上的長期期權。第二，選擇深度價內的履約價，Delta 要大於等於零點八。Delta 越高，走勢越接近正股。第三，ITM Prob 也要高，代表到期時期權仍有內在價值的機率大。'
+    },
+    {
+      id: 'l9-short-leg', label: 'Short Call 選擇標準',
+      text: '賣出的 Short Call 有幾個關鍵條件。到期日選十九到四十五天，也就是一到兩個月的近期期權。履約價選虛值，讓 Delta 落在零點二到零點三五之間，這樣被指派的機率較低，同時還能收到合理的權利金。以 Nokia 為例，賣出十七美元的 Call 收取零點四二，Delta 是零點二七，是一個不錯的平衡點。'
+    },
+    {
+      id: 'l9-calculator', label: '黃金法則驗算',
+      text: '建倉前最重要的步驟是驗算黃金法則。公式是：Long Call 權利金，必須小於 Short Call 履約價減去 Long Call 履約價的差值。以 Nokia 為例：LEAPS 權利金五點七五，差價是十七減十等於七，五點七五小於七，通過。這代表你的最大獲利空間是正數。違反黃金法則的後果是：即使股票方向做對了，整體仍是虧損。請注意，Delta 和 ITM 機率是必填欄位，因為它們決定了策略的安全邊際。'
+    },
+    {
+      id: 'l9-scenarios', label: '三種市場情境',
+      text: '建倉後有三種可能情況。第一，股價橫盤或微跌，這是最理想的情況，Short Call 到期歸零，穩收全部權利金，繼續持有 LEAPS 賣下一張。第二，股價大跌，Short Call 歸零收入，但 LEAPS 大幅縮水，最大損失等於 LEAPS 成本減去歷次 Short Call 的累計收入。第三，股價暴漲破履約價，面臨被指派風險，必須在到期前主動平倉。特別提醒，PMCC 持有者沒有正股，若 Short Call 被指派，帳戶將出現裸空部位，風險極高。'
+    },
+    {
+      id: 'l9-exit', label: '平倉與滾倉',
+      text: '平倉有三種情境。情境 A 最輕鬆，Short Call 到期歸零，直接落袋，繼續下個月。情境 B 是股價上漲提前平倉，先 Buy to Close Short Call，再 Sell to Close LEAPS，只要符合黃金法則，整體仍獲利。情境 C 最緊急，股價暴漲，Short Call 深度價內，必須立即平倉整組，不可拖延。關於滾倉，有三種方式：向上滾、向外滾、和同時向上向外滾。但滾倉的本質是把問題往後推，若股價持續強勢，累積的損失可能超過獲利，應評估是否直接認賠出場。'
+    }
+  ];
+
+  var ttsIdx = 0, ttsPlaying = false, ttsPaused = false, ttsRate = 0.9;
+  var activePanelId = null;
+
+  function initDots() {
+    var c = document.getElementById('tts-dots');
+    c.innerHTML = '';
+    SCRIPT.forEach(function (s, i) {
+      var d = document.createElement('div');
+      d.className = 'tts-dot'; d.id = 'tts-dot-' + i; d.title = s.label;
+      d.onclick = function () { ttsJumpTo(i); };
+      c.appendChild(d);
+    });
+  }
+
+  function updateDots() {
+    SCRIPT.forEach(function (_, i) {
+      var d = document.getElementById('tts-dot-' + i);
+      if (!d) return;
+      d.className = 'tts-dot' + (i < ttsIdx ? ' done' : i === ttsIdx ? ' current' : '');
+    });
+  }
+
+  function setActivePanel(id) {
+    if (activePanelId) {
+      var prev = document.getElementById(activePanelId);
+      if (prev) prev.classList.remove('tts-active');
+    }
+    activePanelId = id;
+    if (id) {
+      var el = document.getElementById(id);
+      if (el) { el.classList.add('tts-active'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+    }
+  }
+
+  function updateUI() {
+    var btn = document.getElementById('tts-play-btn');
+    var sec = document.getElementById('tts-section-name');
+    if (ttsPlaying && !ttsPaused) {
+      btn.textContent = '⏸ 暫停'; btn.className = 'tts-btn playing';
+    } else if (ttsPaused) {
+      btn.textContent = '▶ 繼續'; btn.className = 'tts-btn';
+    } else if (ttsIdx >= SCRIPT.length) {
+      btn.textContent = '↺ 重新朗讀'; btn.className = 'tts-btn';
+    } else {
+      btn.textContent = ttsIdx === 0 ? '▶ 朗讀全文' : '▶ 繼續朗讀'; btn.className = 'tts-btn';
+    }
+    sec.textContent = ttsIdx < SCRIPT.length ? '▸ ' + SCRIPT[ttsIdx].label : '✓ 朗讀完畢';
+    setActivePanel(ttsIdx < SCRIPT.length ? SCRIPT[ttsIdx].id : null);
+    updateDots();
+  }
+
+  function showSubtitle(text) {
+    var el = document.getElementById('tts-subtitle');
+    if (!el) return;
+    el.innerHTML = text.split('').map(function (c, i) {
+      var s = c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '&' ? '&amp;' : c;
+      return '<span class="sub-c" id="sc-' + i + '">' + s + '</span>';
+    }).join('');
+    el.scrollTop = 0; el.classList.add('active');
+  }
+
+  function clearSubtitle() {
+    var el = document.getElementById('tts-subtitle');
+    if (el) { el.innerHTML = ''; el.classList.remove('active'); }
+  }
+
+  function speakSection() {
+    if (!ttsPlaying) return;
+    if (ttsIdx >= SCRIPT.length) { ttsPlaying = false; ttsIdx = 0; updateUI(); return; }
+    updateUI();
+    var item = SCRIPT[ttsIdx];
+    var utt = new SpeechSynthesisUtterance(item.text);
+    utt.lang = 'zh-TW'; utt.rate = ttsRate; utt.pitch = 1.0;
+    showSubtitle(item.text);
+    utt.onboundary = function (e) {
+      var chars = document.querySelectorAll('#tts-subtitle .sub-c');
+      var len = e.charLength || 1;
+      chars.forEach(function (c, i) {
+        c.className = 'sub-c' + (i < e.charIndex ? ' done' : i < e.charIndex + len ? ' now' : '');
+      });
+      var cur = document.getElementById('sc-' + e.charIndex);
+      if (cur) cur.scrollIntoView({ block: 'nearest' });
+    };
+    utt.onend = function () { if (!ttsPlaying) return; ttsIdx++; setTimeout(speakSection, 350); };
+    utt.onerror = function (e) { if (e.error === 'interrupted') return; if (!ttsPlaying) return; ttsIdx++; speakSection(); };
+    setTimeout(function () { speechSynthesis.speak(utt); }, 50);
+  }
+
+  window.ttsToggle = function () {
+    if (speechSynthesis.speaking && !speechSynthesis.paused) {
+      speechSynthesis.pause(); ttsPlaying = false; ttsPaused = true; updateUI();
+    } else if (speechSynthesis.paused) {
+      speechSynthesis.resume(); ttsPlaying = true; ttsPaused = false; updateUI();
+    } else {
+      if (ttsIdx >= SCRIPT.length) ttsIdx = 0;
+      ttsPlaying = true; ttsPaused = false; speakSection();
+    }
+  };
+
+  window.ttsStop = function () {
+    speechSynthesis.cancel(); clearSubtitle();
+    ttsPlaying = false; ttsPaused = false; ttsIdx = 0;
+    setActivePanel(null);
+    document.getElementById('tts-section-name').textContent = '點擊「朗讀全文」開始';
+    updateDots();
+    document.getElementById('tts-play-btn').textContent = '▶ 朗讀全文';
+    document.getElementById('tts-play-btn').className = 'tts-btn';
+  };
+
+  window.ttsJumpTo = function (i) { speechSynthesis.cancel(); ttsIdx = i; ttsPlaying = true; ttsPaused = false; setTimeout(speakSection, 80); };
+  window.ttsSetRate = function (v) { ttsRate = parseFloat(v); };
+
+  initDots(); updateUI();
+}());
+</script>
+
+<!-- ═══════════════════ Edit Mode JS ═══════════════════ -->
+<script>
+(function () {
+  var _editMode = false, _focusEl = null;
+
+  window.toggleEditMode = function () {
+    _editMode = !_editMode;
+    document.body.classList.toggle('edit-mode', _editMode);
+    document.getElementById('edit-btn').classList.toggle('active', _editMode);
+    document.getElementById('edit-icon').textContent  = _editMode ? '🔒' : '✏️';
+    document.getElementById('edit-label').textContent = _editMode ? '完成編輯' : '編輯模式';
+    document.getElementById('edit-toolbar').classList.toggle('visible', _editMode);
+    if (!_editMode) { blurCurrent(); document.getElementById('et-hint').style.display = ''; document.getElementById('et-controls').style.display = 'none'; }
+  };
+
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); window.toggleEditMode(); }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!_editMode) return;
+    var el = e.target;
+    if (!el || el.closest('#edit-toolbar') || el.closest('#edit-btn') || el.closest('#tts-bar')) return;
+    if (el.closest('#drag-canvas') && !el.matches('button,input,select,a,textarea')) {
+      e.preventDefault(); focusEl(el);
+    }
+  });
+
+  function focusEl(el) {
+    blurCurrent(); _focusEl = el;
+    el.classList.add('el-focus'); el.contentEditable = 'true'; el.focus();
+    document.getElementById('et-hint').style.display = 'none';
+    document.getElementById('et-controls').style.display = '';
+    updateToolbar(el);
+  }
+
+  function blurCurrent() {
+    if (_focusEl) { _focusEl.classList.remove('el-focus'); _focusEl.contentEditable = 'false'; _focusEl = null; }
+  }
+
+  function updateToolbar(el) {
+    var cs = window.getComputedStyle(el);
+    document.getElementById('et-size-val').textContent = Math.round(parseFloat(cs.fontSize));
+    document.getElementById('et-bold').classList.toggle('on', parseFloat(cs.fontWeight) >= 700);
+    document.getElementById('et-italic').classList.toggle('on', cs.fontStyle === 'italic');
+    var hex = rgbToHex(cs.color);
+    if (hex) document.getElementById('et-color').value = hex;
+    document.getElementById('et-lh').value = parseFloat(cs.lineHeight) / parseFloat(cs.fontSize) || 1.4;
+  }
+
+  function rgbToHex(rgb) {
+    var m = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+    if (!m) return null;
+    return '#' + [1,2,3].map(function (i) { return parseInt(m[i]).toString(16).padStart(2,'0'); }).join('');
+  }
+
+  window.applyStyle   = function (p, v) { if (_focusEl) _focusEl.style[p] = v; };
+  window.adjustSize   = function (d) {
+    if (!_focusEl) return;
+    var nv = Math.max(8, Math.min(72, (parseFloat(window.getComputedStyle(_focusEl).fontSize) || 16) + d));
+    _focusEl.style.fontSize = nv + 'px'; document.getElementById('et-size-val').textContent = Math.round(nv);
+  };
+  window.toggleBold   = function () {
+    if (!_focusEl) return;
+    var b = parseFloat(window.getComputedStyle(_focusEl).fontWeight) >= 700;
+    _focusEl.style.fontWeight = b ? '400' : '700'; document.getElementById('et-bold').classList.toggle('on', !b);
+  };
+  window.toggleItalic = function () {
+    if (!_focusEl) return;
+    var it = window.getComputedStyle(_focusEl).fontStyle === 'italic';
+    _focusEl.style.fontStyle = it ? 'normal' : 'italic'; document.getElementById('et-italic').classList.toggle('on', !it);
+  };
+  window.resetElement = function () { if (_focusEl) { _focusEl.style.cssText = ''; updateToolbar(_focusEl); } };
+  window.copyHtml     = function () {
+    if (!_focusEl) return;
+    navigator.clipboard.writeText(_focusEl.outerHTML).then(function () {
+      var btn = document.getElementById('et-copy-btn');
+      btn.textContent = '✓ 已複製'; setTimeout(function () { btn.textContent = '複製'; }, 1500);
+    });
+  };
+}());
+</script>
+
+<!-- ═══════════════════ Drag Layout JS ═══════════════════ -->
+<script>
+(function () {
+  var L9_LAY = 'l9-layout-v1';
+  var canvas = null, dragging = null, resizing = null, dragOX = 0, dragOY = 0, rzS = {};
+
+  function getSL() { try { return JSON.parse(localStorage.getItem(L9_LAY) || 'null'); } catch (e) { return null; } }
+  function putSL(s) { try { localStorage.setItem(L9_LAY, JSON.stringify(s)); } catch (e) {} }
+  function saveItem(id, x, y, w, h) {
+    var s = getSL() || {}; s[id] = { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: h ? Math.round(h) : null }; putSL(s);
+  }
+  function applyPos(el, x, y, w, h) {
+    el.style.position = 'absolute'; el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.width = w + 'px';
+    if (h) el.style.minHeight = h + 'px';
+  }
+
+  function addHandles(el) {
+    var dh = document.createElement('div');
+    dh.className = 'drag-handle';
+    el.insertBefore(dh, el.firstChild);
+    ['nw','n','ne','e','se','s','sw','w'].forEach(function (dir) {
+      var rh = document.createElement('div');
+      rh.className = 'rh rh-' + dir; rh.dataset.dir = dir; el.appendChild(rh);
+    });
+  }
+
+  function initLayout() {
+    canvas = document.getElementById('drag-canvas');
+    if (!canvas) return;
+    var els = Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    var saved = getSL();
+
+    /* Invalidate if new drag-ids not in saved */
+    var requiredIds = ['l9-course-tag','l9-header','l9-what',
+                       'l9-long-leg','l9-short-leg','l9-calculator','l9-scenarios','l9-exit'];
+    if (saved) {
+      var allPresent = requiredIds.every(function (id) { return saved[id]; });
+      if (!allPresent) { saved = null; try { localStorage.removeItem(L9_LAY); } catch (e) {} }
+    }
+
+    var GAP = 8;
+    var cw  = canvas.getBoundingClientRect().width || window.innerWidth;
+    var pw  = cw - 16;
+
+    if (saved) {
+      els.forEach(function (el) {
+        var id = el.dataset.dragId;
+        var s  = saved[id];
+        if (s) applyPos(el, s.x, s.y, s.w, s.h);
+        else   applyPos(el, GAP, GAP, pw, null);
+        addHandles(el);
+      });
+    } else {
+      var y = GAP;
+      els.forEach(function (el) {
+        applyPos(el, GAP, y, pw, null);
+        addHandles(el);
+        requestAnimationFrame(function () {
+          y = parseFloat(el.style.top) + el.getBoundingClientRect().height + GAP;
+        });
+      });
+      /* Sequential layout pass */
+      (function layoutPass() {
+        var curY = GAP;
+        els.forEach(function (el) {
+          el.style.top = curY + 'px';
+          curY += el.getBoundingClientRect().height + GAP;
+        });
+      })();
+    }
+
+    /* Drag */
+    canvas.addEventListener('mousedown', function (e) {
+      var dh = e.target.closest('.drag-handle');
+      if (!dh) return;
+      var el = dh.parentElement;
+      if (!el || !el.dataset.dragId) return;
+      dragging = el; dragOX = e.clientX - el.offsetLeft; dragOY = e.clientY - el.offsetTop;
+      el.classList.add('is-dragging'); e.preventDefault();
+    });
+
+    /* Resize */
+    canvas.addEventListener('mousedown', function (e) {
+      var rh = e.target.closest('.rh');
+      if (!rh) return;
+      var el = rh.parentElement;
+      if (!el || !el.dataset.dragId) return;
+      resizing = el;
+      rzS = { dir: rh.dataset.dir, mx: e.clientX, my: e.clientY,
+              x: el.offsetLeft, y: el.offsetTop,
+              w: el.offsetWidth, h: el.offsetHeight };
+      el.classList.add('is-resizing'); e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', function (e) {
+      if (dragging) {
+        var nx = e.clientX - dragOX, ny = e.clientY - dragOY;
+        dragging.style.left = Math.max(0, nx) + 'px';
+        dragging.style.top  = Math.max(0, ny) + 'px';
+      }
+      if (resizing) {
+        var dx = e.clientX - rzS.mx, dy = e.clientY - rzS.my;
+        var d  = rzS.dir;
+        var nx2 = rzS.x, ny2 = rzS.y, nw = rzS.w, nh = rzS.h;
+        if (d.includes('e')) nw = Math.max(200, rzS.w + dx);
+        if (d.includes('s')) nh = Math.max(80,  rzS.h + dy);
+        if (d.includes('w')) { nw = Math.max(200, rzS.w - dx); nx2 = rzS.x + rzS.w - nw; }
+        if (d.includes('n')) { nh = Math.max(80,  rzS.h - dy); ny2 = rzS.y + rzS.h - nh; }
+        resizing.style.left = nx2 + 'px'; resizing.style.top = ny2 + 'px';
+        resizing.style.width = nw + 'px'; resizing.style.minHeight = nh + 'px';
+      }
+    });
+
+    document.addEventListener('mouseup', function () {
+      if (dragging) {
+        saveItem(dragging.dataset.dragId, dragging.offsetLeft, dragging.offsetTop, dragging.offsetWidth, null);
+        dragging.classList.remove('is-dragging'); dragging = null;
+      }
+      if (resizing) {
+        saveItem(resizing.dataset.dragId, resizing.offsetLeft, resizing.offsetTop, resizing.offsetWidth, resizing.offsetHeight);
+        resizing.classList.remove('is-resizing'); resizing = null;
+      }
+    });
+  }
+
+  window.resetLayout = function () {
+    try { localStorage.removeItem(L9_LAY); } catch (e) {}
+    location.reload();
+  };
+
+  window.addEventListener('load', initLayout);
+}());
+</script>
+
+<script>
+window.showLeapsITMExplain = function () {
+  window.driver.js.driver({
+    animate: true, allowClose: true, overlayOpacity: 0.4,
+    steps: [{
+      element: '#leaps-itm-info-btn',
+      popover: {
+        title: '📊 LEAPS ITM Prob 是什麼？',
+        description: [
+          '<strong>ITM Prob</strong> = 到期日當天，股價仍高於 LEAPS 行使價的機率。',
+          '來源：Black-Scholes 公式的 <code style="background:#F5EDE0;padding:2px 5px;border-radius:4px;">N(d₂)</code>',
+          '',
+          '🎯 <strong>為什麼越高越好？</strong>',
+          '你買的 LEAPS Long Call 是整個策略的底倉。',
+          'ITM Prob 高（≥ 75%）→ LEAPS 到期時仍有內在價值（股價 − 行使價）',
+          'ITM Prob 低 → LEAPS 到期歸零 → 整個 PMCC 策略失敗',
+          '',
+          '📌 <strong>範例：</strong>行使價 $10，股價 $14.80',
+          '→ 內在價值 = $4.80，ITM Prob 85% 代表 85% 機率維持此狀態',
+          '',
+          '✅ 建議門檻：<strong>≥ 75%</strong>（Delta ≥ 0.80 通常對應 ITM Prob ≥ 80%）'
+        ].join('<br>'),
+        side: 'bottom', align: 'start'
+      }
+    }]
+  }).drive();
+};
+
+window.showSCITMExplain = function () {
+  window.driver.js.driver({
+    animate: true, allowClose: true, overlayOpacity: 0.4,
+    steps: [{
+      element: '#sc-itm-info-btn',
+      popover: {
+        title: '📊 Short Call ITM Prob 是什麼？',
+        description: [
+          '<strong>ITM Prob</strong> = 到期日當天，股價超過 Short Call 行使價（被指派）的機率。',
+          '來源：Black-Scholes 公式的 <code style="background:#F5EDE0;padding:2px 5px;border-radius:4px;">N(d₂)</code>',
+          '',
+          '🎯 <strong>Short Call 與 LEAPS 相反：越低越好</strong>',
+          'ITM Prob 低（≤ 35%）→ 股價大概率不超過行使價 → Short Call 到期無價值 → 保費全收 ✅',
+          'ITM Prob 高 → 股價可能漲過行使價 → 有被指派（Assign）風險 ⚠️',
+          '',
+          '⚠️ <strong>被指派會怎樣？</strong>',
+          '需以行使價賣出股票，必須補倉或關閉 LEAPS，打亂整個策略。',
+          '',
+          '✅ 建議門檻：<strong>≤ 35%</strong>（對應 Delta 0.20–0.35，19–45 DTE）'
+        ].join('<br>'),
+        side: 'bottom', align: 'start'
+      }
+    }]
+  }).drive();
+};
+</script>
+<script>
+
+window.showLeapsExplain = function () {
+  window.driver.js.driver({
+    animate: true, allowClose: true, overlayOpacity: 0.45, popoverClass: 'leaps-popover',
+    nextBtnText: '下一步 →', prevBtnText: '← 上一步', doneBtnText: '✓ 完成',
+    steps: [
+      {
+        element: '#l9-long-leg',
+        popover: {
+          title: '📘 什麼是 LEAPS Long Call？',
+          description: [
+            '<strong>LEAPS</strong>（Long-term Equity AnticiPation Securities）',
+            '= 到期日超過 <strong>180 天</strong>的長期期權。',
+            '',
+            '在 PMCC 策略中，你<strong>買入</strong>一張深度價內（ITM）的 LEAPS Call，',
+            '用它來「模擬持有正股」，但只需付正股成本的約 39%。',
+            '',
+            '優點：',
+            '• 槓桿效果：用較少資金參與股票漲幅',
+            '• 最大損失固定為 LEAPS 權利金（不像持股可能跌更多）',
+            '• 搭配每月賣出 Short Call 收取保費，攤低持倉成本',
+            '',
+            '⚠️ <strong>黃金法則：</strong>長天期看漲期權支付的權利金，必須小於（短天期 Call 的履約價 − 長天期 Call 的履約價）的數值，否則即使方向正確也保證虧損。'
+          ].join('<br>'),
+          side: 'over'
+        }
+      },
+      {
+        element: '#leaps-b1',
+        popover: {
+          title: '① 到期日（DTE）≥ 180 天',
+          description: [
+            '<strong>DTE（Days To Expiration）</strong>= 距到期日剩餘天數。',
+            '',
+            '為什麼要 ≥ 180 天？',
+            '• 給股票足夠時間往預期方向移動',
+            '• LEAPS 距到期還遠，<strong>時間價值流逝慢</strong>（Theta 損耗小）',
+            '• 建議選 <strong>300–500 天以上</strong>，保留多輪賣 Short Call 的空間',
+            '',
+            '若 DTE 太短：LEAPS 價格跌快，賣 Short Call 還沒回本，底倉就已過期。'
+          ].join('<br>'),
+          side: 'over'
+        }
+      },
+      {
+        element: '#leaps-b2',
+        popover: {
+          title: '② Delta ≥ 0.80（深度價內）',
+          description: [
+            '<strong>Delta</strong> = 股票每漲 $1，期權漲多少錢的比率。',
+            '',
+            '為什麼要 Delta ≥ 0.80？',
+            '• Delta 0.80 代表股票漲 $1，你的 LEAPS 約漲 $0.80',
+            '• 高 Delta → LEAPS <strong>走勢接近正股</strong>，真正「代替」持股',
+            '• Delta 太低（如 0.50）→ 股票漲 $1 只賺 $0.50，槓桿效果差且 Theta 損耗大',
+            '',
+            '實務：選行使價比現股低 20–30% 的 Call，通常 Delta ≥ 0.80。'
+          ].join('<br>'),
+          side: 'over'
+        }
+      },
+      {
+        element: '#leaps-b3',
+        popover: {
+          title: '③ 實例：NOK LEAPS',
+          description: [
+            '股價 $14.80，選 LEAPS Strike = $10（深度 ITM）：',
+            '',
+            '• 買入成本：$5.75（= 權利金，即 <strong>P<sub>L</sub></strong>）',
+            '• Delta：0.90 → 每漲 $1 賺約 $0.90',
+            '• ITM Prob：85% → 到期時有 85% 機率股價仍 > $10',
+            '',
+            '對比買 100 股正股需 $1,480，LEAPS 只需 $575（= $5.75 × 100），',
+            '節省 61% 資金，但能參與大部分的漲幅。'
+          ].join('<br>'),
+          side: 'over'
+        }
+      },
+      {
+        element: '#leaps-criteria',
+        popover: {
+          title: '📋 LEAPS 選股三要素',
+          description: [
+            '<strong>同時滿足以下三個條件才算合格：</strong>',
+            '',
+            '✅ <strong>DTE ≥ 180 天</strong>（建議 300 天以上）',
+            '　→ 時間充裕，Theta 損耗低',
+            '',
+            '✅ <strong>Delta ≥ 0.80</strong>（深度 ITM）',
+            '　→ 走勢接近正股，有效代替持股',
+            '',
+            '✅ <strong>ITM Prob 越高越好</strong>（建議 ≥ 75%）',
+            '　→ 到期時仍有內在價值的機率高，底倉不歸零',
+            '',
+            '三者缺一，PMCC 策略的根基就不穩固。'
+          ].join('<br>'),
+          side: 'over'
+        }
+      }
+    ]
+  }).drive();
+};
+
+</script>
+</body>
+</html>

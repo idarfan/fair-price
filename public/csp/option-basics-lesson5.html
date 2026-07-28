@@ -1,0 +1,1838 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>期權小學堂第5課 · 造市商與滾倉的關係</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #FAF3E8;
+  --page-bg:    #FFF9F2;
+  --panel-bg:   #FFFCF7;
+  --ink:        #2A1A0E;
+  --muted:      #7A6555;
+  --border:     #E2D4C2;
+  --gold:       #D4900A;
+  --gold-bg:    #FEF4D8;
+  --gold-bdr:   #E8B840;
+  --green:      #2E9E52;
+  --green-bg:   #E8F8EE;
+  --green-bdr:  #8ED4A8;
+  --red:        #D04040;
+  --red-bg:     #FDEAEA;
+  --red-bdr:    #F5AAAA;
+  --blue:       #3A70C0;
+  --blue-bg:    #EBF2FF;
+  --blue-bdr:   #9ABCE8;
+  --purple:     #7050C0;
+  --purple-bg:  #F0EAFF;
+  --r-lg: 16px;
+  --r-md: 10px;
+  --r-sm: 6px;
+}
+
+body {
+  background: var(--bg);
+  font-family: "PingFang TC", "Microsoft JhengHei", "Heiti TC", system-ui, sans-serif;
+  padding: 0; margin: 0;
+  padding-top: 46px;
+}
+
+.page {
+  background: var(--page-bg);
+  max-width: 100%; width: 100%;
+  padding: 32px 40px 36px;
+}
+
+.course-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--ink); color: #FFF9F0;
+  font-size: 12px; font-weight: 700;
+  padding: 5px 14px; border-radius: 100px;
+  letter-spacing: 1px; margin-bottom: 18px;
+}
+
+.page-header {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 20px; align-items: start; margin-bottom: 28px;
+}
+.page-title  { font-size: 32px; font-weight: 900; color: var(--ink); line-height: 1.2; }
+.page-subtitle { font-size: 14px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+.page-desc   { font-size: 13px; color: var(--muted); margin-top: 6px; }
+
+.contract-box {
+  background: var(--gold-bg); border: 2px solid var(--gold-bdr);
+  border-radius: var(--r-lg); padding: 14px 18px; min-width: 190px;
+}
+.cb-title {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--gold);
+  margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.cb-ticker {
+  font-size: 22px; font-weight: 900; color: var(--ink);
+  margin-bottom: 12px; display: flex; align-items: baseline; gap: 6px;
+}
+.cb-ticker small { font-size: 13px; font-weight: 500; color: var(--muted); }
+.cb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cb-item .ci-l { font-size: 10px; color: var(--muted); margin-bottom: 1px; }
+.cb-item .ci-v { font-size: 16px; font-weight: 700; color: var(--ink); }
+.cb-item .ci-v.green { color: var(--green); }
+
+.panels {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 16px; margin-bottom: 16px;
+}
+.panel {
+  background: var(--panel-bg); border: 2px solid var(--border);
+  border-radius: var(--r-lg); padding: 20px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+
+.tag-row { display: flex; align-items: center; justify-content: space-between; }
+.step-badge {
+  width: 26px; height: 26px; background: var(--ink); color: #FFFDF8;
+  border-radius: 100px; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; flex-shrink: 0;
+}
+
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700;
+  padding: 4px 12px; border-radius: 100px; letter-spacing: 0.3px;
+}
+.pill-outline {
+  background: transparent; border: 1.5px solid;
+  font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+}
+.pill.setup,  .pill-outline.setup  { color: #7A6555; background: #F0E8DC; border-color: #C4B49A; }
+.pill.win,    .pill-outline.win    { color: var(--green); background: var(--green-bg); border-color: var(--green-bdr); }
+.pill.assign, .pill-outline.assign { color: var(--red);   background: var(--red-bg);   border-color: var(--red-bdr); }
+.pill.chart,  .pill-outline.chart  { color: var(--blue);  background: var(--blue-bg);  border-color: var(--blue-bdr); }
+.pill.bonus,  .pill-outline.bonus  { color: var(--purple); background: var(--purple-bg); border-color: #C0A8F0; }
+.pill.gold,   .pill-outline.gold   { color: var(--gold);  background: var(--gold-bg);  border-color: var(--gold-bdr); }
+
+.ptitle { font-size: 18px; font-weight: 800; color: var(--ink); line-height: 1.35; }
+
+.txn-box {
+  background: #FFFBF4; border: 1.5px dashed var(--border);
+  border-radius: var(--r-md); padding: 14px 12px;
+}
+.actors-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.actor { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+.actor-emoji {
+  width: 68px; height: 68px; border-radius: 100px;
+  background: #F5EDE0; border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; flex-shrink: 0;
+}
+.actor-name { font-size: 11px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.actor-sub  { font-size: 10px; color: var(--muted); white-space: nowrap; }
+
+.txn-center { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.arr-group  { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.arr-row    { display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 600; }
+.arr-row.fwd { color: var(--muted); }
+.arr-row.rev { color: var(--green); }
+.arr-line   { flex: 1; height: 1.5px; position: relative; }
+.arr-line.fwd { background: var(--muted); }
+.arr-line.rev { background: var(--green); }
+.arr-line.fwd::after {
+  content: ''; position: absolute; right: 0; top: -4px;
+  border: 5px solid transparent; border-left-color: var(--muted); border-right: none;
+}
+.arr-line.rev::before {
+  content: ''; position: absolute; left: 0; top: -4px;
+  border: 5px solid transparent; border-right-color: var(--green); border-left: none;
+}
+
+.bullets { display: flex; flex-direction: column; gap: 7px; }
+.bullet  { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.bullet-num {
+  width: 20px; height: 20px; background: var(--gold-bg);
+  border: 1.5px solid var(--gold-bdr); border-radius: 100px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 800; color: var(--gold);
+  flex-shrink: 0; margin-top: 1px;
+}
+
+.stat-pills { display: grid; gap: 8px; }
+.stat-pills.cols-2 { grid-template-columns: 1fr 1fr; }
+.stat-pills.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.spill {
+  background: #F5EFE6; border: 1.5px solid var(--border);
+  border-radius: var(--r-md); padding: 8px 10px;
+}
+.spill .sl { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+.spill .sv { font-size: 15px; font-weight: 800; color: var(--ink); }
+.spill .sv.green { color: var(--green); }
+.spill .sv.red   { color: var(--red); }
+.spill .sv.gold  { color: var(--gold); }
+.spill .sv.blue  { color: var(--blue); }
+
+.result-box { border-radius: var(--r-md); padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
+.result-box.green { background: var(--green-bg); border: 1.5px solid var(--green-bdr); }
+.result-box.gold  { background: var(--gold-bg);  border: 1.5px solid var(--gold-bdr); }
+.result-box.red   { background: var(--red-bg);   border: 1.5px solid var(--red-bdr); }
+.result-box.blue  { background: var(--blue-bg);  border: 1.5px solid var(--blue-bdr); }
+.rb-label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.rb-val   { font-size: 20px; font-weight: 900; }
+.rb-val.green { color: var(--green); }
+.rb-val.gold  { color: var(--gold); }
+.rb-val.red   { color: var(--red); }
+.rb-val.blue  { color: var(--blue); }
+
+.payoff-stats { display: flex; flex-direction: column; gap: 7px; }
+.ps-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.ps-dot { width: 10px; height: 10px; border-radius: 100px; flex-shrink: 0; }
+.ps-dot.green { background: var(--green); }
+.ps-dot.gold  { background: var(--gold); }
+.ps-dot.red   { background: var(--red); }
+.ps-dot.blue  { background: var(--blue); }
+.ps-label { color: var(--muted); flex: 1; }
+.ps-val   { font-weight: 800; color: var(--ink); }
+.ps-val.green { color: var(--green); }
+.ps-val.red   { color: var(--red); }
+.ps-val.gold  { color: var(--gold); }
+
+.bonus-panel { background: var(--panel-bg); border: 2px solid var(--border); border-radius: var(--r-lg); padding: 22px; }
+.bonus-body  { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 16px; }
+
+.timeline {
+  background: #FAF5EE; border: 1.5px dashed var(--border);
+  border-radius: var(--r-md); padding: 20px 14px 14px;
+  position: relative; min-height: 150px;
+}
+
+.ledger { display: flex; flex-direction: column; gap: 7px; }
+.ledger-head { font-size: 12px; font-weight: 700; color: var(--muted); display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.l-row { display: flex; align-items: baseline; font-size: 13px; color: var(--muted); gap: 6px; }
+.l-desc { flex: 1; }
+.l-calc { font-size: 11px; color: #B0A090; }
+.l-val  { font-weight: 700; min-width: 72px; text-align: right; }
+.l-val.green { color: var(--green); }
+.l-val.red   { color: var(--red); }
+.l-divider   { border: none; border-top: 1.5px solid var(--border); }
+.l-total { display: flex; justify-content: space-between; font-size: 17px; font-weight: 900; color: var(--ink); padding-top: 2px; }
+.l-total .lt-val { color: var(--green); }
+
+.summary-pills { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 16px; }
+.sum-pill { background: #F5EFE6; border: 1.5px solid var(--border); border-radius: var(--r-md); padding: 10px 12px; }
+.sum-pill.hl-green { background: var(--green-bg); border-color: var(--green-bdr); }
+.sum-pill.hl-gold  { background: var(--gold-bg);  border-color: var(--gold-bdr); }
+.sum-pill.hl-blue  { background: var(--blue-bg);  border-color: var(--blue-bdr); }
+.sum-pill .sl { font-size: 10px; color: var(--muted); margin-bottom: 3px; }
+.sum-pill .sv { font-size: 19px; font-weight: 900; color: var(--ink); }
+.sum-pill.hl-green .sv { color: var(--green); }
+.sum-pill.hl-gold  .sv { color: #B07000; }
+.sum-pill.hl-blue  .sv { color: var(--blue); }
+
+.warning {
+  margin-top: 14px; background: #FFF8E8;
+  border: 1.5px solid var(--gold-bdr); border-radius: var(--r-sm);
+  padding: 10px 14px; font-size: 12px; color: #8A6000; line-height: 1.7;
+  display: flex; gap: 8px;
+}
+
+/* ── Lesson-5 specific ───────────── */
+.flow-chain { display: flex; align-items: center; gap: 8px; }
+.flow-node {
+  flex: 1; border: 2px solid var(--border); border-radius: var(--r-md);
+  padding: 10px 8px; text-align: center;
+}
+.flow-node.blue   { border-color: var(--blue-bdr);   background: var(--blue-bg); }
+.flow-node.gold   { border-color: var(--gold-bdr);   background: var(--gold-bg); }
+.flow-node.green  { border-color: var(--green-bdr);  background: var(--green-bg); }
+.fn-emoji { font-size: 22px; margin-bottom: 4px; }
+.fn-label { font-size: 12px; font-weight: 800; color: var(--ink); }
+.fn-sub   { font-size: 10px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+.flow-arrow { font-size: 18px; color: var(--muted); flex-shrink: 0; }
+
+.roll-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.roll-card { border: 1.5px solid var(--border); border-radius: var(--r-md); padding: 10px; background: var(--panel-bg); text-align: center; }
+.roll-card.rc-out   { border-color: var(--green-bdr); background: var(--green-bg); }
+.roll-card.rc-down  { border-color: var(--gold-bdr);  background: var(--gold-bg); }
+.roll-card.rc-both  { border-color: var(--blue-bdr);  background: var(--blue-bg); }
+.rc-icon  { font-size: 22px; margin-bottom: 5px; }
+.rc-title { font-size: 13px; font-weight: 800; color: var(--ink); margin-bottom: 3px; }
+.rc-sub   { font-size: 10.5px; color: var(--muted); line-height: 1.5; }
+.rc-tag   { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 100px; display: inline-block; margin-top: 6px; letter-spacing: 0.5px; }
+.rc-tag.green  { color: var(--green); background: #D4F0E0; }
+.rc-tag.gold   { color: var(--gold);  background: #FDE8A0; }
+.rc-tag.blue   { color: var(--blue);  background: #C8DCFA; }
+
+.trigger-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.trigger-item { border: 1.5px solid var(--gold-bdr); background: var(--gold-bg); border-radius: var(--r-md); padding: 10px 12px; }
+.ti-icon { font-size: 18px; margin-bottom: 4px; }
+.ti-cond { font-size: 12px; font-weight: 800; color: var(--ink); }
+.ti-desc { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+
+.rel-table { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1.5px solid var(--border); border-radius: var(--r-md); overflow: hidden; margin-top: 2px; }
+.rel-table .rt-head { display: contents; }
+.rt-cell { padding: 8px 10px; font-size: 12px; border-bottom: 1px solid var(--border); line-height: 1.5; }
+.rt-cell:nth-child(odd)  { border-right: 1px solid var(--border); }
+.rt-cell.hd { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; background: var(--gold-bg); color: var(--gold); }
+.rt-cell.hd:last-child { border-right: none; }
+.rt-cell:last-child, .rt-cell:nth-last-child(2) { border-bottom: none; }
+
+.tips-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.tip-item  { display: flex; gap: 10px; align-items: flex-start; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+.tip-num {
+  width: 22px; height: 22px; border-radius: 100px; flex-shrink: 0;
+  background: var(--ink); color: #FFFDF8;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; margin-top: 1px;
+}
+.tip-item strong { color: var(--ink); }
+
+/* ── TTS Active highlight ── */
+.panel.tts-active, .bonus-panel.tts-active {
+  outline: 2px solid var(--gold); outline-offset: 3px; border-radius: var(--r-lg);
+}
+
+/* ── TTS Bar (fixed top) ── */
+#tts-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 3000;
+  background: rgba(42,26,14,0.97); backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 8px 20px; display: flex; align-items: center; gap: 12px;
+  font-family: "PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+.tts-btn {
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+  color: #FFF9F0; border-radius: 100px; padding: 5px 14px; font-size: 12px;
+  cursor: pointer; font-family: inherit; font-weight: 700;
+  transition: background 0.15s; display: flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.tts-btn:hover { background: rgba(255,255,255,0.22); }
+.tts-btn.playing { background: #1E7A3A; border-color: #2E9E52; color: #fff; }
+.tts-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.15); flex-shrink: 0; }
+.tts-dots { display: flex; gap: 5px; align-items: center; }
+.tts-dot {
+  width: 7px; height: 7px; border-radius: 100px;
+  background: rgba(255,255,255,0.2); cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.tts-dot.done    { background: rgba(255,255,255,0.45); }
+.tts-dot.current { background: var(--gold); transform: scale(1.5); }
+.tts-section { font-size: 12px; color: #E8C060; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tts-speed {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #FFF9F0; border-radius: 6px; padding: 3px 7px; font-size: 12px;
+  cursor: pointer; font-family: inherit;
+}
+
+/* ── TTS Subtitle (字體加大版) ── */
+#tts-subtitle {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  max-width: 780px; width: calc(100% - 40px);
+  background: rgba(8,4,1,0.88); backdrop-filter: blur(8px);
+  color: #FFF9F0; border-radius: 12px; padding: 14px 22px;
+  font-size: 18px; line-height: 1.85; z-index: 2500;
+  display: none; pointer-events: none;
+  max-height: 140px; overflow: hidden;
+  box-shadow: 0 4px 28px rgba(0,0,0,0.45);
+}
+#tts-subtitle.active { display: block; }
+.sub-c       { color: rgba(255,249,240,0.28); }
+.sub-c.done  { color: rgba(255,249,240,0.75); }
+.sub-c.now   { color: #F5C540; background: rgba(245,197,64,0.18); border-radius: 2px; }
+
+/* ── Drag & Resize System ── */
+#drag-canvas { position: relative !important; min-height: 3000px; overflow: visible; }
+[data-drag-id] { box-sizing: border-box; }
+.edit-mode [data-drag-id]:hover > .drag-handle,
+[data-drag-id].is-dragging > .drag-handle,
+[data-drag-id].is-resizing > .drag-handle { opacity: 1; }
+.drag-handle {
+  position: absolute; top: -15px; left: 0; right: 0; height: 13px;
+  background: linear-gradient(90deg, #3A70C0, #2255A0);
+  border-radius: 5px 5px 0 0; cursor: grab; opacity: 0;
+  transition: opacity 0.15s; display: flex; align-items: center;
+  justify-content: center; z-index: 200; user-select: none;
+}
+.drag-handle:active { cursor: grabbing; }
+.drag-handle::before { content: ':::'; font-size: 9px; font-weight: 900; color: rgba(255,255,255,.85); letter-spacing: 4px; }
+.edit-mode [data-drag-id]:hover,
+[data-drag-id].is-dragging,
+[data-drag-id].is-resizing { outline: 2px dashed rgba(58,112,192,.45); outline-offset: 3px; }
+.rh { position:absolute; width:10px; height:10px; background:#3A70C0; border:2px solid #fff; border-radius:2px; opacity:0; transition:opacity .15s; z-index:201; }
+.edit-mode [data-drag-id]:hover .rh,
+[data-drag-id].is-resizing .rh { opacity: 1; }
+.rh-nw{top:-5px;left:-5px;cursor:nw-resize;} .rh-n{top:-5px;left:50%;transform:translateX(-50%);cursor:n-resize;}
+.rh-ne{top:-5px;right:-5px;cursor:ne-resize;} .rh-e{top:50%;right:-5px;transform:translateY(-50%);cursor:e-resize;}
+.rh-se{bottom:-5px;right:-5px;cursor:se-resize;} .rh-s{bottom:-5px;left:50%;transform:translateX(-50%);cursor:s-resize;}
+.rh-sw{bottom:-5px;left:-5px;cursor:sw-resize;} .rh-w{top:50%;left:-5px;transform:translateY(-50%);cursor:w-resize;}
+#layout-reset-btn {
+  position: fixed; bottom: 70px; right: 20px;
+  background: #FAF3E8; border: 1.5px solid #E2D4C2; border-radius: 8px;
+  padding: 7px 16px; font-size: 12px; cursor: pointer; z-index: 10001;
+  color: #7A6555; font-family: inherit; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  transition: background .15s;
+}
+#layout-reset-btn:hover { background: #F0E4D0; }
+</style>
+<style id="driver-css">
+.driver-active .driver-overlay,.driver-active *{pointer-events:none}.driver-active .driver-active-element,.driver-active .driver-active-element *,.driver-popover,.driver-popover *{pointer-events:auto}@keyframes animate-fade-in{0%{opacity:0}to{opacity:1}}.driver-fade .driver-overlay{animation:animate-fade-in .2s ease-in-out}.driver-fade .driver-popover{animation:animate-fade-in .2s}.driver-popover{all:unset;box-sizing:border-box;color:#2d2d2d;margin:0;padding:15px;border-radius:5px;min-width:250px;max-width:300px;box-shadow:0 1px 10px #0006;z-index:1000000000;position:fixed;top:0;right:0;background-color:#fff}.driver-popover *{font-family:Helvetica Neue,Inter,ui-sans-serif,"Apple Color Emoji",Helvetica,Arial,sans-serif}.driver-popover-title{font:19px/normal sans-serif;font-weight:700;display:block;position:relative;line-height:1.5;zoom:1;margin:0}.driver-popover-close-btn{all:unset;position:absolute;top:0;right:0;width:32px;height:28px;cursor:pointer;font-size:18px;font-weight:500;color:#d2d2d2;z-index:1;text-align:center;transition:color;transition-duration:.2s}.driver-popover-close-btn:hover,.driver-popover-close-btn:focus{color:#2d2d2d}.driver-popover-title[style*=block]+.driver-popover-description{margin-top:5px}.driver-popover-description{margin-bottom:0;font:14px/normal sans-serif;line-height:1.5;font-weight:400;zoom:1}.driver-popover-footer{margin-top:15px;text-align:right;zoom:1;display:flex;align-items:center;justify-content:space-between}.driver-popover-progress-text{font-size:13px;font-weight:400;color:#727272;zoom:1}.driver-popover-footer button{all:unset;display:inline-block;box-sizing:border-box;padding:3px 7px;text-decoration:none;text-shadow:1px 1px 0 #fff;background-color:#fff;color:#2d2d2d;font:12px/normal sans-serif;cursor:pointer;outline:0;zoom:1;line-height:1.3;border:1px solid #ccc;border-radius:3px}.driver-popover-footer .driver-popover-btn-disabled{opacity:.5;pointer-events:none}:not(body):has(>.driver-active-element){overflow:hidden!important}.driver-no-interaction,.driver-no-interaction *{pointer-events:none!important}.driver-popover-footer button:hover,.driver-popover-footer button:focus{background-color:#f7f7f7}.driver-popover-navigation-btns{display:flex;flex-grow:1;justify-content:flex-end}.driver-popover-navigation-btns button+button{margin-left:4px}.driver-popover-arrow{content:"";position:absolute;border:5px solid #fff}.driver-popover-arrow-side-over{display:none}.driver-popover-arrow-side-left{left:100%;border-right-color:transparent;border-bottom-color:transparent;border-top-color:transparent}.driver-popover-arrow-side-right{right:100%;border-left-color:transparent;border-bottom-color:transparent;border-top-color:transparent}.driver-popover-arrow-side-top{top:100%;border-right-color:transparent;border-bottom-color:transparent;border-left-color:transparent}.driver-popover-arrow-side-bottom{bottom:100%;border-left-color:transparent;border-top-color:transparent;border-right-color:transparent}.driver-popover-arrow-side-center{display:none}.driver-popover-arrow-side-left.driver-popover-arrow-align-start,.driver-popover-arrow-side-right.driver-popover-arrow-align-start{top:15px}.driver-popover-arrow-side-top.driver-popover-arrow-align-start,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-start{left:15px}.driver-popover-arrow-align-end.driver-popover-arrow-side-left,.driver-popover-arrow-align-end.driver-popover-arrow-side-right{bottom:15px}.driver-popover-arrow-side-top.driver-popover-arrow-align-end,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-end{right:15px}.driver-popover-arrow-side-left.driver-popover-arrow-align-center,.driver-popover-arrow-side-right.driver-popover-arrow-align-center{top:50%;margin-top:-5px}.driver-popover-arrow-side-top.driver-popover-arrow-align-center,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-center{left:50%;margin-left:-5px}.driver-popover-arrow-none{display:none}
+.driver-popover {
+  background-color: #FFFCF7 !important;
+  border: 2px solid #E8B840 !important;
+  border-radius: 12px !important;
+  max-width: 480px !important;
+  font-family: "PingFang TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15) !important;
+}
+.driver-popover-title {
+  color: #2A1A0E !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+}
+.driver-popover-description {
+  color: #2A1A0E !important;
+  font-size: 13px !important;
+  line-height: 1.8 !important;
+}
+.driver-popover-footer button {
+  background: #D4900A !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 5px 14px !important;
+  font-weight: 700 !important;
+}
+.driver-popover-footer button:hover {
+  background: #b87a08 !important;
+}
+</style>
+<script id="driver-js">this.driver=this.driver||{};this.driver.js=function(F){"use strict";let z={},q;function V(e={}){z={animate:!0,allowClose:!0,overlayClickBehavior:"close",overlayOpacity:.7,smoothScroll:!1,disableActiveInteraction:!1,showProgress:!1,stagePadding:10,stageRadius:5,popoverOffset:10,showButtons:["next","previous","close"],disableButtons:[],overlayColor:"#000",...e}}function s(e){return e?z[e]:z}function le(e){q=e}function k(){return q}let A={};function N(e,o){A[e]=o}function T(e){var o;(o=A[e])==null||o.call(A)}function de(){A={}}function O(e,o,t,i){return(e/=i/2)<1?t/2*e*e+o:-t/2*(--e*(e-2)-1)+o}function K(e){const o='a[href]:not([disabled]), button:not([disabled]), textarea:not([disabled]), input[type="text"]:not([disabled]), input[type="radio"]:not([disabled]), input[type="checkbox"]:not([disabled]), select:not([disabled])';return e.flatMap(t=>{const i=t.matches(o),d=Array.from(t.querySelectorAll(o));return[...i?[t]:[],...d]}).filter(t=>getComputedStyle(t).pointerEvents!=="none"&&ve(t))}function Y(e){if(!e||ue(e))return;const o=s("smoothScroll"),t=e.offsetHeight>window.innerHeight;e.scrollIntoView({behavior:!o||pe(e)?"auto":"smooth",inline:"center",block:t?"start":"center"})}function pe(e){if(!e||!e.parentElement)return;const o=e.parentElement;return o.scrollHeight>o.clientHeight}function ue(e){const o=e.getBoundingClientRect();return o.top>=0&&o.left>=0&&o.bottom<=(window.innerHeight||document.documentElement.clientHeight)&&o.right<=(window.innerWidth||document.documentElement.clientWidth)}function ve(e){return!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)}let D={};function S(e,o){D[e]=o}function l(e){return e?D[e]:D}function X(){D={}}function fe(e,o,t,i){let d=l("__activeStagePosition");const n=d||t.getBoundingClientRect(),f=i.getBoundingClientRect(),w=O(e,n.x,f.x-n.x,o),r=O(e,n.y,f.y-n.y,o),v=O(e,n.width,f.width-n.width,o),g=O(e,n.height,f.height-n.height,o);d={x:w,y:r,width:v,height:g},Q(d),S("__activeStagePosition",d)}function j(e){if(!e)return;const o=e.getBoundingClientRect(),t={x:o.x,y:o.y,width:o.width,height:o.height};S("__activeStagePosition",t),Q(t)}function he(){const e=l("__activeStagePosition"),o=l("__overlaySvg");if(!e)return;if(!o){console.warn("No stage svg found.");return}const t=window.innerWidth,i=window.innerHeight;o.setAttribute("viewBox",`0 0 ${t} ${i}`)}function ge(e){const o=we(e);document.body.appendChild(o),U(o,t=>{t.target.tagName==="path"&&T("overlayClick")}),S("__overlaySvg",o)}function Q(e){const o=l("__overlaySvg");if(!o){ge(e);return}const t=o.firstElementChild;if((t==null?void 0:t.tagName)!=="path")throw new Error("no path element found in stage svg");t.setAttribute("d",Z(e))}function we(e){const o=window.innerWidth,t=window.innerHeight,i=document.createElementNS("http://www.w3.org/2000/svg","svg");i.classList.add("driver-overlay","driver-overlay-animated"),i.setAttribute("viewBox",`0 0 ${o} ${t}`),i.setAttribute("xmlSpace","preserve"),i.setAttribute("xmlnsXlink","http://www.w3.org/1999/xlink"),i.setAttribute("version","1.1"),i.setAttribute("preserveAspectRatio","xMinYMin slice"),i.style.fillRule="evenodd",i.style.clipRule="evenodd",i.style.strokeLinejoin="round",i.style.strokeMiterlimit="2",i.style.zIndex="10000",i.style.position="fixed",i.style.top="0",i.style.left="0",i.style.width="100%",i.style.height="100%";const d=document.createElementNS("http://www.w3.org/2000/svg","path");return d.setAttribute("d",Z(e)),d.style.fill=s("overlayColor")||"rgb(0,0,0)",d.style.opacity=`${s("overlayOpacity")}`,d.style.pointerEvents="auto",d.style.cursor="auto",i.appendChild(d),i}function Z(e){const o=window.innerWidth,t=window.innerHeight,i=s("stagePadding")||0,d=s("stageRadius")||0,n=e.width+i*2,f=e.height+i*2,w=Math.min(d,n/2,f/2),r=Math.floor(Math.max(w,0)),v=e.x-i+r,g=e.y-i,y=n-r*2,a=f-r*2;return`M${o},0L0,0L0,${t}L${o},${t}L${o},0Z
+    M${v},${g} h${y} a${r},${r} 0 0 1 ${r},${r} v${a} a${r},${r} 0 0 1 -${r},${r} h-${y} a${r},${r} 0 0 1 -${r},-${r} v-${a} a${r},${r} 0 0 1 ${r},-${r} z`}function me(){const e=l("__overlaySvg");e&&e.remove()}function ye(){const e=document.getElementById("driver-dummy-element");if(e)return e;let o=document.createElement("div");return o.id="driver-dummy-element",o.style.width="0",o.style.height="0",o.style.pointerEvents="none",o.style.opacity="0",o.style.position="fixed",o.style.top="50%",o.style.left="50%",document.body.appendChild(o),o}function G(e){const{element:o}=e;let t=typeof o=="function"?o():typeof o=="string"?document.querySelector(o):o;t||(t=ye()),xe(t,e)}function be(){const e=l("__activeElement"),o=l("__activeStep");e&&(j(e),he(),ne(e,o))}function xe(e,o){var C;const i=Date.now(),d=l("__activeStep"),n=l("__activeElement")||e,f=!n||n===e,w=e.id==="driver-dummy-element",r=n.id==="driver-dummy-element",v=s("animate"),g=o.onHighlightStarted||s("onHighlightStarted"),y=(o==null?void 0:o.onHighlighted)||s("onHighlighted"),a=(d==null?void 0:d.onDeselected)||s("onDeselected"),p=s(),c=l();!f&&a&&a(r?void 0:n,d,{config:p,state:c,driver:k()}),g&&g(w?void 0:e,o,{config:p,state:c,driver:k()});const u=!f&&v;let h=!1;_e(),S("previousStep",d),S("previousElement",n),S("activeStep",o),S("activeElement",e);const m=()=>{if(l("__transitionCallback")!==m)return;const x=Date.now()-i,E=400-x<=400/2;o.popover&&E&&!h&&u&&(ee(e,o),h=!0),s("animate")&&x<400?fe(x,400,n,e):(j(e),y&&y(w?void 0:e,o,{config:s(),state:l(),driver:k()}),S("__transitionCallback",void 0),S("__previousStep",d),S("__previousElement",n),S("__activeStep",o),S("__activeElement",e)),window.requestAnimationFrame(m)};S("__transitionCallback",m),window.requestAnimationFrame(m),Y(e),!u&&o.popover&&ee(e,o),n.classList.remove("driver-active-element","driver-no-interaction"),n.removeAttribute("aria-haspopup"),n.removeAttribute("aria-expanded"),n.removeAttribute("aria-controls"),((C=o.disableActiveInteraction)!=null?C:s("disableActiveInteraction"))&&e.classList.add("driver-no-interaction"),e.classList.add("driver-active-element"),e.setAttribute("aria-haspopup","dialog"),e.setAttribute("aria-expanded","true"),e.setAttribute("aria-controls","driver-popover-content")}function Ce(){var e;(e=document.getElementById("driver-dummy-element"))==null||e.remove(),document.querySelectorAll(".driver-active-element").forEach(o=>{o.classList.remove("driver-active-element","driver-no-interaction"),o.removeAttribute("aria-haspopup"),o.removeAttribute("aria-expanded"),o.removeAttribute("aria-controls")})}function H(){const e=l("__resizeTimeout");e&&window.cancelAnimationFrame(e),S("__resizeTimeout",window.requestAnimationFrame(be))}function Pe(e){var r;if(!l("isInitialized")||!(e.key==="Tab"||e.keyCode===9))return;const i=l("__activeElement"),d=(r=l("popover"))==null?void 0:r.wrapper,n=K([...d?[d]:[],...i?[i]:[]]),f=n[0],w=n[n.length-1];if(e.preventDefault(),e.shiftKey){const v=n[n.indexOf(document.activeElement)-1]||w;v==null||v.focus()}else{const v=n[n.indexOf(document.activeElement)+1]||f;v==null||v.focus()}}function J(e){var t;((t=s("allowKeyboardControl"))==null||t)&&(e.key==="Escape"?T("escapePress"):e.key==="ArrowRight"?T("arrowRightPress"):e.key==="ArrowLeft"&&T("arrowLeftPress"))}function U(e,o,t){const i=(n,f)=>{const w=n.target;e.contains(w)&&((!t||t(w))&&(n.preventDefault(),n.stopPropagation(),n.stopImmediatePropagation()),f==null||f(n))};document.addEventListener("pointerdown",i,!0),document.addEventListener("mousedown",i,!0),document.addEventListener("pointerup",i,!0),document.addEventListener("mouseup",i,!0),document.addEventListener("click",n=>{i(n,o)},!0)}function Se(){window.addEventListener("keyup",J,!1),window.addEventListener("keydown",Pe,!1),window.addEventListener("resize",H),window.addEventListener("scroll",H)}function ke(){window.removeEventListener("keyup",J),window.removeEventListener("resize",H),window.removeEventListener("scroll",H)}function _e(){const e=l("popover");e&&(e.wrapper.style.display="none")}function ee(e,o){var x,P;let t=l("popover");t&&document.body.removeChild(t.wrapper),t=Te(),document.body.appendChild(t.wrapper);const{title:i,description:d,showButtons:n,disableButtons:f,showProgress:w,nextBtnText:r=s("nextBtnText")||"Next &rarr;",prevBtnText:v=s("prevBtnText")||"&larr; Previous",progressText:g=s("progressText")||"{current} of {total}"}=o.popover||{};t.nextButton.innerHTML=r,t.previousButton.innerHTML=v,t.progress.innerHTML=g,i?(t.title.innerHTML=i,t.title.style.display="block"):t.title.style.display="none",d?(t.description.innerHTML=d,t.description.style.display="block"):t.description.style.display="none";const y=n||s("showButtons"),a=w||s("showProgress")||!1,p=(y==null?void 0:y.includes("next"))||(y==null?void 0:y.includes("previous"))||a;t.closeButton.style.display=y.includes("close")?"block":"none",p?(t.footer.style.display="flex",t.progress.style.display=a?"block":"none",t.nextButton.style.display=y.includes("next")?"block":"none",t.previousButton.style.display=y.includes("previous")?"block":"none"):t.footer.style.display="none";const c=f||s("disableButtons")||[];c!=null&&c.includes("next")&&(t.nextButton.disabled=!0,t.nextButton.classList.add("driver-popover-btn-disabled")),c!=null&&c.includes("previous")&&(t.previousButton.disabled=!0,t.previousButton.classList.add("driver-popover-btn-disabled")),c!=null&&c.includes("close")&&(t.closeButton.disabled=!0,t.closeButton.classList.add("driver-popover-btn-disabled"));const u=t.wrapper;u.style.display="block",u.style.left="",u.style.top="",u.style.bottom="",u.style.right="",u.id="driver-popover-content",u.setAttribute("role","dialog"),u.setAttribute("aria-labelledby","driver-popover-title"),u.setAttribute("aria-describedby","driver-popover-description");const h=t.arrow;h.className="driver-popover-arrow";const m=((x=o.popover)==null?void 0:x.popoverClass)||s("popoverClass")||"";u.className=`driver-popover ${m}`.trim(),U(t.wrapper,E=>{var W,I,M;const L=E.target,$=((W=o.popover)==null?void 0:W.onNextClick)||s("onNextClick"),B=((I=o.popover)==null?void 0:I.onPrevClick)||s("onPrevClick"),R=((M=o.popover)==null?void 0:M.onCloseClick)||s("onCloseClick");if(L.closest(".driver-popover-next-btn"))return $?$(e,o,{config:s(),state:l(),driver:k()}):T("nextClick");if(L.closest(".driver-popover-prev-btn"))return B?B(e,o,{config:s(),state:l(),driver:k()}):T("prevClick");if(L.closest(".driver-popover-close-btn"))return R?R(e,o,{config:s(),state:l(),driver:k()}):T("closeClick")},E=>!(t!=null&&t.description.contains(E))&&!(t!=null&&t.title.contains(E))&&typeof E.className=="string"&&E.className.includes("driver-popover")),S("popover",t);const b=((P=o.popover)==null?void 0:P.onPopoverRender)||s("onPopoverRender");b&&b(t,{config:s(),state:l(),driver:k()}),ne(e,o),Y(u);const C=e.classList.contains("driver-dummy-element"),_=K([u,...C?[]:[e]]);_.length>0&&_[0].focus()}function te(){const e=l("popover");if(!(e!=null&&e.wrapper))return;const o=e.wrapper.getBoundingClientRect(),t=s("stagePadding")||0,i=s("popoverOffset")||0;return{width:o.width+t+i,height:o.height+t+i,realWidth:o.width,realHeight:o.height}}function oe(e,o){const{elementDimensions:t,popoverDimensions:i,popoverPadding:d,popoverArrowDimensions:n}=o;return e==="start"?Math.max(Math.min(t.top-d,window.innerHeight-i.realHeight-n.width),n.width):e==="end"?Math.max(Math.min(t.top-(i==null?void 0:i.realHeight)+t.height+d,window.innerHeight-(i==null?void 0:i.realHeight)-n.width),n.width):e==="center"?Math.max(Math.min(t.top+t.height/2-(i==null?void 0:i.realHeight)/2,window.innerHeight-(i==null?void 0:i.realHeight)-n.width),n.width):0}function ie(e,o){const{elementDimensions:t,popoverDimensions:i,popoverPadding:d,popoverArrowDimensions:n}=o;return e==="start"?Math.max(Math.min(t.left-d,window.innerWidth-i.realWidth-n.width),n.width):e==="end"?Math.max(Math.min(t.left-(i==null?void 0:i.realWidth)+t.width+d,window.innerWidth-(i==null?void 0:i.realWidth)-n.width),n.width):e==="center"?Math.max(Math.min(t.left+t.width/2-(i==null?void 0:i.realWidth)/2,window.innerWidth-(i==null?void 0:i.realWidth)-n.width),n.width):0}function ne(e,o){const t=l("popover");if(!t)return;const{align:i="start",side:d="left"}=(o==null?void 0:o.popover)||{},n=i,f=e.id==="driver-dummy-element"?"over":d,w=s("stagePadding")||0,r=te(),v=t.arrow.getBoundingClientRect(),g=e.getBoundingClientRect(),y=g.top-r.height;let a=y>=0;const p=window.innerHeight-(g.bottom+r.height);let c=p>=0;const u=g.left-r.width;let h=u>=0;const m=window.innerWidth-(g.right+r.width);let b=m>=0;const C=!a&&!c&&!h&&!b;let _=f;if(f==="top"&&a?b=h=c=!1:f==="bottom"&&c?b=h=a=!1:f==="left"&&h?b=a=c=!1:f==="right"&&b&&(h=a=c=!1),f==="over"){const x=window.innerWidth/2-r.realWidth/2,P=window.innerHeight/2-r.realHeight/2;t.wrapper.style.left=`${x}px`,t.wrapper.style.right="auto",t.wrapper.style.top=`${P}px`,t.wrapper.style.bottom="auto"}else if(C){const x=window.innerWidth/2-(r==null?void 0:r.realWidth)/2,P=10;t.wrapper.style.left=`${x}px`,t.wrapper.style.right="auto",t.wrapper.style.bottom=`${P}px`,t.wrapper.style.top="auto"}else if(h){const x=Math.min(u,window.innerWidth-(r==null?void 0:r.realWidth)-v.width),P=oe(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.left=`${x}px`,t.wrapper.style.top=`${P}px`,t.wrapper.style.bottom="auto",t.wrapper.style.right="auto",_="left"}else if(b){const x=Math.min(m,window.innerWidth-(r==null?void 0:r.realWidth)-v.width),P=oe(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.right=`${x}px`,t.wrapper.style.top=`${P}px`,t.wrapper.style.bottom="auto",t.wrapper.style.left="auto",_="right"}else if(a){const x=Math.min(y,window.innerHeight-r.realHeight-v.width);let P=ie(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.top=`${x}px`,t.wrapper.style.left=`${P}px`,t.wrapper.style.bottom="auto",t.wrapper.style.right="auto",_="top"}else if(c){const x=Math.min(p,window.innerHeight-(r==null?void 0:r.realHeight)-v.width);let P=ie(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.left=`${P}px`,t.wrapper.style.bottom=`${x}px`,t.wrapper.style.top="auto",t.wrapper.style.right="auto",_="bottom"}C?t.arrow.classList.add("driver-popover-arrow-none"):Ee(n,_,e)}function Ee(e,o,t){const i=l("popover");if(!i)return;const d=t.getBoundingClientRect(),n=te(),f=i.arrow,w=n.width,r=window.innerWidth,v=d.width,g=d.left,y=n.height,a=window.innerHeight,p=d.top,c=d.height;f.className="driver-popover-arrow";let u=o,h=e;if(o==="top"?(g+v<=0?(u="right",h="end"):g+v-w<=0&&(u="top",h="start"),g>=r?(u="left",h="end"):g+w>=r&&(u="top",h="end")):o==="bottom"?(g+v<=0?(u="right",h="start"):g+v-w<=0&&(u="bottom",h="start"),g>=r?(u="left",h="start"):g+w>=r&&(u="bottom",h="end")):o==="left"?(p+c<=0?(u="bottom",h="end"):p+c-y<=0&&(u="left",h="start"),p>=a?(u="top",h="end"):p+y>=a&&(u="left",h="end")):o==="right"&&(p+c<=0?(u="bottom",h="start"):p+c-y<=0&&(u="right",h="start"),p>=a?(u="top",h="start"):p+y>=a&&(u="right",h="end")),!u)f.classList.add("driver-popover-arrow-none");else{f.classList.add(`driver-popover-arrow-side-${u}`),f.classList.add(`driver-popover-arrow-align-${h}`);const m=t.getBoundingClientRect(),b=f.getBoundingClientRect(),C=s("stagePadding")||0,_=m.left-C<window.innerWidth&&m.right+C>0&&m.top-C<window.innerHeight&&m.bottom+C>0;o==="bottom"&&_&&(b.x>m.x&&b.x+b.width<m.x+m.width?i.wrapper.style.transform="translateY(0)":(f.classList.remove(`driver-popover-arrow-align-${h}`),f.classList.add("driver-popover-arrow-none"),i.wrapper.style.transform=`translateY(-${C/2}px)`))}}function Te(){const e=document.createElement("div");e.classList.add("driver-popover");const o=document.createElement("div");o.classList.add("driver-popover-arrow");const t=document.createElement("header");t.id="driver-popover-title",t.classList.add("driver-popover-title"),t.style.display="none",t.innerText="Popover Title";const i=document.createElement("div");i.id="driver-popover-description",i.classList.add("driver-popover-description"),i.style.display="none",i.innerText="Popover description is here";const d=document.createElement("button");d.type="button",d.classList.add("driver-popover-close-btn"),d.setAttribute("aria-label","Close"),d.innerHTML="&times;";const n=document.createElement("footer");n.classList.add("driver-popover-footer");const f=document.createElement("span");f.classList.add("driver-popover-progress-text"),f.innerText="";const w=document.createElement("span");w.classList.add("driver-popover-navigation-btns");const r=document.createElement("button");r.type="button",r.classList.add("driver-popover-prev-btn"),r.innerHTML="&larr; Previous";const v=document.createElement("button");return v.type="button",v.classList.add("driver-popover-next-btn"),v.innerHTML="Next &rarr;",w.appendChild(r),w.appendChild(v),n.appendChild(f),n.appendChild(w),e.appendChild(d),e.appendChild(o),e.appendChild(t),e.appendChild(i),e.appendChild(n),{wrapper:e,arrow:o,title:t,description:i,footer:n,previousButton:r,nextButton:v,closeButton:d,footerButtons:w,progress:f}}function Le(){var o;const e=l("popover");e&&((o=e.wrapper.parentElement)==null||o.removeChild(e.wrapper))}const $e="";function Ae(e={}){V(e);function o(){s("allowClose")&&g()}function t(){const a=s("overlayClickBehavior");if(s("allowClose")&&a==="close"){g();return}if(typeof a=="function"){const p=l("__activeStep"),c=l("__activeElement");a(c,p,{config:s(),state:l(),driver:k()});return}a==="nextStep"&&i()}function i(){const a=l("activeIndex"),p=s("steps")||[];if(typeof a=="undefined")return;const c=a+1;p[c]?v(c):g()}function d(){const a=l("activeIndex"),p=s("steps")||[];if(typeof a=="undefined")return;const c=a-1;p[c]?v(c):g()}function n(a){(s("steps")||[])[a]?v(a):g()}function f(){var b;if(l("__transitionCallback"))return;const p=l("activeIndex"),c=l("__activeStep"),u=l("__activeElement");if(typeof p=="undefined"||typeof c=="undefined"||typeof l("activeIndex")=="undefined")return;const m=((b=c.popover)==null?void 0:b.onPrevClick)||s("onPrevClick");if(m)return m(u,c,{config:s(),state:l(),driver:k()});d()}function w(){var m;if(l("__transitionCallback"))return;const p=l("activeIndex"),c=l("__activeStep"),u=l("__activeElement");if(typeof p=="undefined"||typeof c=="undefined")return;const h=((m=c.popover)==null?void 0:m.onNextClick)||s("onNextClick");if(h)return h(u,c,{config:s(),state:l(),driver:k()});i()}function r(){l("isInitialized")||(S("isInitialized",!0),document.body.classList.add("driver-active",s("animate")?"driver-fade":"driver-simple"),Se(),N("overlayClick",t),N("escapePress",o),N("arrowLeftPress",f),N("arrowRightPress",w))}function v(a=0){var R,W,I,M,re,se,ae,ce;const p=s("steps");if(!p){console.error("No steps to drive through"),g();return}if(!p[a]){g();return}S("__activeOnDestroyed",document.activeElement),S("activeIndex",a);const c=p[a],u=p[a+1],h=p[a-1],m=((R=c.popover)==null?void 0:R.doneBtnText)||s("doneBtnText")||"Done",b=s("allowClose"),C=typeof((W=c.popover)==null?void 0:W.showProgress)!="undefined"?(I=c.popover)==null?void 0:I.showProgress:s("showProgress"),x=(((M=c.popover)==null?void 0:M.progressText)||s("progressText")||"{{current}} of {{total}}").replace("{{current}}",`${a+1}`).replace("{{total}}",`${p.length}`),P=((re=c.popover)==null?void 0:re.showButtons)||s("showButtons"),E=["next","previous",...b?["close"]:[]].filter(He=>!(P!=null&&P.length)||P.includes(He)),L=((se=c.popover)==null?void 0:se.onNextClick)||s("onNextClick"),$=((ae=c.popover)==null?void 0:ae.onPrevClick)||s("onPrevClick"),B=((ce=c.popover)==null?void 0:ce.onCloseClick)||s("onCloseClick");G({...c,popover:{showButtons:E,nextBtnText:u?void 0:m,disableButtons:[...h?[]:["previous"]],showProgress:C,progressText:x,onNextClick:L||(()=>{u?v(a+1):g()}),onPrevClick:$||(()=>{v(a-1)}),onCloseClick:B||(()=>{g()}),...(c==null?void 0:c.popover)||{}}})}function g(a=!0){const p=l("__activeElement"),c=l("__activeStep"),u=l("__activeOnDestroyed"),h=s("onDestroyStarted");if(a&&h){const C=!p||(p==null?void 0:p.id)==="driver-dummy-element";h(C?void 0:p,c,{config:s(),state:l(),driver:k()});return}const m=(c==null?void 0:c.onDeselected)||s("onDeselected"),b=s("onDestroyed");if(document.body.classList.remove("driver-active","driver-fade","driver-simple"),ke(),Le(),Ce(),me(),de(),X(),p&&c){const C=p.id==="driver-dummy-element";m&&m(C?void 0:p,c,{config:s(),state:l(),driver:k()}),b&&b(C?void 0:p,c,{config:s(),state:l(),driver:k()})}u&&u.focus()}const y={isActive:()=>l("isInitialized")||!1,refresh:H,drive:(a=0)=>{r(),v(a)},setConfig:V,setSteps:a=>{X(),V({...s(),steps:a})},getConfig:s,getState:l,getActiveIndex:()=>l("activeIndex"),isFirstStep:()=>l("activeIndex")===0,isLastStep:()=>{const a=s("steps")||[],p=l("activeIndex");return p!==void 0&&p===a.length-1},getActiveStep:()=>l("activeStep"),getActiveElement:()=>l("activeElement"),getPreviousElement:()=>l("previousElement"),getPreviousStep:()=>l("previousStep"),moveNext:i,movePrevious:d,moveTo:n,hasNextStep:()=>{const a=s("steps")||[],p=l("activeIndex");return p!==void 0&&!!a[p+1]},hasPreviousStep:()=>{const a=s("steps")||[],p=l("activeIndex");return p!==void 0&&!!a[p-1]},highlight:a=>{r(),G({...a,popover:a.popover?{showButtons:[],showProgress:!1,progressText:"",...a.popover}:void 0})},destroy:()=>{g(!1)}};return le(y),y}return F.driver=Ae,Object.defineProperty(F,Symbol.toStringTag,{value:"Module"}),F}({});</script>
+</head>
+<body>
+<!-- TTS Bar -->
+<div id="tts-bar">
+  <button id="tts-play-btn" class="tts-btn" onclick="ttsToggle()">▶ 朗讀全文</button>
+  <button class="tts-btn" onclick="ttsStop()" title="停止並重設">⏹</button>
+  <div class="tts-sep"></div>
+  <div class="tts-dots" id="tts-dots"></div>
+  <div class="tts-sep"></div>
+  <span class="tts-section" id="tts-section-name">點擊「朗讀全文」開始</span>
+  <select id="tts-speed" title="語速" onchange="ttsSetRate(this.value)">
+    <option value="0.7">慢速 0.7×</option>
+    <option value="0.9" selected>正常 0.9×</option>
+    <option value="1.1">快速 1.1×</option>
+    <option value="1.3">很快 1.3×</option>
+  </select>
+  <div class="tts-sep"></div>
+  <button class="tts-btn" onclick="adjustPageFont(-1)" style="padding:4px 9px;font-size:11px;font-weight:900;" title="縮小字體">A−</button>
+  <button class="tts-btn" onclick="adjustPageFont(1)"  style="padding:4px 9px;font-size:11px;font-weight:900;" title="放大字體">A+</button>
+</div>
+<div id="tts-subtitle"></div>
+<div class="page" id="drag-canvas">
+
+  <div data-drag-id="l5-course-tag" class="course-tag">📚 期權小學堂 · 第5課</div>
+
+  <!-- Header -->
+  <div data-drag-id="l5-header" class="page-header">
+    <div>
+      <div class="page-title">造市商與滾倉的關係</div>
+      <div class="page-subtitle">Market Maker × Roll Position — Behind the Scenes</div>
+      <div class="page-desc">理解誰在跟你交易，才能看懂滾倉背後的市場邏輯 🏦</div>
+    </div>
+    <div class="contract-box">
+      <div class="cb-title">🔄 滾倉實例</div>
+      <div class="cb-ticker">SQQQ <small>· CSP Roll Out</small></div>
+      <div class="cb-grid">
+        <div class="cb-item"><div class="ci-l">滾倉日</div><div class="ci-v">05/01</div></div>
+        <div class="cb-item"><div class="ci-l">口數</div><div class="ci-v">4 口</div></div>
+        <div class="cb-item"><div class="ci-l">舊到期</div><div class="ci-v">5/15</div></div>
+        <div class="cb-item"><div class="ci-l">新到期</div><div class="ci-v">9/18</div></div>
+        <div class="cb-item"><div class="ci-l">履約價</div><div class="ci-v">$60</div></div>
+        <div class="cb-item"><div class="ci-l">Roll Credit</div><div class="ci-v green">+$1,904</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4 Panels -->
+  <div class="panels">
+
+    <!-- Panel 1: 造市商是誰 -->
+    <div data-drag-id="l5-panel-mm" class="panel" id="l5-panel-mm">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="step-badge">1</div>
+          <div class="pill-outline setup">MARKET STRUCTURE</div>
+        </div>
+        <div class="pill setup">市場機制</div>
+      </div>
+
+      <div class="ptitle">造市商是中間人<br>它不賭方向，只賺 Bid-Ask Spread 💰</div>
+
+      <div class="txn-box">
+        <div class="actors-row">
+          <div class="actor">
+            <div class="actor-emoji">🐾</div>
+            <div class="actor-name">你（賣方）</div>
+            <div class="actor-sub">CSP 策略者</div>
+          </div>
+          <div class="txn-center">
+            <div class="arr-group">
+              <div class="arr-row fwd">
+                <span style="white-space:nowrap">賣 Put</span>
+                <div class="arr-line fwd"></div>
+              </div>
+              <div class="arr-row rev">
+                <div class="arr-line rev"></div>
+                <span style="white-space:nowrap">Premium ✓</span>
+              </div>
+            </div>
+          </div>
+          <div class="actor">
+            <div class="actor-emoji" style="background:var(--gold-bg);border-color:var(--gold-bdr);">🏦</div>
+            <div class="actor-name">造市商</div>
+            <div class="actor-sub">Spread 獲利</div>
+          </div>
+          <div class="txn-center">
+            <div class="arr-group">
+              <div class="arr-row fwd">
+                <span style="white-space:nowrap">撮合</span>
+                <div class="arr-line fwd"></div>
+              </div>
+              <div class="arr-row fwd" style="color:var(--muted);">
+                <div class="arr-line fwd"></div>
+                <span style="white-space:nowrap">Delta</span>
+              </div>
+            </div>
+          </div>
+          <div class="actor">
+            <div class="actor-emoji" style="background:var(--green-bg);border-color:var(--green-bdr);">🌹</div>
+            <div class="actor-name">真正對手方</div>
+            <div class="actor-sub">買 Put 避險</div>
+          </div>
+        </div>
+        <div style="text-align:center;font-size:10.5px;color:var(--blue);background:var(--blue-bg);border-radius:var(--r-sm);padding:5px 10px;border:1px solid var(--blue-bdr);">
+          知名造市商：Citadel · SIG · Virtu · Jane Street · Optiver
+        </div>
+      </div>
+
+      <div class="bullets">
+        <div class="bullet"><div class="bullet-num">①</div><span>造市商<strong style="color:var(--ink)">同時掛出 Bid 和 Ask</strong>，讓市場隨時有流動性，它們不猜漲跌。</span></div>
+        <div class="bullet"><div class="bullet-num">②</div><span>每筆交易只賺薄薄的買賣價差（Spread），乘以每天數百萬筆，獲利相當可觀。</span></div>
+        <div class="bullet"><div class="bullet-num">③</div><span>真正跟你方向對賭的，是透過造市商撮合的<strong style="color:var(--ink)">其他散戶或機構</strong>——它們買 Put 是為了對沖或看空。</span></div>
+      </div>
+    </div>
+
+    <!-- Panel 2: Delta 對沖 -->
+    <div data-drag-id="l5-panel-delta" class="panel" id="l5-panel-delta">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="step-badge">2</div>
+          <div class="pill-outline chart">DELTA HEDGING</div>
+        </div>
+        <div class="pill chart">對沖機制</div>
+      </div>
+
+      <div class="ptitle">Delta 對沖：MM 如何<br>把方向性風險歸零 📊</div>
+
+      <div class="txn-box">
+        <div class="flow-chain">
+          <div class="flow-node blue">
+            <div class="fn-emoji">🐾</div>
+            <div class="fn-label">你賣 Put</div>
+            <div class="fn-sub">收 Premium<br>Delta = -0.30</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node gold">
+            <div class="fn-emoji">🏦</div>
+            <div class="fn-label">MM 買 Put</div>
+            <div class="fn-sub">承接合約<br>立刻對沖</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node green">
+            <div class="fn-emoji">📈</div>
+            <div class="fn-label">買 SQQQ 股票</div>
+            <div class="fn-sub">30 股 / 張<br>Delta → 0</div>
+          </div>
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center;line-height:1.6;">
+          Put Delta = −0.30 → MM 買入 30 股 SQQQ 對沖每張合約
+        </div>
+      </div>
+
+      <div style="background:#FFF8E8;border:1.5px solid var(--gold-bdr);border-radius:var(--r-sm);padding:10px 12px;font-size:12px;color:#8A6000;line-height:1.7;">
+        <strong>⚡ SQQQ 特殊性：</strong>三倍反向 ETF，每日自動 Rebalance，Delta 變化更快（Gamma 較高），MM 的對沖調整頻率遠高於一般股票，全部由演算法毫秒級執行。
+      </div>
+
+      <div class="stat-pills cols-3">
+        <div class="spill"><div class="sl">MM 真正的風險</div><div class="sv" style="font-size:13px;">Gap Risk</div></div>
+        <div class="spill"><div class="sl">到期日附近</div><div class="sv" style="font-size:13px;">Gamma Risk</div></div>
+        <div class="spill"><div class="sl">極端行情</div><div class="sv" style="font-size:13px;">流動性枯竭</div></div>
+      </div>
+
+      <div class="result-box blue">
+        <span class="rb-label">🏦 MM 視你的策略為</span>
+        <span class="rb-val blue" style="font-size:16px;">純中間人業務</span>
+      </div>
+    </div>
+
+    <!-- Panel 3: 滾倉三種類型 -->
+    <div data-drag-id="l5-panel-roll" class="panel" id="l5-panel-roll">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="step-badge">3</div>
+          <div class="pill-outline win">ROLL TYPES</div>
+        </div>
+        <div class="pill win">滾倉操作</div>
+      </div>
+
+      <div class="ptitle">滾倉三種操作<br>買回舊倉 + 賣出新倉 🔄</div>
+
+      <div class="txn-box" style="font-size:13px;color:var(--ink);">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">ROLL NET FORMULA</div>
+        <div style="font-size:14px;font-weight:800;color:var(--ink);text-align:center;line-height:1.8;">
+          Roll Net = 新合約收取 Premium − 買回舊倉成本
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px;text-align:center;font-size:11px;">
+          <div style="background:var(--green-bg);border:1px solid var(--green-bdr);border-radius:var(--r-sm);padding:5px;color:var(--green);font-weight:700;">Net &gt; 0<br><span style="font-weight:500">Roll for Credit ✓</span></div>
+          <div style="background:#F5EFE6;border:1px solid var(--border);border-radius:var(--r-sm);padding:5px;color:var(--muted);font-weight:700;">Net = 0<br><span style="font-weight:500">Roll for Even</span></div>
+          <div style="background:var(--red-bg);border:1px solid var(--red-bdr);border-radius:var(--r-sm);padding:5px;color:var(--red);font-weight:700;">Net &lt; 0<br><span style="font-weight:500">Roll for Debit</span></div>
+        </div>
+      </div>
+
+      <div class="roll-grid">
+        <div class="roll-card rc-out">
+          <div class="rc-icon">🕐</div>
+          <div class="rc-title">Roll Out</div>
+          <div class="rc-sub">只延長到期日<br>履約價不變</div>
+          <div class="rc-tag green">最常用</div>
+        </div>
+        <div class="roll-card rc-down">
+          <div class="rc-icon">📉</div>
+          <div class="rc-title">Roll Down</div>
+          <div class="rc-sub">只降低履約價<br>到期日不變</div>
+          <div class="rc-tag gold">跌近Strike時</div>
+        </div>
+        <div class="roll-card rc-both">
+          <div class="rc-icon">↘️</div>
+          <div class="rc-title">Roll Out+Down</div>
+          <div class="rc-sub">同時延長到期<br>並降低履約價</div>
+          <div class="rc-tag blue">跌幅較大時</div>
+        </div>
+      </div>
+
+      <div class="result-box green">
+        <span class="rb-label">✅ 本次 SQQQ Roll Out</span>
+        <span class="rb-val green">+$1,904 Credit</span>
+      </div>
+
+      <div class="bullets">
+        <div class="bullet"><div class="bullet-num">買</div><span>買回 5/15 到期：4口 × $10.20 × 100 = <strong style="color:var(--red)">−$4,080</strong></span></div>
+        <div class="bullet"><div class="bullet-num">賣</div><span>賣出 9/18 到期：4口 × $14.96 × 100 = <strong style="color:var(--green)">+$5,984</strong></span></div>
+      </div>
+    </div>
+
+    <!-- Panel 4: 觸發時機 -->
+    <div data-drag-id="l5-panel-timing" class="panel" id="l5-panel-timing">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="step-badge">4</div>
+          <div class="pill-outline bonus">TIMING</div>
+        </div>
+        <div class="pill bonus">觸發時機</div>
+      </div>
+
+      <div class="ptitle">何時該滾倉？<br>四個觸發條件 ⏱️</div>
+
+      <div class="trigger-grid">
+        <div class="trigger-item">
+          <div class="ti-icon">⏰</div>
+          <div class="ti-cond">DTE ≤ 21 天</div>
+          <div class="ti-desc">Theta 加速衰減轉折點，剩餘時間價值變少</div>
+        </div>
+        <div class="trigger-item">
+          <div class="ti-icon">💰</div>
+          <div class="ti-cond">已獲利 ≥ 50%</div>
+          <div class="ti-desc">提前 Roll 釋放保證金，可立刻開新倉</div>
+        </div>
+        <div class="trigger-item">
+          <div class="ti-icon">📊</div>
+          <div class="ti-cond">Delta &gt; −0.50</div>
+          <div class="ti-desc">被行權風險升高，評估是否要滾</div>
+        </div>
+        <div class="trigger-item" style="border-color:var(--blue-bdr);background:var(--blue-bg);">
+          <div class="ti-icon">🌊</div>
+          <div class="ti-cond" style="color:var(--blue);">IV 上升</div>
+          <div class="ti-desc">新合約 Premium 更豐厚，Roll for Credit 更容易</div>
+        </div>
+      </div>
+
+      <svg width="100%" viewBox="0 0 260 90" style="display:block;overflow:visible;">
+        <defs>
+          <marker id="ax4x" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+            <path d="M1 1.5L8 5L1 8.5" fill="none" stroke="#888" stroke-width="1.5" stroke-linecap="round"/>
+          </marker>
+          <marker id="ax4y" viewBox="0 0 10 10" refX="5" refY="9" markerWidth="5" markerHeight="5" orient="auto">
+            <path d="M1 9L5 1L9 9" fill="none" stroke="#888" stroke-width="1.5" stroke-linecap="round"/>
+          </marker>
+        </defs>
+        <!-- OTM zone (right, green) -->
+        <rect x="135" y="8" width="115" height="68" fill="#2E9E52" opacity="0.08" rx="3"/>
+        <!-- ITM zone (left, red) -->
+        <rect x="28"  y="8" width="107" height="68" fill="#D04040" opacity="0.08" rx="3"/>
+        <!-- axes -->
+        <line x1="28" y1="80" x2="252" y2="80" stroke="#AAAAAA" stroke-width="1.5" marker-end="url(#ax4x)"/>
+        <line x1="28" y1="82" x2="28"  y2="5"  stroke="#AAAAAA" stroke-width="1.5" marker-end="url(#ax4y)"/>
+        <!-- zero line -->
+        <line x1="28" y1="44" x2="252" y2="44" stroke="#CCCCCC" stroke-width="1" stroke-dasharray="3,3"/>
+        <!-- strike at $60 -->
+        <line x1="135" y1="6" x2="135" y2="78" stroke="#D04040" stroke-width="1.2" stroke-dasharray="4,3"/>
+        <text x="135" y="86" font-size="9" fill="#D04040" text-anchor="middle" font-family="sans-serif" font-weight="700">$60 Strike</text>
+        <!-- labels -->
+        <text x="68"  y="20" font-size="11" fill="#D04040" text-anchor="middle" font-family="sans-serif" font-weight="700">ITM ⚠️</text>
+        <text x="68"  y="33" font-size="9"  fill="#D04040" text-anchor="middle" font-family="sans-serif">評估滾倉</text>
+        <text x="193" y="20" font-size="11" fill="#2E9E52" text-anchor="middle" font-family="sans-serif" font-weight="700">OTM ✅</text>
+        <text x="193" y="33" font-size="9"  fill="#2E9E52" text-anchor="middle" font-family="sans-serif">安心等到期</text>
+        <!-- price arrow -->
+        <text x="5" y="45" font-size="8.5" fill="#AAAAAA" font-family="sans-serif">$0</text>
+        <text x="230" y="78" font-size="8.5" fill="#AAAAAA" font-family="sans-serif">SQQQ 股價</text>
+      </svg>
+
+      <div class="warning" style="margin-top:4px;">
+        <span>🚫</span>
+        <span><strong>不建議滾倉：</strong>Deep ITM 且 Roll for Debit 金額很大（侵蝕已累積 Premium）；或標的基本面惡化不應繼續持倉。</span>
+      </div>
+    </div>
+
+  </div><!-- /panels -->
+
+  <!-- Bonus Panel: 真實案例 + 實務啟示 -->
+  <div data-drag-id="l5-bonus" class="bonus-panel" id="l5-bonus">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge" style="background:var(--purple);">5</div>
+        <div class="pill-outline bonus">REAL CASE + INSIGHTS</div>
+      </div>
+      <div class="pill bonus">真實案例 · 實務啟示 🎯</div>
+    </div>
+
+    <div class="ptitle" style="margin-top:14px;">SQQQ CSP 完整滾倉記錄 × Wheel 策略五大啟示</div>
+    <div style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.65;">
+      從 04/16 分批開倉到 05/01 執行 Roll Out，完整記錄每一筆 Premium 的來源，以及造市商在背後如何靜靜對沖每一次操作。
+    </div>
+
+    <div class="bonus-body">
+
+      <!-- Timeline -->
+      <div class="timeline">
+        <!-- horizontal bar -->
+        <div style="position:absolute;top:72px;left:44px;right:44px;height:2px;background:var(--ink);border-radius:2px;"></div>
+
+        <!-- Node 1: 開倉期 -->
+        <div style="position:absolute;top:54px;left:8px;display:flex;flex-direction:column;align-items:center;gap:3px;">
+          <div style="width:36px;height:36px;background:var(--blue-bg);border:2px solid var(--blue-bdr);border-radius:100px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--blue);">開</div>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;white-space:nowrap;">04/16–20</div>
+          <div style="font-size:11px;font-weight:700;color:var(--ink);white-space:nowrap;">分批開倉</div>
+          <div style="font-size:10px;color:var(--blue);font-weight:600;white-space:nowrap;">4口 $60 Put</div>
+          <div style="font-size:10px;color:var(--green);font-weight:600;white-space:nowrap;">+$2,179.84</div>
+        </div>
+
+        <!-- Node 2: 滾倉 (mid) -->
+        <div style="position:absolute;top:50px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:3px;">
+          <div style="width:36px;height:36px;background:var(--gold-bg);border:2px solid var(--gold-bdr);border-radius:100px;display:flex;align-items:center;justify-content:center;font-size:18px;">🔄</div>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;white-space:nowrap;">05/01</div>
+          <div style="font-size:11px;font-weight:700;color:var(--ink);white-space:nowrap;">Roll Out</div>
+          <div style="font-size:10px;color:var(--gold);font-weight:600;white-space:nowrap;">5/15→9/18</div>
+          <div style="font-size:10px;color:var(--green);font-weight:600;white-space:nowrap;">+$1,904</div>
+        </div>
+        <div style="position:absolute;top:98px;left:50%;transform:translateX(-50%);text-align:center;white-space:nowrap;">
+          <div style="font-size:10px;color:var(--muted);">SQQQ ≈ $50，深度 ITM</div>
+        </div>
+
+        <!-- Node 3: 到期 -->
+        <div style="position:absolute;top:54px;right:8px;display:flex;flex-direction:column;align-items:center;gap:3px;">
+          <div style="width:36px;height:36px;background:var(--green-bg);border:2px solid var(--green-bdr);border-radius:100px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--green);">到</div>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;white-space:nowrap;">09/18</div>
+          <div style="font-size:11px;font-weight:700;color:var(--ink);white-space:nowrap;">新合約到期</div>
+          <div style="font-size:10px;color:var(--muted);white-space:nowrap;">OTM → 全賺</div>
+          <div style="font-size:10px;color:var(--muted);white-space:nowrap;">ITM → 接股</div>
+        </div>
+      </div>
+
+      <!-- Ledger -->
+      <div class="ledger">
+        <div class="ledger-head">📋 Premium 總帳</div>
+        <div class="l-row">
+          <span class="l-desc">① 04/16 開倉 2口</span>
+          <span class="l-calc">2×$5.00×100×(−1%)</span>
+          <span class="l-val green">+$999.92</span>
+        </div>
+        <div class="l-row">
+          <span class="l-desc">② 04/17 加碼 1口</span>
+          <span class="l-calc">1×$6.00×100×(−1%)</span>
+          <span class="l-val green">+$599.96</span>
+        </div>
+        <div class="l-row">
+          <span class="l-desc">③ 04/20 加碼 1口</span>
+          <span class="l-calc">1×$5.80×100×(−1%)</span>
+          <span class="l-val green">+$579.96</span>
+        </div>
+        <div class="l-row">
+          <span class="l-desc">④ 05/01 Roll Credit</span>
+          <span class="l-calc">($14.96−$10.20)×4×100</span>
+          <span class="l-val green">+$1,904.00</span>
+        </div>
+        <hr class="l-divider">
+        <div class="l-total">
+          <span>💰 累積 Premium</span>
+          <span class="lt-val">+$4,083.84</span>
+        </div>
+        <div style="margin-top:8px;">
+          <div class="result-box green" style="padding:7px 12px;">
+            <span style="font-size:12px;color:var(--muted);">若 9/18 OTM (SQQQ &gt; $60)</span>
+            <span style="font-size:15px;font-weight:900;color:var(--green);">全額保留 🎉</span>
+          </div>
+          <div class="result-box gold" style="padding:7px 12px;margin-top:6px;">
+            <span style="font-size:12px;color:var(--muted);">若 ITM 被指派接股</span>
+            <span style="font-size:15px;font-weight:900;color:var(--gold);">成本 $60 − $10.21 ≈ $49.79</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="summary-pills">
+      <div class="sum-pill"><div class="sl">開倉期間</div><div class="sv" style="font-size:15px;">04/16–20</div></div>
+      <div class="sum-pill hl-blue"><div class="sl">履約價</div><div class="sv">$60</div></div>
+      <div class="sum-pill hl-green"><div class="sl">累積 Premium</div><div class="sv" style="font-size:16px;">$4,084</div></div>
+      <div class="sum-pill hl-gold"><div class="sl">Roll Credit</div><div class="sv">$1,904</div></div>
+    </div>
+
+    <!-- 造市商視角 vs 你的操作 table -->
+    <div style="margin-top:20px;">
+      <div style="font-size:13px;font-weight:800;color:var(--ink);margin-bottom:10px;">🏦 造市商視角：你的每一筆操作，它在另一側做什麼</div>
+      <div class="rel-table">
+        <div class="rt-cell hd">你的滾倉操作</div>
+        <div class="rt-cell hd">造市商視角</div>
+        <div class="rt-cell">買回舊 Put（平倉）</div>
+        <div class="rt-cell">造市商賣 Put 給你，同時縮減對沖部位</div>
+        <div class="rt-cell">賣出新 Put（開倉）</div>
+        <div class="rt-cell">造市商買入新 Put，立刻重新 Delta 對沖</div>
+        <div class="rt-cell">你在賺 Theta 時間價值</div>
+        <div class="rt-cell">它在賺每一筆的 Bid-Ask Spread</div>
+      </div>
+    </div>
+
+    <!-- 5 practical tips -->
+    <div style="margin-top:20px;">
+      <div style="font-size:13px;font-weight:800;color:var(--ink);margin-bottom:4px;">📌 對 Wheel 策略的五大實務啟示</div>
+      <div class="tips-list">
+        <div class="tip-item">
+          <div class="tip-num">1</div>
+          <span><strong>選流動性好的標的：</strong>造市商積極參與的標的，Spread 窄，進出成本低，你的成交價更划算。</span>
+        </div>
+        <div class="tip-item">
+          <div class="tip-num">2</div>
+          <span><strong>盡量選 30～45 天到期：</strong>這個區間流動性最好、Spread 最窄，造市商對沖成本最低，最終反映在你的成交價也最好。</span>
+        </div>
+        <div class="tip-item">
+          <div class="tip-num">3</div>
+          <span><strong>避免遠天期開倉：</strong>Spread 太寬（對沖難度高），你每次進出都在幫造市商付對沖成本，侵蝕報酬。</span>
+        </div>
+        <div class="tip-item">
+          <div class="tip-num">4</div>
+          <span><strong>提前平倉技巧：</strong>掛 $0.01 平倉單，等 Theta 幾乎歸零時成交，釋放保證金後馬上開新倉，年化報酬更高。</span>
+        </div>
+        <div class="tip-item">
+          <div class="tip-num">5</div>
+          <span><strong>滾倉要 for Credit：</strong>每次滾倉都應至少打平，最好收到淨 Credit，讓累積 Premium 持續增加，成本基礎持續下降。</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="warning">
+      <span>💡</span>
+      <span>造市商對你的策略方向毫無意見，它對你買回舊Put或賣出新Put都只是照單全收，在另一側默默調整對沖。<strong>真正決定你輸贏的是股價走向和你的倉位管理，而非造市商。</strong></span>
+    </div>
+  </div>
+
+  <!-- ══ 造市商延伸說明 ══════════════════════════════════════════════════ -->
+
+  <!-- Section 6: 造市商與交易所合約 -->
+  <div data-drag-id="l5-mm-contract" class="bonus-panel" id="l5-mm-contract" style="margin-top:16px;">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge" style="background:var(--blue);">6</div>
+        <div class="pill-outline chart">MM CONTRACT</div>
+      </div>
+      <div class="pill chart">造市商與交易所合約 🤝</div>
+    </div>
+
+    <div class="ptitle" style="margin-top:14px;">造市商憑什麼能在市場「開店」？</div>
+    <div style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.65;">
+      造市商並非想進場就能進場——它必須與交易所簽訂<strong>造市商協議（Market Maker Agreement）</strong>，以「特權換義務」維持市場秩序。
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
+      <!-- 特權 -->
+      <div style="background:var(--green-bg);border:1.5px solid var(--green-bdr);border-radius:var(--r-md);padding:14px 16px;">
+        <div style="font-size:11px;font-weight:800;color:var(--green);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">✅ 特權（Privileges）</div>
+        <div class="bullets">
+          <div class="bullet">
+            <div class="bullet-num" style="background:var(--green-bg);border-color:var(--green-bdr);color:var(--green);">1</div>
+            <span><strong>零手續費</strong>：每筆交易免佣，大幅降低高頻操作成本</span>
+          </div>
+          <div class="bullet">
+            <div class="bullet-num" style="background:var(--green-bg);border-color:var(--green-bdr);color:var(--green);">2</div>
+            <span><strong>優先撮合</strong>：相同報價下，造市商訂單比散戶先成交</span>
+          </div>
+          <div class="bullet">
+            <div class="bullet-num" style="background:var(--green-bg);border-color:var(--green-bdr);color:var(--green);">3</div>
+            <span><strong>股票出借</strong>：可向交易所借入股票執行 Delta 對沖，無需持有</span>
+          </div>
+          <div class="bullet">
+            <div class="bullet-num" style="background:var(--green-bg);border-color:var(--green-bdr);color:var(--green);">4</div>
+            <span><strong>自有訂單流</strong>：可優先看到部分散戶訂單，預判短期供需</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 義務 -->
+      <div style="background:var(--red-bg);border:1.5px solid var(--red-bdr);border-radius:var(--r-md);padding:14px 16px;">
+        <div style="font-size:11px;font-weight:800;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">⚠️ 義務（Obligations）</div>
+        <div class="bullets">
+          <div class="bullet">
+            <div class="bullet-num" style="background:var(--red-bg);border-color:var(--red-bdr);color:var(--red);">1</div>
+            <span><strong>雙邊連續報價</strong>：必須同時掛出 Bid（買價）與 Ask（賣價），讓市場隨時可交易</span>
+          </div>
+          <div class="bullet">
+            <div class="bullet-num" style="background:var(--red-bg);border-color:var(--red-bdr);color:var(--red);">2</div>
+            <span><strong>最大 Spread（價差）限制</strong>：Bid-Ask 不能超過交易所規定上限，通常 &lt; $0.10–$0.30</span>
+          </div>
+          <div class="bullet">
+            <div class="bullet-num" style="background:var(--red-bg);border-color:var(--red-bdr);color:var(--red);">3</div>
+            <span><strong>不可單方面撤市</strong>：極端行情下仍須報價，不得因風險過大而直接離場</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="warning" style="margin-top:16px;">
+      <span>💡</span>
+      <span>正是這份合約，讓你每次賣 Put 或執行滾倉時，對面<strong>永遠都有人接</strong>——那就是履行義務的造市商。</span>
+    </div>
+  </div>
+
+  <!-- Section 7: 商業模式 — 靠 Spread 賺錢 -->
+  <div data-drag-id="l5-mm-spread" class="bonus-panel" id="l5-mm-spread" style="margin-top:16px;">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge" style="background:var(--gold);">7</div>
+        <div class="pill-outline gold">BUSINESS MODEL</div>
+      </div>
+      <div class="pill gold">商業模式 — 靠 Spread（價差）賺錢 💰</div>
+    </div>
+
+    <div class="ptitle" style="margin-top:14px;">造市商的收入公式很簡單：每次都賺那一點點差價</div>
+    <div style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.65;">
+      造市商不賭方向——它只是同時報出買價和賣價，在中間賺取 Spread（價差）。每一筆成交，哪怕只有幾分錢，乘上每天數百萬筆交易就是穩定收入。
+    </div>
+
+    <!-- Spread 圖解 -->
+    <div style="margin-top:16px;background:#FFFBF4;border:1.5px dashed var(--border);border-radius:var(--r-md);padding:16px 18px;">
+      <div style="font-size:12px;font-weight:800;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">📊 Spread（價差）運作示意</div>
+      <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:center;gap:8px;text-align:center;">
+        <!-- 你賣 -->
+        <div style="background:var(--blue-bg);border:1.5px solid var(--blue-bdr);border-radius:var(--r-md);padding:10px 8px;">
+          <div style="font-size:18px;margin-bottom:4px;">🙋</div>
+          <div style="font-size:12px;font-weight:800;color:var(--blue);">你 賣 Put</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">成交價：Bid</div>
+          <div style="font-size:20px;font-weight:900;color:var(--ink);margin-top:2px;">$2.00</div>
+        </div>
+        <div style="font-size:22px;color:var(--muted);">↔</div>
+        <!-- 造市商 -->
+        <div style="background:var(--gold-bg);border:2px solid var(--gold-bdr);border-radius:var(--r-md);padding:10px 8px;">
+          <div style="font-size:18px;margin-bottom:4px;">🏦</div>
+          <div style="font-size:12px;font-weight:800;color:var(--gold);">造市商</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;">Bid $2.00 / Ask $2.05</div>
+          <div style="font-size:13px;font-weight:900;color:var(--green);margin-top:4px;">賺 $0.05 × 100 = <br><span style="font-size:16px;">$5</span></div>
+        </div>
+        <div style="font-size:22px;color:var(--muted);">↔</div>
+        <!-- 下一個買家 -->
+        <div style="background:var(--green-bg);border:1.5px solid var(--green-bdr);border-radius:var(--r-md);padding:10px 8px;">
+          <div style="font-size:18px;margin-bottom:4px;">🙋</div>
+          <div style="font-size:12px;font-weight:800;color:var(--green);">下一個買家</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">成交價：Ask</div>
+          <div style="font-size:20px;font-weight:900;color:var(--ink);margin-top:2px;">$2.05</div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--muted);">
+        Spread（價差）= Ask − Bid = $2.05 − $2.00 = <strong style="color:var(--green);">$0.05 / 股 = $5 / 口</strong>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;">
+      <div class="spill">
+        <div class="sl">每口 Spread（價差）利潤</div>
+        <div class="sv green">$5</div>
+      </div>
+      <div class="spill">
+        <div class="sl">每天交易筆數（大型 MM）</div>
+        <div class="sv blue">數百萬筆</div>
+      </div>
+      <div class="spill">
+        <div class="sl">方向性風險</div>
+        <div class="sv gold">接近零</div>
+      </div>
+    </div>
+
+    <div class="warning" style="margin-top:14px;">
+      <span>💡</span>
+      <span>造市商的利潤與股價漲跌<strong>完全無關</strong>——它只需市場有成交量。這也是為什麼造市商偏好流動性高的標的：成交越多，賺得越多。</span>
+    </div>
+  </div>
+
+  <!-- Section 8: Delta 對沖實現「無風險」收 Spread -->
+  <div data-drag-id="l5-mm-hedge" class="bonus-panel" id="l5-mm-hedge" style="margin-top:16px;">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge" style="background:var(--purple);">8</div>
+        <div class="pill-outline bonus">DELTA HEDGE</div>
+      </div>
+      <div class="pill bonus">Delta 對沖 — 讓 Spread（價差）成為「無風險」利潤 🔒</div>
+    </div>
+
+    <div class="ptitle" style="margin-top:14px;">造市商如何把方向性風險歸零？</div>
+    <div style="margin-top:8px;">
+      <button onclick="startDeltaHedgeTour()" style="background:var(--blue);color:#fff;border:none;border-radius:100px;padding:7px 18px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">🎯 啟動 Delta 對沖導覽</button>
+    </div>
+    <div style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.65;">
+      光靠 Spread（價差）還不夠——如果造市商買入的 Put 因為股價大跌而暴漲，Spread 那點收入根本不夠補損。所以造市商在每一筆成交的同時，立刻用股票對沖消除方向風險。以 NOK 滾倉為例：
+    </div>
+
+    <!-- NOK Example Flow -->
+    <div style="margin-top:16px;">
+      <div style="font-size:12px;font-weight:800;color:var(--muted);letter-spacing:0.5px;margin-bottom:10px;">📋 NOK 真實案例：造市商如何對沖你的滾倉</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <!-- Step 1 -->
+        <div id="dh-step1" style="display:flex;align-items:flex-start;gap:12px;background:var(--blue-bg);border:1.5px solid var(--blue-bdr);border-radius:var(--r-md);padding:12px 14px;">
+          <div style="width:28px;height:28px;background:var(--blue);border-radius:100px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;flex-shrink:0;">1</div>
+          <div>
+            <div style="font-size:13px;font-weight:800;color:var(--ink);">你賣出 10口 NOK $14 Put @ $0.30</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;">→ 造市商以 Bid 買入，立刻持有 10口 NOK Put，得到負 Delta：<strong style="color:var(--red);">Δ = −0.30 × 10 × 100 = −300 Delta</strong></div>
+          </div>
+        </div>
+        <!-- Step 2 -->
+        <div id="dh-step2" style="display:flex;align-items:flex-start;gap:12px;background:var(--gold-bg);border:1.5px solid var(--gold-bdr);border-radius:var(--r-md);padding:12px 14px;">
+          <div style="width:28px;height:28px;background:var(--gold);border-radius:100px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;flex-shrink:0;">2</div>
+          <div>
+            <div style="font-size:13px;font-weight:800;color:var(--ink);">毫秒內：演算法買入 300 股 NOK @ $15.50</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;">→ 股票的 Delta = +1.0 × 300 = <strong style="color:var(--green);">+300 Delta</strong></div>
+          </div>
+        </div>
+        <!-- Step 3 -->
+        <div id="dh-step3" style="display:flex;align-items:flex-start;gap:12px;background:var(--green-bg);border:1.5px solid var(--green-bdr);border-radius:var(--r-md);padding:12px 14px;">
+          <div style="width:28px;height:28px;background:var(--green);border-radius:100px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;flex-shrink:0;">3</div>
+          <div>
+            <div style="font-size:13px;font-weight:800;color:var(--ink);">Net Delta ≈ 0，方向風險歸零</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;">NOK 漲 → 股票賺 / Put 跌，淨損益 ≈ 0 ｜ NOK 跌 → 股票虧 / Put 漲，淨損益 ≈ 0</div>
+          </div>
+        </div>
+        <!-- Step 4 -->
+        <div id="dh-spread" style="display:flex;align-items:flex-start;gap:12px;background:var(--panel-bg);border:2px solid var(--gold-bdr);border-radius:var(--r-md);padding:12px 14px;">
+          <div style="font-size:20px;flex-shrink:0;">💰</div>
+          <div>
+            <div style="font-size:13px;font-weight:800;color:var(--gold);">造市商最終保留：Spread（價差）利潤</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;">Ask − Bid = $0.31 − $0.30 = $0.01 × 10口 × 100 = <strong style="color:var(--gold);">$10 淨利</strong>（無論 NOK 漲跌）</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- Delta 原理深入說明 -->
+    <div style="margin-top:18px;">
+      <div id="dh-why300-title" style="font-size:13px;font-weight:800;color:var(--ink);margin-bottom:12px;">📐 為什麼是 300 股，而不是 1,000 股？</div>
+
+      <!-- Why not 1000 shares table -->
+      <div style="overflow-x:auto;margin-bottom:14px;">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+          <thead>
+            <tr style="background:var(--ink);color:#FFF9F0;">
+              <th style="padding:8px 12px;text-align:left;border-radius:6px 0 0 0;">情境</th>
+              <th style="padding:8px 12px;text-align:right;">Put 獲利（NOK 跌 $1）</th>
+              <th style="padding:8px 12px;text-align:right;">股票損失</th>
+              <th style="padding:8px 12px;text-align:right;border-radius:0 6px 0 0;">淨損益</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:var(--red-bg);">
+              <td style="padding:8px 12px;border-bottom:1px solid var(--border);">買 1,000 股對沖</td>
+              <td style="padding:8px 12px;text-align:right;border-bottom:1px solid var(--border);color:var(--green);font-weight:700;">+$300</td>
+              <td style="padding:8px 12px;text-align:right;border-bottom:1px solid var(--border);color:var(--red);font-weight:700;">−$1,000</td>
+              <td style="padding:8px 12px;text-align:right;border-bottom:1px solid var(--border);color:var(--red);font-weight:800;">−$700 ❌</td>
+            </tr>
+            <tr style="background:var(--green-bg);">
+              <td style="padding:8px 12px;">買 300 股對沖</td>
+              <td style="padding:8px 12px;text-align:right;color:var(--green);font-weight:700;">+$300</td>
+              <td style="padding:8px 12px;text-align:right;color:var(--red);font-weight:700;">−$300</td>
+              <td style="padding:8px 12px;text-align:right;color:var(--green);font-weight:800;">$0 ✅</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- What Delta means -->
+      <div id="dh-delta-meaning" style="background:var(--blue-bg);border:1.5px solid var(--blue-bdr);border-radius:var(--r-md);padding:13px 15px;margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:800;color:var(--blue);margin-bottom:8px;">💡 Delta 的真正含義</div>
+        <div style="font-size:12.5px;color:var(--ink);line-height:1.75;">
+          Delta <strong>−0.30</strong> 代表：<em>「這張 Put 的行為，等同於你做空了 30 股股票」</em>。<br>
+          每當 NOK 漲 $1，這張 Put 就跌 $0.30（Put 是看跌的，股票漲對 Put 不利）。<br>
+          10口 × 100股 × 0.30 = <strong>300 股的等效曝險</strong>，所以只需買 300 股來對沖，多買反而製造相反方向的風險。
+        </div>
+      </div>
+
+      <!-- Dynamic Delta table -->
+      <div id="dh-dynamic-title" style="font-size:12px;font-weight:800;color:var(--muted);margin-bottom:8px;">📊 Delta 會隨股價移動，對沖持股數也要跟著調整</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+          <thead>
+            <tr style="background:rgba(42,26,14,0.08);">
+              <th style="padding:7px 12px;text-align:left;border-bottom:2px solid var(--border);">NOK 股價</th>
+              <th style="padding:7px 12px;text-align:center;border-bottom:2px solid var(--border);">狀態</th>
+              <th style="padding:7px 12px;text-align:right;border-bottom:2px solid var(--border);">Put Delta</th>
+              <th style="padding:7px 12px;text-align:right;border-bottom:2px solid var(--border);">需持有股票</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:7px 12px;font-weight:700;">$15（遠 OTM）</td>
+              <td style="padding:7px 12px;text-align:center;"><span style="background:var(--green-bg);color:var(--green);border-radius:100px;padding:2px 8px;font-size:11px;font-weight:700;">OTM</span></td>
+              <td style="padding:7px 12px;text-align:right;color:var(--muted);">−0.20</td>
+              <td style="padding:7px 12px;text-align:right;font-weight:700;">200 股</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);background:var(--gold-bg);">
+              <td style="padding:7px 12px;font-weight:700;">$14（接近 ATM）</td>
+              <td style="padding:7px 12px;text-align:center;"><span style="background:var(--gold-bg);color:var(--gold);border-radius:100px;padding:2px 8px;font-size:11px;font-weight:700;">ATM</span></td>
+              <td style="padding:7px 12px;text-align:right;color:var(--gold);font-weight:800;">−0.50</td>
+              <td style="padding:7px 12px;text-align:right;font-weight:800;color:var(--gold);">500 股</td>
+            </tr>
+            <tr>
+              <td style="padding:7px 12px;font-weight:700;">$12（深度 ITM）</td>
+              <td style="padding:7px 12px;text-align:center;"><span style="background:var(--red-bg);color:var(--red);border-radius:100px;padding:2px 8px;font-size:11px;font-weight:700;">ITM</span></td>
+              <td style="padding:7px 12px;text-align:right;color:var(--red);">−0.85</td>
+              <td style="padding:7px 12px;text-align:right;font-weight:700;">850 股</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:7px;line-height:1.6;">
+        這就是為什麼叫「<strong>動態</strong> Delta 對沖」——股價每動一下，Delta 就變，造市商的演算法就要立刻增減持股，不是買一次就不管。
+      </div>
+    </div>
+
+      <!-- 延伸推論：你的 Delta 決定持股數 -->
+      <div style="margin-top:16px;">
+        <div style="font-size:13px;font-weight:800;color:var(--ink);margin-bottom:10px;">🔗 你的 CSP Delta 決定造市商要持有多少股</div>
+        <div style="overflow-x:auto;margin-bottom:14px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+            <thead>
+              <tr style="background:var(--ink);color:#FFF9F0;">
+                <th style="padding:8px 12px;text-align:left;border-radius:6px 0 0 0;">你賣的 CSP 類型</th>
+                <th style="padding:8px 12px;text-align:right;">Put Delta</th>
+                <th style="padding:8px 12px;text-align:right;border-radius:0 6px 0 0;">造市商需買入股票（10口）</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:8px 12px;">遠 OTM（履約價遠低於股價）</td>
+                <td style="padding:8px 12px;text-align:right;color:var(--muted);">−0.10</td>
+                <td style="padding:8px 12px;text-align:right;font-weight:700;">100 股</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);background:#F5F8FF;">
+                <td style="padding:8px 12px;">常用 CSP（Delta −0.20 ～ −0.30）</td>
+                <td style="padding:8px 12px;text-align:right;color:var(--blue);font-weight:700;">−0.25</td>
+                <td style="padding:8px 12px;text-align:right;font-weight:700;color:var(--blue);">250 股</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);background:var(--gold-bg);">
+                <td style="padding:8px 12px;">接近 ATM</td>
+                <td style="padding:8px 12px;text-align:right;color:var(--gold);font-weight:800;">−0.50</td>
+                <td style="padding:8px 12px;text-align:right;font-weight:800;color:var(--gold);">500 股</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 12px;">深度 ITM</td>
+                <td style="padding:8px 12px;text-align:right;color:var(--red);">−0.85</td>
+                <td style="padding:8px 12px;text-align:right;font-weight:700;">850 股</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="font-size:12.5px;font-weight:800;color:var(--muted);margin-bottom:8px;">💡 兩個重要推論</div>
+        <div class="bullets">
+          <div class="bullet">
+            <div class="bullet-num">1</div>
+            <span><strong>你的 Delta 越接近 ATM（−0.50），造市商對沖成本越高</strong>——它要持有更多股票、調整越頻繁。這也是 ATM 附近 Bid-Ask Spread（價差）往往比遠 OTM 稍寬的原因之一。選 Delta −0.20 ～ −0.30 的 CSP，除了勝率較高，進出的 Spread 也更窄，成本更低。</span>
+          </div>
+          <div class="bullet">
+            <div class="bullet-num">2</div>
+            <span><strong>當你的 CSP 從 OTM 跌進 ITM（股價下跌），Delta 從 −0.20 變成 −0.80</strong>——造市商必須不斷加買股票補足對沖（例如從 200 股追到 800 股）。這些追買動作對股價會產生微小的支撐效果，也是為什麼 ATM 附近期權到期日前股價常有「磁吸」現象。</span>
+          </div>
+        </div>
+      </div>
+
+    <div class="warning" style="margin-top:14px;">
+      <span>💡</span>
+      <span>造市商每一步對沖都是即時的——當你點下「賣出」的瞬間，它已在另一個市場完成對沖。這叫做<strong>動態 Delta 對沖（Dynamic Delta Hedging）</strong>，是現代造市商的核心技術。</span>
+    </div>
+  </div>
+
+  <!-- Section 9: 沒有造市商會怎樣 -->
+  <div data-drag-id="l5-mm-nomm" class="bonus-panel" id="l5-mm-nomm" style="margin-top:16px;">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge" style="background:var(--red);">9</div>
+        <div class="pill-outline assign">NO MARKET MAKER</div>
+      </div>
+      <div class="pill assign">沒有造市商會怎樣？ ⚠️</div>
+    </div>
+
+    <div class="ptitle" style="margin-top:14px;">如果造市商消失，期權市場會立刻癱瘓</div>
+    <div style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.65;">
+      期權市場的流動性幾乎完全依賴造市商。沒有它們，以下情況會立即發生：
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">
+      <!-- 問題 1 -->
+      <div style="background:var(--red-bg);border:1.5px solid var(--red-bdr);border-radius:var(--r-md);padding:14px;">
+        <div style="font-size:20px;margin-bottom:6px;">📉</div>
+        <div style="font-size:13px;font-weight:800;color:var(--red);margin-bottom:6px;">Bid-Ask Spread（買賣價差）暴漲</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;">現在 NOK Put 的 Spread（價差）約 $0.01–$0.05；無造市商時可能超過 <strong>$0.50</strong>，進出成本暴增 10 倍以上</div>
+      </div>
+      <!-- 問題 2 -->
+      <div style="background:var(--red-bg);border:1.5px solid var(--red-bdr);border-radius:var(--r-md);padding:14px;">
+        <div style="font-size:20px;margin-bottom:6px;">🚫</div>
+        <div style="font-size:13px;font-weight:800;color:var(--red);margin-bottom:6px;">流動性差的期權根本無法成交</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;">只有當另一位散戶剛好想做反向交易，你的訂單才能成交——低流動性期權可能掛幾天都等不到對手方</div>
+      </div>
+      <!-- 問題 3 -->
+      <div style="background:var(--red-bg);border:1.5px solid var(--red-bdr);border-radius:var(--r-md);padding:14px;">
+        <div style="font-size:20px;margin-bottom:6px;">🔄</div>
+        <div style="font-size:13px;font-weight:800;color:var(--red);margin-bottom:6px;">滾倉訂單無法即時執行</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;">Roll 需要同時成交買回舊倉 + 開立新倉。沒有造市商，兩筆訂單都可能找不到對手方，滾倉策略完全失效</div>
+      </div>
+      <!-- 問題 4 -->
+      <div style="background:var(--red-bg);border:1.5px solid var(--red-bdr);border-radius:var(--r-md);padding:14px;">
+        <div style="font-size:20px;margin-bottom:6px;">⏱️</div>
+        <div style="font-size:13px;font-weight:800;color:var(--red);margin-bottom:6px;">只有掌握完美時機的人能交易</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;">你賣 Put 需要剛好有人想買 Put；你想平倉需要剛好有人想賣 Put——散戶幾乎不可能配對成功</div>
+      </div>
+    </div>
+
+    <!-- 總結 -->
+    <div style="margin-top:18px;background:var(--gold-bg);border:2px solid var(--gold-bdr);border-radius:var(--r-md);padding:16px 18px;text-align:center;">
+      <div style="font-size:12px;font-weight:800;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">📌 三者關係總結</div>
+      <div style="font-size:14px;color:var(--ink);line-height:1.8;">
+        造市商以<strong>「法律契約維持市場流動性」</strong>換取<strong>「Spread（價差）利潤」</strong>，<br>
+        並透過<strong> Delta 對沖</strong>把方向風險歸零，<br>
+        讓你每次開倉、滾倉都能<strong>即時成交</strong>。
+      </div>
+    </div>
+  </div>
+
+
+</div>
+
+<!-- ══ EDIT MODE ═══════════════════════════════════════════════════ -->
+<button id="edit-btn" onclick="toggleEditMode()" title="Ctrl+E">
+  <span id="edit-icon">✏️</span>
+  <span id="edit-label">編輯模式</span>
+</button>
+
+<div id="edit-toolbar">
+  <div class="et-hint" id="et-hint">← 點擊頁面任意文字開始編輯</div>
+  <div class="et-group" id="et-controls" style="display:none;">
+    <div class="et-item">
+      <div class="et-label">字體</div>
+      <select id="et-font" onchange="applyStyle('fontFamily', this.value)">
+        <option value='"PingFang TC","Microsoft JhengHei",sans-serif'>PingFang TC</option>
+        <option value='Georgia,"Times New Roman",serif'>Georgia (serif)</option>
+        <option value='system-ui,sans-serif'>System UI</option>
+        <option value='"Courier New",monospace'>等寬字體</option>
+      </select>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">大小</div>
+      <div class="et-size-ctrl">
+        <button class="et-btn-sm" onclick="adjustSize(-1)">−</button>
+        <span id="et-size-val">16</span>
+        <button class="et-btn-sm" onclick="adjustSize(1)">+</button>
+      </div>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button id="et-bold"   class="et-fmt-btn" onclick="toggleBold()"><b>B</b></button>
+      <button id="et-italic" class="et-fmt-btn" onclick="toggleItalic()"><i>I</i></button>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">顏色</div>
+      <input type="color" id="et-color" oninput="applyStyle('color', this.value)" title="文字顏色">
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">行距</div>
+      <input type="range" id="et-lh" min="1" max="3" step="0.05" value="1.4"
+             oninput="applyStyle('lineHeight', this.value); document.getElementById('et-lh-val').textContent = parseFloat(this.value).toFixed(1);">
+      <span id="et-lh-val" style="font-size:11px;min-width:22px;">1.4</span>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button class="et-action-btn" onclick="resetElement()" title="重設此元素樣式">重設</button>
+      <button class="et-action-btn" id="et-copy-btn" onclick="copyHtml()" title="複製 HTML">複製</button>
+    </div>
+  </div>
+</div>
+
+<style>
+#edit-btn {
+  position: fixed; bottom: 28px; right: 28px; z-index: 2000;
+  background: #2A1A0E; color: #FFF9F0; border: none; border-radius: 100px;
+  padding: 10px 20px; font-size: 14px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  font-family: "PingFang TC","Microsoft JhengHei",sans-serif;
+  transition: background 0.15s, transform 0.1s;
+}
+#edit-btn:hover { background: #4A3020; transform: scale(1.03); }
+#edit-btn.active { background: #2E7040; }
+
+#edit-toolbar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #FFFCF7; border-top: 2px solid #E2D4C2;
+  padding: 10px 24px 12px; z-index: 1999;
+  display: flex; align-items: center; gap: 0;
+  box-shadow: 0 -4px 24px rgba(80,40,0,0.10);
+  transform: translateY(100%); transition: transform 0.22s cubic-bezier(.4,0,.2,1);
+  font-family: "PingFang TC","Microsoft JhengHei",sans-serif;
+  flex-wrap: wrap; min-height: 56px;
+}
+#edit-toolbar.visible { transform: translateY(0); }
+
+.et-hint { font-size: 13px; color: #A08878; padding: 6px 0; font-style: italic; }
+.et-group { display: flex; align-items: center; gap: 0; flex-wrap: wrap; width: 100%; }
+.et-item  { display: flex; flex-direction: column; gap: 3px; padding: 0 14px; }
+.et-label { font-size: 10px; font-weight: 600; color: #9A8878; letter-spacing: 0.5px; text-transform: uppercase; }
+.et-divider { width: 1px; height: 36px; background: #E2D4C2; flex-shrink: 0; }
+#et-font {
+  font-size: 13px; border: 1.5px solid #E2D4C2; border-radius: 6px;
+  padding: 4px 8px; background: white; color: #2A1A0E; cursor: pointer; font-family: inherit;
+}
+.et-size-ctrl { display: flex; align-items: center; gap: 6px; }
+.et-btn-sm {
+  width: 24px; height: 24px; border: 1.5px solid #E2D4C2; border-radius: 6px;
+  background: white; font-size: 14px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #2A1A0E; line-height: 1;
+}
+.et-btn-sm:hover { background: #F5EFE6; }
+#et-size-val { font-size: 14px; font-weight: 700; min-width: 28px; text-align: center; color: #2A1A0E; }
+.et-fmt-btn {
+  width: 30px; height: 30px; border: 1.5px solid #E2D4C2; border-radius: 6px;
+  background: white; font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: #2A1A0E;
+}
+.et-fmt-btn:hover { background: #F5EFE6; }
+.et-fmt-btn.on { background: #2A1A0E; color: white; border-color: #2A1A0E; }
+#et-color { width: 36px; height: 28px; border: 1.5px solid #E2D4C2; border-radius: 6px; padding: 2px; cursor: pointer; background: white; }
+#et-lh { width: 80px; accent-color: #D4900A; }
+.et-action-btn {
+  font-size: 12px; font-weight: 600; padding: 5px 12px;
+  border: 1.5px solid #E2D4C2; border-radius: 6px; background: white;
+  cursor: pointer; color: #2A1A0E; font-family: inherit;
+}
+.et-action-btn:hover { background: #F5EFE6; }
+
+.edit-mode .page * { cursor: text; }
+.edit-mode .page [contenteditable]:hover,
+.edit-mode .page *:hover { outline: 1.5px dashed #E8B840; outline-offset: 2px; border-radius: 3px; }
+.el-focus { outline: 2px solid #3A70C0 !important; outline-offset: 3px; border-radius: 3px; }
+.edit-mode .page .el-focus * { outline: none !important; }
+</style>
+
+<script>
+(function() {
+  let editMode = false, focused = null;
+  let originalStyles = new WeakMap();
+
+  window.toggleEditMode = function() {
+    editMode = !editMode;
+    document.body.classList.toggle('edit-mode', editMode);
+    document.getElementById('edit-btn').classList.toggle('active', editMode);
+    document.getElementById('edit-label').textContent = editMode ? '退出編輯' : '編輯模式';
+    document.getElementById('edit-icon').textContent  = editMode ? '✕' : '✏️';
+    const tb = document.getElementById('edit-toolbar');
+    tb.classList.toggle('visible', editMode);
+    if (!editMode) {
+      blurCurrent();
+      document.getElementById('et-hint').style.display = '';
+      document.getElementById('et-controls').style.display = 'none';
+    }
+  };
+
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); window.toggleEditMode(); }
+    if (e.key === 'Escape' && editMode) blurCurrent();
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!editMode) return;
+    const btn = document.getElementById('edit-btn');
+    const tb  = document.getElementById('edit-toolbar');
+    if (btn.contains(e.target) || tb.contains(e.target)) return;
+    blurCurrent();
+
+    let el = e.target;
+    while (el && el !== document.body) {
+      const tag = el.tagName.toLowerCase();
+      if (['div','p','span','h1','h2','h3','h4','label','td','th','li','small'].includes(tag)) break;
+      el = el.parentElement;
+    }
+    if (!el || el === document.body) return;
+
+    focused = el;
+    if (!originalStyles.has(el)) originalStyles.set(el, el.getAttribute('style') || '');
+    el.contentEditable = 'true';
+    el.classList.add('el-focus');
+    el.focus();
+    updateToolbar(el);
+    document.getElementById('et-hint').style.display = 'none';
+    document.getElementById('et-controls').style.display = 'flex';
+  });
+
+  function blurCurrent() {
+    if (focused) { focused.contentEditable = 'false'; focused.classList.remove('el-focus'); focused = null; }
+  }
+
+  function updateToolbar(el) {
+    const cs = window.getComputedStyle(el);
+    const ff = (el.style.fontFamily || cs.fontFamily || '').replace(/"/g,'');
+    const sel = document.getElementById('et-font');
+    let matched = false;
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value.replace(/"/g,'').split(',')[0].trim() === ff.split(',')[0].trim()) { sel.selectedIndex = i; matched = true; break; }
+    }
+    if (!matched) sel.selectedIndex = 0;
+
+    const fs = parseFloat(cs.fontSize) || 14;
+    document.getElementById('et-size-val').textContent = Math.round(fs);
+    document.getElementById('et-bold').classList.toggle('on', parseInt(cs.fontWeight) >= 600);
+    document.getElementById('et-italic').classList.toggle('on', cs.fontStyle === 'italic');
+    document.getElementById('et-color').value = rgbToHex(cs.color);
+    const lhRaw = cs.lineHeight;
+    const lhNum = lhRaw === 'normal' ? 1.4 : parseFloat(lhRaw) / fs;
+    const lhSlider = document.getElementById('et-lh');
+    lhSlider.value = isNaN(lhNum) ? 1.4 : Math.min(3, Math.max(1, lhNum));
+    document.getElementById('et-lh-val').textContent = parseFloat(lhSlider.value).toFixed(1);
+  }
+
+  window.applyStyle   = function(p, v) { if (focused) focused.style[p] = v; };
+  window.adjustSize   = function(d) {
+    if (!focused) return;
+    const next = Math.max(8, Math.min(72, Math.round(parseFloat(window.getComputedStyle(focused).fontSize) || 14) + d));
+    focused.style.fontSize = next + 'px';
+    document.getElementById('et-size-val').textContent = next;
+  };
+  window.toggleBold   = function() {
+    if (!focused) return;
+    const isBold = parseInt(window.getComputedStyle(focused).fontWeight) >= 600;
+    focused.style.fontWeight = isBold ? '400' : '800';
+    document.getElementById('et-bold').classList.toggle('on', !isBold);
+  };
+  window.toggleItalic = function() {
+    if (!focused) return;
+    const isItalic = window.getComputedStyle(focused).fontStyle === 'italic';
+    focused.style.fontStyle = isItalic ? 'normal' : 'italic';
+    document.getElementById('et-italic').classList.toggle('on', !isItalic);
+  };
+  window.resetElement = function() {
+    if (!focused) return; focused.style.cssText = originalStyles.get(focused) || ''; updateToolbar(focused);
+  };
+  window.copyHtml = function() {
+    navigator.clipboard.writeText(document.querySelector('.page').outerHTML).then(function() {
+      const btn = document.getElementById('et-copy-btn');
+      btn.textContent = '已複製 ✓';
+      setTimeout(function() { btn.textContent = '複製'; }, 2000);
+    });
+  };
+
+  function rgbToHex(rgb) {
+    const m = rgb.match(/\d+/g);
+    if (!m || m.length < 3) return '#000000';
+    return '#' + [m[0],m[1],m[2]].map(function(x) { return ('0' + parseInt(x).toString(16)).slice(-2); }).join('');
+  }
+})();
+</script>
+
+
+<!-- ═══════════════════ TTS JS ═══════════════════ -->
+<script>
+(function () {
+  var _fontZoom = parseFloat(localStorage.getItem('l5-font-zoom') || '1');
+  var _fontBaseMap = new WeakMap();
+  function applyFontZoom() {
+    document.querySelectorAll('.page .panel *, .page .bonus-panel *').forEach(function (el) {
+      if (!_fontBaseMap.has(el)) {
+        _fontBaseMap.set(el, parseFloat(window.getComputedStyle(el).fontSize) || 14);
+      }
+      el.style.fontSize = (_fontBaseMap.get(el) * _fontZoom) + 'px';
+    });
+  }
+  window.adjustPageFont = function (delta) {
+    _fontZoom = Math.max(0.7, Math.min(2.0, parseFloat((_fontZoom + delta * 0.1).toFixed(2))));
+    applyFontZoom();
+    localStorage.setItem('l5-font-zoom', _fontZoom);
+  };
+  window.addEventListener('load', function () { if (_fontZoom !== 1) applyFontZoom(); });
+
+  var SCRIPT = [
+    {
+      id: null, label: '開場白',
+      text: '歡迎來到期權小學堂第五課：造市商與滾倉的關係。這一課我們要揭開市場背後的神秘面紗——你每次賣 Put，對面到底是誰在承接？以及當股價跌近履約價，滾倉這個工具怎麼用、何時該用。'
+    },
+    {
+      id: 'l5-panel-mm', label: '造市商是誰',
+      text: '造市商是中間人，它不賭方向，只賺 Bid-Ask Spread。當你賣出一張 Put，承接的是造市商，不是某個賭方向的散戶。造市商同時掛出買價和賣價，讓市場隨時有流動性。真正跟你方向對賭的，是透過造市商撮合的其他散戶或機構——它們買 Put 是為了對沖或看空。知名造市商有 Citadel、SIG、Virtu、Jane Street、Optiver，每天用演算法執行數百萬筆交易，薄利多銷。'
+    },
+    {
+      id: 'l5-panel-delta', label: 'Delta 對沖機制',
+      text: 'Delta 對沖：造市商如何把方向性風險歸零。以 SQQQ 為例，你賣出 Put，Delta 是負零點三；造市商買入這張 Put 後，立刻買入三十股 SQQQ 來對沖，讓自己的 Delta 趨近於零。SQQQ 是三倍反向 ETF，每日自動 Rebalance，Gamma 更高，造市商的對沖調整頻率遠高於一般股票，全部由演算法毫秒級執行。造市商真正的風險不是方向，而是跳空風險、到期日附近的 Gamma Risk，以及極端行情下的流動性枯竭。'
+    },
+    {
+      id: 'l5-panel-roll', label: '滾倉三種操作',
+      text: '滾倉三種操作。核心公式：Roll Net 等於新合約收取的 Premium 減去買回舊倉的成本。大於零叫 Roll for Credit，最理想；等於零叫 Roll for Even；小於零叫 Roll for Debit，要謹慎評估。三種類型：Roll Out 只延長到期日，履約價不變，最常用；Roll Down 只降低履約價，到期日不變，用於股價跌近履約價時；Roll Out 加 Down 同時延長到期並降低履約價，用於跌幅較大時。本次 SQQQ 執行 Roll Out，從五月十五日延到九月十八日，收到一千九百零四美元 Credit。'
+    },
+    {
+      id: 'l5-panel-timing', label: '何時該滾倉',
+      text: '何時該滾倉？四個觸發條件。第一，DTE 小於等於二十一天，Theta 加速衰減的轉折點。第二，已獲利大於等於百分之五十，提前 Roll 可釋放保證金、立刻開新倉。第三，Delta 絕對值超過零點五，被行權風險升高。第四，IV 上升時，新合約 Premium 更豐厚，Roll for Credit 更容易成立。反之，若已是深度 ITM 且 Roll for Debit 金額很大，或標的基本面惡化，就不建議繼續滾倉了。'
+    },
+    {
+      id: 'l5-bonus', label: '真實案例與五大啟示',
+      text: '最後是真實案例和五大實務啟示。SQQQ CSP 這次操作：四月十六到二十日分批開倉，共收兩千一百七十九元 Premium；五月一日 SQQQ 跌到約五十元，深度 ITM，執行 Roll Out 到九月十八日，再收一千九百零四元 Credit，累積 Premium 達四千零八十四元。五大啟示：一，選流動性好的標的，Spread 窄；二，盡量選三十到四十五天到期，流動性最佳；三，避免遠天期開倉，Spread 太寬；四，可掛一分錢平倉單，等 Theta 歸零後釋放保證金再開新倉；五，每次滾倉都要 for Credit，讓累積 Premium 持續增加，成本基礎持續下降。'
+    },
+    {
+      id: 'l5-mm-contract', label: '造市商與交易所合約',
+      text: '造市商並非想進場就能進場——它必須與交易所簽訂造市商協議。合約給予造市商四項特權：零手續費，讓高頻操作成本極低；優先撮合，相同報價下造市商訂單比散戶先成交；股票出借，可向交易所借入股票執行 Delta 對沖；以及自有訂單流，可預見部分散戶訂單動向。但特權的代價是三項義務：必須同時掛出買價和賣價持續雙邊報價；買賣價差不能超過交易所規定上限；以及不可在極端行情下單方面撤出市場。正是這份合約，讓你每次賣 Put 或執行滾倉時，對面永遠都有人接。'
+    },
+    {
+      id: 'l5-mm-spread', label: '商業模式：靠 Spread 賺錢',
+      text: '造市商的商業模式非常簡單：每筆交易只賺那一點點 Spread，也就是買賣價差。以 NOK Put 為例，Bid 兩元、Ask 兩點零五元：你賣出，造市商以兩元買入；下一個買家以兩點零五元成交，造市商賺零點零五元，乘以一百股等於五元。單筆利潤微薄，但大型造市商每天執行數百萬筆，年度利潤極為可觀。關鍵是造市商的收入與股價方向完全無關，它只需要市場有足夠的成交量。'
+    },
+    {
+      id: 'l5-mm-hedge', label: 'Delta 對沖：無風險收 Spread',
+      text: 'Delta 對沖讓造市商把方向性風險歸零。以 NOK 滾倉為例，你賣出十口 NOK 十四美元 Put，Delta 負零點三；造市商買入後立刻持有負三千 Delta 的風險敞口。演算法毫秒內同時買入三百股 NOK 股票，每股 Delta 加一，合計正三百 Delta，和 Put 的負三百精確對沖，Net Delta 歸零。此後無論 NOK 漲跌，股票和 Put 的損益互相抵消，造市商只保留 Spread 利潤。這就是動態 Delta 對沖，是現代造市商的核心技術。'
+    },
+    {
+      id: 'l5-mm-nomm', label: '沒有造市商會怎樣',
+      text: '最後來想像一個沒有造市商的期權市場。首先，Bid-Ask Spread 會暴漲，NOK Put 現在買賣價差只有一到五分，沒有造市商時可能超過五毛，進出成本暴增十倍。其次，流動性差的期權根本無法成交，你的訂單需要等另一位散戶剛好想做反向交易，可能掛幾天都等不到。第三，滾倉訂單無法即時執行，Roll 需要同時成交兩筆，沒有造市商兩筆都可能失敗。第四，只有掌握完美時機的人才能交易，散戶幾乎不可能配對成功。總結：造市商以法律契約維持市場流動性換取 Spread 利潤，並透過 Delta 對沖把方向風險歸零，讓你每次開倉、滾倉都能即時成交。'
+    }
+  ];
+
+  var ttsIdx = 0, ttsPlaying = false, ttsPaused = false, ttsRate = 0.9;
+  var activePanelId = null;
+
+  function initDots() {
+    var c = document.getElementById('tts-dots');
+    c.innerHTML = '';
+    SCRIPT.forEach(function (s, i) {
+      var d = document.createElement('div');
+      d.className = 'tts-dot'; d.id = 'tts-dot-' + i; d.title = s.label;
+      d.onclick = function () { ttsJumpTo(i); };
+      c.appendChild(d);
+    });
+  }
+
+  function updateDots() {
+    SCRIPT.forEach(function (_, i) {
+      var d = document.getElementById('tts-dot-' + i);
+      if (!d) return;
+      d.className = 'tts-dot' + (i < ttsIdx ? ' done' : i === ttsIdx ? ' current' : '');
+    });
+  }
+
+  function setActivePanel(id) {
+    if (activePanelId) {
+      var prev = document.getElementById(activePanelId);
+      if (prev) prev.classList.remove('tts-active');
+    }
+    activePanelId = id;
+    if (id) {
+      var el = document.getElementById(id);
+      if (el) { el.classList.add('tts-active'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+    }
+  }
+
+  function updateUI() {
+    var btn = document.getElementById('tts-play-btn');
+    var sec = document.getElementById('tts-section-name');
+    if (ttsPlaying && !ttsPaused) {
+      btn.textContent = '⏸ 暫停'; btn.className = 'tts-btn playing';
+    } else if (ttsPaused) {
+      btn.textContent = '▶ 繼續'; btn.className = 'tts-btn';
+    } else if (ttsIdx >= SCRIPT.length) {
+      btn.textContent = '↺ 重新朗讀'; btn.className = 'tts-btn';
+    } else {
+      btn.textContent = ttsIdx === 0 ? '▶ 朗讀全文' : '▶ 繼續朗讀'; btn.className = 'tts-btn';
+    }
+    sec.textContent = ttsIdx < SCRIPT.length ? '▸ ' + SCRIPT[ttsIdx].label : '✓ 朗讀完畢';
+    setActivePanel(ttsIdx < SCRIPT.length ? SCRIPT[ttsIdx].id : null);
+    updateDots();
+  }
+
+  function showSubtitle(text) {
+    var el = document.getElementById('tts-subtitle');
+    if (!el) return;
+    el.innerHTML = text.split('').map(function (c, i) {
+      var s = c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '&' ? '&amp;' : c;
+      return '<span class="sub-c" id="sc-' + i + '">' + s + '</span>';
+    }).join('');
+    el.scrollTop = 0; el.classList.add('active');
+  }
+
+  function clearSubtitle() {
+    var el = document.getElementById('tts-subtitle');
+    if (el) { el.innerHTML = ''; el.classList.remove('active'); }
+  }
+
+  function speakSection() {
+    if (!ttsPlaying) return;
+    if (ttsIdx >= SCRIPT.length) { ttsPlaying = false; ttsIdx = 0; updateUI(); return; }
+    updateUI();
+    var item = SCRIPT[ttsIdx];
+    var utt = new SpeechSynthesisUtterance(item.text);
+    utt.lang = 'zh-TW'; utt.rate = ttsRate; utt.pitch = 1.0;
+    showSubtitle(item.text);
+    utt.onboundary = function (e) {
+      var chars = document.querySelectorAll('#tts-subtitle .sub-c');
+      var len = e.charLength || 1;
+      chars.forEach(function (c, i) {
+        c.className = 'sub-c' + (i < e.charIndex ? ' done' : i < e.charIndex + len ? ' now' : '');
+      });
+      var cur = document.getElementById('sc-' + e.charIndex);
+      if (cur) cur.scrollIntoView({ block: 'nearest' });
+    };
+    utt.onend = function () { if (!ttsPlaying) return; ttsIdx++; setTimeout(speakSection, 350); };
+    utt.onerror = function (e) { if (e.error === 'interrupted') return; if (!ttsPlaying) return; ttsIdx++; speakSection(); };
+    setTimeout(function () { speechSynthesis.speak(utt); }, 50);
+  }
+
+  window.ttsToggle = function () {
+    if (speechSynthesis.speaking && !speechSynthesis.paused) {
+      speechSynthesis.pause(); ttsPlaying = false; ttsPaused = true; updateUI();
+    } else if (speechSynthesis.paused) {
+      speechSynthesis.resume(); ttsPlaying = true; ttsPaused = false; updateUI();
+    } else {
+      if (ttsIdx >= SCRIPT.length) ttsIdx = 0;
+      ttsPlaying = true; ttsPaused = false; speakSection();
+    }
+  };
+
+  window.ttsStop = function () {
+    speechSynthesis.cancel(); clearSubtitle();
+    ttsPlaying = false; ttsPaused = false; ttsIdx = 0;
+    setActivePanel(null);
+    document.getElementById('tts-section-name').textContent = '點擊「朗讀全文」開始';
+    updateDots();
+    document.getElementById('tts-play-btn').textContent = '▶ 朗讀全文';
+    document.getElementById('tts-play-btn').className = 'tts-btn';
+  };
+
+  window.ttsJumpTo = function (i) { speechSynthesis.cancel(); ttsIdx = i; ttsPlaying = true; ttsPaused = false; setTimeout(speakSection, 80); };
+  window.ttsSetRate = function (v) { ttsRate = parseFloat(v); };
+
+  initDots();
+  // ── Driver.js: Dynamic Delta Hedging 導覽 ──────────────────────────────
+  window.startDeltaHedgeTour = function () {
+    var driverObj = window.driver.js.driver({
+      showProgress: true,
+      nextBtnText: '下一步 →',
+      prevBtnText: '← 上一步',
+      doneBtnText: '完成 ✓',
+      steps: [
+        {
+          element: '#dh-step1',
+          popover: {
+            title: '① 你賣出 Put，Market Maker（造市商）接單',
+            description: '你賣出 10口 NOK $14 Put，每口 Delta = −0.30。<br><br>造市商以 <strong>Bid 價</strong>買入，立刻持有：<br>10口 × 100股 × 0.30 = <strong style="color:#D04040;">−300 Delta</strong> 的曝險。<br><br>Delta 為負代表：股價每跌 $1，Market Maker（造市商）持有的 Put 組合就<strong>獲利 $300</strong>，這是方向性風險。',
+            side: 'bottom', align: 'start'
+          }
+        },
+        {
+          element: '#dh-step2',
+          popover: {
+            title: '② 毫秒內：買入 300 股對沖',
+            description: '演算法立刻在股票市場買入 <strong>300 股</strong> NOK。<br><br>每股股票 Delta = +1.0，所以：<br>300股 × 1.0 = <strong style="color:#2E9E52;">+300 Delta</strong><br><br>為什麼是 300 股？因為 Put 的曝險只有 300 Delta，買 300 股剛好對沖，<strong>不多也不少</strong>。',
+            side: 'bottom', align: 'start'
+          }
+        },
+        {
+          element: '#dh-step3',
+          popover: {
+            title: '③ Net Delta ≈ 0，方向風險歸零',
+            description: '−300（Put）＋ +300（股票）= <strong>0</strong><br><br>此後無論 NOK 漲跌：<br>• NOK 漲 → 股票賺 / Put 跌 → 淨損益 ≈ 0<br>• NOK 跌 → 股票虧 / Put 漲 → 淨損益 ≈ 0<br><br>造市商<strong>不賭方向</strong>，兩種情況都不虧。',
+            side: 'top', align: 'start'
+          }
+        },
+        {
+          element: '#dh-spread',
+          popover: {
+            title: '④ 最終保留：Spread（價差）利潤',
+            description: '對沖消除方向風險後，造市商唯一保留的就是 <strong>Spread（價差）</strong>：<br><br>Ask − Bid = $0.31 − $0.30 = <strong style="color:#D4900A;">$0.01 × 10口 × 100 = $10 淨利</strong><br><br>這筆利潤與 NOK 漲跌<strong>完全無關</strong>，每次成交都穩賺。',
+            side: 'top', align: 'start'
+          }
+        },
+        {
+          element: '#dh-why300-title',
+          popover: {
+            title: '⑤ 為什麼不買 1,000 股？',
+            description: '1,000 股 = 10口 × 100股，是合約的全部標的股數。<br><br>但 Put 的 Delta 只有 −0.30，意思是它<strong>只等效做空了 300 股</strong>，而不是 1,000 股。<br><br>如果買 1,000 股對沖：<br>NOK 跌 $1 → Put 賺 $300，股票虧 $1,000 → <strong style="color:#D04040;">淨虧 $700</strong><br><br>買太多股票反而製造相反方向的風險！',
+            side: 'top', align: 'start'
+          }
+        },
+        {
+          element: '#dh-delta-meaning',
+          popover: {
+            title: '⑥ Delta = 等效股票數量',
+            description: 'Delta −0.30 的直覺解釋：<br><br><em>「這張 Put 的行為，等同於做空了 30 股股票」</em><br><br>所以 10口 × 30股等效 = <strong>300 股等效曝險</strong>。<br><br>對沖就是把這 300 股等效曝險，用買入 300 股真實股票來抵銷。',
+            side: 'left', align: 'start'
+          }
+        },
+        {
+          element: '#dh-dynamic-title',
+          popover: {
+            title: '⑦ Delta 是動態的',
+            description: 'Delta 不是固定的——股價移動，Delta 就跟著變。<br><br>• OTM（$15）→ Delta −0.20 → 需持 <strong>200 股</strong><br>• ATM（$14）→ Delta −0.50 → 需持 <strong>500 股</strong><br>• ITM（$12）→ Delta −0.85 → 需持 <strong>850 股</strong><br><br>造市商的演算法每秒都在計算，隨時增減持股，這就是「<strong>動態</strong> Delta 對沖」的意思。',
+            side: 'top', align: 'start'
+          }
+        }
+      ]
+    });
+    document.getElementById('l5-mm-hedge').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(function () { driverObj.drive(); }, 400);
+  };
+
+
+}());
+</script>
+
+<button id="layout-reset-btn" onclick="resetLayout()" title="重設版面">&#x21BA; 重設版面</button>
+<script>
+/* Drag & Resize System */
+(function() {
+  var LAYOUT_KEY = 'l5-layout-v1';
+  var canvas = null, dragging = null, resizing = null;
+  var dragOX = 0, dragOY = 0, rzS = {};
+
+  function getSaved() { try { return JSON.parse(localStorage.getItem(LAYOUT_KEY)||'null'); } catch(e){ return null; } }
+  function putSaved(s) { try { localStorage.setItem(LAYOUT_KEY,JSON.stringify(s)); } catch(e){} }
+  function saveItem(id,x,y,w,h) {
+    var s=getSaved()||{}; s[id]={x:Math.round(x),y:Math.round(y),w:Math.round(w),h:h?Math.round(h):null}; putSaved(s);
+  }
+  function applyPos(el,x,y,w,h) {
+    el.style.position='absolute'; el.style.left=x+'px'; el.style.top=y+'px'; el.style.width=w+'px';
+    if(h) el.style.minHeight=h+'px';
+  }
+  function addHandles(el) {
+    var dh=document.createElement('div'); dh.className='drag-handle'; el.insertBefore(dh,el.firstChild);
+    dh.addEventListener('mousedown',function(e){
+      if(!document.body.classList.contains('edit-mode')) return;
+      e.preventDefault(); e.stopPropagation();
+      dragging=el; var r=el.getBoundingClientRect();
+      dragOX=e.clientX-r.left; dragOY=e.clientY-r.top;
+      el.classList.add('is-dragging'); el.style.zIndex='1000';
+    });
+    ['nw','n','ne','e','se','s','sw','w'].forEach(function(dir){
+      var rh=document.createElement('div'); rh.className='rh rh-'+dir; el.appendChild(rh);
+      rh.addEventListener('mousedown',function(e){
+        if(!document.body.classList.contains('edit-mode')) return;
+        e.preventDefault(); e.stopPropagation();
+        resizing={el:el,dir:dir};
+        rzS={mx:e.clientX,my:e.clientY,w:el.offsetWidth,h:el.offsetHeight,l:parseFloat(el.style.left)||0,t:parseFloat(el.style.top)||0};
+        el.classList.add('is-resizing'); el.style.zIndex='1000';
+      });
+    });
+  }
+  document.addEventListener('mousemove',function(e){
+    if(dragging){
+      var cr=canvas.getBoundingClientRect();
+      var x=Math.max(0,e.clientX-cr.left-dragOX), y=Math.max(0,e.clientY-cr.top-dragOY);
+      dragging.style.left=x+'px'; dragging.style.top=y+'px';
+      var bot=y+dragging.offsetHeight, curMin=parseInt(canvas.style.minHeight)||3000;
+      if(bot+100>curMin) canvas.style.minHeight=(bot+300)+'px';
+    }
+    if(resizing){
+      var el=resizing.el, dir=resizing.dir;
+      var dx=e.clientX-rzS.mx, dy=e.clientY-rzS.my;
+      var w=rzS.w, h=rzS.h, l=rzS.l, t=rzS.t;
+      if(dir.indexOf('e')>=0) w=Math.max(180,rzS.w+dx);
+      if(dir.indexOf('w')>=0){ w=Math.max(180,rzS.w-dx); l=rzS.l+(rzS.w-w); }
+      if(dir.indexOf('s')>=0) h=Math.max(80,rzS.h+dy);
+      if(dir.indexOf('n')>=0){ h=Math.max(80,rzS.h-dy); t=rzS.t+(rzS.h-h); }
+      el.style.width=w+'px'; el.style.minHeight=h+'px'; el.style.left=l+'px'; el.style.top=t+'px';
+    }
+  });
+  document.addEventListener('mouseup',function(){
+    if(dragging){
+      dragging.classList.remove('is-dragging'); dragging.style.zIndex='';
+      saveItem(dragging.dataset.dragId,parseFloat(dragging.style.left)||0,parseFloat(dragging.style.top)||0,dragging.offsetWidth,null);
+      dragging=null;
+    }
+    if(resizing){
+      var el=resizing.el; el.classList.remove('is-resizing'); el.style.zIndex='';
+      saveItem(el.dataset.dragId,parseFloat(el.style.left)||0,parseFloat(el.style.top)||0,el.offsetWidth,el.offsetHeight);
+      resizing=null;
+    }
+  });
+  window.resetLayout = function(){ localStorage.removeItem(LAYOUT_KEY); location.reload(); };
+
+  function moveToCanvas(el){ if(el.parentElement!==canvas) canvas.appendChild(el); }
+
+  function initLayout(){
+    canvas=document.getElementById('drag-canvas'); if(!canvas) return;
+    var saved=getSaved();
+    var items=Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    items.forEach(function(el){ addHandles(el); });
+    if(saved){
+      items.forEach(function(el){
+        var s=saved[el.dataset.dragId]; moveToCanvas(el);
+        if(s) applyPos(el,s.x,s.y,s.w,s.h);
+      });
+      var maxB=0;
+      items.forEach(function(el){ var b=(parseFloat(el.style.top)||0)+el.offsetHeight; if(b>maxB) maxB=b; });
+      canvas.style.minHeight=Math.max(3000,maxB+200)+'px';
+    } else {
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){
+          var cr=canvas.getBoundingClientRect(), newSaved={}, maxB=0, captures=[];
+          items.forEach(function(el){
+            var r=el.getBoundingClientRect();
+            captures.push({el:el,x:r.left-cr.left,y:r.top-cr.top,w:r.width,h:r.height});
+          });
+          captures.forEach(function(p){
+            moveToCanvas(p.el); applyPos(p.el,p.x,p.y,p.w,null);
+            newSaved[p.el.dataset.dragId]={x:Math.round(p.x),y:Math.round(p.y),w:Math.round(p.w),h:null};
+            if(p.y+p.h>maxB) maxB=p.y+p.h;
+          });
+          canvas.style.minHeight=Math.max(3000,maxB+200)+'px';
+          putSaved(newSaved);
+        });
+      });
+    }
+  }
+  window.addEventListener('load', initLayout);
+})();
+</script>
+</body>
+</html>

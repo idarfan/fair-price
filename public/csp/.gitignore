@@ -1,0 +1,10 @@
+.claude/
+*.Zone.Identifier
+*:Zone.Identifier
+*.png
+*.bak
+*.jpg
+*.jpeg
+mcp_temp_picture/
+samples/
+!images/*.png

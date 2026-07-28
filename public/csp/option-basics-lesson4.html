@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>期權小學堂第4課 · Roll Position 滾倉</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#FAF3E8;--page-bg:#FFF9F2;--panel-bg:#FFFCF7;
+  --ink:#2A1A0E;--muted:#7A6555;--border:#E2D4C2;
+  --gold:#D4900A;--gold-bg:#FEF4D8;--gold-bdr:#E8B840;
+  --green:#2E9E52;--green-bg:#E8F8EE;--green-bdr:#8ED4A8;
+  --red:#D04040;--red-bg:#FDEAEA;--red-bdr:#F5AAAA;
+  --blue:#3A70C0;--blue-bg:#EBF2FF;--blue-bdr:#9ABCE8;
+  --amber:#C07830;--amber-bg:#FFF3DC;--amber-bdr:#F0C060;
+  --purple:#7C3AED;--purple-bg:#F5F3FF;--purple-bdr:#C4B5FD;
+  --r-lg:16px;--r-md:10px;--r-sm:6px;
+}
+body{background:var(--bg);font-family:"PingFang TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif;padding:0;margin:0;}
+.page{background:var(--page-bg);max-width:100%;width:100%;padding:32px 40px 80px;position:relative;min-height:3000px;}
+.course-tag{display:inline-flex;align-items:center;gap:6px;background:var(--ink);color:#FFF9F0;font-size:12px;font-weight:700;padding:5px 14px;border-radius:100px;letter-spacing:1px;margin-bottom:18px;}
+.page-header{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:start;margin-bottom:28px;}
+.page-title{font-size:32px;font-weight:900;color:var(--ink);line-height:1.2;}
+.page-subtitle{font-size:14px;color:var(--muted);margin-top:4px;font-weight:500;}
+.page-desc{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.7;}
+.concept-box{background:var(--gold-bg);border:2px solid var(--gold-bdr);border-radius:var(--r-lg);padding:14px 18px;min-width:230px;}
+.cb-title{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.cb-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:7px;}
+.cb-badge{width:28px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;margin-top:1px;}
+.cb-row p{font-size:12px;color:var(--ink);line-height:1.5;font-weight:500;}
+.section-divider{display:flex;align-items:center;gap:12px;margin:40px 0 80px;}
+.section-divider-line{flex:1;height:2px;background:var(--border);}
+.section-divider-label{font-size:11px;font-weight:800;letter-spacing:2px;color:var(--muted);text-transform:uppercase;white-space:nowrap;}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:100px;}
+.pill-green{background:var(--green-bg);color:var(--green);border:1.5px solid var(--green-bdr);}
+.pill-blue{background:var(--blue-bg);color:var(--blue);border:1.5px solid var(--blue-bdr);}
+.pill-purple{background:var(--purple-bg);color:var(--purple);border:1.5px solid var(--purple-bdr);}
+.info-card{background:var(--panel-bg);border:2px solid var(--border);border-radius:var(--r-lg);padding:16px 20px;margin-bottom:24px;}
+.info-card h3{font-size:15px;font-weight:800;color:var(--ink);margin-bottom:10px;}
+.info-card p{font-size:13px;color:var(--ink);line-height:1.65;margin-bottom:8px;}
+.info-card p:last-child{margin-bottom:0;}
+.pos-tag{display:inline-flex;align-items:center;gap:8px;background:#f4f6f9;border:1px solid #c8ccd0;border-radius:4px;padding:6px 12px;font-size:12.5px;font-weight:700;color:#1a3a6b;margin-bottom:10px;}
+.pos-stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.pos-stat{background:var(--blue-bg);border:1.5px solid var(--blue-bdr);border-radius:8px;padding:6px 12px;font-size:12px;}
+.pos-stat b{display:block;font-size:10px;color:var(--blue);margin-bottom:2px;}
+.roll-card{background:var(--panel-bg);border:2px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:24px;}
+.roll-card-header{padding:14px 18px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
+.roll-card-name{font-size:18px;font-weight:900;}
+.roll-card-en{font-size:11px;color:var(--muted);font-weight:600;margin-top:2px;}
+.roll-form{padding:12px 14px 4px;}
+.roll-section{margin-bottom:10px;}
+.roll-section-title{font-size:11px;font-weight:800;color:#fff;background:#1a3a6b;padding:3px 10px;border-radius:3px 3px 0 0;display:inline-block;}
+.roll-section-title.new{background:#185c1e;}
+.roll-section-body{border:1px solid #bfc3c8;border-radius:0 4px 4px 4px;}
+.order-row1{background:#f4f6f9;padding:6px 8px;display:flex;flex-wrap:wrap;gap:5px;align-items:flex-end;border-bottom:1px solid #e0e3e7;}
+.ofield{display:flex;flex-direction:column;gap:2px;}
+.olabel{font-size:10px;color:#555;white-space:nowrap;}
+.oinput,.oselect-fake{background:#fff;border:1px solid #bfc3c8;border-radius:3px;padding:3px 5px;font-size:12px;color:#222;font-family:inherit;height:26px;box-sizing:border-box;}
+.oinput:focus{outline:none;border-color:#2771c9;box-shadow:0 0 0 2px rgba(39,113,201,.15);}
+.oselect-fake{display:flex;align-items:center;white-space:nowrap;cursor:default;user-select:none;}
+.oinput[type=number]{width:68px;}
+.oinput.ticker-input{width:60px;text-transform:uppercase;}
+.oinput.date-input{width:96px;}
+.oinput.strike-input{width:72px;}
+.oinput.premium-input{width:72px;}
+.obtn{border:1px solid #bfc3c8;border-radius:3px;padding:3px 9px;font-size:11.5px;font-family:inherit;cursor:pointer;font-weight:600;height:26px;box-sizing:border-box;white-space:nowrap;}
+.obtn-quote{background:#2771c9;color:#fff;border-color:#2771c9;}
+.obtn-clear2{background:#fff;color:#444;border-color:#bfc3c8;}
+.obtn-review2{background:#2771c9;color:#fff;border-color:#2771c9;}
+.quote-table{width:100%;border-collapse:collapse;font-size:11px;}
+.quote-table th{background:#eef0f5;padding:3px 6px;text-align:left;color:#555;font-weight:600;border-bottom:1px solid #dde;white-space:nowrap;}
+.quote-table td{padding:3px 6px;border-bottom:1px solid #eee;color:#222;white-space:nowrap;}
+.quote-table td:first-child{color:#2771c9;font-weight:600;}
+.quote-table td.up{color:#2d8f2d;font-weight:700;}
+.quote-ts{font-size:10px;color:#888;padding:2px 8px;background:#f9fafb;}
+.roll-net-bar{background:#eef2fb;border:1px solid #c8d4f0;border-radius:4px;padding:8px 12px;margin:8px 0 4px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.net-radio-group{display:flex;flex-direction:column;gap:3px;}
+.net-radio-label{font-size:11px;color:#333;display:flex;align-items:center;gap:5px;cursor:pointer;}
+.net-radio-label input{margin:0;}
+.net-price-box{display:flex;flex-direction:column;gap:2px;}
+.net-price-label{font-size:10px;color:#666;font-weight:600;}
+.net-price-val{font-size:18px;font-weight:800;color:#1a3a6b;}
+.net-price-val.credit{color:#2d8f2d;}
+.net-price-val.debit{color:#c0392b;}
+.roll-net-btns{display:flex;gap:6px;margin-left:auto;}
+.roll-calc{background:#f9fafb;border-top:1px solid #e0e3e7;padding:8px 14px;display:flex;flex-wrap:wrap;gap:14px;}
+.calc-item{display:flex;flex-direction:column;gap:1px;min-width:90px;}
+.calc-label{font-size:9.5px;color:#666;}
+.calc-value{font-size:13px;font-weight:700;color:#222;}
+.calc-value.win{color:#16a34a;}
+.calc-value.loss{color:#dc2626;}
+.calc-value.neut{color:#d97706;}
+.chart-section{border-top:1px solid var(--border);background:#fff;padding:12px 14px;}
+.chart-title{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;}
+.chart-canvas-wrap{position:relative;width:100%;height:260px;}
+.roll-explain{margin:12px 14px 14px;border-left:3px solid var(--green);border-radius:0 6px 6px 0;background:rgba(46,158,82,.05);padding:9px 12px;font-size:12.5px;}
+.roll-explain.blue{border-left-color:var(--blue);background:rgba(58,112,192,.05);}
+.roll-explain.purple{border-left-color:var(--purple);background:rgba(124,58,237,.05);}
+.re-title{font-size:11px;font-weight:700;margin-bottom:7px;color:var(--green);}
+.re-title.blue{color:var(--blue);}
+.re-title.purple{color:var(--purple);}
+.roll-explain p{margin:0 0 5px;line-height:1.55;color:var(--ink);}
+.roll-explain p:last-child{margin-bottom:0;}
+.oe-table{width:100%;border-collapse:collapse;font-size:11.5px;margin:6px 0;}
+.oe-table th{background:rgba(46,158,82,.12);padding:4px 6px;font-weight:700;text-align:left;color:var(--ink);}
+.oe-table.blue th{background:rgba(58,112,192,.12);}
+.oe-table.purple th{background:rgba(124,58,237,.12);}
+.oe-table td{padding:4px 6px;border-top:1px solid rgba(0,0,0,.07);color:var(--ink);}
+.explain-win{color:#16a34a;font-weight:700;}
+.explain-lose{color:#dc2626;}
+.explain-break{color:#d97706;}
+.summary-table-wrap{overflow-x:auto;}
+.summary-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.summary-table th,.summary-table td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top;}
+.summary-table th{background:var(--ink);color:#FFF9F0;font-size:11px;font-weight:700;letter-spacing:.5px;}
+.summary-table th:first-child{border-radius:10px 0 0 0;}
+.summary-table th:last-child{border-radius:0 10px 0 0;}
+.summary-table tr:last-child td{border-bottom:none;}
+.summary-table tr:nth-child(even) td{background:#FDFAF5;}
+.insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.insight-box{border-radius:var(--r-md);padding:14px 16px;border:2px solid;}
+.insight-box h4{font-size:13px;font-weight:800;margin-bottom:6px;}
+.insight-box p{font-size:12px;line-height:1.65;color:var(--ink);}
+.insight-green{background:var(--green-bg);border-color:var(--green-bdr);}
+.insight-green h4{color:var(--green);}
+.insight-blue{background:var(--blue-bg);border-color:var(--blue-bdr);}
+.insight-blue h4{color:var(--blue);}
+.insight-purple{background:var(--purple-bg);border-color:var(--purple-bdr);}
+.insight-purple h4{color:var(--purple);}
+.insight-amber{background:var(--amber-bg);border-color:var(--amber-bdr);}
+.insight-amber h4{color:var(--amber);}
+#edit-btn{position:fixed;bottom:28px;right:28px;z-index:2000;background:var(--ink);color:#FFF9F0;border:none;border-radius:100px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(0,0,0,.25);font-family:inherit;transition:background .15s,transform .1s;}
+#edit-btn:hover{background:#4A3020;transform:scale(1.03);}
+#edit-btn.active{background:#2E7040;}
+#edit-toolbar{position:fixed;bottom:0;left:0;right:0;background:#FFFCF7;border-top:2px solid #E2D4C2;padding:10px 24px 12px;z-index:1999;display:flex;align-items:center;box-shadow:0 -4px 24px rgba(80,40,0,.10);transform:translateY(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);font-family:inherit;flex-wrap:wrap;min-height:56px;}
+#edit-toolbar.visible{transform:translateY(0);}
+.et-hint{font-size:13px;color:#A08878;padding:6px 0;font-style:italic;}
+.et-group{display:flex;align-items:center;flex-wrap:wrap;width:100%;}
+.et-item{display:flex;flex-direction:column;gap:3px;padding:0 14px;}
+.et-label{font-size:10px;font-weight:600;color:#9A8878;letter-spacing:.5px;text-transform:uppercase;}
+.et-divider{width:1px;height:36px;background:#E2D4C2;flex-shrink:0;}
+#et-font{font-size:13px;border:1.5px solid #E2D4C2;border-radius:6px;padding:4px 8px;background:white;color:var(--ink);cursor:pointer;font-family:inherit;}
+.et-size-ctrl{display:flex;align-items:center;gap:6px;}
+.et-btn-sm{width:24px;height:24px;border:1.5px solid #E2D4C2;border-radius:6px;background:white;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink);}
+.et-btn-sm:hover{background:#F5EFE6;}
+#et-size-val{font-size:14px;font-weight:700;min-width:28px;text-align:center;color:var(--ink);}
+.et-fmt-btn{width:30px;height:30px;border:1.5px solid #E2D4C2;border-radius:6px;background:white;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink);}
+.et-fmt-btn:hover{background:#F5EFE6;}
+.et-fmt-btn.on{background:var(--ink);color:white;border-color:var(--ink);}
+#et-color{width:36px;height:28px;border:1.5px solid #E2D4C2;border-radius:6px;padding:2px;cursor:pointer;background:white;}
+#et-lh{width:80px;accent-color:var(--gold);}
+.et-action-btn{font-size:12px;font-weight:600;padding:5px 12px;border:1.5px solid #E2D4C2;border-radius:6px;background:white;cursor:pointer;color:var(--ink);font-family:inherit;}
+.et-action-btn:hover{background:#F5EFE6;}
+.edit-mode .page *:hover{outline:1.5px dashed #E8B840;outline-offset:2px;border-radius:3px;}
+.edit-mode .page input:hover,.edit-mode .page input:focus{outline:none !important;pointer-events:auto !important;}
+.el-focus{outline:2px solid var(--blue) !important;outline-offset:3px;border-radius:3px;}
+.edit-mode .page .el-focus *{outline:none !important;}
+#drag-canvas{position:relative !important;min-height:3000px;overflow:visible;}
+[data-drag-id]{box-sizing:border-box;}
+.edit-mode [data-drag-id]:hover>.drag-handle,[data-drag-id].is-dragging>.drag-handle,[data-drag-id].is-resizing>.drag-handle{opacity:1;}
+.drag-handle{position:absolute;top:-15px;left:0;right:0;height:13px;background:linear-gradient(90deg,#3A70C0,#2255A0);border-radius:5px 5px 0 0;cursor:grab;opacity:0;transition:opacity .15s;display:flex;align-items:center;justify-content:center;z-index:200;user-select:none;}
+.drag-handle:active{cursor:grabbing;}
+.drag-handle::before{content:":::";font-size:9px;font-weight:900;color:rgba(255,255,255,.85);letter-spacing:4px;}
+.edit-mode [data-drag-id]:hover,[data-drag-id].is-dragging,[data-drag-id].is-resizing{outline:2px dashed rgba(58,112,192,.45);outline-offset:3px;}
+.rh{position:absolute;width:10px;height:10px;background:#3A70C0;border:2px solid #fff;border-radius:2px;opacity:0;transition:opacity .15s;z-index:201;}
+.edit-mode [data-drag-id]:hover .rh,[data-drag-id].is-resizing .rh{opacity:1;}
+.rh-nw{top:-5px;left:-5px;cursor:nw-resize;}.rh-n{top:-5px;left:50%;transform:translateX(-50%);cursor:n-resize;}
+.rh-ne{top:-5px;right:-5px;cursor:ne-resize;}.rh-e{top:50%;right:-5px;transform:translateY(-50%);cursor:e-resize;}
+.rh-se{bottom:-5px;right:-5px;cursor:se-resize;}.rh-s{bottom:-5px;left:50%;transform:translateX(-50%);cursor:s-resize;}
+.rh-sw{bottom:-5px;left:-5px;cursor:sw-resize;}.rh-w{top:50%;left:-5px;transform:translateY(-50%);cursor:w-resize;}
+#layout-reset-btn{position:fixed;bottom:70px;right:20px;background:#FAF3E8;border:1.5px solid #E2D4C2;border-radius:8px;padding:7px 16px;font-size:12px;cursor:pointer;z-index:10001;color:#7A6555;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,.12);}
+#layout-reset-btn:hover{background:#F0E4D0;}
+
+/* ── TTS Active highlight ── */
+.panel.tts-active, .full-card.tts-active, .info-card.tts-active, .roll-card.tts-active, .summary-table-wrap.tts-active, .insight-grid.tts-active {
+  outline: 2px solid var(--gold); outline-offset: 4px; border-radius: var(--r-md);
+}
+
+/* ── TTS Bar (fixed top) ── */
+#tts-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 3000;
+  background: rgba(42,26,14,0.97); backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 8px 20px; display: flex; align-items: center; gap: 12px;
+  font-family: "PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+.tts-btn {
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+  color: #FFF9F0; border-radius: 100px; padding: 5px 14px; font-size: 12px;
+  cursor: pointer; font-family: inherit; font-weight: 700;
+  transition: background 0.15s; display: flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.tts-btn:hover { background: rgba(255,255,255,0.22); }
+.tts-btn.playing { background: #1E7A3A; border-color: #2E9E52; color: #fff; }
+.tts-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.15); flex-shrink: 0; }
+.tts-dots { display: flex; gap: 5px; align-items: center; }
+.tts-dot {
+  width: 7px; height: 7px; border-radius: 100px;
+  background: rgba(255,255,255,0.2); cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.tts-dot.done    { background: rgba(255,255,255,0.45); }
+.tts-dot.current { background: var(--gold); transform: scale(1.5); }
+.tts-section { font-size: 12px; color: #E8C060; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tts-speed {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #FFF9F0; border-radius: 6px; padding: 3px 7px; font-size: 12px;
+  cursor: pointer; font-family: inherit;
+}
+
+/* ── TTS Subtitle ── */
+#tts-subtitle {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  max-width: 700px; width: calc(100% - 40px);
+  background: rgba(8,4,1,0.85); backdrop-filter: blur(8px);
+  color: #FFF9F0; border-radius: 10px; padding: 10px 18px;
+  font-size: 14px; line-height: 1.9; z-index: 2500;
+  display: none; pointer-events: none;
+  max-height: 110px; overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+#tts-subtitle.active { display: block; }
+.sub-c       { color: rgba(255,249,240,0.28); }
+.sub-c.done  { color: rgba(255,249,240,0.75); }
+.sub-c.now   { color: #F5C540; background: rgba(245,197,64,0.18); border-radius: 2px; }
+
+/* ── Page top padding for TTS bar ── */
+body { padding-top: 52px; }
+
+</style>
+</head>
+<body>
+
+<!-- TTS Bar -->
+<div id="tts-bar">
+  <button id="tts-play-btn" class="tts-btn" onclick="ttsToggle()">▶ 朗讀全文</button>
+  <button class="tts-btn" onclick="ttsStop()" title="停止並重設">⏹</button>
+  <div class="tts-sep"></div>
+  <div class="tts-dots" id="tts-dots"></div>
+  <div class="tts-sep"></div>
+  <span class="tts-section" id="tts-section-name">點擊「朗讀全文」開始</span>
+  <select id="tts-speed" title="語速" onchange="ttsSetRate(this.value)">
+    <option value="0.8">0.8×</option>
+    <option value="0.9" selected>0.9×</option>
+    <option value="1.0">1.0×</option>
+    <option value="1.1">1.1×</option>
+    <option value="1.2">1.2×</option>
+  </select>
+  <div class="tts-sep"></div>
+  <span style="font-size:11px;color:#8A7A5A;">🔊</span>
+  <input type="range" id="tts-vol" min="0" max="1" step="0.05" value="1"
+         style="width:60px;accent-color:var(--gold);cursor:pointer;" title="音量">
+  <div class="tts-sep"></div>
+  <button class="tts-btn" onclick="adjustPageFont(-1)" style="padding:4px 9px;font-size:11px;font-weight:900;" title="縮小字體">A−</button>
+  <button class="tts-btn" onclick="adjustPageFont(1)"  style="padding:4px 9px;font-size:11px;font-weight:900;" title="放大字體">A+</button>
+</div>
+<div id="tts-subtitle"></div>
+<div class="page" id="drag-canvas">
+
+  <div data-drag-id="course-tag" class="course-tag">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="#FFF9F0" stroke-width="1.5"/><path d="M6 3v3l2 1.5" stroke="#FFF9F0" stroke-width="1.5" stroke-linecap="round"/></svg>
+    期權小學堂 &middot; 第 4 課
+  </div>
+
+  <div class="page-header">
+    <div data-drag-id="header-text">
+      <div class="page-title">Roll Position：CSP 滾倉策略</div>
+      <div class="page-subtitle">Roll Position — Managing the Cash Secured Put</div>
+      <div class="page-desc">當 CSP 面臨股價下跌壓力，<strong>滾倉（Roll）</strong>是最常用的主動管理手法：買回現有部位，同時賣出新部位，<br>以延長時間、調整履約價，換取更多空間讓股價反彈。</div>
+    </div>
+    <div data-drag-id="concept-box" class="concept-box">
+      <div class="cb-title"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" fill="#D4900A"/></svg>三種滾倉方式</div>
+      <div class="cb-row">
+        <div class="cb-badge" style="background:var(--green-bg);color:var(--green);">Out</div>
+        <p><strong>Roll Out</strong>：延長到期日，履約價不變<br><span style="font-size:11px;color:var(--muted);">通常可收 Credit</span></p>
+      </div>
+      <div class="cb-row">
+        <div class="cb-badge" style="background:var(--blue-bg);color:var(--blue);">Dn</div>
+        <p><strong>Roll Down</strong>：降低履約價，到期日不變<br><span style="font-size:11px;color:var(--muted);">通常需付 Debit</span></p>
+      </div>
+      <div class="cb-row">
+        <div class="cb-badge" style="background:var(--purple-bg);color:var(--purple);">O+D</div>
+        <p><strong>Roll Out+Down</strong>：同時延期＋降履約價<br><span style="font-size:11px;color:var(--muted);">最靈活、防守最全面</span></p>
+      </div>
+    </div>
+  </div>
+
+  <div data-drag-id="what-is-roll" class="info-card">
+    <h3>&#128161; 什麼時候需要滾倉？</h3>
+    <p>賣出 CSP 後，若股價下跌接近甚至跌破履約價，部位出現未實現虧損。此時有三個選擇：<strong>（1）認賠平倉</strong>、<strong>（2）等待到期被行使</strong>、<strong>（3）滾倉爭取時間</strong>。</p>
+    <p>滾倉核心邏輯：<strong>用時間換空間</strong> — 買回虧損的 Put，換一個更遠期（或更低履約價）的 Put 繼續賣，讓股價有更多時間反彈回履約價以上。</p>
+    <p>⚠️ 滾倉不是萬靈丹。若對標的基本面已失去信心，應直接平倉，而非無止境滾倉。</p>
+  </div>
+
+  <div data-drag-id="position-card" class="info-card">
+    <h3>&#128203; 範例持有部位（以下三種滾倉均以此為基礎）</h3>
+    <div class="pos-tag">&#128274; -4 contract(s) of SQQQ 09/18/2026 60.00 Put</div>
+    <p>原始賣出時收取的權利金為每股 <strong>$14.96</strong>（4 合約 × 100 股 = 合計 $5,984）。損益兩平：<strong>$45.04</strong>。</p>
+    <div class="pos-stats">
+      <div class="pos-stat"><b>股票代號</b>SQQQ</div>
+      <div class="pos-stat"><b>方向</b>Short Put（CSP）</div>
+      <div class="pos-stat"><b>合約數</b>-4</div>
+      <div class="pos-stat"><b>到期日</b>09/18/2026</div>
+      <div class="pos-stat"><b>履約價</b>$60.00</div>
+      <div class="pos-stat"><b>原始收取權利金</b>$14.96／股</div>
+      <div class="pos-stat"><b>原始損益兩平</b>$45.04</div>
+    </div>
+  </div>
+
+  <!-- ROLL OUT -->
+  <div data-drag-id="roll-out-divider" class="section-divider">
+    <div class="section-divider-line"></div>
+    <div class="section-divider-label" style="color:var(--green);">&#9654; ROLL OUT &mdash; 只延長到期日，履約價不變</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div data-drag-id="roll-out-card" class="roll-card" style="border-color:var(--green-bdr);">
+    <div class="roll-card-header">
+      <div>
+        <div class="roll-card-name" style="color:var(--green);">Roll Out</div>
+        <div class="roll-card-en">延期滾倉 — 買回現有 Put，賣出相同履約價但更遠到期日的 Put</div>
+      </div>
+      <span class="pill pill-green">通常收 Credit &#8593;</span>
+    </div>
+    <div class="roll-form">
+      <div class="roll-section">
+        <div class="roll-section-title">持有倉位</div>
+        <div class="roll-section-body">
+          <div class="order-row1">
+            <div class="ofield"><span class="olabel">訂單類別</span><div class="oselect-fake" style="width:86px;">Buy Close &#9660;</div></div>
+            <div class="ofield"><span class="olabel">合約</span><input type="number" id="ro-contracts" class="oinput" style="width:50px;" value="4" min="1" oninput="calcRollOut()"></div>
+            <div class="ofield"><span class="olabel">股票代號</span><input type="text" id="ro-ticker" class="oinput ticker-input" value="SQQQ" oninput="calcRollOut()"></div>
+            <div class="ofield"><span class="olabel">到期日</span><input type="text" id="ro-orig-expiry" class="oinput date-input" value="09/18/2026" oninput="calcRollOut()"></div>
+            <div class="ofield"><span class="olabel">履約價</span><input type="number" id="ro-strike" class="oinput strike-input" value="60" step="0.5" oninput="calcRollOut()"></div>
+            <div class="ofield"><span class="olabel">買回價格</span><input type="number" id="ro-close-price" class="oinput premium-input" value="14.96" step="0.01" oninput="calcRollOut()"></div>
+            <div class="ofield"><span class="olabel">原始收取</span><input type="number" id="ro-orig-prem" class="oinput premium-input" value="14.96" step="0.01" oninput="calcRollOut()"></div>
+          </div>
+          <div class="quote-ts">即時報價 美東時間 03:59:22 pm (OPRA)</div>
+          <div style="overflow-x:auto;"><table class="quote-table">
+            <tr><th>代號</th><th>價格</th><th>變更</th><th>出價</th><th>要價</th><th>進×出量</th><th>高</th><th>低</th></tr>
+            <tr><td>SQQQ 09/18/2026 60.00 PUT</td><td>14.96</td><td class="up">+0.06</td><td>14.75</td><td>16.10</td><td>492×10</td><td>14.96</td><td>14.96</td></tr>
+          </table></div>
+        </div>
+      </div>
+      <div class="roll-section">
+        <div class="roll-section-title new">新開倉位</div>
+        <div class="roll-section-body">
+          <div class="order-row1">
+            <div class="ofield"><span class="olabel">訂單類別</span><div class="oselect-fake" style="width:86px;">Sell Open &#9660;</div></div>
+            <div class="ofield"><span class="olabel">合約</span><div class="oselect-fake" style="width:50px;">4</div></div>
+            <div class="ofield"><span class="olabel">股票代號</span><div class="oselect-fake" style="width:60px;">SQQQ</div></div>
+            <div class="ofield"><span class="olabel">&#x270F; 新到期日</span><input type="text" id="ro-new-expiry" class="oinput date-input" value="12/18/2026" oninput="calcRollOut()"></div>
+            <div class="ofield"><span class="olabel">履約價（不變）</span><div class="oselect-fake" id="ro-new-strike-disp" style="width:72px;">60.00</div></div>
+            <div class="ofield"><span class="olabel">&#x270F; 新收取權利金</span><input type="number" id="ro-new-prem" class="oinput premium-input" value="16.40" step="0.01" oninput="calcRollOut()"></div>
+            <button class="obtn obtn-quote">期權鍵</button>
+          </div>
+          <div class="quote-ts">即時報價 美東時間 03:59:59 pm (OPRA)</div>
+          <div style="overflow-x:auto;"><table class="quote-table">
+            <tr><th>代號</th><th>現價</th><th>變更</th><th>出價</th><th>要價</th><th>進×出量</th><th>高</th><th>低</th></tr>
+            <tr><td id="ro-q-new-sym">SQQQ 12/18/2026 60.00 PUT</td><td id="ro-q-newprice">16.40</td><td>0.00</td><td>18.15</td><td>19.70</td><td>16×13</td><td>N/A</td><td>N/A</td></tr>
+          </table></div>
+        </div>
+      </div>
+      <div class="roll-net-bar">
+        <div class="net-radio-group">
+          <label class="net-radio-label"><input type="radio" name="ro-nt" value="credit" checked> Credit</label>
+          <label class="net-radio-label"><input type="radio" name="ro-nt" value="debit"> Debit</label>
+        </div>
+        <div class="net-price-box"><span class="net-price-label">Net Price</span><span class="net-price-val credit" id="ro-net-price">1.44</span></div>
+        <div style="font-size:11px;color:#555;" id="ro-net-desc">每股收 $1.44 Credit &times; 400 股 = 總收入 <strong id="ro-net-total">+$576</strong></div>
+        <div class="roll-net-btns"><button class="obtn obtn-clear2">清除</button><button class="obtn obtn-review2">檢視</button></div>
+      </div>
+    </div>
+    <div class="roll-calc">
+      <div class="calc-item"><span class="calc-label">原始損益兩平</span><span class="calc-value neut" id="ro-orig-bep">$45.04</span></div>
+      <div class="calc-item"><span class="calc-label">滾倉後損益兩平</span><span class="calc-value win" id="ro-new-bep">$43.60</span></div>
+      <div class="calc-item"><span class="calc-label">損益兩平改善</span><span class="calc-value win" id="ro-bep-improve">&#9660; $1.44</span></div>
+      <div class="calc-item"><span class="calc-label">滾倉淨損益</span><span class="calc-value win" id="ro-net-income">+$576.00</span></div>
+      <div class="calc-item"><span class="calc-label">累計收取權利金</span><span class="calc-value" id="ro-total-prem">$16.40／股</span></div>
+    </div>
+    <div class="chart-section">
+      <div class="chart-title">P&amp;L 比較：滾倉前（Sep K=$60）vs 滾倉後（Dec K=$60）每股損益</div>
+      <div class="chart-canvas-wrap"><canvas id="chart-ro"></canvas></div>
+    </div>
+    <div class="roll-explain">
+      <div class="re-title">&#9654; Roll Out 邏輯分析</div>
+      <p>買回 SQQQ Sep $<span id="ro-exp-strike">60</span> Put（$<span id="ro-exp-close">14.96</span>），賣出 <strong>Dec $<span id="ro-exp-newstrike">60</span> Put</strong>（$<span id="ro-exp-newprem">16.40</span>），淨收 Credit <strong>$<span id="ro-exp-net">1.44</span>／股</strong>。</p>
+      <table class="oe-table">
+        <tr><th>情境（新到期日）</th><th>說明</th></tr>
+        <tr><td>股價 &#8805; $<span id="ro-tbl-k">60</span>（成功）</td><td class="explain-win">Put 歸零，累計保留 $<span id="ro-tbl-basis">16.40</span>／股（×400 = $<span id="ro-tbl-total">6560</span>）</td></tr>
+        <tr><td>股價 = $<span id="ro-tbl-bep">43.60</span>（損益平衡）</td><td class="explain-break">損益兩平</td></tr>
+        <tr><td>股價 &lt; $<span id="ro-tbl-bep2">43.60</span></td><td class="explain-lose">每股虧損 = $<span id="ro-tbl-bep3">43.60</span> &#8722; 股價</td></tr>
+      </table>
+      <p style="margin-top:6px;font-size:11.5px;color:var(--muted);">&#10003; Roll Out 是最常用的滾倉方式：通常可收 Credit 同時延長時間，損益兩平下移 $<span id="ro-exp-improve">1.44</span>。</p>
+    </div>
+  </div>
+
+  <!-- ROLL DOWN -->
+  <div data-drag-id="roll-down-divider" class="section-divider">
+    <div class="section-divider-line"></div>
+    <div class="section-divider-label" style="color:var(--blue);">&#9660; ROLL DOWN &mdash; 只降低履約價，到期日不變</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div data-drag-id="roll-down-card" class="roll-card" style="border-color:var(--blue-bdr);">
+    <div class="roll-card-header">
+      <div>
+        <div class="roll-card-name" style="color:var(--blue);">Roll Down</div>
+        <div class="roll-card-en">降履約滾倉 — 買回現有 Put，賣出相同到期日但更低履約價的 Put</div>
+      </div>
+      <span class="pill pill-blue">通常付 Debit &#8595;</span>
+    </div>
+    <div class="roll-form">
+      <div class="roll-section">
+        <div class="roll-section-title">持有倉位</div>
+        <div class="roll-section-body">
+          <div class="order-row1">
+            <div class="ofield"><span class="olabel">訂單類別</span><div class="oselect-fake" style="width:86px;">Buy Close &#9660;</div></div>
+            <div class="ofield"><span class="olabel">合約</span><input type="number" id="rd-contracts" class="oinput" style="width:50px;" value="4" min="1" oninput="calcRollDown()"></div>
+            <div class="ofield"><span class="olabel">股票代號</span><input type="text" id="rd-ticker" class="oinput ticker-input" value="SQQQ" oninput="calcRollDown()"></div>
+            <div class="ofield"><span class="olabel">到期日</span><input type="text" id="rd-orig-expiry" class="oinput date-input" value="09/18/2026" oninput="calcRollDown()"></div>
+            <div class="ofield"><span class="olabel">履約價</span><input type="number" id="rd-orig-strike" class="oinput strike-input" value="60" step="0.5" oninput="calcRollDown()"></div>
+            <div class="ofield"><span class="olabel">買回價格</span><input type="number" id="rd-close-price" class="oinput premium-input" value="14.96" step="0.01" oninput="calcRollDown()"></div>
+            <div class="ofield"><span class="olabel">原始收取</span><input type="number" id="rd-orig-prem" class="oinput premium-input" value="14.96" step="0.01" oninput="calcRollDown()"></div>
+          </div>
+          <div class="quote-ts">即時報價 美東時間 03:59:22 pm (OPRA)</div>
+          <div style="overflow-x:auto;"><table class="quote-table">
+            <tr><th>代號</th><th>價格</th><th>變更</th><th>出價</th><th>要價</th><th>進×出量</th><th>高</th><th>低</th></tr>
+            <tr><td>SQQQ 09/18/2026 60.00 PUT</td><td>14.96</td><td class="up">+0.06</td><td>14.75</td><td>16.10</td><td>492×10</td><td>14.96</td><td>14.96</td></tr>
+          </table></div>
+        </div>
+      </div>
+      <div class="roll-section">
+        <div class="roll-section-title new">新開倉位</div>
+        <div class="roll-section-body">
+          <div class="order-row1">
+            <div class="ofield"><span class="olabel">訂單類別</span><div class="oselect-fake" style="width:86px;">Sell Open &#9660;</div></div>
+            <div class="ofield"><span class="olabel">合約</span><div class="oselect-fake" style="width:50px;">4</div></div>
+            <div class="ofield"><span class="olabel">股票代號</span><div class="oselect-fake" style="width:60px;">SQQQ</div></div>
+            <div class="ofield"><span class="olabel">到期日（不變）</span><div class="oselect-fake" id="rd-expiry-disp" style="width:96px;">09/18/2026</div></div>
+            <div class="ofield"><span class="olabel">&#x270F; 新履約價</span><input type="number" id="rd-new-strike" class="oinput strike-input" value="55" step="0.5" oninput="calcRollDown()"></div>
+            <div class="ofield"><span class="olabel">&#x270F; 新收取權利金</span><input type="number" id="rd-new-prem" class="oinput premium-input" value="11.50" step="0.01" oninput="calcRollDown()"></div>
+            <button class="obtn obtn-quote">期權鍵</button>
+          </div>
+          <div class="quote-ts">即時報價 美東時間 03:59:59 pm (OPRA)</div>
+          <div style="overflow-x:auto;"><table class="quote-table">
+            <tr><th>代號</th><th>現價</th><th>變更</th><th>出價</th><th>要價</th><th>進×出量</th><th>高</th><th>低</th></tr>
+            <tr><td id="rd-q-new-sym">SQQQ 09/18/2026 55.00 PUT</td><td id="rd-q-newprice">11.50</td><td>0.00</td><td>11.20</td><td>11.80</td><td>20×15</td><td>N/A</td><td>N/A</td></tr>
+          </table></div>
+        </div>
+      </div>
+      <div class="roll-net-bar">
+        <div class="net-radio-group">
+          <label class="net-radio-label"><input type="radio" name="rd-nt" value="credit"> Credit</label>
+          <label class="net-radio-label"><input type="radio" name="rd-nt" value="debit" checked> Debit</label>
+        </div>
+        <div class="net-price-box"><span class="net-price-label">Net Price</span><span class="net-price-val debit" id="rd-net-price">3.46</span></div>
+        <div style="font-size:11px;color:#555;" id="rd-net-desc">每股付 $3.46 Debit &times; 400 股 = 總費用 <strong id="rd-net-total">-$1,384</strong></div>
+        <div class="roll-net-btns"><button class="obtn obtn-clear2">清除</button><button class="obtn obtn-review2">檢視</button></div>
+      </div>
+    </div>
+    <div class="roll-calc">
+      <div class="calc-item"><span class="calc-label">原始損益兩平</span><span class="calc-value neut" id="rd-orig-bep">$45.04</span></div>
+      <div class="calc-item"><span class="calc-label">滾倉後損益兩平</span><span class="calc-value win" id="rd-new-bep">$43.50</span></div>
+      <div class="calc-item"><span class="calc-label">履約價降低</span><span class="calc-value win" id="rd-strike-drop">&#9660; $5.00</span></div>
+      <div class="calc-item"><span class="calc-label">滾倉淨損益</span><span class="calc-value loss" id="rd-net-income">&#8722;$1,384.00</span></div>
+      <div class="calc-item"><span class="calc-label">累計收取權利金</span><span class="calc-value" id="rd-total-prem">$11.50／股</span></div>
+    </div>
+    <div class="chart-section">
+      <div class="chart-title">P&amp;L 比較：滾倉前（K=$60）vs 滾倉後（K=$55）每股損益</div>
+      <div class="chart-canvas-wrap"><canvas id="chart-rd"></canvas></div>
+    </div>
+    <div class="roll-explain blue">
+      <div class="re-title blue">&#9660; Roll Down 邏輯分析</div>
+      <p>買回 SQQQ Sep $<span id="rd-exp-origstrike">60</span> Put（$<span id="rd-exp-close">14.96</span>），賣出 <strong>Sep $<span id="rd-exp-newstrike">55</span> Put</strong>（$<span id="rd-exp-newprem">11.50</span>），淨付 Debit <strong>$<span id="rd-exp-net">3.46</span>／股</strong>。</p>
+      <table class="oe-table blue">
+        <tr><th>情境（相同到期日）</th><th>說明</th></tr>
+        <tr><td>股價 &#8805; $<span id="rd-tbl-k">55</span>（成功）</td><td class="explain-win">Put 歸零，累計保留 $<span id="rd-tbl-basis">11.50</span>／股（×400 = $<span id="rd-tbl-total">4600</span>）</td></tr>
+        <tr><td>股價 = $<span id="rd-tbl-bep">43.50</span>（損益平衡）</td><td class="explain-break">損益兩平</td></tr>
+        <tr><td>股價 &lt; $<span id="rd-tbl-bep2">43.50</span></td><td class="explain-lose">每股虧損 = $<span id="rd-tbl-bep3">43.50</span> &#8722; 股價</td></tr>
+      </table>
+      <p style="margin-top:6px;font-size:11.5px;color:var(--muted);">&#128204; 履約價從 $<span id="rd-exp-origstrike2">60</span> 降至 $<span id="rd-exp-newstrike2">55</span>，遠離股價，但需付出額外費用壓縮累計收益。</p>
+    </div>
+  </div>
+
+  <!-- ROLL OUT+DOWN -->
+  <div data-drag-id="roll-outdown-divider" class="section-divider">
+    <div class="section-divider-line"></div>
+    <div class="section-divider-label" style="color:var(--purple);">&#9670; ROLL OUT+DOWN &mdash; 同時延長到期日 + 降低履約價</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div data-drag-id="roll-outdown-card" class="roll-card" style="border-color:var(--purple-bdr);">
+    <div class="roll-card-header">
+      <div>
+        <div class="roll-card-name" style="color:var(--purple);">Roll Out + Down</div>
+        <div class="roll-card-en">雙向滾倉 — 同時延長到期日並降低履約價，靈活度與防守性最高</div>
+      </div>
+      <span class="pill pill-purple">Credit 或小 Debit</span>
+    </div>
+    <div class="roll-form">
+      <div class="roll-section">
+        <div class="roll-section-title">持有倉位</div>
+        <div class="roll-section-body">
+          <div class="order-row1">
+            <div class="ofield"><span class="olabel">訂單類別</span><div class="oselect-fake" style="width:86px;">Buy Close &#9660;</div></div>
+            <div class="ofield"><span class="olabel">合約</span><input type="number" id="rod-contracts" class="oinput" style="width:50px;" value="4" min="1" oninput="calcRollOutDown()"></div>
+            <div class="ofield"><span class="olabel">股票代號</span><input type="text" id="rod-ticker" class="oinput ticker-input" value="SQQQ" oninput="calcRollOutDown()"></div>
+            <div class="ofield"><span class="olabel">到期日</span><input type="text" id="rod-orig-expiry" class="oinput date-input" value="09/18/2026" oninput="calcRollOutDown()"></div>
+            <div class="ofield"><span class="olabel">履約價</span><input type="number" id="rod-orig-strike" class="oinput strike-input" value="60" step="0.5" oninput="calcRollOutDown()"></div>
+            <div class="ofield"><span class="olabel">買回價格</span><input type="number" id="rod-close-price" class="oinput premium-input" value="14.96" step="0.01" oninput="calcRollOutDown()"></div>
+            <div class="ofield"><span class="olabel">原始收取</span><input type="number" id="rod-orig-prem" class="oinput premium-input" value="14.96" step="0.01" oninput="calcRollOutDown()"></div>
+          </div>
+          <div class="quote-ts">即時報價 美東時間 03:59:22 pm (OPRA)</div>
+          <div style="overflow-x:auto;"><table class="quote-table">
+            <tr><th>代號</th><th>價格</th><th>變更</th><th>出價</th><th>要價</th><th>進×出量</th><th>高</th><th>低</th></tr>
+            <tr><td>SQQQ 09/18/2026 60.00 PUT</td><td>14.96</td><td class="up">+0.06</td><td>14.75</td><td>16.10</td><td>492×10</td><td>14.96</td><td>14.96</td></tr>
+          </table></div>
+        </div>
+      </div>
+      <div class="roll-section">
+        <div class="roll-section-title new">新開倉位</div>
+        <div class="roll-section-body">
+          <div class="order-row1">
+            <div class="ofield"><span class="olabel">訂單類別</span><div class="oselect-fake" style="width:86px;">Sell Open &#9660;</div></div>
+            <div class="ofield"><span class="olabel">合約</span><div class="oselect-fake" style="width:50px;">4</div></div>
+            <div class="ofield"><span class="olabel">股票代號</span><div class="oselect-fake" style="width:60px;">SQQQ</div></div>
+            <div class="ofield"><span class="olabel">&#x270F; 新到期日</span><input type="text" id="rod-new-expiry" class="oinput date-input" value="12/18/2026" oninput="calcRollOutDown()"></div>
+            <div class="ofield"><span class="olabel">&#x270F; 新履約價</span><input type="number" id="rod-new-strike" class="oinput strike-input" value="55" step="0.5" oninput="calcRollOutDown()"></div>
+            <div class="ofield"><span class="olabel">&#x270F; 新收取權利金</span><input type="number" id="rod-new-prem" class="oinput premium-input" value="14.20" step="0.01" oninput="calcRollOutDown()"></div>
+            <button class="obtn obtn-quote">期權鍵</button>
+          </div>
+          <div class="quote-ts">即時報價 美東時間 03:59:59 pm (OPRA)</div>
+          <div style="overflow-x:auto;"><table class="quote-table">
+            <tr><th>代號</th><th>現價</th><th>變更</th><th>出價</th><th>要價</th><th>進×出量</th><th>高</th><th>低</th></tr>
+            <tr><td id="rod-q-new-sym">SQQQ 12/18/2026 55.00 PUT</td><td id="rod-q-newprice">14.20</td><td>0.00</td><td>13.90</td><td>14.50</td><td>10×8</td><td>N/A</td><td>N/A</td></tr>
+          </table></div>
+        </div>
+      </div>
+      <div class="roll-net-bar">
+        <div class="net-radio-group">
+          <label class="net-radio-label"><input type="radio" name="rod-nt" value="credit"> Credit</label>
+          <label class="net-radio-label"><input type="radio" name="rod-nt" value="debit" checked> Debit</label>
+        </div>
+        <div class="net-price-box"><span class="net-price-label">Net Price</span><span class="net-price-val debit" id="rod-net-price">0.76</span></div>
+        <div style="font-size:11px;color:#555;" id="rod-net-desc">每股付 $0.76 Debit &times; 400 股 = 總費用 <strong id="rod-net-total">-$304</strong></div>
+        <div class="roll-net-btns"><button class="obtn obtn-clear2">清除</button><button class="obtn obtn-review2">檢視</button></div>
+      </div>
+    </div>
+    <div class="roll-calc">
+      <div class="calc-item"><span class="calc-label">原始損益兩平</span><span class="calc-value neut" id="rod-orig-bep">$45.04</span></div>
+      <div class="calc-item"><span class="calc-label">滾倉後損益兩平</span><span class="calc-value win" id="rod-new-bep">$40.80</span></div>
+      <div class="calc-item"><span class="calc-label">損益兩平改善</span><span class="calc-value win" id="rod-bep-improve">&#9660; $4.24</span></div>
+      <div class="calc-item"><span class="calc-label">滾倉淨損益</span><span class="calc-value loss" id="rod-net-income">&#8722;$304.00</span></div>
+      <div class="calc-item"><span class="calc-label">累計收取權利金</span><span class="calc-value" id="rod-total-prem">$14.20／股</span></div>
+    </div>
+    <div class="chart-section">
+      <div class="chart-title">P&amp;L 比較：原始（Sep K=$60）vs 滾倉後（Dec K=$55）每股損益</div>
+      <div class="chart-canvas-wrap"><canvas id="chart-rod"></canvas></div>
+    </div>
+    <div class="roll-explain purple">
+      <div class="re-title purple">&#9670; Roll Out+Down 邏輯分析</div>
+      <p>買回 Sep $<span id="rod-exp-origstrike">60</span> Put（$<span id="rod-exp-close">14.96</span>），賣出 <strong>Dec $<span id="rod-exp-newstrike">55</span> Put</strong>（$<span id="rod-exp-newprem">14.20</span>），淨付 Debit <strong>$<span id="rod-exp-net">0.76</span>／股</strong>。</p>
+      <table class="oe-table purple">
+        <tr><th>情境（新到期日）</th><th>說明</th></tr>
+        <tr><td>股價 &#8805; $<span id="rod-tbl-k">55</span>（成功）</td><td class="explain-win">Put 歸零，累計保留 $<span id="rod-tbl-basis">14.20</span>／股（×400 = $<span id="rod-tbl-total">5680</span>）</td></tr>
+        <tr><td>股價 = $<span id="rod-tbl-bep">40.80</span>（損益平衡）</td><td class="explain-break">損益兩平</td></tr>
+        <tr><td>股價 &lt; $<span id="rod-tbl-bep2">40.80</span></td><td class="explain-lose">每股虧損 = $<span id="rod-tbl-bep3">40.80</span> &#8722; 股價</td></tr>
+      </table>
+      <p style="margin-top:6px;font-size:11.5px;color:var(--muted);">&#128302; 履約價降 $<span id="rod-exp-strikedrop">5</span>＋延期至 Dec，損益兩平大幅改善 $<span id="rod-exp-bepimprove">4.24</span>，以小額 Debit 換取最全面的防守空間。</p>
+    </div>
+  </div>
+
+  <!-- COMPARE -->
+  <div data-drag-id="compare-divider" class="section-divider">
+    <div class="section-divider-line"></div>
+    <div class="section-divider-label">&#9776; 三種滾倉方式 P&amp;L 比較</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div data-drag-id="compare-card" class="info-card">
+    <h3>&#128202; 三種滾倉方式損益對比圖（每股損益）</h3>
+    <div class="chart-canvas-wrap" style="height:300px;margin-top:10px;"><canvas id="chart-compare"></canvas></div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:11px;">
+      <span style="display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:26px;height:0;border-top:2.5px dashed #C07830;"></span>原始部位（K=60，BEP=<span id="cmp-bep-orig">$45.04</span>）</span>
+      <span style="display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:26px;height:0;border-top:2.5px solid #2E9E52;"></span>Roll Out（BEP=<span id="cmp-bep-ro">$43.60</span>）</span>
+      <span style="display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:26px;height:0;border-top:2.5px solid #3A70C0;"></span>Roll Down（BEP=<span id="cmp-bep-rd">$43.50</span>）</span>
+      <span style="display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:26px;height:0;border-top:2.5px solid #7C3AED;"></span>Roll Out+Down（BEP=<span id="cmp-bep-rod">$40.80</span>）</span>
+    </div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div data-drag-id="summary-divider" class="section-divider">
+    <div class="section-divider-line"></div>
+    <div class="section-divider-label">&#9776; 三種滾倉比較總表</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div data-drag-id="summary-table" class="summary-table-wrap">
+    <table class="summary-table">
+      <tr><th>滾倉類型</th><th>到期日</th><th>履約價</th><th>淨 Credit / Debit</th><th>新損益兩平</th><th>適用時機</th></tr>
+      <tr>
+        <td><span style="background:var(--green-bg);color:var(--green);border-radius:4px;padding:2px 6px;font-size:11px;font-weight:700;">Roll Out</span></td>
+        <td>延長（Dec）</td><td>不變（$60）</td>
+        <td style="color:#2d8f2d;font-weight:700;">+Credit $1.44／股</td>
+        <td>$43.60（改善 $1.44）</td>
+        <td>股價略低於履約價，仍看好，想以最低成本爭取時間</td>
+      </tr>
+      <tr>
+        <td><span style="background:var(--blue-bg);color:var(--blue);border-radius:4px;padding:2px 6px;font-size:11px;font-weight:700;">Roll Down</span></td>
+        <td>不變（Sep）</td><td>降低（$55）</td>
+        <td style="color:#c0392b;font-weight:700;">-Debit $3.46／股</td>
+        <td>$43.50（履約價降 $5）</td>
+        <td>股價急跌需快速降低履約價，不想延長時間</td>
+      </tr>
+      <tr>
+        <td><span style="background:var(--purple-bg);color:var(--purple);border-radius:4px;padding:2px 6px;font-size:11px;font-weight:700;">Roll Out+Down</span></td>
+        <td>延長（Dec）</td><td>降低（$55）</td>
+        <td style="color:#c0392b;font-weight:700;">-Debit $0.76／股</td>
+        <td>$40.80（改善 $4.24）</td>
+        <td>股價大跌，需同時爭取時間與降低履約價，防守最全面</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- INSIGHTS -->
+  <div data-drag-id="insights-divider" class="section-divider">
+    <div class="section-divider-line"></div>
+    <div class="section-divider-label">&#9711; 滾倉關鍵原則</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div data-drag-id="insight-grid" class="insight-grid">
+    <div class="insight-box insight-green">
+      <h4>&#10003; Roll Out 首選原則</h4>
+      <p>若股價僅略低於履約價，優先考慮 Roll Out。<strong>能收 Credit 最理想</strong>，等於白拿時間價值差額。目標：新到期日 Delta ≤ 0.30，DTE ≥ 30 天。</p>
+    </div>
+    <div class="insight-box insight-blue">
+      <h4>&#9660; Roll Down 的代價</h4>
+      <p>降低履約價增加安全邊際，但必須<strong>付出 Debit</strong>（壓縮累計收益）。原則：Roll Down 後的損益兩平不應比原始還差，否則不如直接平倉。</p>
+    </div>
+    <div class="insight-box insight-purple">
+      <h4>&#9670; 滾倉次數上限</h4>
+      <p>每次滾倉都是<strong>增加曝險時間</strong>。建議最多滾倉 2–3 次。若第三次滾後仍深度 ITM，應考慮<strong>認賠出場</strong>，而非繼續無限滾倉。</p>
+    </div>
+    <div class="insight-box insight-amber">
+      <h4>&#9888; 滾倉不是逃避損失</h4>
+      <p>滾倉是<strong>主動管理工具</strong>，不是掩蓋虧損的手段。若標的基本面惡化（財報變差、趨勢反轉），應直接平倉止損，<strong>切勿無止境滾倉</strong>。</p>
+    </div>
+  </div>
+
+</div>
+
+<button id="edit-btn" onclick="toggleEditMode()">
+  <span id="edit-icon">&#9998;</span>
+  <span id="edit-label">編輯模式</span>
+</button>
+
+<div id="edit-toolbar">
+  <span class="et-hint" id="et-hint">點選任意文字區塊以編輯</span>
+  <div class="et-group" id="et-controls" style="display:none;">
+    <div class="et-item">
+      <span class="et-label">字體</span>
+      <select id="et-font" onchange="applyStyle('fontFamily',this.value)">
+        <option value='"PingFang TC","Microsoft JhengHei",sans-serif'>PingFang TC</option>
+        <option value='"Helvetica Neue",Arial,sans-serif'>Helvetica</option>
+        <option value='"Georgia",serif'>Georgia</option>
+      </select>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <span class="et-label">大小</span>
+      <div class="et-size-ctrl">
+        <button class="et-btn-sm" onclick="adjustSize(-1)">&#8722;</button>
+        <span id="et-size-val">14</span>
+        <button class="et-btn-sm" onclick="adjustSize(1)">+</button>
+      </div>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <span class="et-label">樣式</span>
+      <div style="display:flex;gap:4px;">
+        <button class="et-fmt-btn" id="et-bold" onclick="toggleBold()"><b>B</b></button>
+        <button class="et-fmt-btn" id="et-italic" onclick="toggleItalic()"><i>I</i></button>
+        <input type="color" id="et-color" value="#2A1A0E" oninput="applyStyle('color',this.value)">
+      </div>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <span class="et-label">行距 <span id="et-lh-val">1.4</span></span>
+      <input type="range" id="et-lh" min="1" max="3" step="0.05" value="1.4"
+        oninput="applyStyle('lineHeight',this.value);document.getElementById('et-lh-val').textContent=parseFloat(this.value).toFixed(1);">
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button class="et-action-btn" onclick="resetElement()">重設</button>
+      <button class="et-action-btn" id="et-copy-btn" onclick="copyHtml()">複製 HTML</button>
+      <button class="et-action-btn" onclick="clearSavedState()" style="color:#D04040;">&#128465; 清除</button>
+    </div>
+  </div>
+</div>
+
+<button id="layout-reset-btn" onclick="resetLayout()" title="重設版面">&#8635; 重設版面</button>
+
+<script>
+var L4_KEY='l4-state-v1',L4_LAY='l4-layout-v3';
+function getSaved(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
+function putSaved(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function saveTextEdit(el){if(!el||!el.id)return;var s=getSaved(L4_KEY)||{};s['t:'+el.id]={html:el.innerHTML,style:el.getAttribute('style')||''};putSaved(L4_KEY,s);}
+function restoreTextEdits(){var s=getSaved(L4_KEY);if(!s)return;Object.keys(s).forEach(function(k){if(k.indexOf('t:')!==0)return;var el=document.getElementById(k.slice(2));if(!el)return;if(s[k].html!==undefined)el.innerHTML=s[k].html;if(s[k].style)el.setAttribute('style',s[k].style);});}
+window.clearSavedState=function(){localStorage.removeItem(L4_KEY);localStorage.removeItem(L4_LAY);location.reload();};
+window.addEventListener('load',restoreTextEdits);
+(function(){
+  var editMode=false,focused=null,originalStyles=new WeakMap();
+  window.toggleEditMode=function(){editMode=!editMode;document.body.classList.toggle('edit-mode',editMode);document.getElementById('edit-btn').classList.toggle('active',editMode);document.getElementById('edit-label').textContent=editMode?'退出編輯':'編輯模式';document.getElementById('edit-icon').innerHTML=editMode?'&#10005;':'&#9998;';document.getElementById('edit-toolbar').classList.toggle('visible',editMode);if(!editMode)blurCurrent();};
+  document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key==='e'){e.preventDefault();window.toggleEditMode();}if(e.key==='Escape'&&editMode)blurCurrent();});
+  document.addEventListener('click',function(e){if(!editMode)return;var btn=document.getElementById('edit-btn'),tb=document.getElementById('edit-toolbar');if(btn.contains(e.target)||tb.contains(e.target))return;if(e.target.tagName==='INPUT')return;blurCurrent();var el=e.target,allowed=['div','p','span','h1','h2','h3','h4','td','th','strong','b'];while(el&&el!==document.body){if(allowed.indexOf(el.tagName.toLowerCase())!==-1)break;el=el.parentElement;}if(!el||el===document.body)return;if(el.querySelector&&el.querySelector('input'))return;focused=el;if(!el.id)el.id='el-'+Date.now();if(!originalStyles.has(el))originalStyles.set(el,el.getAttribute('style')||'');el.contentEditable='true';el.classList.add('el-focus');el.focus();updateToolbar(el);document.getElementById('et-hint').style.display='none';document.getElementById('et-controls').style.display='flex';});
+  function blurCurrent(){if(focused){saveTextEdit(focused);focused.contentEditable='false';focused.classList.remove('el-focus');focused=null;document.getElementById('et-hint').style.display='';document.getElementById('et-controls').style.display='none';}}
+  function updateToolbar(el){var cs=window.getComputedStyle(el);var fs=parseFloat(cs.fontSize)||14;document.getElementById('et-size-val').textContent=Math.round(fs);document.getElementById('et-bold').classList.toggle('on',parseInt(cs.fontWeight)>=600);document.getElementById('et-italic').classList.toggle('on',cs.fontStyle==='italic');document.getElementById('et-color').value=rgbToHex(cs.color);var lhRaw=cs.lineHeight,lhNum=lhRaw==='normal'?1.4:parseFloat(lhRaw)/fs;var s=document.getElementById('et-lh');s.value=isNaN(lhNum)?1.4:Math.min(3,Math.max(1,lhNum));document.getElementById('et-lh-val').textContent=parseFloat(s.value).toFixed(1);}
+  window.applyStyle=function(p,v){if(focused)focused.style[p]=v;};
+  window.adjustSize=function(d){if(!focused)return;var cur=Math.round(parseFloat(window.getComputedStyle(focused).fontSize)||14),next=Math.max(8,Math.min(72,cur+d));focused.style.fontSize=next+'px';document.getElementById('et-size-val').textContent=next;};
+  window.toggleBold=function(){if(!focused)return;var b=parseInt(window.getComputedStyle(focused).fontWeight)>=600;focused.style.fontWeight=b?'400':'800';document.getElementById('et-bold').classList.toggle('on',!b);};
+  window.toggleItalic=function(){if(!focused)return;var it=window.getComputedStyle(focused).fontStyle==='italic';focused.style.fontStyle=it?'normal':'italic';document.getElementById('et-italic').classList.toggle('on',!it);};
+  window.resetElement=function(){if(!focused)return;focused.style.cssText=originalStyles.get(focused)||'';};
+  window.copyHtml=function(){var h=document.querySelector('.page').outerHTML;navigator.clipboard.writeText(h).then(function(){var b=document.getElementById('et-copy-btn');b.textContent='已複製 ✓';setTimeout(function(){b.textContent='複製 HTML';},2000);});};
+  function rgbToHex(rgb){var m=rgb.match(/\d+/g);if(!m||m.length<3)return '#000000';return '#'+[m[0],m[1],m[2]].map(function(x){return('0'+parseInt(x).toString(16)).slice(-2);}).join('');}
+})();
+(function(){
+  var canvas=null,dragging=null,resizing=null,dragOX=0,dragOY=0,rzS={};
+  function getSL(){return getSaved(L4_LAY);}function putSL(s){putSaved(L4_LAY,s);}
+  function saveItem(id,x,y,w,h){var s=getSL()||{};s[id]={x:Math.round(x),y:Math.round(y),w:Math.round(w),h:h?Math.round(h):null};putSL(s);}
+  function applyPos(el,x,y,w,h){el.style.position='absolute';el.style.left=x+'px';el.style.top=y+'px';el.style.width=w+'px';if(h)el.style.minHeight=h+'px';}
+  function addHandles(el){var dh=document.createElement('div');dh.className='drag-handle';el.insertBefore(dh,el.firstChild);dh.addEventListener('mousedown',function(e){if(!document.body.classList.contains('edit-mode'))return;e.preventDefault();e.stopPropagation();dragging=el;var r=el.getBoundingClientRect();dragOX=e.clientX-r.left;dragOY=e.clientY-r.top;el.classList.add('is-dragging');el.style.zIndex='1000';});['nw','n','ne','e','se','s','sw','w'].forEach(function(dir){var rh=document.createElement('div');rh.className='rh rh-'+dir;el.appendChild(rh);rh.addEventListener('mousedown',function(e){if(!document.body.classList.contains('edit-mode'))return;e.preventDefault();e.stopPropagation();resizing={el:el,dir:dir};rzS={mx:e.clientX,my:e.clientY,w:el.offsetWidth,h:el.offsetHeight,l:parseFloat(el.style.left)||0,t:parseFloat(el.style.top)||0};el.classList.add('is-resizing');el.style.zIndex='1000';});});}
+  document.addEventListener('mousemove',function(e){if(dragging){var cr=canvas.getBoundingClientRect(),x=Math.max(0,e.clientX-cr.left-dragOX),y=Math.max(0,e.clientY-cr.top-dragOY);dragging.style.left=x+'px';dragging.style.top=y+'px';var bot=y+dragging.offsetHeight,cm=parseInt(canvas.style.minHeight)||3000;if(bot+100>cm)canvas.style.minHeight=(bot+300)+'px';}if(resizing){var el=resizing.el,dir=resizing.dir,dx=e.clientX-rzS.mx,dy=e.clientY-rzS.my,w=rzS.w,h=rzS.h,l=rzS.l,t=rzS.t;if(dir.indexOf('e')>=0)w=Math.max(180,rzS.w+dx);if(dir.indexOf('w')>=0){w=Math.max(180,rzS.w-dx);l=rzS.l+(rzS.w-w);}if(dir.indexOf('s')>=0)h=Math.max(80,rzS.h+dy);if(dir.indexOf('n')>=0){h=Math.max(80,rzS.h-dy);t=rzS.t+(rzS.h-h);}el.style.width=w+'px';el.style.minHeight=h+'px';el.style.left=l+'px';el.style.top=t+'px';}});
+  document.addEventListener('mouseup',function(){if(dragging){dragging.classList.remove('is-dragging');dragging.style.zIndex='';saveItem(dragging.dataset.dragId,parseFloat(dragging.style.left)||0,parseFloat(dragging.style.top)||0,dragging.offsetWidth,null);dragging=null;}if(resizing){var el=resizing.el;el.classList.remove('is-resizing');el.style.zIndex='';saveItem(el.dataset.dragId,parseFloat(el.style.left)||0,parseFloat(el.style.top)||0,el.offsetWidth,el.offsetHeight);resizing=null;}});
+  window.resetLayout=function(){localStorage.removeItem(L4_LAY);location.reload();};
+  function initLayout(){canvas=document.getElementById('drag-canvas');if(!canvas)return;var saved=getSL();var items=Array.from(canvas.querySelectorAll('[data-drag-id]'));items.forEach(function(el){addHandles(el);});if(saved&&(!saved['roll-out-card']||!saved['roll-down-card']||!saved['roll-outdown-card'])){saved=null;localStorage.removeItem(L4_LAY);}
+  if(saved){items.forEach(function(el){var s=saved[el.dataset.dragId];if(el.parentElement!==canvas)canvas.appendChild(el);if(s)applyPos(el,s.x,s.y,s.w,s.h);});var maxB=0;items.forEach(function(el){var b=(parseFloat(el.style.top)||0)+el.offsetHeight;if(b>maxB)maxB=b;});canvas.style.minHeight=Math.max(3000,maxB+200)+'px';}
+  else{requestAnimationFrame(function(){requestAnimationFrame(function(){var cr=canvas.getBoundingClientRect(),caps=[];items.forEach(function(el){var r=el.getBoundingClientRect();caps.push({el:el,x:r.left-cr.left,y:r.top-cr.top,w:r.width,h:r.height});});var ns={},maxB=0;caps.forEach(function(p){if(p.el.parentElement!==canvas)canvas.appendChild(p.el);applyPos(p.el,p.x,p.y,p.w,null);ns[p.el.dataset.dragId]={x:Math.round(p.x),y:Math.round(p.y),w:Math.round(p.w),h:null};if(p.y+p.h>maxB)maxB=p.y+p.h;});canvas.style.minHeight=Math.max(3000,maxB+200)+'px';putSL(ns);});});}
+  }
+  window.addEventListener('load',initLayout);
+})();
+</script>
+
+<script>
+var SP=[];for(var _i=20;_i<=80;_i++)SP.push(_i);
+function spP(prices,k,basis){return prices.map(function(s){return Math.min(0,s-k)+basis;});}
+var cRO=null,cRD=null,cROD=null,cCMP=null;
+function ann(k1,b1,k2,b2,c1,c2){return{z:{type:'line',yMin:0,yMax:0,borderColor:'#aaa',borderWidth:1},k1:{type:'line',xMin:k1,xMax:k1,borderColor:c1,borderDash:[4,3],borderWidth:1.5,label:{content:'K='+k1,display:true,position:'start',font:{size:9},color:c1,backgroundColor:'transparent',padding:2}},k2:{type:'line',xMin:k2,xMax:k2,borderColor:c2,borderDash:[4,3],borderWidth:1.5,label:{content:'K='+k2,display:k2!==k1,position:'end',font:{size:9},color:c2,backgroundColor:'transparent',padding:2}},b1:{type:'line',xMin:b1,xMax:b1,borderColor:c1,borderDash:[2,4],borderWidth:1},b2:{type:'line',xMin:b2,xMax:b2,borderColor:c2,borderDash:[2,4],borderWidth:1}};}
+function opts(annotations){return{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},boxWidth:18,padding:10}},tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+': $'+ctx.parsed.y.toFixed(2);}}},annotation:{annotations:annotations}},scales:{x:{title:{display:true,text:'到期股價 ($)',font:{size:10}},ticks:{font:{size:10}}},y:{title:{display:true,text:'每股損益 ($)',font:{size:10}},ticks:{font:{size:10},callback:function(v){return'$'+v.toFixed(2);}}}}};}
+window.addEventListener('load',function(){
+  cRO=new Chart(document.getElementById('chart-ro').getContext('2d'),{type:'line',data:{labels:SP,datasets:[{label:'原始部位（Sep K=60）',data:spP(SP,60,14.96),borderColor:'#C07830',borderDash:[5,4],borderWidth:2,pointRadius:0,fill:false,tension:0},{label:'Roll Out 後（Dec K=60）',data:spP(SP,60,16.40),borderColor:'#2E9E52',borderWidth:2.5,pointRadius:0,fill:false,tension:0}]},options:opts(ann(60,45.04,60,43.60,'#C07830','#2E9E52'))});
+  cRD=new Chart(document.getElementById('chart-rd').getContext('2d'),{type:'line',data:{labels:SP,datasets:[{label:'原始部位（Sep K=60）',data:spP(SP,60,14.96),borderColor:'#C07830',borderDash:[5,4],borderWidth:2,pointRadius:0,fill:false,tension:0},{label:'Roll Down 後（Sep K=55）',data:spP(SP,55,11.50),borderColor:'#3A70C0',borderWidth:2.5,pointRadius:0,fill:false,tension:0}]},options:opts(ann(60,45.04,55,43.50,'#C07830','#3A70C0'))});
+  cROD=new Chart(document.getElementById('chart-rod').getContext('2d'),{type:'line',data:{labels:SP,datasets:[{label:'原始部位（Sep K=60）',data:spP(SP,60,14.96),borderColor:'#C07830',borderDash:[5,4],borderWidth:2,pointRadius:0,fill:false,tension:0},{label:'Roll Out+Down 後（Dec K=55）',data:spP(SP,55,14.20),borderColor:'#7C3AED',borderWidth:2.5,pointRadius:0,fill:false,tension:0}]},options:opts(ann(60,45.04,55,40.80,'#C07830','#7C3AED'))});
+  cCMP=new Chart(document.getElementById('chart-compare').getContext('2d'),{type:'line',data:{labels:SP,datasets:[{label:'原始部位（K=60）',data:spP(SP,60,14.96),borderColor:'#C07830',borderDash:[5,4],borderWidth:2,pointRadius:0,fill:false,tension:0},{label:'Roll Out（K=60）',data:spP(SP,60,16.40),borderColor:'#2E9E52',borderWidth:2,pointRadius:0,fill:false,tension:0},{label:'Roll Down（K=55）',data:spP(SP,55,11.50),borderColor:'#3A70C0',borderWidth:2,pointRadius:0,fill:false,tension:0},{label:'Roll Out+Down（K=55）',data:spP(SP,55,14.20),borderColor:'#7C3AED',borderWidth:2,pointRadius:0,fill:false,tension:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},boxWidth:18}},tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+': $'+ctx.parsed.y.toFixed(2);}}},annotation:{annotations:{z:{type:'line',yMin:0,yMax:0,borderColor:'#aaa',borderWidth:1}}}},scales:{x:{title:{display:true,text:'到期股價 ($)',font:{size:10}},ticks:{font:{size:10}}},y:{title:{display:true,text:'每股損益 ($)',font:{size:10}},ticks:{font:{size:10},callback:function(v){return'$'+v.toFixed(2);}}}}}});
+  setTimeout(function(){calcRollOut();calcRollDown();calcRollOutDown();},200);
+});
+</script>
+
+<script>
+function set(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
+function calcRollOut(){
+  var c=parseFloat(document.getElementById('ro-contracts').value)||4;
+  var k=parseFloat(document.getElementById('ro-strike').value)||60;
+  var cp=parseFloat(document.getElementById('ro-close-price').value)||14.96;
+  var op=parseFloat(document.getElementById('ro-orig-prem').value)||14.96;
+  var np=parseFloat(document.getElementById('ro-new-prem').value)||16.40;
+  var nExp=document.getElementById('ro-new-expiry').value||'12/18/2026';
+  var sh=c*100,net=np-cp,basis=op+net,origBep=k-op,newBep=k-basis,imp=origBep-newBep,isC=net>=0,nt=net*sh;
+  var el=document.getElementById('ro-net-price');el.textContent=Math.abs(net).toFixed(2);el.className='net-price-val '+(isC?'credit':'debit');
+  document.querySelectorAll('input[name="ro-nt"]').forEach(function(r){r.checked=(r.value===(isC?'credit':'debit'));});
+  document.getElementById('ro-net-desc').innerHTML='每股'+(isC?'收':'付')+' $'+Math.abs(net).toFixed(2)+' '+(isC?'Credit':'Debit')+' \xd7 '+sh+' 股 = 總'+(isC?'收入':'費用')+' <strong>'+(nt>=0?'+':'-')+'$'+Math.abs(nt).toFixed(0)+'</strong>';
+  set('ro-orig-bep','$'+origBep.toFixed(2));set('ro-new-bep','$'+newBep.toFixed(2));
+  set('ro-bep-improve',(imp>=0?'▼ ':'▲ ')+'$'+Math.abs(imp).toFixed(2));
+  var ie=document.getElementById('ro-net-income');ie.textContent=(nt>=0?'+':'-')+'$'+Math.abs(nt).toFixed(2);ie.className='calc-value '+(nt>=0?'win':'loss');
+  set('ro-total-prem','$'+basis.toFixed(2)+'／股');
+  set('ro-new-strike-disp',k.toFixed(2));set('ro-q-new-sym','SQQQ '+nExp+' '+k.toFixed(2)+' PUT');set('ro-q-newprice',np.toFixed(2));
+  set('ro-exp-strike',k.toFixed(0));set('ro-exp-close',cp.toFixed(2));set('ro-exp-newstrike',k.toFixed(0));set('ro-exp-newprem',np.toFixed(2));set('ro-exp-net',Math.abs(net).toFixed(2));set('ro-exp-improve',imp.toFixed(2));
+  set('ro-tbl-k',k.toFixed(0));set('ro-tbl-basis',basis.toFixed(2));set('ro-tbl-total',(basis*sh).toFixed(0));
+  ['ro-tbl-bep','ro-tbl-bep2','ro-tbl-bep3'].forEach(function(id){set(id,newBep.toFixed(2));});
+  if(cRO){cRO.data.datasets[0].data=spP(SP,k,op);cRO.data.datasets[1].data=spP(SP,k,basis);cRO.data.datasets[1].label='Roll Out 後（'+nExp+' K='+k.toFixed(0)+'）';var a=cRO.options.plugins.annotation.annotations;a.k1.xMin=a.k1.xMax=k;a.k1.label.content='K='+k.toFixed(0);a.k2.xMin=a.k2.xMax=k;a.k2.label.display=false;a.b1.xMin=a.b1.xMax=origBep;a.b2.xMin=a.b2.xMax=newBep;cRO.update();}
+  if(cCMP){cCMP.data.datasets[0].data=spP(SP,k,op);cCMP.data.datasets[1].data=spP(SP,k,basis);cCMP.data.datasets[1].label='Roll Out（K='+k.toFixed(0)+'）';set('cmp-bep-ro','$'+newBep.toFixed(2));cCMP.update();}
+}
+function calcRollDown(){
+  var c=parseFloat(document.getElementById('rd-contracts').value)||4;
+  var k=parseFloat(document.getElementById('rd-orig-strike').value)||60;
+  var cp=parseFloat(document.getElementById('rd-close-price').value)||14.96;
+  var op=parseFloat(document.getElementById('rd-orig-prem').value)||14.96;
+  var nk=parseFloat(document.getElementById('rd-new-strike').value)||55;
+  var np=parseFloat(document.getElementById('rd-new-prem').value)||11.50;
+  var exp=document.getElementById('rd-orig-expiry').value||'09/18/2026';
+  var sh=c*100,net=np-cp,basis=op+net,origBep=k-op,newBep=nk-basis,sd=k-nk,isC=net>=0,nt=net*sh;
+  var el=document.getElementById('rd-net-price');el.textContent=Math.abs(net).toFixed(2);el.className='net-price-val '+(isC?'credit':'debit');
+  document.querySelectorAll('input[name="rd-nt"]').forEach(function(r){r.checked=(r.value===(isC?'credit':'debit'));});
+  document.getElementById('rd-net-desc').innerHTML='每股'+(isC?'收':'付')+' $'+Math.abs(net).toFixed(2)+' '+(isC?'Credit':'Debit')+' \xd7 '+sh+' 股 = 總'+(isC?'收入':'費用')+' <strong>'+(nt>=0?'+':'-')+'$'+Math.abs(nt).toFixed(0)+'</strong>';
+  set('rd-orig-bep','$'+origBep.toFixed(2));set('rd-new-bep','$'+newBep.toFixed(2));
+  set('rd-strike-drop',(sd>=0?'▼ ':'▲ ')+'$'+Math.abs(sd).toFixed(2));
+  var ie=document.getElementById('rd-net-income');ie.textContent=(nt>=0?'+':'-')+'$'+Math.abs(nt).toFixed(2);ie.className='calc-value '+(nt>=0?'win':'loss');
+  set('rd-total-prem','$'+basis.toFixed(2)+'／股');
+  set('rd-expiry-disp',exp);set('rd-q-new-sym','SQQQ '+exp+' '+nk.toFixed(2)+' PUT');set('rd-q-newprice',np.toFixed(2));
+  set('rd-exp-origstrike',k.toFixed(0));set('rd-exp-close',cp.toFixed(2));set('rd-exp-newstrike',nk.toFixed(0));set('rd-exp-newprem',np.toFixed(2));set('rd-exp-net',Math.abs(net).toFixed(2));set('rd-exp-origstrike2',k.toFixed(0));set('rd-exp-newstrike2',nk.toFixed(0));
+  set('rd-tbl-k',nk.toFixed(0));set('rd-tbl-basis',basis.toFixed(2));set('rd-tbl-total',(basis*sh).toFixed(0));
+  ['rd-tbl-bep','rd-tbl-bep2','rd-tbl-bep3'].forEach(function(id){set(id,newBep.toFixed(2));});
+  if(cRD){cRD.data.datasets[0].data=spP(SP,k,op);cRD.data.datasets[1].data=spP(SP,nk,basis);cRD.data.datasets[1].label='Roll Down 後（'+exp+' K='+nk.toFixed(0)+'）';var a=cRD.options.plugins.annotation.annotations;a.k1.xMin=a.k1.xMax=k;a.k1.label.content='K='+k.toFixed(0);a.k2.xMin=a.k2.xMax=nk;a.k2.label.content='K='+nk.toFixed(0);a.k2.label.display=nk!==k;a.b1.xMin=a.b1.xMax=origBep;a.b2.xMin=a.b2.xMax=newBep;cRD.update();}
+  if(cCMP){cCMP.data.datasets[2].data=spP(SP,nk,basis);cCMP.data.datasets[2].label='Roll Down（K='+nk.toFixed(0)+'）';set('cmp-bep-rd','$'+newBep.toFixed(2));cCMP.update();}
+}
+function calcRollOutDown(){
+  var c=parseFloat(document.getElementById('rod-contracts').value)||4;
+  var k=parseFloat(document.getElementById('rod-orig-strike').value)||60;
+  var cp=parseFloat(document.getElementById('rod-close-price').value)||14.96;
+  var op=parseFloat(document.getElementById('rod-orig-prem').value)||14.96;
+  var nk=parseFloat(document.getElementById('rod-new-strike').value)||55;
+  var np=parseFloat(document.getElementById('rod-new-prem').value)||14.20;
+  var nExp=document.getElementById('rod-new-expiry').value||'12/18/2026';
+  var sh=c*100,net=np-cp,basis=op+net,origBep=k-op,newBep=nk-basis,imp=origBep-newBep,sd=k-nk,isC=net>=0,nt=net*sh;
+  var el=document.getElementById('rod-net-price');el.textContent=Math.abs(net).toFixed(2);el.className='net-price-val '+(isC?'credit':'debit');
+  document.querySelectorAll('input[name="rod-nt"]').forEach(function(r){r.checked=(r.value===(isC?'credit':'debit'));});
+  document.getElementById('rod-net-desc').innerHTML='每股'+(isC?'收':'付')+' $'+Math.abs(net).toFixed(2)+' '+(isC?'Credit':'Debit')+' \xd7 '+sh+' 股 = 總'+(isC?'收入':'費用')+' <strong>'+(nt>=0?'+':'-')+'$'+Math.abs(nt).toFixed(0)+'</strong>';
+  set('rod-orig-bep','$'+origBep.toFixed(2));set('rod-new-bep','$'+newBep.toFixed(2));
+  set('rod-bep-improve',(imp>=0?'▼ ':'▲ ')+'$'+Math.abs(imp).toFixed(2));
+  var ie=document.getElementById('rod-net-income');ie.textContent=(nt>=0?'+':'-')+'$'+Math.abs(nt).toFixed(2);ie.className='calc-value '+(nt>=0?'win':'loss');
+  set('rod-total-prem','$'+basis.toFixed(2)+'／股');
+  set('rod-q-new-sym','SQQQ '+nExp+' '+nk.toFixed(2)+' PUT');set('rod-q-newprice',np.toFixed(2));
+  set('rod-exp-origstrike',k.toFixed(0));set('rod-exp-close',cp.toFixed(2));set('rod-exp-newstrike',nk.toFixed(0));set('rod-exp-newprem',np.toFixed(2));set('rod-exp-net',Math.abs(net).toFixed(2));set('rod-exp-strikedrop',sd.toFixed(0));set('rod-exp-bepimprove',imp.toFixed(2));
+  set('rod-tbl-k',nk.toFixed(0));set('rod-tbl-basis',basis.toFixed(2));set('rod-tbl-total',(basis*sh).toFixed(0));
+  ['rod-tbl-bep','rod-tbl-bep2','rod-tbl-bep3'].forEach(function(id){set(id,newBep.toFixed(2));});
+  if(cROD){cROD.data.datasets[0].data=spP(SP,k,op);cROD.data.datasets[1].data=spP(SP,nk,basis);cROD.data.datasets[1].label='Roll Out+Down 後（'+nExp+' K='+nk.toFixed(0)+'）';var a=cROD.options.plugins.annotation.annotations;a.k1.xMin=a.k1.xMax=k;a.k1.label.content='K='+k.toFixed(0);a.k2.xMin=a.k2.xMax=nk;a.k2.label.content='K='+nk.toFixed(0);a.k2.label.display=nk!==k;a.b1.xMin=a.b1.xMax=origBep;a.b2.xMin=a.b2.xMax=newBep;cROD.update();}
+  if(cCMP){cCMP.data.datasets[3].data=spP(SP,nk,basis);cCMP.data.datasets[3].label='Roll Out+Down（K='+nk.toFixed(0)+'）';set('cmp-bep-rod','$'+newBep.toFixed(2));cCMP.update();}
+}
+</script>
+
+<!-- ═══════════════════ TTS + Font Zoom JS ═══════════════════ -->
+<script>
+(function () {
+  /* ── Font Zoom ── */
+  var _fontZoom = parseFloat(localStorage.getItem('l4-font-zoom') || '1');
+  var _fontBaseMap = new WeakMap();
+  function applyFontZoom() {
+    document.querySelectorAll('#drag-canvas [data-drag-id] *').forEach(function (el) {
+      if (!_fontBaseMap.has(el)) {
+        _fontBaseMap.set(el, parseFloat(window.getComputedStyle(el).fontSize) || 14);
+      }
+      el.style.fontSize = (_fontBaseMap.get(el) * _fontZoom) + 'px';
+    });
+  }
+  function relayoutAfterZoom() {
+    var canvas = document.getElementById('drag-canvas');
+    if (!canvas) return;
+    var panels = Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    if (!panels.length) return;
+    panels.sort(function (a, b) { return (parseFloat(a.style.top) || 0) - (parseFloat(b.style.top) || 0); });
+    var GAP = 16, y = GAP;
+    panels.forEach(function (el) {
+      el.style.top = y + 'px';
+      y += el.getBoundingClientRect().height + GAP;
+    });
+    try { localStorage.removeItem('l4-layout-v3'); } catch (e) {}
+    canvas.style.minHeight = (y + 40) + 'px';
+  }
+  window.adjustPageFont = function (delta) {
+    _fontZoom = Math.max(0.7, Math.min(2.0, parseFloat((_fontZoom + delta * 0.1).toFixed(2))));
+    applyFontZoom();
+    localStorage.setItem('l4-font-zoom', _fontZoom);
+    requestAnimationFrame(function () { requestAnimationFrame(relayoutAfterZoom); });
+  };
+  window.addEventListener('load', function () {
+    if (_fontZoom !== 1) {
+      applyFontZoom();
+      requestAnimationFrame(function () { requestAnimationFrame(relayoutAfterZoom); });
+    }
+  });
+
+  /* ── TTS Script (第4課：Roll Position 滾倉) ── */
+  var SCRIPT = [
+    {
+      id: null, label: '開場白',
+      text: '歡迎來到期權小學堂第四課。這一課的主題是 Roll Position，也就是滾倉策略。當你賣出 CSP 之後，如果股價下跌接近履約價，滾倉是最常用的主動管理方式——它讓你有機會用時間換空間，避免被迫行使或認賠平倉。'
+    },
+    {
+      id: 'what-is-roll', label: '什麼時候需要滾倉',
+      text: '什麼時候需要滾倉？當賣出的 CSP 面臨股價下跌壓力，部位出現未實現虧損時，你有三個選擇：第一，認賠平倉；第二，等待到期被行使；第三，滾倉爭取時間。滾倉的核心邏輯是用時間換空間——買回虧損的 Put，換一個更遠期或更低履約價的 Put 繼續賣，讓股價有更多時間反彈回履約價以上。但要注意，如果你對標的基本面已經失去信心，應直接平倉，而不是無止境地滾倉。'
+    },
+    {
+      id: 'position-card', label: '範例持有部位',
+      text: '本課以一個具體範例貫穿三種滾倉：賣出 4 口 SQQQ 二零二六年九月十八日到期、履約價六十元的 CSP，原始收取的權利金為每股十四點九六美元，合計五千九百八十四美元，損益兩平股價為四十五點零四元。'
+    },
+    {
+      id: 'roll-out-card', label: 'Roll Out 延長到期日',
+      text: 'Roll Out，第一種滾倉方式，只延長到期日，履約價保持不變。操作方式是買回原有的 Put，再以相同履約價賣出更遠月份的 Put。通常可以收到一筆 Credit，也就是淨收入，這筆 Credit 加上原始 premium，共同降低了你的損益兩平點。這是三種方式中最保守的，適合你認為股價只是短期下跌、中長期仍會回升的情況。'
+    },
+    {
+      id: 'roll-down-card', label: 'Roll Down 降低履約價',
+      text: 'Roll Down，第二種滾倉方式，保持相同到期日，但把履約價往下移。因為你換了一個 OTM 更深的履約價，新 Put 的 premium 通常比買回的費用低，所以多半需要支付一筆 Debit。好處是履約價拉遠了，被行使的風險降低。這種方式適合股價已大幅下跌、但你認為到期前不會再繼續跌太多的情況。'
+    },
+    {
+      id: 'roll-outdown-card', label: 'Roll Out+Down 雙向滾倉',
+      text: 'Roll Out 加 Down，第三種也是最靈活的滾倉方式，同時延長到期日並降低履約價。這樣操作通常能達到 Credit 中性甚至小幅收入，同時把履約價往下移，爭取更多保護空間。損益兩平點的改善幅度通常比單純 Roll Down 還要大，是三種方式中防守最全面的選擇，適合股價已明顯下跌且後市仍不確定的情況。'
+    },
+    {
+      id: 'compare-card', label: '三種滾倉比較',
+      text: '透過損益圖比較三種滾倉方式：Roll Out 保持履約價不變，只延長時間，損益兩平點因額外 Credit 而小幅改善；Roll Down 把履約價往下移，但損益兩平點因支付 Debit 而稍微上升；Roll Out 加 Down 結合兩者優點，履約價下移同時損益兩平點也明顯改善。每種方式各有適用場景，要根據你對後市的判斷來選擇。'
+    },
+    {
+      id: 'summary-table', label: '策略比較總表',
+      text: '策略比較總表整理了三種滾倉方式的關鍵差異：Roll Out 通常帶來 Credit，履約價不變；Roll Down 通常需要 Debit，履約價下移；Roll Out 加 Down 最靈活，Credit 與 Debit 視市況而定，履約價也往下移。選擇哪種方式，取決於你對後市的看法、手中的現金水位，以及你願意承擔的時間風險。'
+    },
+    {
+      id: 'insight-grid', label: '關鍵洞察',
+      text: '最後是四個關鍵洞察。第一，滾倉不是逃避，是主動管理。第二，Credit 滾倉優先，能收到 Credit 的滾倉方式不消耗資金，是最理想的情況。第三，無限滾倉有風險，如果標的持續下跌，每次滾倉都只是延遲損失，要設好停損條件。第四，滾倉前先問自己：對這個標的還有信心嗎？如果沒有，及時認賠比繼續滾倉更理性。'
+    }
+  ];
+
+  var ttsIdx = 0, ttsPlaying = false, ttsPaused = false, ttsRate = 0.9;
+  var activePanelId = null;
+
+  function initDots() {
+    var c = document.getElementById('tts-dots');
+    c.innerHTML = '';
+    SCRIPT.forEach(function (s, i) {
+      var d = document.createElement('div');
+      d.className = 'tts-dot'; d.id = 'tts-dot-' + i; d.title = s.label;
+      d.onclick = function () { ttsJumpTo(i); };
+      c.appendChild(d);
+    });
+  }
+
+  function updateDots() {
+    SCRIPT.forEach(function (_, i) {
+      var d = document.getElementById('tts-dot-' + i);
+      if (!d) return;
+      d.className = 'tts-dot' + (i < ttsIdx ? ' done' : i === ttsIdx ? ' current' : '');
+    });
+  }
+
+  function setActivePanel(id) {
+    if (activePanelId) {
+      var prev = document.getElementById(activePanelId);
+      if (prev) prev.classList.remove('tts-active');
+    }
+    activePanelId = id;
+    if (id) {
+      var el = document.getElementById(id);
+      if (el) { el.classList.add('tts-active'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+    }
+  }
+
+  function updateUI() {
+    var btn = document.getElementById('tts-play-btn');
+    var sec = document.getElementById('tts-section-name');
+    if (ttsPlaying && !ttsPaused) {
+      btn.textContent = '⏸ 暫停'; btn.className = 'tts-btn playing';
+    } else if (ttsPaused) {
+      btn.textContent = '▶ 繼續'; btn.className = 'tts-btn';
+    } else if (ttsIdx >= SCRIPT.length) {
+      btn.textContent = '↺ 重新朗讀'; btn.className = 'tts-btn';
+    } else {
+      btn.textContent = ttsIdx === 0 ? '▶ 朗讀全文' : '▶ 繼續朗讀'; btn.className = 'tts-btn';
+    }
+    sec.textContent = ttsIdx < SCRIPT.length ? '▸ ' + SCRIPT[ttsIdx].label : '✓ 朗讀完畢';
+    setActivePanel(ttsIdx < SCRIPT.length ? SCRIPT[ttsIdx].id : null);
+    updateDots();
+  }
+
+  function showSubtitle(text) {
+    var el = document.getElementById('tts-subtitle');
+    if (!el) return;
+    el.innerHTML = text.split('').map(function (c, i) {
+      var s = c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '&' ? '&amp;' : c;
+      return '<span class="sub-c" id="sc-' + i + '">' + s + '</span>';
+    }).join('');
+    el.scrollTop = 0; el.classList.add('active');
+  }
+
+  function clearSubtitle() {
+    var el = document.getElementById('tts-subtitle');
+    if (el) { el.innerHTML = ''; el.classList.remove('active'); }
+  }
+
+  function speakSection() {
+    if (!ttsPlaying) return;
+    if (ttsIdx >= SCRIPT.length) { ttsPlaying = false; ttsIdx = 0; updateUI(); return; }
+    updateUI();
+    var item = SCRIPT[ttsIdx];
+    var utt = new SpeechSynthesisUtterance(item.text);
+    utt.lang = 'zh-TW'; utt.rate = ttsRate; utt.pitch = 1.0;
+    showSubtitle(item.text);
+    utt.onboundary = function (e) {
+      var chars = document.querySelectorAll('#tts-subtitle .sub-c');
+      var len = e.charLength || 1;
+      chars.forEach(function (c, i) {
+        c.className = 'sub-c' + (i < e.charIndex ? ' done' : i < e.charIndex + len ? ' now' : '');
+      });
+      var cur = document.getElementById('sc-' + e.charIndex);
+      if (cur) cur.scrollIntoView({ block: 'nearest' });
+    };
+    utt.onend = function () { if (!ttsPlaying) return; ttsIdx++; setTimeout(speakSection, 350); };
+    utt.onerror = function (e) { if (e.error === 'interrupted') return; if (!ttsPlaying) return; ttsIdx++; speakSection(); };
+    setTimeout(function () { speechSynthesis.speak(utt); }, 50);
+  }
+
+  window.ttsToggle = function () {
+    if (speechSynthesis.speaking && !speechSynthesis.paused) {
+      speechSynthesis.pause(); ttsPlaying = false; ttsPaused = true; updateUI();
+    } else if (speechSynthesis.paused) {
+      speechSynthesis.resume(); ttsPlaying = true; ttsPaused = false; updateUI();
+    } else {
+      if (ttsIdx >= SCRIPT.length) ttsIdx = 0;
+      ttsPlaying = true; ttsPaused = false; speakSection();
+    }
+  };
+
+  window.ttsStop = function () {
+    speechSynthesis.cancel(); clearSubtitle();
+    ttsPlaying = false; ttsPaused = false; ttsIdx = 0;
+    setActivePanel(null);
+    document.getElementById('tts-section-name').textContent = '點擊「朗讀全文」開始';
+    updateDots();
+    document.getElementById('tts-play-btn').textContent = '▶ 朗讀全文';
+    document.getElementById('tts-play-btn').className = 'tts-btn';
+  };
+
+  window.ttsJumpTo = function (i) { speechSynthesis.cancel(); ttsIdx = i; ttsPlaying = true; ttsPaused = false; setTimeout(speakSection, 80); };
+  window.ttsSetRate = function (v) { ttsRate = parseFloat(v); };
+
+  /* ── Volume control ── */
+  var volEl = document.getElementById('tts-vol');
+  if (volEl) volEl.addEventListener('input', function () {
+    /* SpeechSynthesisUtterance volume is set per utterance; store for next */
+    window._ttsVol = parseFloat(this.value);
+  });
+
+  initDots();
+}());
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>期權小學堂 · 第10課 · 各股市場情緒及走勢分析</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#FAF3E8;--page-bg:#FFF9F2;--panel-bg:#FFFCF7;
+  --ink:#2A1A0E;--muted:#7A6555;--border:#E2D4C2;
+  --gold:#D4900A;--gold-bg:#FEF4D8;--gold-bdr:#E8B840;
+  --green:#2E9E52;--green-bg:#E8F8EE;--green-bdr:#8ED4A8;
+  --red:#D04040;--red-bg:#FDEAEA;--red-bdr:#F5AAAA;
+  --blue:#3A70C0;--blue-bg:#EBF2FF;--blue-bdr:#9ABCE8;
+  --teal:#0E8C7A;--teal-bg:#E6F8F5;--teal-bdr:#7AD4C4;
+  --r-lg:16px;--r-md:10px;--r-sm:6px;
+}
+body{background:var(--bg);font-family:"PingFang TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif;padding:0;margin:0;padding-top:52px;padding-bottom:80px;}
+
+/* TTS BAR */
+#tts-bar{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;gap:6px;background:#1C1410;padding:8px 14px;box-shadow:0 2px 12px rgba(0,0,0,.3);}
+.tts-btn{background:#2E2018;color:#D4C4A8;border:1px solid #4A3828;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;}
+.tts-btn:hover{background:#3A2820;}
+.tts-sep{width:1px;height:20px;background:#4A3828;margin:0 2px;}
+.tts-dot-row{display:flex;align-items:center;gap:4px;margin:0 4px;}
+.tts-dot{width:8px;height:8px;border-radius:100px;background:#4A3828;transition:background .2s;}
+.tts-dot.done{background:var(--gold);}
+.tts-dot.active{background:#E8E0D0;}
+#tts-sect-label{font-size:11px;color:#7A6555;margin-left:4px;}
+.tts-vol{accent-color:var(--gold);width:80px;}
+.tts-size-grp{display:flex;align-items:center;gap:4px;margin-left:auto;}
+.tts-sz-btn{background:#2E2018;color:#D4C4A8;border:1px solid #4A3828;border-radius:5px;padding:3px 9px;font-size:13px;font-weight:700;cursor:pointer;}
+.tts-sz-btn:hover{background:#3A2820;}
+
+/* PAGE */
+.page{background:var(--page-bg);max-width:100%;width:100%;padding:20px 8px 36px;}
+#drag-canvas{position:relative;width:100%;min-height:640px;}
+
+/* PANELS */
+.course-tag{display:inline-flex;align-items:center;gap:6px;background:var(--ink);color:#FFF9F0;font-size:12px;font-weight:700;padding:5px 14px;border-radius:100px;letter-spacing:1px;}
+.panel{background:var(--panel-bg);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:20px 22px;position:relative;overflow:visible;}
+.page-title{font-size:32px;font-weight:900;color:var(--ink);line-height:1.2;}
+.page-subtitle{font-size:14px;color:var(--muted);margin-top:4px;font-weight:500;}
+.page-desc{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.6;}
+.page-header{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:start;}
+.section-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:100px;background:var(--ink);color:#FFF9F0;font-size:13px;font-weight:900;flex-shrink:0;}
+.section-label{font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 8px;}
+.tag-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.ptitle{font-size:20px;font-weight:900;color:var(--ink);margin-bottom:12px;}
+.bullet{display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.75;color:var(--ink);padding:4px 6px;border-radius:6px;transition:background .15s;}
+.bullet:hover{background:#EEE8FF;}
+.bullet-num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:100px;background:var(--border);color:var(--ink);font-size:11px;font-weight:800;flex-shrink:0;margin-top:2px;}
+
+/* INFO / SIGNAL BOXES */
+.info-box{background:var(--blue-bg);border:1.5px solid var(--blue-bdr);border-radius:var(--r-md);padding:12px 14px;margin-top:14px;}
+.info-box-title{font-size:12px;font-weight:800;color:var(--blue);margin-bottom:6px;}
+.info-box-body{font-size:12px;color:var(--ink);line-height:1.9;}
+.signal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+.signal-box{border-radius:var(--r-md);padding:12px 14px;font-size:12px;line-height:1.75;}
+.signal-box.call-box{background:var(--green-bg);border:1.5px solid var(--green-bdr);}
+.signal-box.put-box{background:var(--red-bg);border:1.5px solid var(--red-bdr);}
+.signal-box-title{font-size:13px;font-weight:800;margin-bottom:6px;}
+.signal-box-title.call{color:var(--green);}
+.signal-box-title.put{color:var(--red);}
+.warn-box{background:#FFF7C0;border:1.5px solid var(--gold-bdr);border-radius:var(--r-md);padding:10px 12px;margin-top:12px;font-size:12px;color:var(--ink);line-height:1.75;}
+
+/* RESIZE HANDLE */
+.resize-handle{position:absolute;bottom:4px;right:6px;width:14px;height:14px;cursor:se-resize;color:var(--border);font-size:14px;line-height:1;user-select:none;}
+
+/* ─── TOOL SECTION ─── */
+#flow-tool-section{margin-top:24px;background:var(--panel-bg);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:24px;}
+.tool-header{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid var(--border);}
+.tool-title{font-size:22px;font-weight:900;color:var(--ink);}
+.tool-subtitle{font-size:12px;color:var(--muted);margin-top:3px;}
+
+/* Upload */
+.upload-zone{border:2px dashed var(--teal-bdr);border-radius:var(--r-lg);padding:32px;text-align:center;background:var(--teal-bg);cursor:pointer;transition:background .2s,border-color .2s;margin-bottom:20px;}
+.upload-zone:hover,.upload-zone.drag-over{background:#C0EEE8;border-color:var(--teal);}
+.upload-icon{font-size:40px;margin-bottom:10px;}
+.upload-text{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px;}
+.upload-hint{font-size:12px;color:var(--muted);}
+#csv-file-input{display:none;}
+#upload-status{display:none;margin-bottom:12px;padding:10px 14px;border-radius:var(--r-md);font-size:13px;font-weight:700;}
+
+/* Tabs */
+.tabs-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid var(--border);min-height:40px;}
+.tab-btn{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:var(--page-bg);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;}
+.tab-btn:hover{background:var(--teal-bg);border-color:var(--teal-bdr);color:var(--teal);}
+.tab-btn.active{background:var(--ink);color:#FFF9F0;border-color:var(--ink);}
+.tab-close{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:100px;background:transparent;color:inherit;font-size:13px;cursor:pointer;border:none;padding:0;line-height:1;opacity:.6;}
+.tab-close:hover{opacity:1;}
+#no-data-msg{text-align:center;padding:48px 24px;color:var(--muted);font-size:14px;line-height:2;}
+#analysis-content{display:none;}
+
+/* Summary cards */
+.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+.summary-card{border-radius:var(--r-md);padding:14px 16px;text-align:center;}
+.summary-card.s-total{background:var(--blue-bg);border:1.5px solid var(--blue-bdr);}
+.summary-card.s-call{background:var(--green-bg);border:1.5px solid var(--green-bdr);}
+.summary-card.s-put{background:var(--red-bg);border:1.5px solid var(--red-bdr);}
+.summary-card.s-ratio{background:var(--gold-bg);border:1.5px solid var(--gold-bdr);}
+.sc-label{font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;}
+.sc-value{font-size:26px;font-weight:900;color:var(--ink);}
+.sc-value.v-call{color:var(--green);}
+.sc-value.v-put{color:var(--red);}
+.sc-value.v-gold{color:var(--gold);}
+.sc-sub{font-size:11px;color:var(--muted);margin-top:4px;}
+
+/* Analysis tables */
+.analysis-block{margin-bottom:24px;}
+.analysis-block-title{font-size:14px;font-weight:800;color:var(--ink);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.blk-badge{font-size:10px;font-weight:700;letter-spacing:1px;padding:2px 8px;border-radius:4px;background:var(--teal-bg);color:var(--teal);border:1px solid var(--teal-bdr);}
+.flow-table{width:100%;border-collapse:collapse;font-size:12px;border-radius:var(--r-md);overflow:hidden;border:1px solid var(--border);}
+.flow-table th{background:#F0E8DC;color:var(--ink);padding:8px 10px;font-weight:800;font-size:11px;text-align:left;border-bottom:1.5px solid var(--border);white-space:nowrap;}
+.flow-table td{padding:7px 10px;border-bottom:1px solid #F0E8DC;vertical-align:middle;}
+.flow-table tbody tr:hover td{background:#EEE8FF;}
+.flow-table tbody tr:last-child td{border-bottom:none;}
+.td-call{color:var(--green);font-weight:700;}
+.td-put{color:var(--red);font-weight:700;}
+.td-ask{color:var(--green);font-weight:700;cursor:help;}
+.td-bid{color:var(--red);font-weight:700;cursor:help;}
+.td-mid{color:var(--gold);font-weight:700;cursor:help;}
+  /* Driver.js leaps-popover：固定在 TTS bar 正下方，水平置中，不遮表格 */
+  .driver-popover.leaps-popover{
+    position:fixed!important;
+    top:220px!important;
+    left:50%!important;
+    transform:translateX(-50%)!important;
+    right:auto!important;
+    bottom:auto!important;
+    max-width:min(680px,90vw)!important;
+    cursor:move!important;
+    z-index:100001!important;
+  }
+.driver-overlay,.driver-overlay *{pointer-events:none!important;}
+.td-money{font-weight:700;font-family:monospace;font-size:11.5px;}
+.td-big{color:var(--gold);font-weight:900;}
+.expiry-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.expiry-chip{padding:4px 12px;border-radius:100px;background:var(--teal-bg);color:var(--teal);border:1px solid var(--teal-bdr);font-size:12px;font-weight:700;}
+
+/* Fixed buttons */
+.reset-btn{position:fixed;bottom:16px;right:110px;background:#2E2018;color:#D4C4A8;border:1px solid #4A3828;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;z-index:900;}
+.reset-btn:hover{background:#3A2820;}
+.edit-mode-btn{position:fixed;bottom:16px;right:16px;background:var(--ink);color:#FFF9F0;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;z-index:900;}
+
+/* Exp Type badges */
+.exp-badge{display:inline-flex;align-items:center;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:0.5px;margin-left:4px;vertical-align:middle;}
+.exp-badge.w{background:#F0E8FF;color:#7A3FC0;border:1px solid #C4A0F0;}
+.exp-badge.m{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-bdr);}
+/* Filter bar */
+.filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:10px 14px;background:var(--gold-bg);border:1.5px solid var(--gold-bdr);border-radius:var(--r-md);flex-wrap:wrap;}
+.filter-bar-label{font-size:12px;font-weight:700;color:var(--muted);}
+.filter-btn{padding:5px 14px;border-radius:6px;border:1.5px solid var(--border);background:var(--page-bg);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;}
+.filter-btn:hover{background:var(--teal-bg);border-color:var(--teal-bdr);color:var(--teal);}
+.filter-btn.active{background:var(--ink);color:#FFF9F0;border-color:var(--ink);}
+/* W/M stats grid */
+.wm-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px;}
+.wm-card{border-radius:var(--r-md);padding:14px 16px;}
+.wm-card.wk{background:#F8F0FF;border:1.5px solid #C4A0F0;}
+.wm-card.mn{background:var(--blue-bg);border:1.5px solid var(--blue-bdr);}
+.wm-card-title{font-size:13px;font-weight:800;margin-bottom:10px;}
+.wm-card-title.wk{color:#7A3FC0;}
+.wm-card-title.mn{color:var(--blue);}
+.wm-stat-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:12px;}
+.wm-stat-row:last-child{border-bottom:none;}
+.wm-stat-val{font-weight:700;}
+
+/* Sentiment bars */
+.sentiment-bars-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.sb-block{background:var(--page-bg);border:1.5px solid var(--border);border-radius:var(--r-md);padding:14px 16px;}
+.sb-title{font-size:12px;font-weight:800;color:var(--ink);text-align:center;margin-bottom:8px;}
+.sb-net-val{font-size:15px;font-weight:900;display:inline-block;margin-left:6px;}
+.sb-net-val.pos{color:var(--green);}
+.sb-net-val.neg{color:var(--red);}
+.sb-net-val.zero{color:var(--muted);}
+.sb-side-labels{display:flex;justify-content:space-between;font-size:10px;font-weight:700;margin-bottom:4px;}
+.sb-side-labels .sl{color:var(--red);}
+.sb-side-labels .sr{color:var(--green);}
+.sb-track{display:flex;height:18px;border-radius:9px;overflow:hidden;border:1px solid var(--border);}
+.sb-bear-fill{background:linear-gradient(to right,#F5AAAA,#FDEAEA);flex-shrink:0;}
+.sb-marker{width:4px;background:rgba(42,26,14,0.55);flex-shrink:0;}
+.sb-bull-fill{background:linear-gradient(to left,#8ED4A8,#E8F8EE);flex:1;}
+.sb-amounts{display:flex;justify-content:space-between;font-size:10px;font-family:monospace;margin-top:5px;}
+.sb-amounts .sa-l{color:var(--red);font-weight:700;}
+.sb-amounts .sa-r{color:var(--green);font-weight:700;}
+</style>
+</head>
+<body>
+
+<!-- TTS Bar -->
+<div id="tts-bar">
+  <button class="tts-btn" id="tts-play" onclick="ttsToggle()">▶ 朗讀全文</button>
+  <button class="tts-btn" id="tts-stop" onclick="ttsStop()" style="display:none;">■</button>
+  <div class="tts-dot-row" id="tts-dots"></div>
+  <span id="tts-sect-label">▶ 開場白</span>
+  <div class="tts-sep"></div>
+  <input type="range" class="tts-vol" id="tts-vol" min="0" max="1" step="0.05" value="0.9" oninput="ttsSetVol(this.value)">
+  <div class="tts-size-grp">
+    <button class="tts-sz-btn" onclick="adjustPageFont(-1)">A−</button>
+    <button class="tts-sz-btn" onclick="adjustPageFont(1)">A+</button>
+  </div>
+</div>
+
+<div class="page">
+  <div id="drag-canvas">
+
+    <!-- Course Tag -->
+    <div class="course-tag" data-drag-id="l10-course-tag">📚 期權小學堂 · 第10課</div>
+
+    <!-- Header Panel -->
+    <div class="panel" data-drag-id="l10-header">
+      <div class="page-header">
+        <div>
+          <div class="page-title">各股市場情緒 📊</div>
+          <div class="page-subtitle">Options Flow Analysis <span style="font-size:0.78em;font-weight:700;color:var(--teal);background:var(--teal-bg);border:1px solid var(--teal-bdr);border-radius:6px;padding:2px 8px;margin-left:6px;vertical-align:middle;">期權資金流向分析</span></div>
+          <div class="page-desc">上傳 Barchart Options Flow CSV，即時解析各股的 Call/Put 資金流向、大單押注方向，判讀市場主力對個股的情緒與走勢預期。資料自動存於本機（IndexedDB），支援多檔歷史切換。</div>
+          <div class="info-box">
+            <div class="info-box-title">📌 使用流程</div>
+            <div class="info-box-body">
+              ① 前往 <strong>Barchart.com</strong> → 搜尋股票 → 點 Options → Options Flow<br>
+              ② 點右上角 <strong>Download CSV</strong> 下載當日期權流向資料<br>
+              ③ 在下方工具區<strong>上傳 CSV</strong> → 自動解析並存於本機<br>
+              ④ 切換標籤查看歷史記錄，分析 Call/Put 比值與大單方向
+            </div>
+          </div>
+        </div>
+        <div style="min-width:195px;max-width:220px;background:var(--gold-bg);border:2px solid var(--gold-bdr);border-radius:var(--r-lg);padding:14px 16px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;">⚖ 情緒判讀基準</div>
+          <div style="font-size:12.5px;color:var(--ink);line-height:2.1;">
+            <div style="font-weight:700;">Call Premium ÷ Put Premium</div>
+            <div style="color:var(--green);font-weight:800;">≥ 1.5 → 市場情緒偏向看多 🟢</div>
+            <div style="color:var(--red);font-weight:800;">≤ 0.67 → 市場情緒偏向看空 🔴</div>
+            <div style="color:var(--muted);">中間值 → 方向中立 ⚪</div>
+            <hr style="border:none;border-top:1px solid var(--gold-bdr);margin:8px 0;">
+            <div style="font-size:11px;color:var(--muted);">大單定義：單筆 Premium<br>≥ $500,000 → <strong style="color:var(--gold);">🏅 機構級</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- What is Options Flow -->
+    <div class="panel" data-drag-id="l10-what">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="section-num">1</div>
+          <div class="section-label">WHAT IS OPTIONS FLOW</div>
+        </div>
+        <span style="font-size:11px;color:var(--muted);">期權資金流向</span>
+      </div>
+      <div class="ptitle">什麼是 Options Flow？</div>
+      <div class="bullet"><span class="bullet-num">①</span><span>Options Flow 是期權市場上<strong>每一筆真實成交紀錄</strong>的彙整，記錄了 Strike、到期日、Call/Put 方向、成交量、Premium（權利金總額）等完整資訊。</span></div>
+      <div class="bullet"><span class="bullet-num">②</span><span><strong>Premium 大小</strong>才是判斷「有無大資金押注」的關鍵。一筆 <strong style="color:var(--gold);">$500,000</strong> 以上的期權交易，很可能來自機構或對沖基金，不是散戶行為。</span></div>
+      <div class="bullet" id="side-bullet-row"><span class="bullet-num">③</span><span><strong>成交方向（Side）</strong>最重要 <button id="side-info-btn" onclick="window.showSideExplain()" style="background:none;border:1.5px solid var(--gold);border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;color:var(--gold);line-height:1;padding:0;vertical-align:middle;">?</button>：<code id="side-ask-code" style="background:var(--green-bg);color:var(--green);padding:1px 5px;border-radius:4px;font-weight:700;">ask</code> = 主動買入（看多/看空意圖強）；<code id="side-bid-code" style="background:var(--red-bg);color:var(--red);padding:1px 5px;border-radius:4px;font-weight:700;">bid</code> = 主動賣出（通常是造市商賣期權收保費）；<code id="side-mid-code" style="background:var(--gold-bg);color:var(--gold);padding:1px 5px;border-radius:4px;font-weight:700;">mid</code> = 中間價成交（方向不明，不計入情緒指標）。</span></div>
+      <div class="bullet"><span class="bullet-num">④</span><span>從 <strong>Barchart.com</strong> 可免費下載個股的 Options Flow CSV，欄位涵蓋 Symbol、Type、Strike、Expires、DTE、Size、Side、Premium、Delta 等。</span></div>
+    </div>
+
+    <!-- Signal Reading -->
+    <div class="panel" data-drag-id="l10-signals">
+      <div class="tag-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="section-num">2</div>
+          <div class="section-label">SIGNAL READING</div>
+        </div>
+        <span style="font-size:11px;color:var(--muted);">信號解讀</span>
+      </div>
+      <div class="ptitle">如何判讀市場情緒？</div>
+      <div class="signal-grid">
+        <div class="signal-box call-box">
+          <div class="signal-box-title call">🟢 看多信號（Bullish）</div>
+          <div>• 大筆 <strong>ask-side Call</strong> 成交</div>
+          <div>• Call Premium 顯著 &gt; Put Premium</div>
+          <div>• 高 Delta Call（≥ 0.70）大量買入</div>
+          <div>• 長 DTE Call（&gt;180天）機構押注</div>
+          <div>• 價外 Strike 大量成交</div>
+        </div>
+        <div class="signal-box put-box">
+          <div class="signal-box-title put">🔴 看空信號（Bearish）</div>
+          <div>• 大筆 <strong>ask-side Put</strong> 成交</div>
+          <div>• Put Premium 顯著 &gt; Call Premium</div>
+          <div>• 低行使價 Put 大量買入</div>
+          <div>• 短 DTE Put（&lt;30天）短線對沖</div>
+          <div>• 價外 Put 異常大量成交</div>
+        </div>
+      </div>
+      <div class="warn-box">
+        ⚠️ <strong>注意</strong>：Options Flow 只是<strong>情緒指標</strong>，不代表方向一定正確。機構也可能用期權做<strong>對沖</strong>（與持股方向相反）。建議搭配<strong>技術面與基本面</strong>一起判斷，不可單一指標決策。
+      </div>
+    </div>
+
+  </div><!-- /drag-canvas -->
+
+  <!-- ─── FULL-WIDTH TOOL SECTION ─── -->
+  <div id="flow-tool-section">
+    <div class="tool-header">
+      <span style="font-size:32px;">🔬</span>
+      <div>
+        <div class="tool-title">Options Flow 分析工具</div>
+        <div class="tool-subtitle">上傳 Barchart CSV → 自動解析存檔 → 多檔標籤切換歷史記錄</div>
+      </div>
+    </div>
+
+    <div class="upload-zone" id="upload-zone" onclick="document.getElementById('csv-file-input').click()">
+      <div class="upload-icon">📂</div>
+      <div class="upload-text">點擊上傳 CSV，或將檔案拖曳至此</div>
+      <div class="upload-hint">Barchart.com → Options Flow → 右上角 Download CSV</div>
+      <input type="file" id="csv-file-input" accept=".csv" onchange="handleFileUpload(this.files[0])">
+    </div>
+
+    <div id="upload-status"></div>
+    <div class="tabs-bar" id="tabs-bar"></div>
+    <div id="no-data-msg">📭 尚未上傳任何資料。<br>上傳 CSV 後，資料將自動存於本機並顯示於此。<br><span style="font-size:11px;">資料存於瀏覽器 IndexedDB，清除瀏覽器資料後會消失。</span></div>
+
+    <div id="analysis-content">
+      <div id="sentiment-bars"></div>
+      <div class="summary-grid" id="summary-grid"></div>
+      <div id="filter-bar-container"></div>
+      <div id="analysis-blocks"></div>
+      <div id="wm-stats-block"></div>
+    </div>
+  </div>
+</div>
+
+<button class="reset-btn" onclick="resetLayout()">↺ 重設版面</button>
+<button class="edit-mode-btn" onclick="toggleEditMode()">✏ 編輯模式</button>
+
+<script>
+// ── FONT ZOOM (with relayoutAfterZoom) ──
+(function(){
+  var _fontZoom = parseFloat(localStorage.getItem('l10-font-zoom') || '1');
+  var _fontBaseMap = new WeakMap();
+
+  function applyFontZoom(){
+    document.querySelectorAll(
+      '#drag-canvas .panel *, #drag-canvas .course-tag *'
+    ).forEach(function(el){
+      if(!_fontBaseMap.has(el)){
+        _fontBaseMap.set(el, parseFloat(window.getComputedStyle(el).fontSize) || 14);
+      }
+      el.style.fontSize = (_fontBaseMap.get(el) * _fontZoom) + 'px';
+    });
+  }
+
+  function relayoutAfterZoom(){
+    var canvas = document.getElementById('drag-canvas');
+    if(!canvas) return;
+    var tagEl  = canvas.querySelector('[data-drag-id="l10-course-tag"]');
+    var hdrEl  = canvas.querySelector('[data-drag-id="l10-header"]');
+    var whatEl = canvas.querySelector('[data-drag-id="l10-what"]');
+    var sigEl  = canvas.querySelector('[data-drag-id="l10-signals"]');
+    if(!tagEl||!hdrEl||!whatEl||!sigEl) return;
+    /* 保留兩欄結構：tag → hdr（全寬）→ what + signals 並排（同一 Y）*/
+    var GAP = 8, y = GAP;
+    tagEl.style.top  = y + 'px';
+    y += tagEl.getBoundingClientRect().height + GAP;
+    hdrEl.style.top  = y + 'px';
+    y += hdrEl.getBoundingClientRect().height + GAP;
+    whatEl.style.top = y + 'px';
+    sigEl.style.top  = y + 'px';
+    /* 更新 localStorage（key v2）*/
+    try{
+      var lay = {};
+      [tagEl,hdrEl,whatEl,sigEl].forEach(function(el){
+        lay[el.dataset.dragId] = {
+          x: parseFloat(el.style.left)||0, y: parseFloat(el.style.top)||0,
+          w: el.offsetWidth, h: null
+        };
+      });
+      localStorage.setItem('l10-layout-v3', JSON.stringify(lay));
+    }catch(e){}
+    /* 字型縮放後更新 canvas 高度，防止 flow-tool-section 疊圖 */
+    var _maxH = 0;
+    [tagEl,hdrEl,whatEl,sigEl].forEach(function(el){
+      _maxH = Math.max(_maxH, el.offsetTop + el.offsetHeight);
+    });
+    canvas.style.minHeight = (_maxH + 40) + 'px';
+  }
+
+  window.adjustPageFont = function(d){
+    _fontZoom = Math.max(0.7, Math.min(2.0, parseFloat((_fontZoom + d*0.1).toFixed(2))));
+    applyFontZoom();
+    localStorage.setItem('l10-font-zoom', _fontZoom);
+    requestAnimationFrame(function(){ requestAnimationFrame(relayoutAfterZoom); });
+  };
+
+  window.addEventListener('load', function(){
+    if(_fontZoom !== 1){
+      applyFontZoom();
+      requestAnimationFrame(function(){ requestAnimationFrame(relayoutAfterZoom); });
+    }
+  });
+})();
+
+// ── TTS ──
+(function(){
+  const SECTS = [
+    { label:'開場白', text:'第10課，各股市場情緒及走勢分析。本課教你使用期權資金流向數據，判讀市場主力對個股的多空情緒，並透過分析工具解析 Barchart 下載的 CSV 數據。' },
+    { label:'期權資金流向', text:'Options Flow 是期權市場上每一筆真實成交紀錄的彙整。Premium大小是判斷是否有大資金押注的關鍵，五十萬美元以上的交易很可能來自機構。成交方向很重要：ask代表主動買入，bid代表主動賣出，ask-side成交意圖更強。' },
+    { label:'信號解讀', text:'看多信號：大筆ask-side Call成交、Call Premium顯著大於Put Premium、高Delta Call或長天期Call大量買入。看空信號：大筆ask-side Put成交、Put Premium顯著大於Call Premium。注意Options Flow只是情緒指標，建議搭配技術面與基本面一起判斷，不可單一指標決策。' },
+  ];
+  let idx = 0, utt = null, speaking = false;
+  const dots = document.getElementById('tts-dots');
+  const lbl  = document.getElementById('tts-sect-label');
+  SECTS.forEach((_, i) => { const d = document.createElement('div'); d.className='tts-dot'; d.id='dot-'+i; dots.appendChild(d); });
+  function render(){
+    SECTS.forEach((_,i)=>{ document.getElementById('dot-'+i).className='tts-dot'+(i<idx?' done':i===idx?' active':''); });
+    if(lbl) lbl.textContent='▶ '+(SECTS[idx]?SECTS[idx].label:'完成');
+    document.getElementById('tts-play').textContent = speaking ? '⏸ 暫停' : '▶ 朗讀全文';
+    document.getElementById('tts-stop').style.display = speaking ? 'inline-flex' : 'none';
+  }
+  function speak(){
+    if(!window.speechSynthesis || idx>=SECTS.length){ speaking=false; render(); return; }
+    utt=new SpeechSynthesisUtterance(SECTS[idx].text);
+    utt.lang='zh-TW'; utt.volume=parseFloat(document.getElementById('tts-vol').value);
+    utt.onend=()=>{ idx++; idx<SECTS.length ? speak() : (speaking=false, idx=0, render()); };
+    window.speechSynthesis.speak(utt); speaking=true; render();
+  }
+  window.ttsToggle=function(){ if(!speaking){ speak(); } else { window.speechSynthesis.pause(); speaking=false; render(); } };
+  window.ttsStop=function(){ window.speechSynthesis.cancel(); speaking=false; idx=0; render(); };
+  window.ttsSetVol=function(v){ if(utt) utt.volume=v; };
+  render();
+})();
+
+// ── DRAG LAYOUT ──
+(function(){
+  const KEY = 'l10-layout-v3';
+  const REQUIRED = ['l10-course-tag','l10-header','l10-what','l10-signals'];
+  /* 參照 lesson9 layoutPass 做法：
+     逐步定位每個元素，定位後立即用 getBoundingClientRect().height 讀實際高度，
+     再計算下一個元素的 Y。確保高度讀取時元素已在最終寬度下完成 reflow。 */
+  function computeDefaults(canvas){
+    const cw     = canvas.getBoundingClientRect().width || window.innerWidth;
+    const GAP    = 8;
+    const usable = cw - GAP * 2;
+    const half   = Math.floor((usable - GAP) / 2);
+    const tagEl  = canvas.querySelector('[data-drag-id="l10-course-tag"]');
+    const hdrEl  = canvas.querySelector('[data-drag-id="l10-header"]');
+    const whatEl = canvas.querySelector('[data-drag-id="l10-what"]');
+    const sigEl  = canvas.querySelector('[data-drag-id="l10-signals"]');
+
+    function pos(el, x, y, w){
+      el.style.position='absolute';
+      el.style.left=x+'px'; el.style.top=y+'px'; el.style.width=w+'px';
+    }
+
+    // Step 1: course-tag
+    var tagY = GAP;
+    pos(tagEl, GAP, tagY, 220);
+    var tagH = tagEl.getBoundingClientRect().height;
+
+    // Step 2: header（全寬，定位後讀高）
+    var hdrY = tagY + tagH + GAP;
+    pos(hdrEl, GAP, hdrY, usable);
+    var hdrH = hdrEl.getBoundingClientRect().height;
+
+    // Step 3: what + signals 並排（同一 Y）
+    var rowY = hdrY + hdrH + GAP;
+    pos(whatEl, GAP,           rowY, half);
+    pos(sigEl,  GAP+half+GAP,  rowY, half);
+
+    return {
+      'l10-course-tag': { x:GAP,          y:tagY, w:220,    h:null },
+      'l10-header':     { x:GAP,          y:hdrY, w:usable, h:null },
+      'l10-what':       { x:GAP,          y:rowY, w:half,   h:null },
+      'l10-signals':    { x:GAP+half+GAP, y:rowY, w:half,   h:null },
+    };
+  }
+  let editMode = false;
+
+  function applyLayout(layout){
+    const canvas = document.getElementById('drag-canvas');
+    REQUIRED.forEach(id => {
+      const el = canvas.querySelector('[data-drag-id="'+id+'"]');
+      if(!el || !layout[id]) return;
+      el.style.position = 'absolute';
+      el.style.left = layout[id].x + 'px';
+      el.style.top  = Math.max(0, Math.min(layout[id].y, 1800)) + 'px';
+      if(layout[id].w) el.style.width  = layout[id].w + 'px';
+      if(layout[id].h) el.style.height = layout[id].h + 'px';
+    });
+    updateCanvasHeight();
+  }
+
+  function updateCanvasHeight(){
+    const canvas = document.getElementById('drag-canvas');
+    let maxH = 0;
+    canvas.querySelectorAll('[data-drag-id]').forEach(el => {
+      maxH = Math.max(maxH, el.offsetTop + el.offsetHeight);
+    });
+    canvas.style.minHeight = (maxH + 40) + 'px';
+  }
+
+  function saveLayout(){
+    const canvas = document.getElementById('drag-canvas');
+    const layout = {};
+    canvas.querySelectorAll('[data-drag-id]').forEach(el => {
+      layout[el.dataset.dragId] = { x:parseInt(el.style.left)||0, y:parseInt(el.style.top)||0, w:el.offsetWidth, h:el.offsetHeight };
+    });
+    localStorage.setItem(KEY, JSON.stringify(layout));
+  }
+
+  function makeDraggable(el){
+    el.addEventListener('mousedown', e => {
+      if(!editMode) return;
+      if(e.target.tagName==='BUTTON'||e.target.tagName==='INPUT'||e.target.tagName==='A'||e.target.closest('.resize-handle')) return;
+      e.preventDefault();
+      const ox=e.clientX-el.offsetLeft, oy=e.clientY-el.offsetTop;
+      const onMove=e2=>{ el.style.left=Math.max(0,e2.clientX-ox)+'px'; el.style.top=Math.max(0,e2.clientY-oy)+'px'; updateCanvasHeight(); };
+      const onUp=()=>{ document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); saveLayout(); };
+      document.addEventListener('mousemove',onMove); document.addEventListener('mouseup',onUp);
+    });
+    const rh = document.createElement('div');
+    rh.className='resize-handle'; rh.title='調整大小'; rh.textContent='⟲';
+    rh.addEventListener('mousedown', e => {
+      if(!editMode) return;
+      e.preventDefault(); e.stopPropagation();
+      const sw=el.offsetWidth, sh=el.offsetHeight, sx=e.clientX, sy=e.clientY;
+      const onMove=e2=>{ el.style.width=Math.max(200,sw+e2.clientX-sx)+'px'; el.style.height=Math.max(80,sh+e2.clientY-sy)+'px'; updateCanvasHeight(); };
+      const onUp=()=>{ document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); saveLayout(); };
+      document.addEventListener('mousemove',onMove); document.addEventListener('mouseup',onUp);
+    });
+    el.appendChild(rh);
+  }
+
+  window.resetLayout=function(){ localStorage.removeItem(KEY); location.reload(); };
+  window.toggleEditMode=function(){
+    editMode=!editMode;
+    document.querySelector('.edit-mode-btn').textContent = editMode ? '✓ 完成編輯' : '✏ 編輯模式';
+    document.getElementById('drag-canvas').querySelectorAll('[data-drag-id]').forEach(el=>{
+      el.style.cursor = editMode ? 'grab' : 'default';
+      el.style.outline = editMode ? '2px dashed var(--teal-bdr)' : '';
+    });
+  };
+
+  window.addEventListener('load', () => {
+    const canvas = document.getElementById('drag-canvas');
+    canvas.querySelectorAll('[data-drag-id]').forEach(el => makeDraggable(el));
+    try {
+      const saved = localStorage.getItem(KEY);
+      const layout = saved ? JSON.parse(saved) : null;
+      const defs = computeDefaults(canvas);
+      applyLayout(layout && REQUIRED.every(id=>layout[id]) ? layout : defs);
+      if(!saved) localStorage.setItem(KEY, JSON.stringify(defs));
+    } catch(_){ applyLayout(computeDefaults(canvas)); }
+  });
+})();
+
+// ── CSV PARSER (ported from analyze-options-flow.js) ──
+function parseLine(line){
+  const result=[]; let cur='', inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){ inQ=!inQ; }
+    else if(c===','&&!inQ){ result.push(cur); cur=''; }
+    else { cur+=c; }
+  }
+  result.push(cur);
+  return result;
+}
+
+function parseCSV(text){
+  const lines=text.trim().split('\n');
+  if(lines.length<2) return [];
+  const headers=parseLine(lines[0]);
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const vals=parseLine(lines[i]);
+    if(vals.length!==headers.length) continue;
+    const row={};
+    headers.forEach((h,idx)=>row[h.trim()]=(vals[idx]||'').trim());
+    const et=(row['Exp Type']||'').trim().toUpperCase();
+    row.expType = et==='W'?'W':et==='M'?'M':'未分類';
+    rows.push(row);
+  }
+  return rows.filter(r=>r['Type']==='Call'||r['Type']==='Put');
+}
+
+function extractDate(text){
+  const m=text.match(/as of (\d{2})-(\d{2})-(\d{4})/);
+  if(m) return `${m[3]}-${m[1]}-${m[2]}`;
+  return new Date().toISOString().slice(0,10);
+}
+
+// ── INDEXEDDB ──
+let _db=null;
+const DB_NAME='OptionsFlowDB', DB_STORE='uploads', DB_VER=1;
+function openDB(){
+  return new Promise((res,rej)=>{
+    if(_db){ res(_db); return; }
+    const req=indexedDB.open(DB_NAME,DB_VER);
+    req.onupgradeneeded=e=>{ const d=e.target.result; if(!d.objectStoreNames.contains(DB_STORE)) d.createObjectStore(DB_STORE,{keyPath:'id'}); };
+    req.onsuccess=e=>{ _db=e.target.result; res(_db); };
+    req.onerror=e=>rej(e.target.error);
+  });
+}
+function dbPut(rec){ return openDB().then(d=>new Promise((res,rej)=>{ const tx=d.transaction(DB_STORE,'readwrite'); tx.objectStore(DB_STORE).put(rec); tx.oncomplete=()=>res(); tx.onerror=e=>rej(e.target.error); })); }
+function dbGetAll(){ return openDB().then(d=>new Promise((res,rej)=>{ const tx=d.transaction(DB_STORE,'readonly'); const req=tx.objectStore(DB_STORE).getAll(); req.onsuccess=()=>res(req.result); req.onerror=e=>rej(e.target.error); })); }
+function dbDelete(id){ return openDB().then(d=>new Promise((res,rej)=>{ const tx=d.transaction(DB_STORE,'readwrite'); tx.objectStore(DB_STORE).delete(id); tx.oncomplete=()=>res(); tx.onerror=e=>rej(e.target.error); })); }
+
+// ── FILE UPLOAD ──
+window.handleFileUpload=async function(file){
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    const text=e.target.result;
+    const rows=parseCSV(text);
+    if(rows.length===0){ showStatus('❌ 解析失敗：找不到 Call/Put 資料，請確認為 Barchart Options Flow CSV。','error'); return; }
+    const symbol=(rows[0]['Symbol']||'').toUpperCase()||'UNKNOWN';
+    const date=extractDate(text);
+    const id=`${symbol}_${date}`;
+    const all=await dbGetAll();
+    const existing=all.find(r=>r.id===id);
+    await dbPut({ id, symbol, date, uploadedAt:new Date().toISOString(), rawRows:rows });
+    const label=`${symbol} ${date.replace(/-/g,'/')}`;
+    showStatus(existing ? `✅ 已更新「${label}」（共 ${rows.length} 筆）` : `✅ 已新增「${label}」（共 ${rows.length} 筆）`, 'success');
+    await renderAllTabs();
+    switchTab(id);
+    document.getElementById('csv-file-input').value='';
+  };
+  reader.onerror=()=>showStatus('❌ 讀取檔案失敗，請重試。','error');
+  reader.readAsText(file);
+};
+
+function showStatus(msg,type){
+  const el=document.getElementById('upload-status');
+  el.style.display='block'; el.textContent=msg;
+  el.style.cssText+=`;background:${type==='success'?'var(--green-bg)':'var(--red-bg)'};color:${type==='success'?'var(--green)':'var(--red)'};border:1.5px solid ${type==='success'?'var(--green-bdr)':'var(--red-bdr)'};border-radius:var(--r-md);padding:10px 14px;font-size:13px;font-weight:700;margin-bottom:12px;`;
+  setTimeout(()=>{ el.style.display='none'; }, 5000);
+}
+
+// Drag-and-drop
+(function(){
+  const zone=document.getElementById('upload-zone');
+  zone.addEventListener('dragover', e=>{ e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', ()=>zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e=>{ e.preventDefault(); zone.classList.remove('drag-over'); const f=e.dataTransfer.files[0]; if(f) handleFileUpload(f); });
+})();
+
+// ── TABS ──
+let currentTab=null;
+let _currentRawRows=[];
+let _currentFilter='all';
+async function renderAllTabs(){
+  const all=await dbGetAll();
+  all.sort((a,b)=>b.uploadedAt.localeCompare(a.uploadedAt));
+  const bar=document.getElementById('tabs-bar'); bar.innerHTML='';
+  const hasData=all.length>0;
+  document.getElementById('no-data-msg').style.display=hasData?'none':'block';
+  if(!hasData){ document.getElementById('analysis-content').style.display='none'; return; }
+  all.forEach(rec=>{
+    const btn=document.createElement('div');
+    btn.className='tab-btn'+(rec.id===currentTab?' active':''); btn.dataset.id=rec.id;
+    const label=`${rec.symbol} ${rec.date.replace(/-/g,'/')}`;
+    const labelSpan=document.createElement('span'); labelSpan.textContent=label;
+    const closeBtn=document.createElement('button'); closeBtn.className='tab-close'; closeBtn.title='刪除'; closeBtn.textContent='×';
+    btn.appendChild(labelSpan); btn.appendChild(closeBtn);
+    btn.querySelector('span').addEventListener('click',()=>switchTab(rec.id));
+    btn.querySelector('.tab-close').addEventListener('click',e=>{
+      e.stopPropagation();
+      if(confirm(`確定刪除「${label}」的資料？此操作無法復原。`)){
+        dbDelete(rec.id).then(()=>{ if(currentTab===rec.id){ currentTab=null; document.getElementById('analysis-content').style.display='none'; } renderAllTabs(); });
+      }
+    });
+    bar.appendChild(btn);
+  });
+}
+
+async function switchTab(id){
+  currentTab=id;
+  _currentFilter='all';
+  const all=await dbGetAll();
+  const rec=all.find(r=>r.id===id);
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.id===id));
+  if(!rec) return;
+  _currentRawRows=rec.rawRows;
+  renderAnalysis(_currentRawRows, rec.symbol, rec.date, 'all');
+}
+
+// ── ANALYSIS (ported from analyze-options-flow.js) ──
+
+/*
+ * ⚠ 重要說明：
+ * Net Trade Sentiment 與 Delta Imbalance 為依據 Side 欄位「推測還原」的計算邏輯，
+ * 可能與 Barchart 官網實際顯示數字有差異，僅供參考。
+ * 此非 Barchart 官方公開公式。
+ *
+ * 分類規則（推測）：
+ *   ask → Bullish（買方主動掃單，視為看多方向性資金）
+ *   bid → Bearish（賣方主動按 bid 成交，視為看空方向性資金）
+ *   mid → 排除不計（成交在中間價，方向性不明確；亦可能是造市商報價成交，無法判斷方向）
+ */
+function isBullishTrade(side, type){
+  // Call+Ask（買Call）= 多；Call+Bid（賣Call）= 空
+  // Put+Ask（買Put） = 空；Put+Bid（賣Put） = 多
+  const isCall = type.toLowerCase() === 'call';
+  const isAsk  = side.toLowerCase() === 'ask';
+  return isCall ? isAsk : !isAsk;
+}
+
+function calcNetSentiment(rows){
+  let bull=0, bear=0;
+  for(const r of rows){
+    const side=(r['Side']||'').toLowerCase();
+    if(side==='mid') continue;
+    const type=(r['Type']||'');
+    const p=parseFloat(r['Premium'])||0;
+    if(isBullishTrade(side, type)) bull+=p; else bear+=p;
+  }
+  return {bull, bear, net:bull-bear};
+}
+
+function calcDeltaImbalance(rows){
+  let bull=0, bear=0;
+  for(const r of rows){
+    const side=(r['Side']||'').toLowerCase();
+    if(side==='mid') continue;
+    const type=(r['Type']||'');
+    // Barchart 使用絕對值 |Δ|；方向由 Call/Put × Side 組合決定
+    const delta=Math.abs(parseFloat(r['Delta'])||0);
+    const size=parseInt(r['Size'],10)||0;
+    const contrib=delta*size*100;
+    if(isBullishTrade(side, type)) bull+=contrib; else bear+=contrib;
+  }
+  return {bull, bear, net:bull-bear};
+}
+
+function makeSentimentBarHTML(label, bull, bear, isMoney){
+  const total=bull+bear;
+  const bearPct=total>0?(bear/total*100):50;
+  const bullPct=total>0?(bull/total*100):50;
+  const net=bull-bear;
+  const netCls=net>0?'pos':net<0?'neg':'zero';
+  const fmtN=isMoney
+    ? n=>{ const s=Math.round(Math.abs(n)); return (n<0?'-':'+')+'$'+s.toLocaleString('en-US'); }
+    : n=>{ const s=Math.round(Math.abs(n)); return (n<0?'-':'+')+(s).toLocaleString('en-US'); };
+  const fmtAbs=isMoney
+    ? n=>'$'+Math.round(n).toLocaleString('en-US')
+    : n=>Math.round(n).toLocaleString('en-US');
+  return `<div class="sb-block">
+    <div class="sb-title">${label}<span class="sb-net-val ${netCls}">${fmtN(net)}</span></div>
+    <div class="sb-side-labels"><span class="sl">◀ Bearish</span><span class="sr">Bullish ▶</span></div>
+    <div class="sb-track">
+      <div class="sb-bear-fill" style="width:${bearPct.toFixed(1)}%;"></div>
+      <div class="sb-marker"></div>
+      <div class="sb-bull-fill"></div>
+    </div>
+    <div class="sb-amounts">
+      <span class="sa-l">−${fmtAbs(bear)}</span>
+      <span class="sa-r">+${fmtAbs(bull)}</span>
+    </div>
+  </div>`;
+}
+
+function renderSentimentBars(rows){
+  const ns=calcNetSentiment(rows);
+  const di=calcDeltaImbalance(rows);
+  document.getElementById('sentiment-bars').innerHTML=`<img src="images/bear-bull.png" alt="Bear vs Bull" style="width:100%;height:auto;border-radius:var(--r-md);display:block;margin-bottom:12px;">
+  <div class="sentiment-bars-wrap">
+    ${makeSentimentBarHTML('Net Trade Sentiment',ns.bull,ns.bear,true)}
+    ${makeSentimentBarHTML('Delta Imbalance',di.bull,di.bear,false)}
+  </div>`;
+}
+
+function fmt$(n){ return '$'+Math.round(n).toLocaleString('en-US'); }
+function fmtDate(iso){ return (iso||'').slice(0,10); }
+
+function calcSentiment(cp, pp){
+  const ratio=pp>0?(cp/pp).toFixed(2):'N/A';
+  let s='⚪ 中立', clr='var(--muted)';
+  if(ratio!=='N/A'){ const rv=parseFloat(ratio); if(rv>=1.5){s='🟢 市場情緒偏向看多';clr='var(--green)';}else if(rv<=0.67){s='🔴 市場情緒偏向看空';clr='var(--red)';} }
+  return {ratio, s, clr};
+}
+
+function groupByContract(rows){
+  const g={};
+  for(const r of rows){
+    const k=`${r['Type']}_${r['Strike']}_${r['Expires']}`;
+    if(!g[k]) g[k]={ type:r['Type'], strike:r['Strike'], expires:r['Expires'], count:0, totalSize:0, totalPremium:0 };
+    g[k].count++;
+    g[k].totalSize += parseInt(r['Size'],10)||0;
+    g[k].totalPremium += parseFloat(r['Premium'])||0;
+  }
+  return Object.values(g);
+}
+
+function expBadge(et){
+  if(et==='W') return '<span class="exp-badge w">W週</span>';
+  if(et==='M') return '<span class="exp-badge m">M月</span>';
+  return '';
+}
+
+window.setFilter=function(f){
+  _currentFilter=f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.f===f));
+  const filtered=f==='all'?_currentRawRows:_currentRawRows.filter(r=>r.expType===f);
+  renderSentimentBars(filtered);
+  renderTables(filtered);
+};
+
+function renderTables(rows){
+  const topN=10;
+  const topTrades=[...rows].sort((a,b)=>(parseFloat(b['Premium'])||0)-(parseFloat(a['Premium'])||0)).slice(0,topN);
+  const groups=groupByContract(rows);
+  const byExpiry=[...groups].sort((a,b)=>new Date(a.expires)-new Date(b.expires));
+  const byPrem=[...groups].sort((a,b)=>b.totalPremium-a.totalPremium);
+  const expiries=[...new Set(groups.map(g=>fmtDate(g.expires)))].sort();
+  const tblHdr=(cols)=>`<thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>`;
+  const trRow=r=>{
+    const isC=r['Type']==='Call';
+    const _side=(r['Side']||'').toLowerCase();
+    const sideCls=_side==='ask'?'td-ask':_side==='mid'?'td-mid':'td-bid';
+    const p=parseFloat(r['Premium'])||0, big=p>=500000;
+    return `<tr><td class="${isC?'td-call':'td-put'}">${r['Type']}${expBadge(r.expType)}</td><td>$${r['Strike']}</td><td>${fmtDate(r['Expires'])}</td><td>${r['DTE']||''}</td><td>$${r['Trade']||''}</td><td>${(parseInt(r['Size'],10)||0).toLocaleString()}</td><td class="${sideCls}" data-side="${_side}">${r['Side']||''}</td><td class="td-money${big?' td-big':''}">${fmt$(p)}</td><td style="color:var(--muted);font-size:11px;">${r['Time']||''}</td></tr>`;
+  };
+  const grRow=g=>{
+    const isC=g.type==='Call', big=g.totalPremium>=1000000;
+    return `<tr><td class="${isC?'td-call':'td-put'}">${g.type}</td><td>$${g.strike}</td><td>${fmtDate(g.expires)}</td><td>${g.count}</td><td>${g.totalSize.toLocaleString()}</td><td class="td-money${big?' td-big':''}">${fmt$(g.totalPremium)}</td></tr>`;
+  };
+  const empty=`<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px;">無符合篩選條件的資料</td></tr>`;
+  document.getElementById('analysis-blocks').innerHTML=`
+    <div class="analysis-block">
+      <div class="analysis-block-title">💰 單筆交易明細 <span class="blk-badge">依權利金排序 TOP ${topN}</span></div>
+      <div style="overflow-x:auto;"><table class="flow-table">${tblHdr(['Type','Strike','到期日','DTE','成交價','張數','Side','Premium','時間'])}<tbody>${topTrades.length?topTrades.map(trRow).join(''):empty}</tbody></table></div>
+    </div>
+    <div class="analysis-block">
+      <div class="analysis-block-title">📅 依到期日排序 <span class="blk-badge">最近到期優先 TOP ${topN}</span></div>
+      <div style="overflow-x:auto;"><table class="flow-table">${tblHdr(['Type','Strike','到期日','筆數','總張數','總 Premium'])}<tbody>${byExpiry.slice(0,topN).map(grRow).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px;">無資料</td></tr>'}</tbody></table></div>
+    </div>
+    <div class="analysis-block">
+      <div class="analysis-block-title">🏆 最大資金押注 <span class="blk-badge">依總 Premium 排序 TOP ${topN}</span></div>
+      <div style="overflow-x:auto;"><table class="flow-table">${tblHdr(['Type','Strike','到期日','筆數','總張數','總 Premium'])}<tbody>${byPrem.slice(0,topN).map(grRow).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px;">無資料</td></tr>'}</tbody></table></div>
+    </div>
+    <div class="analysis-block">
+      <div class="analysis-block-title">📆 本次資料涵蓋到期日</div>
+      <div class="expiry-chips">${expiries.length?expiries.map(e=>`<div class="expiry-chip">${e}</div>`).join(''):'<span style="color:var(--muted);font-size:12px;">無資料</span>'}</div>
+    </div>`;
+}
+
+function wmStatCard(rows, label, cssClass){
+  const calls=rows.filter(r=>r['Type']==='Call');
+  const puts=rows.filter(r=>r['Type']==='Put');
+  const cp=calls.reduce((s,r)=>s+(parseFloat(r['Premium'])||0),0);
+  const pp=puts.reduce((s,r)=>s+(parseFloat(r['Premium'])||0),0);
+  const {ratio, s, clr}=calcSentiment(cp,pp);
+  return `<div class="wm-card ${cssClass}">
+    <div class="wm-card-title ${cssClass}">${label} <span style="font-size:11px;font-weight:600;color:var(--muted);">${rows.length} 筆</span></div>
+    <div class="wm-stat-row"><span>總筆數（C/P）</span><span class="wm-stat-val">${rows.length}（${calls.length} / ${puts.length}）</span></div>
+    <div class="wm-stat-row"><span>Call 總權利金</span><span class="wm-stat-val" style="color:var(--green);">${fmt$(cp)}</span></div>
+    <div class="wm-stat-row"><span>Put 總權利金</span><span class="wm-stat-val" style="color:var(--red);">${fmt$(pp)}</span></div>
+    <div class="wm-stat-row"><span>C/P 比值</span><span class="wm-stat-val">${ratio} <span style="color:${clr};font-size:11px;font-weight:700;">${s}</span></span></div>
+  </div>`;
+}
+
+function renderAnalysis(rows, symbol, date, filter){
+  filter=filter||'all';
+  document.getElementById('analysis-content').style.display='block';
+  _currentRawRows=rows; _currentFilter=filter;
+
+  // 3.1 整體摘要（全部資料，不受 filter 影響）
+  const calls=rows.filter(r=>r['Type']==='Call');
+  const puts=rows.filter(r=>r['Type']==='Put');
+  const cp=calls.reduce((s,r)=>s+(parseFloat(r['Premium'])||0),0);
+  const pp=puts.reduce((s,r)=>s+(parseFloat(r['Premium'])||0),0);
+  const {ratio, s:sent, clr:sentClr}=calcSentiment(cp,pp);
+  document.getElementById('summary-grid').innerHTML=`
+    <div class="summary-card s-total"><div class="sc-label">總交易筆數</div><div class="sc-value">${rows.length}</div><div class="sc-sub">Call ${calls.length} / Put ${puts.length}</div></div>
+    <div class="summary-card s-call"><div class="sc-label">Call 總權利金</div><div class="sc-value v-call">${fmt$(cp)}</div><div class="sc-sub">${calls.length} 筆</div></div>
+    <div class="summary-card s-put"><div class="sc-label">Put 總權利金</div><div class="sc-value v-put">${fmt$(pp)}</div><div class="sc-sub">${puts.length} 筆</div></div>
+    <div class="summary-card s-ratio"><div class="sc-label">Call/Put 比值</div><div class="sc-value v-gold">${ratio}</div><div class="sc-sub" style="color:${sentClr};font-weight:700;">${sent}</div></div>`;
+
+  // 3.7 篩選器
+  document.getElementById('filter-bar-container').innerHTML=`
+    <div class="filter-bar">
+      <span class="filter-bar-label">📋 篩選到期類型：</span>
+      <button class="filter-btn${filter==='all'?' active':''}" data-f="all" onclick="setFilter('all')">全部</button>
+      <button class="filter-btn${filter==='W'?' active':''}" data-f="W" onclick="setFilter('W')">🟣 週選（W）</button>
+      <button class="filter-btn${filter==='M'?' active':''}" data-f="M" onclick="setFilter('M')">🔵 月選（M）</button>
+      <span style="margin-left:auto;font-size:11px;color:var(--muted);">切換後明細表格即時重算</span>
+    </div>`;
+
+  // 3.2-3.5 表格 + 彙總指標（套用篩選）
+  const filtered=filter==='all'?rows:rows.filter(r=>r.expType===filter);
+  renderSentimentBars(filtered);
+  renderTables(filtered);
+
+  // 3.6 週選 vs 月選統計
+  const hasExpType=rows.some(r=>r.expType==='W'||r.expType==='M');
+  const wmEl=document.getElementById('wm-stats-block');
+  if(!hasExpType){
+    wmEl.innerHTML=`<div class="analysis-block"><div class="analysis-block-title">📊 週選 vs 月選統計</div><div style="padding:12px 0;color:var(--muted);font-size:13px;">本次資料無 Exp Type 欄位（舊版 CSV 格式），略過週選/月選統計。</div></div>`;
+  } else {
+    const wRows=rows.filter(r=>r.expType==='W');
+    const mRows=rows.filter(r=>r.expType==='M');
+    wmEl.innerHTML=`<div class="analysis-block">
+      <div class="analysis-block-title">📊 週選（W）vs 月選（M）統計 <span class="blk-badge">各別 Call/Put 情緒</span></div>
+      <div class="wm-grid">
+        ${wmStatCard(wRows,'🟣 週選（Weekly）','wk')}
+        ${wmStatCard(mRows,'🔵 月選（Monthly）','mn')}
+      </div>
+    </div>`;
+  }
+}
+
+// ── INIT ──
+window.addEventListener('load', async ()=>{
+  await renderAllTabs();
+  const all=await dbGetAll();
+  if(all.length>0){
+    all.sort((a,b)=>b.uploadedAt.localeCompare(a.uploadedAt));
+    switchTab(all[0].id);
+  }
+});
+</script>
+<style id="driver-css">
+.driver-active .driver-overlay,.driver-active *{pointer-events:none}.driver-active .driver-active-element,.driver-active .driver-active-element *,.driver-popover,.driver-popover *{pointer-events:auto}@keyframes animate-fade-in{0%{opacity:0}to{opacity:1}}.driver-fade .driver-overlay{animation:animate-fade-in .2s ease-in-out}.driver-fade .leaps-popover{max-width:60vw!important;width:60vw!important;box-sizing:border-box;}.driver-popover{animation:animate-fade-in .2s}.driver-popover{all:unset;box-sizing:border-box;color:#2d2d2d;margin:0;padding:15px;border-radius:5px;min-width:250px;max-width:300px;box-shadow:0 1px 10px #0006;z-index:1000000000;position:fixed;top:0;right:0;background-color:#fff}.driver-popover *{font-family:Helvetica Neue,Inter,ui-sans-serif,"Apple Color Emoji",Helvetica,Arial,sans-serif}.driver-popover-title{font:28px/normal sans-serif;font-weight:700;display:block;position:relative;line-height:1.5;zoom:1;margin:0}.driver-popover-close-btn{all:unset;position:absolute;top:0;right:0;width:32px;height:28px;cursor:pointer;font-size:18px;font-weight:500;color:#d2d2d2;z-index:1;text-align:center;transition:color;transition-duration:.2s}.driver-popover-close-btn:hover,.driver-popover-close-btn:focus{color:#2d2d2d}.driver-popover-title[style*=block]+.driver-popover-description{margin-top:5px}.driver-popover-description{margin-bottom:0;font:22px/normal sans-serif;line-height:1.5;font-weight:400;zoom:1}.driver-popover-footer{margin-top:15px;text-align:right;zoom:1;display:flex;align-items:center;justify-content:space-between}.driver-popover-progress-text{font-size:13px;font-weight:400;color:#727272;zoom:1}.driver-popover-footer button{all:unset;display:inline-block;box-sizing:border-box;padding:3px 7px;text-decoration:none;text-shadow:1px 1px 0 #fff;background-color:#fff;color:#2d2d2d;font:12px/normal sans-serif;cursor:pointer;outline:0;zoom:1;line-height:1.3;border:1px solid #ccc;border-radius:3px}.driver-popover-footer .driver-popover-btn-disabled{opacity:.5;pointer-events:none}:not(body):has(>.driver-active-element){overflow:hidden!important}.driver-no-interaction,.driver-no-interaction *{pointer-events:none!important}.driver-popover-footer button:hover,.driver-popover-footer button:focus{background-color:#f7f7f7}.driver-popover-navigation-btns{display:flex;flex-grow:1;justify-content:flex-end}.driver-popover-navigation-btns button+button{margin-left:4px}.driver-popover-arrow{content:"";position:absolute;border:5px solid #fff}.driver-popover-arrow-side-over{display:none}.driver-popover-arrow-side-left{left:100%;border-right-color:transparent;border-bottom-color:transparent;border-top-color:transparent}.driver-popover-arrow-side-right{right:100%;border-left-color:transparent;border-bottom-color:transparent;border-top-color:transparent}.driver-popover-arrow-side-top{top:100%;border-right-color:transparent;border-bottom-color:transparent;border-left-color:transparent}.driver-popover-arrow-side-bottom{bottom:100%;border-left-color:transparent;border-top-color:transparent;border-right-color:transparent}.driver-popover-arrow-side-center{display:none}.driver-popover-arrow-side-left.driver-popover-arrow-align-start,.driver-popover-arrow-side-right.driver-popover-arrow-align-start{top:15px}.driver-popover-arrow-side-top.driver-popover-arrow-align-start,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-start{left:15px}.driver-popover-arrow-align-end.driver-popover-arrow-side-left,.driver-popover-arrow-align-end.driver-popover-arrow-side-right{bottom:15px}.driver-popover-arrow-side-top.driver-popover-arrow-align-end,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-end{right:15px}.driver-popover-arrow-side-left.driver-popover-arrow-align-center,.driver-popover-arrow-side-right.driver-popover-arrow-align-center{top:50%;margin-top:-5px}.driver-popover-arrow-side-top.driver-popover-arrow-align-center,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-center{left:50%;margin-left:-5px}.driver-popover-arrow-none{display:none}
+.driver-popover {
+  background-color: #FFFCF7 !important;
+  border: 2px solid #E8B840 !important;
+  border-radius: 12px !important;
+  max-width: 360px !important;
+  font-family: "PingFang TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15) !important;
+}
+.driver-popover-title {
+  color: #2A1A0E !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+}
+.driver-popover-description {
+  color: #2A1A0E !important;
+  font-size: 13px !important;
+  line-height: 1.8 !important;
+}
+.driver-popover-footer button {
+  background: #D4900A !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 5px 14px !important;
+  font-weight: 700 !important;
+}
+.driver-popover-footer button:hover {
+  background: #b87a08 !important;
+}
+</style>
+<script id="driver-js">this.driver=this.driver||{};this.driver.js=function(F){"use strict";let z={},q;function V(e={}){z={animate:!0,allowClose:!0,overlayClickBehavior:"close",overlayOpacity:.7,smoothScroll:!1,disableActiveInteraction:!1,showProgress:!1,stagePadding:10,stageRadius:5,popoverOffset:10,showButtons:["next","previous","close"],disableButtons:[],overlayColor:"#000",...e}}function s(e){return e?z[e]:z}function le(e){q=e}function k(){return q}let A={};function N(e,o){A[e]=o}function T(e){var o;(o=A[e])==null||o.call(A)}function de(){A={}}function O(e,o,t,i){return(e/=i/2)<1?t/2*e*e+o:-t/2*(--e*(e-2)-1)+o}function K(e){const o='a[href]:not([disabled]), button:not([disabled]), textarea:not([disabled]), input[type="text"]:not([disabled]), input[type="radio"]:not([disabled]), input[type="checkbox"]:not([disabled]), select:not([disabled])';return e.flatMap(t=>{const i=t.matches(o),d=Array.from(t.querySelectorAll(o));return[...i?[t]:[],...d]}).filter(t=>getComputedStyle(t).pointerEvents!=="none"&&ve(t))}function Y(e){if(!e||ue(e))return;const o=s("smoothScroll"),t=e.offsetHeight>window.innerHeight;e.scrollIntoView({behavior:!o||pe(e)?"auto":"smooth",inline:"center",block:t?"start":"center"})}function pe(e){if(!e||!e.parentElement)return;const o=e.parentElement;return o.scrollHeight>o.clientHeight}function ue(e){const o=e.getBoundingClientRect();return o.top>=0&&o.left>=0&&o.bottom<=(window.innerHeight||document.documentElement.clientHeight)&&o.right<=(window.innerWidth||document.documentElement.clientWidth)}function ve(e){return!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)}let D={};function S(e,o){D[e]=o}function l(e){return e?D[e]:D}function X(){D={}}function fe(e,o,t,i){let d=l("__activeStagePosition");const n=d||t.getBoundingClientRect(),f=i.getBoundingClientRect(),w=O(e,n.x,f.x-n.x,o),r=O(e,n.y,f.y-n.y,o),v=O(e,n.width,f.width-n.width,o),g=O(e,n.height,f.height-n.height,o);d={x:w,y:r,width:v,height:g},Q(d),S("__activeStagePosition",d)}function j(e){if(!e)return;const o=e.getBoundingClientRect(),t={x:o.x,y:o.y,width:o.width,height:o.height};S("__activeStagePosition",t),Q(t)}function he(){const e=l("__activeStagePosition"),o=l("__overlaySvg");if(!e)return;if(!o){console.warn("No stage svg found.");return}const t=window.innerWidth,i=window.innerHeight;o.setAttribute("viewBox",`0 0 ${t} ${i}`)}function ge(e){const o=we(e);document.body.appendChild(o),U(o,t=>{t.target.tagName==="path"&&T("overlayClick")}),S("__overlaySvg",o)}function Q(e){const o=l("__overlaySvg");if(!o){ge(e);return}const t=o.firstElementChild;if((t==null?void 0:t.tagName)!=="path")throw new Error("no path element found in stage svg");t.setAttribute("d",Z(e))}function we(e){const o=window.innerWidth,t=window.innerHeight,i=document.createElementNS("http://www.w3.org/2000/svg","svg");i.classList.add("driver-overlay","driver-overlay-animated"),i.setAttribute("viewBox",`0 0 ${o} ${t}`),i.setAttribute("xmlSpace","preserve"),i.setAttribute("xmlnsXlink","http://www.w3.org/1999/xlink"),i.setAttribute("version","1.1"),i.setAttribute("preserveAspectRatio","xMinYMin slice"),i.style.fillRule="evenodd",i.style.clipRule="evenodd",i.style.strokeLinejoin="round",i.style.strokeMiterlimit="2",i.style.zIndex="10000",i.style.position="fixed",i.style.top="0",i.style.left="0",i.style.width="100%",i.style.height="100%";const d=document.createElementNS("http://www.w3.org/2000/svg","path");return d.setAttribute("d",Z(e)),d.style.fill=s("overlayColor")||"rgb(0,0,0)",d.style.opacity=`${s("overlayOpacity")}`,d.style.pointerEvents="auto",d.style.cursor="auto",i.appendChild(d),i}function Z(e){const o=window.innerWidth,t=window.innerHeight,i=s("stagePadding")||0,d=s("stageRadius")||0,n=e.width+i*2,f=e.height+i*2,w=Math.min(d,n/2,f/2),r=Math.floor(Math.max(w,0)),v=e.x-i+r,g=e.y-i,y=n-r*2,a=f-r*2;return`M${o},0L0,0L0,${t}L${o},${t}L${o},0Z
+    M${v},${g} h${y} a${r},${r} 0 0 1 ${r},${r} v${a} a${r},${r} 0 0 1 -${r},${r} h-${y} a${r},${r} 0 0 1 -${r},-${r} v-${a} a${r},${r} 0 0 1 ${r},-${r} z`}function me(){const e=l("__overlaySvg");e&&e.remove()}function ye(){const e=document.getElementById("driver-dummy-element");if(e)return e;let o=document.createElement("div");return o.id="driver-dummy-element",o.style.width="0",o.style.height="0",o.style.pointerEvents="none",o.style.opacity="0",o.style.position="fixed",o.style.top="50%",o.style.left="50%",document.body.appendChild(o),o}function G(e){const{element:o}=e;let t=typeof o=="function"?o():typeof o=="string"?document.querySelector(o):o;t||(t=ye()),xe(t,e)}function be(){const e=l("__activeElement"),o=l("__activeStep");e&&(j(e),he(),ne(e,o))}function xe(e,o){var C;const i=Date.now(),d=l("__activeStep"),n=l("__activeElement")||e,f=!n||n===e,w=e.id==="driver-dummy-element",r=n.id==="driver-dummy-element",v=s("animate"),g=o.onHighlightStarted||s("onHighlightStarted"),y=(o==null?void 0:o.onHighlighted)||s("onHighlighted"),a=(d==null?void 0:d.onDeselected)||s("onDeselected"),p=s(),c=l();!f&&a&&a(r?void 0:n,d,{config:p,state:c,driver:k()}),g&&g(w?void 0:e,o,{config:p,state:c,driver:k()});const u=!f&&v;let h=!1;_e(),S("previousStep",d),S("previousElement",n),S("activeStep",o),S("activeElement",e);const m=()=>{if(l("__transitionCallback")!==m)return;const x=Date.now()-i,E=400-x<=400/2;o.popover&&E&&!h&&u&&(ee(e,o),h=!0),s("animate")&&x<400?fe(x,400,n,e):(j(e),y&&y(w?void 0:e,o,{config:s(),state:l(),driver:k()}),S("__transitionCallback",void 0),S("__previousStep",d),S("__previousElement",n),S("__activeStep",o),S("__activeElement",e)),window.requestAnimationFrame(m)};S("__transitionCallback",m),window.requestAnimationFrame(m),Y(e),!u&&o.popover&&ee(e,o),n.classList.remove("driver-active-element","driver-no-interaction"),n.removeAttribute("aria-haspopup"),n.removeAttribute("aria-expanded"),n.removeAttribute("aria-controls"),((C=o.disableActiveInteraction)!=null?C:s("disableActiveInteraction"))&&e.classList.add("driver-no-interaction"),e.classList.add("driver-active-element"),e.setAttribute("aria-haspopup","dialog"),e.setAttribute("aria-expanded","true"),e.setAttribute("aria-controls","driver-popover-content")}function Ce(){var e;(e=document.getElementById("driver-dummy-element"))==null||e.remove(),document.querySelectorAll(".driver-active-element").forEach(o=>{o.classList.remove("driver-active-element","driver-no-interaction"),o.removeAttribute("aria-haspopup"),o.removeAttribute("aria-expanded"),o.removeAttribute("aria-controls")})}function H(){const e=l("__resizeTimeout");e&&window.cancelAnimationFrame(e),S("__resizeTimeout",window.requestAnimationFrame(be))}function Pe(e){var r;if(!l("isInitialized")||!(e.key==="Tab"||e.keyCode===9))return;const i=l("__activeElement"),d=(r=l("popover"))==null?void 0:r.wrapper,n=K([...d?[d]:[],...i?[i]:[]]),f=n[0],w=n[n.length-1];if(e.preventDefault(),e.shiftKey){const v=n[n.indexOf(document.activeElement)-1]||w;v==null||v.focus()}else{const v=n[n.indexOf(document.activeElement)+1]||f;v==null||v.focus()}}function J(e){var t;((t=s("allowKeyboardControl"))==null||t)&&(e.key==="Escape"?T("escapePress"):e.key==="ArrowRight"?T("arrowRightPress"):e.key==="ArrowLeft"&&T("arrowLeftPress"))}function U(e,o,t){const i=(n,f)=>{const w=n.target;e.contains(w)&&((!t||t(w))&&(n.preventDefault(),n.stopPropagation(),n.stopImmediatePropagation()),f==null||f(n))};document.addEventListener("pointerdown",i,!0),document.addEventListener("mousedown",i,!0),document.addEventListener("pointerup",i,!0),document.addEventListener("mouseup",i,!0),document.addEventListener("click",n=>{i(n,o)},!0)}function Se(){window.addEventListener("keyup",J,!1),window.addEventListener("keydown",Pe,!1),window.addEventListener("resize",H),window.addEventListener("scroll",H)}function ke(){window.removeEventListener("keyup",J),window.removeEventListener("resize",H),window.removeEventListener("scroll",H)}function _e(){const e=l("popover");e&&(e.wrapper.style.display="none")}function ee(e,o){var x,P;let t=l("popover");t&&document.body.removeChild(t.wrapper),t=Te(),document.body.appendChild(t.wrapper);const{title:i,description:d,showButtons:n,disableButtons:f,showProgress:w,nextBtnText:r=s("nextBtnText")||"Next &rarr;",prevBtnText:v=s("prevBtnText")||"&larr; Previous",progressText:g=s("progressText")||"{current} of {total}"}=o.popover||{};t.nextButton.innerHTML=r,t.previousButton.innerHTML=v,t.progress.innerHTML=g,i?(t.title.innerHTML=i,t.title.style.display="block"):t.title.style.display="none",d?(t.description.innerHTML=d,t.description.style.display="block"):t.description.style.display="none";const y=n||s("showButtons"),a=w||s("showProgress")||!1,p=(y==null?void 0:y.includes("next"))||(y==null?void 0:y.includes("previous"))||a;t.closeButton.style.display=y.includes("close")?"block":"none",p?(t.footer.style.display="flex",t.progress.style.display=a?"block":"none",t.nextButton.style.display=y.includes("next")?"block":"none",t.previousButton.style.display=y.includes("previous")?"block":"none"):t.footer.style.display="none";const c=f||s("disableButtons")||[];c!=null&&c.includes("next")&&(t.nextButton.disabled=!0,t.nextButton.classList.add("driver-popover-btn-disabled")),c!=null&&c.includes("previous")&&(t.previousButton.disabled=!0,t.previousButton.classList.add("driver-popover-btn-disabled")),c!=null&&c.includes("close")&&(t.closeButton.disabled=!0,t.closeButton.classList.add("driver-popover-btn-disabled"));const u=t.wrapper;u.style.display="block",u.style.left="",u.style.top="",u.style.bottom="",u.style.right="",u.id="driver-popover-content",u.setAttribute("role","dialog"),u.setAttribute("aria-labelledby","driver-popover-title"),u.setAttribute("aria-describedby","driver-popover-description");const h=t.arrow;h.className="driver-popover-arrow";const m=((x=o.popover)==null?void 0:x.popoverClass)||s("popoverClass")||"";u.className=`driver-popover ${m}`.trim(),U(t.wrapper,E=>{var W,I,M;const L=E.target,$=((W=o.popover)==null?void 0:W.onNextClick)||s("onNextClick"),B=((I=o.popover)==null?void 0:I.onPrevClick)||s("onPrevClick"),R=((M=o.popover)==null?void 0:M.onCloseClick)||s("onCloseClick");if(L.closest(".driver-popover-next-btn"))return $?$(e,o,{config:s(),state:l(),driver:k()}):T("nextClick");if(L.closest(".driver-popover-prev-btn"))return B?B(e,o,{config:s(),state:l(),driver:k()}):T("prevClick");if(L.closest(".driver-popover-close-btn"))return R?R(e,o,{config:s(),state:l(),driver:k()}):T("closeClick")},E=>!(t!=null&&t.description.contains(E))&&!(t!=null&&t.title.contains(E))&&typeof E.className=="string"&&E.className.includes("driver-popover")),S("popover",t);const b=((P=o.popover)==null?void 0:P.onPopoverRender)||s("onPopoverRender");b&&b(t,{config:s(),state:l(),driver:k()}),ne(e,o),Y(u);const C=e.classList.contains("driver-dummy-element"),_=K([u,...C?[]:[e]]);_.length>0&&_[0].focus()}function te(){const e=l("popover");if(!(e!=null&&e.wrapper))return;const o=e.wrapper.getBoundingClientRect(),t=s("stagePadding")||0,i=s("popoverOffset")||0;return{width:o.width+t+i,height:o.height+t+i,realWidth:o.width,realHeight:o.height}}function oe(e,o){const{elementDimensions:t,popoverDimensions:i,popoverPadding:d,popoverArrowDimensions:n}=o;return e==="start"?Math.max(Math.min(t.top-d,window.innerHeight-i.realHeight-n.width),n.width):e==="end"?Math.max(Math.min(t.top-(i==null?void 0:i.realHeight)+t.height+d,window.innerHeight-(i==null?void 0:i.realHeight)-n.width),n.width):e==="center"?Math.max(Math.min(t.top+t.height/2-(i==null?void 0:i.realHeight)/2,window.innerHeight-(i==null?void 0:i.realHeight)-n.width),n.width):0}function ie(e,o){const{elementDimensions:t,popoverDimensions:i,popoverPadding:d,popoverArrowDimensions:n}=o;return e==="start"?Math.max(Math.min(t.left-d,window.innerWidth-i.realWidth-n.width),n.width):e==="end"?Math.max(Math.min(t.left-(i==null?void 0:i.realWidth)+t.width+d,window.innerWidth-(i==null?void 0:i.realWidth)-n.width),n.width):e==="center"?Math.max(Math.min(t.left+t.width/2-(i==null?void 0:i.realWidth)/2,window.innerWidth-(i==null?void 0:i.realWidth)-n.width),n.width):0}function ne(e,o){const t=l("popover");if(!t)return;const{align:i="start",side:d="left"}=(o==null?void 0:o.popover)||{},n=i,f=e.id==="driver-dummy-element"?"over":d,w=s("stagePadding")||0,r=te(),v=t.arrow.getBoundingClientRect(),g=e.getBoundingClientRect(),y=g.top-r.height;let a=y>=0;const p=window.innerHeight-(g.bottom+r.height);let c=p>=0;const u=g.left-r.width;let h=u>=0;const m=window.innerWidth-(g.right+r.width);let b=m>=0;const C=!a&&!c&&!h&&!b;let _=f;if(f==="top"&&a?b=h=c=!1:f==="bottom"&&c?b=h=a=!1:f==="left"&&h?b=a=c=!1:f==="right"&&b&&(h=a=c=!1),f==="over"){const x=window.innerWidth/2-r.realWidth/2,P=window.innerHeight/2-r.realHeight/2;t.wrapper.style.left=`${x}px`,t.wrapper.style.right="auto",t.wrapper.style.top=`${P}px`,t.wrapper.style.bottom="auto"}else if(C){const x=window.innerWidth/2-(r==null?void 0:r.realWidth)/2,P=10;t.wrapper.style.left=`${x}px`,t.wrapper.style.right="auto",t.wrapper.style.bottom=`${P}px`,t.wrapper.style.top="auto"}else if(h){const x=Math.min(u,window.innerWidth-(r==null?void 0:r.realWidth)-v.width),P=oe(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.left=`${x}px`,t.wrapper.style.top=`${P}px`,t.wrapper.style.bottom="auto",t.wrapper.style.right="auto",_="left"}else if(b){const x=Math.min(m,window.innerWidth-(r==null?void 0:r.realWidth)-v.width),P=oe(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.right=`${x}px`,t.wrapper.style.top=`${P}px`,t.wrapper.style.bottom="auto",t.wrapper.style.left="auto",_="right"}else if(a){const x=Math.min(y,window.innerHeight-r.realHeight-v.width);let P=ie(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.top=`${x}px`,t.wrapper.style.left=`${P}px`,t.wrapper.style.bottom="auto",t.wrapper.style.right="auto",_="top"}else if(c){const x=Math.min(p,window.innerHeight-(r==null?void 0:r.realHeight)-v.width);let P=ie(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.left=`${P}px`,t.wrapper.style.bottom=`${x}px`,t.wrapper.style.top="auto",t.wrapper.style.right="auto",_="bottom"}C?t.arrow.classList.add("driver-popover-arrow-none"):Ee(n,_,e)}function Ee(e,o,t){const i=l("popover");if(!i)return;const d=t.getBoundingClientRect(),n=te(),f=i.arrow,w=n.width,r=window.innerWidth,v=d.width,g=d.left,y=n.height,a=window.innerHeight,p=d.top,c=d.height;f.className="driver-popover-arrow";let u=o,h=e;if(o==="top"?(g+v<=0?(u="right",h="end"):g+v-w<=0&&(u="top",h="start"),g>=r?(u="left",h="end"):g+w>=r&&(u="top",h="end")):o==="bottom"?(g+v<=0?(u="right",h="start"):g+v-w<=0&&(u="bottom",h="start"),g>=r?(u="left",h="start"):g+w>=r&&(u="bottom",h="end")):o==="left"?(p+c<=0?(u="bottom",h="end"):p+c-y<=0&&(u="left",h="start"),p>=a?(u="top",h="end"):p+y>=a&&(u="left",h="end")):o==="right"&&(p+c<=0?(u="bottom",h="start"):p+c-y<=0&&(u="right",h="start"),p>=a?(u="top",h="start"):p+y>=a&&(u="right",h="end")),!u)f.classList.add("driver-popover-arrow-none");else{f.classList.add(`driver-popover-arrow-side-${u}`),f.classList.add(`driver-popover-arrow-align-${h}`);const m=t.getBoundingClientRect(),b=f.getBoundingClientRect(),C=s("stagePadding")||0,_=m.left-C<window.innerWidth&&m.right+C>0&&m.top-C<window.innerHeight&&m.bottom+C>0;o==="bottom"&&_&&(b.x>m.x&&b.x+b.width<m.x+m.width?i.wrapper.style.transform="translateY(0)":(f.classList.remove(`driver-popover-arrow-align-${h}`),f.classList.add("driver-popover-arrow-none"),i.wrapper.style.transform=`translateY(-${C/2}px)`))}}function Te(){const e=document.createElement("div");e.classList.add("driver-popover");const o=document.createElement("div");o.classList.add("driver-popover-arrow");const t=document.createElement("header");t.id="driver-popover-title",t.classList.add("driver-popover-title"),t.style.display="none",t.innerText="Popover Title";const i=document.createElement("div");i.id="driver-popover-description",i.classList.add("driver-popover-description"),i.style.display="none",i.innerText="Popover description is here";const d=document.createElement("button");d.type="button",d.classList.add("driver-popover-close-btn"),d.setAttribute("aria-label","Close"),d.innerHTML="&times;";const n=document.createElement("footer");n.classList.add("driver-popover-footer");const f=document.createElement("span");f.classList.add("driver-popover-progress-text"),f.innerText="";const w=document.createElement("span");w.classList.add("driver-popover-navigation-btns");const r=document.createElement("button");r.type="button",r.classList.add("driver-popover-prev-btn"),r.innerHTML="&larr; Previous";const v=document.createElement("button");return v.type="button",v.classList.add("driver-popover-next-btn"),v.innerHTML="Next &rarr;",w.appendChild(r),w.appendChild(v),n.appendChild(f),n.appendChild(w),e.appendChild(d),e.appendChild(o),e.appendChild(t),e.appendChild(i),e.appendChild(n),{wrapper:e,arrow:o,title:t,description:i,footer:n,previousButton:r,nextButton:v,closeButton:d,footerButtons:w,progress:f}}function Le(){var o;const e=l("popover");e&&((o=e.wrapper.parentElement)==null||o.removeChild(e.wrapper))}const $e="";function Ae(e={}){V(e);function o(){s("allowClose")&&g()}function t(){const a=s("overlayClickBehavior");if(s("allowClose")&&a==="close"){g();return}if(typeof a=="function"){const p=l("__activeStep"),c=l("__activeElement");a(c,p,{config:s(),state:l(),driver:k()});return}a==="nextStep"&&i()}function i(){const a=l("activeIndex"),p=s("steps")||[];if(typeof a=="undefined")return;const c=a+1;p[c]?v(c):g()}function d(){const a=l("activeIndex"),p=s("steps")||[];if(typeof a=="undefined")return;const c=a-1;p[c]?v(c):g()}function n(a){(s("steps")||[])[a]?v(a):g()}function f(){var b;if(l("__transitionCallback"))return;const p=l("activeIndex"),c=l("__activeStep"),u=l("__activeElement");if(typeof p=="undefined"||typeof c=="undefined"||typeof l("activeIndex")=="undefined")return;const m=((b=c.popover)==null?void 0:b.onPrevClick)||s("onPrevClick");if(m)return m(u,c,{config:s(),state:l(),driver:k()});d()}function w(){var m;if(l("__transitionCallback"))return;const p=l("activeIndex"),c=l("__activeStep"),u=l("__activeElement");if(typeof p=="undefined"||typeof c=="undefined")return;const h=((m=c.popover)==null?void 0:m.onNextClick)||s("onNextClick");if(h)return h(u,c,{config:s(),state:l(),driver:k()});i()}function r(){l("isInitialized")||(S("isInitialized",!0),document.body.classList.add("driver-active",s("animate")?"driver-fade":"driver-simple"),Se(),N("overlayClick",t),N("escapePress",o),N("arrowLeftPress",f),N("arrowRightPress",w))}function v(a=0){var R,W,I,M,re,se,ae,ce;const p=s("steps");if(!p){console.error("No steps to drive through"),g();return}if(!p[a]){g();return}S("__activeOnDestroyed",document.activeElement),S("activeIndex",a);const c=p[a],u=p[a+1],h=p[a-1],m=((R=c.popover)==null?void 0:R.doneBtnText)||s("doneBtnText")||"Done",b=s("allowClose"),C=typeof((W=c.popover)==null?void 0:W.showProgress)!="undefined"?(I=c.popover)==null?void 0:I.showProgress:s("showProgress"),x=(((M=c.popover)==null?void 0:M.progressText)||s("progressText")||"{{current}} of {{total}}").replace("{{current}}",`${a+1}`).replace("{{total}}",`${p.length}`),P=((re=c.popover)==null?void 0:re.showButtons)||s("showButtons"),E=["next","previous",...b?["close"]:[]].filter(He=>!(P!=null&&P.length)||P.includes(He)),L=((se=c.popover)==null?void 0:se.onNextClick)||s("onNextClick"),$=((ae=c.popover)==null?void 0:ae.onPrevClick)||s("onPrevClick"),B=((ce=c.popover)==null?void 0:ce.onCloseClick)||s("onCloseClick");G({...c,popover:{showButtons:E,nextBtnText:u?void 0:m,disableButtons:[...h?[]:["previous"]],showProgress:C,progressText:x,onNextClick:L||(()=>{u?v(a+1):g()}),onPrevClick:$||(()=>{v(a-1)}),onCloseClick:B||(()=>{g()}),...(c==null?void 0:c.popover)||{}}})}function g(a=!0){const p=l("__activeElement"),c=l("__activeStep"),u=l("__activeOnDestroyed"),h=s("onDestroyStarted");if(a&&h){const C=!p||(p==null?void 0:p.id)==="driver-dummy-element";h(C?void 0:p,c,{config:s(),state:l(),driver:k()});return}const m=(c==null?void 0:c.onDeselected)||s("onDeselected"),b=s("onDestroyed");if(document.body.classList.remove("driver-active","driver-fade","driver-simple"),ke(),Le(),Ce(),me(),de(),X(),p&&c){const C=p.id==="driver-dummy-element";m&&m(C?void 0:p,c,{config:s(),state:l(),driver:k()}),b&&b(C?void 0:p,c,{config:s(),state:l(),driver:k()})}u&&u.focus()}const y={isActive:()=>l("isInitialized")||!1,refresh:H,drive:(a=0)=>{r(),v(a)},setConfig:V,setSteps:a=>{X(),V({...s(),steps:a})},getConfig:s,getState:l,getActiveIndex:()=>l("activeIndex"),isFirstStep:()=>l("activeIndex")===0,isLastStep:()=>{const a=s("steps")||[],p=l("activeIndex");return p!==void 0&&p===a.length-1},getActiveStep:()=>l("activeStep"),getActiveElement:()=>l("activeElement"),getPreviousElement:()=>l("previousElement"),getPreviousStep:()=>l("previousStep"),moveNext:i,movePrevious:d,moveTo:n,hasNextStep:()=>{const a=s("steps")||[],p=l("activeIndex");return p!==void 0&&!!a[p+1]},hasPreviousStep:()=>{const a=s("steps")||[],p=l("activeIndex");return p!==void 0&&!!a[p-1]},highlight:a=>{r(),G({...a,popover:a.popover?{showButtons:[],showProgress:!1,progressText:"",...a.popover}:void 0})},destroy:()=>{g(!1)}};return le(y),y}return F.driver=Ae,Object.defineProperty(F,Symbol.toStringTag,{value:"Module"}),F}({});</script>
+
+<script>
+window.showSideExplain = function () {
+  window.driver.js.driver({
+    animate: true, allowClose: true, overlayOpacity: 0.45, popoverClass: 'leaps-popover',
+    nextBtnText: '下一步 →', prevBtnText: '← 上一步', doneBtnText: '✓ 完成',
+    steps: [
+      {
+        element: '#side-ask-code',
+        popover: {
+          title: '📗 ask — 主動買入（Buyer-Initiated）',
+          description: [
+            '成交價格 = 賣方掛出的 <strong>Ask 報價</strong>，由買方主動拿取。',
+            '',
+            '代表買家<strong>迫切想要這張期權</strong>，不等更好的價格就直接成交。',
+            '這種強烈的方向性意圖是機構資金的重要訊號。',
+            '',
+            '多空判斷：',
+            '• <strong>Call + ask</strong> → 買入看漲期權 → <span style="color:#2E9E52;">看多（Bullish）</span>',
+            '• <strong>Put + ask</strong> → 買入看跌期權 → <span style="color:#D04040;">看空（Bearish）</span>'
+          ].join('<br>'),
+          side: 'over'
+        }
+      },
+      {
+        element: '#side-bid-code',
+        popover: {
+          title: '📕 bid — 主動賣出（Seller-Initiated）',
+          description: [
+            '成交價格 = 買方掛出的 <strong>Bid 報價</strong>，由賣方主動讓步。',
+            '',
+            '賣方（通常是造市商或期權賣方）主動以 bid 價出售期權，',
+            '意圖相對較弱，但仍反映特定方向立場。',
+            '',
+            '多空判斷：',
+            '• <strong>Call + bid</strong> → 賣出看漲期權 → <span style="color:#D04040;">看空（Bearish）</span>',
+            '• <strong>Put + bid</strong> → 賣出看跌期權 → <span style="color:#2E9E52;">看多（Bullish）</span>'
+          ].join('<br>'),
+          side: 'over'
+        }
+      },
+      {
+        element: '#side-mid-code',
+        popover: {
+          title: '📒 mid — 中間價成交（Neutral）',
+          description: [
+            '成交價格介於 bid 與 ask 之間，通常是<strong>雙方議價後的協商成交</strong>。',
+            '',
+            '由於無法判斷是買方還是賣方主動發起，',
+            '方向性意圖<strong>不明確</strong>，可能是：',
+            '• 造市商套利對沖',
+            '• 大宗交易（Block Trade）雙方協定',
+            '• 自動化程式在 mid 掃單',
+            '',
+            '⚠️ 本工具將 mid 成交<strong>完全排除</strong>於情緒計算之外，',
+            '避免雜訊污染 Net Trade Sentiment 與 Delta Imbalance 指標。'
+          ].join('<br>'),
+          side: 'over'
+        }
+      }
+    ]
+  }).drive();
+};
+
+/* Tooltip IIFE — td[data-side] hover popover
+ * 觸發：mouseover td[data-side]
+ * 關閉：滑鼠同時離開 td 與 popover（mousemove watcher）
+ * 拖曳：mousedown on popover → 位置存入 localStorage（key: l10-tip-pos）
+ * 狀態：_state = 'IDLE' | 'SHOWING' | 'DRAGGING'
+ * 依賴：window.driver.js.driver（#driver-js script 已載入）
+ */
+(function(){
+  var TIPS = {
+    ask:{
+      title:'📗 ask — 主動買入（Buyer-Initiated）',
+      desc:[
+        '成交價格 = 賣方掛出的 <strong>Ask 報價</strong>，由買方主動拿取。',
+        '代表買家<strong>迫切想要這張期權</strong>，方向性意圖強烈。',
+        '',
+        '多空判斷：',
+        '• <strong>Call + ask</strong> → 買入看漲期權 → <span style="color:#2E9E52;">看多（Bullish）</span>',
+        '• <strong>Put + ask</strong> → 買入看跌期權 → <span style="color:#D04040;">看空（Bearish）</span>'
+      ].join('<br>')
+    },
+    bid:{
+      title:'📕 bid — 主動賣出（Seller-Initiated）',
+      desc:[
+        '成交價格 = 買方掛出的 <strong>Bid 報價</strong>，由賣方主動讓步成交。',
+        '賣方（通常是造市商）主動以 bid 價出售期權。',
+        '',
+        '多空判斷：',
+        '• <strong>Call + bid</strong> → 賣出看漲期權 → <span style="color:#D04040;">看空（Bearish）</span>',
+        '• <strong>Put + bid</strong> → 賣出看跌期權 → <span style="color:#2E9E52;">看多（Bullish）</span>'
+      ].join('<br>')
+    },
+    mid:{
+      title:'📒 mid — 中間價成交（Neutral）',
+      desc:[
+        '成交價介於 bid 與 ask 之間，通常是<strong>雙方議價後的協商成交</strong>。',
+        '無法判斷由買方或賣方主動發起，方向性意圖<strong>不明確</strong>。',
+        '可能來自：造市商套利對沖、大宗交易（Block Trade）、自動化程式掃單。',
+        '',
+        '⚠️ 本工具將 mid 成交<strong>完全排除</strong>於情緒計算之外，',
+        '避免雜訊污染 Net Trade Sentiment 與 Delta Imbalance 指標。'
+      ].join('<br>')
+    }
+  };
+
+  var _state='IDLE'; /* 'IDLE' | 'SHOWING' | 'DRAGGING' */
+  var _drv=null, _activeTd=null, _moveWatcher=null;
+  var _lastClose=0, _lastCloseTd=null;
+  var TIP_POS_KEY='l10-tip-pos';
+
+  function closeTip(){
+    if(_state==='IDLE') return;
+    _lastClose=performance.now(); _lastCloseTd=_activeTd;
+    _state='IDLE';
+    if(_moveWatcher){
+      document.removeEventListener('mousemove',_moveWatcher,true);
+      _moveWatcher=null;
+    }
+    try{_drv.destroy();}catch(x){}
+    _drv=null; _activeTd=null;
+  }
+
+  function startWatcher(){
+    if(_moveWatcher) document.removeEventListener('mousemove',_moveWatcher,true);
+    _moveWatcher=function(e){
+      if(_state==='DRAGGING') return;
+      if(!_drv||!_activeTd){
+        document.removeEventListener('mousemove',_moveWatcher,true);
+        _moveWatcher=null; return;
+      }
+      var tr=_activeTd.getBoundingClientRect();
+      if(e.clientX>=tr.left&&e.clientX<=tr.right&&e.clientY>=tr.top&&e.clientY<=tr.bottom) return;
+      var pw=document.querySelector('.driver-popover.leaps-popover');
+      if(pw){
+        var pr=pw.getBoundingClientRect();
+        if(e.clientX>=pr.left&&e.clientX<=pr.right&&e.clientY>=pr.top&&e.clientY<=pr.bottom) return;
+      }
+      closeTip();
+    };
+    document.addEventListener('mousemove',_moveWatcher,true);
+  }
+
+  function applyTipPos(pw){
+    var pos=null;
+    try{pos=JSON.parse(localStorage.getItem(TIP_POS_KEY));}catch(e){}
+    if(pos&&typeof pos.t==='number'&&typeof pos.l==='number'){
+      pw.style.setProperty('top',   Math.max(0,pos.t)+'px','important');
+      pw.style.setProperty('left',  Math.max(0,pos.l)+'px','important');
+      pw.style.setProperty('right', 'auto','important');
+      pw.style.setProperty('bottom','auto','important');
+      pw.style.setProperty('transform','none','important');
+    }
+  }
+
+  function makeDraggable(pw){
+    if(pw._tipReady) return;
+    pw._tipReady=true;
+    pw.style.setProperty('cursor','move','important');
+    pw.addEventListener('mousedown',function(e){
+      if(e.button!==0) return;
+      e.preventDefault(); e.stopPropagation();
+      _state='DRAGGING';
+      /* 先清 transform 再量 rect，避免 translateX(-50%) 造成偏移 */
+      pw.style.setProperty('transform','none','important');
+      var rect=pw.getBoundingClientRect();
+      pw.style.setProperty('left',rect.left+'px','important');
+      pw.style.setProperty('top', rect.top +'px','important');
+      var ox=e.clientX-rect.left, oy=e.clientY-rect.top;
+      function onMove(e2){
+        var nl=Math.max(0,Math.min(e2.clientX-ox,window.innerWidth -pw.offsetWidth -4));
+        var nt=Math.max(0,Math.min(e2.clientY-oy,window.innerHeight-pw.offsetHeight-4));
+        pw.style.setProperty('left',   nl+'px','important');
+        pw.style.setProperty('top',    nt+'px','important');
+        pw.style.setProperty('right',  'auto','important');
+        pw.style.setProperty('bottom', 'auto','important');
+        pw.style.setProperty('transform','none','important');
+      }
+      function onUp(){
+        _state='SHOWING';
+        document.removeEventListener('mousemove',onMove,true);
+        document.removeEventListener('mouseup',  onUp,  true);
+        try{localStorage.setItem(TIP_POS_KEY,JSON.stringify({
+          t:parseFloat(pw.style.top),l:parseFloat(pw.style.left)
+        }));}catch(e){}
+      }
+      document.addEventListener('mousemove',onMove,true);
+      document.addEventListener('mouseup',  onUp,  true);
+    });
+  }
+
+  document.addEventListener('mouseover',function(e){
+    var td=e.target.closest('td[data-side]');
+    if(!td) return;
+    if(_activeTd===td) return;
+    if(_lastCloseTd===td&&performance.now()-_lastClose<150) return;
+    var tip=TIPS[td.dataset.side];
+    if(!tip) return;
+    closeTip();
+    _activeTd=td;
+    _state='SHOWING';
+    _drv=window.driver.js.driver({
+      animate:false,allowClose:true,overlayOpacity:0,popoverClass:'leaps-popover'
+    });
+    _drv.highlight({
+      element:td,
+      popover:{
+        title:tip.title,description:tip.desc,showButtons:[],side:'over',
+        onPopoverRender:function(){
+          setTimeout(function(){
+            var pw=document.querySelector('.driver-popover.leaps-popover');
+            if(pw){ applyTipPos(pw); makeDraggable(pw); startWatcher(); }
+          },0);
+        }
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

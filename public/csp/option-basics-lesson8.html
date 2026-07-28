@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>期權小學堂 · 第8課 · 如何看懂 Barchart 期權鏈</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#FAF3E8; --page-bg:#FFF9F2; --panel-bg:#FFFCF7; --ink:#2A1A0E; --muted:#7A6555;
+  --border:#E2D4C2; --gold:#D4900A; --gold-bg:#FEF4D8; --gold-bdr:#E8B840;
+  --green:#2E9E52; --green-bg:#E8F8EE; --green-bdr:#8ED4A8;
+  --red:#D04040; --red-bg:#FDEAEA; --red-bdr:#F5AAAA;
+  --blue:#3A70C0; --blue-bg:#EBF2FF; --blue-bdr:#9ABCE8;
+  --r-lg:16px; --r-md:10px; --r-sm:6px;
+}
+body { background:var(--bg); font-family:"PingFang TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif; padding:0; margin:0; padding-top:52px; padding-bottom:70px; }
+.page { background:var(--page-bg); max-width:100%; width:100%; padding:32px 40px 36px; }
+.course-tag { display:inline-flex; align-items:center; gap:6px; background:var(--ink); color:#FFF9F0; font-size:12px; font-weight:700; padding:5px 14px; border-radius:100px; letter-spacing:1px; margin-bottom:18px; }
+.page-header { display:grid; grid-template-columns:1fr auto; gap:20px; align-items:start; margin-bottom:28px; }
+.page-title   { font-size:32px; font-weight:900; color:var(--ink); line-height:1.2; }
+.page-subtitle{ font-size:14px; color:var(--muted); margin-top:4px; font-weight:500; }
+.page-desc    { font-size:13px; color:var(--muted); margin-top:6px; line-height:1.6; }
+.contract-box { background:var(--gold-bg); border:2px solid var(--gold-bdr); border-radius:var(--r-lg); padding:14px 18px; min-width:200px; }
+.cb-title { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--gold); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+.cb-ticker { font-size:20px; font-weight:900; color:var(--ink); margin-bottom:10px; display:flex; align-items:baseline; gap:6px; }
+.cb-ticker small { font-size:12px; font-weight:500; color:var(--muted); }
+.cb-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.cb-item .ci-l { font-size:10px; color:var(--muted); margin-bottom:1px; }
+.cb-item .ci-v { font-size:14px; font-weight:700; color:var(--ink); }
+.cb-item .ci-v.green { color:var(--green); } .cb-item .ci-v.gold { color:var(--gold); } .cb-item .ci-v.blue { color:var(--blue); }
+.full-card { background:var(--panel-bg); border:2px solid var(--border); border-radius:var(--r-lg); padding:20px; display:flex; flex-direction:column; gap:14px; transition:border-color 0.25s,box-shadow 0.25s; margin-bottom:16px; }
+.full-card.tts-active { border-color:var(--gold-bdr); box-shadow:0 0 0 3px rgba(212,144,10,0.18); }
+.tag-row { display:flex; align-items:center; justify-content:space-between; }
+.step-badge { width:26px; height:26px; background:var(--ink); color:#FFFDF8; border-radius:100px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; flex-shrink:0; }
+.pill { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:4px 12px; border-radius:100px; letter-spacing:0.3px; }
+.pill-outline { background:transparent; border:1.5px solid; font-size:10px; font-weight:600; letter-spacing:1px; text-transform:uppercase; }
+.pill.setup,.pill-outline.setup { color:#7A6555; background:#F0E8DC; border-color:#C4B49A; }
+.pill.win,.pill-outline.win { color:var(--green); background:var(--green-bg); border-color:var(--green-bdr); }
+.pill.chart,.pill-outline.chart { color:var(--blue); background:var(--blue-bg); border-color:var(--blue-bdr); }
+.pill.gold,.pill-outline.gold { color:var(--gold); background:var(--gold-bg); border-color:var(--gold-bdr); }
+.ptitle { font-size:18px; font-weight:800; color:var(--ink); line-height:1.35; }
+.bullets { display:flex; flex-direction:column; gap:8px; }
+.bullet { display:flex; align-items:flex-start; gap:10px; font-size:13px; color:var(--ink); line-height:1.65; }
+.bullet-num { width:22px; height:22px; background:var(--gold-bg); border:1.5px solid var(--gold-bdr); border-radius:100px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:var(--gold); flex-shrink:0; }
+
+/* Barchart Simulation */
+.bc-header { background:#F0F4F8; border:1.5px solid #C8D8E8; border-radius:var(--r-md); padding:10px 16px; display:flex; flex-wrap:wrap; gap:0; align-items:center; font-size:12.5px; margin-bottom:12px; }
+.bc-info-item { padding:6px 16px; cursor:pointer; border-right:1px solid #C8D8E8; transition:background 0.15s; display:flex; flex-direction:column; align-items:center; }
+.bc-info-item:last-child { border-right:none; }
+.bc-info-item:hover { background:#E0EAF4; border-radius:6px; }
+.bc-info-label { font-size:9.5px; color:#607080; font-weight:600; letter-spacing:0.5px; white-space:nowrap; }
+.bc-info-value { font-size:13px; font-weight:800; color:#1A2A3A; white-space:nowrap; }
+.bc-info-value.gold { color:var(--gold); } .bc-info-value.blue { color:var(--blue); }
+.bc-split-header { display:grid; grid-template-columns:1fr auto 1fr; gap:0; margin-bottom:4px; }
+.bc-call-label,.bc-put-label { font-size:14px; font-weight:800; text-align:center; padding:6px; border-radius:var(--r-sm) var(--r-sm) 0 0; }
+.bc-call-label { background:var(--green-bg); color:var(--green); }
+.bc-put-label  { background:var(--red-bg);   color:var(--red); }
+.bc-strike-label { background:#FFF8D0; color:#B87A00; font-size:11px; font-weight:700; text-align:center; padding:6px; letter-spacing:1px; text-transform:uppercase; }
+.bc-table-wrap { overflow-x:auto; border:1.5px solid #C8D8E8; border-radius:var(--r-md); }
+.bc-table { width:100%; border-collapse:collapse; font-size:12px; }
+.bc-table th { background:#F0F4F8; color:#607080; font-size:10px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; padding:7px 10px; border-bottom:1.5px solid #C8D8E8; text-align:center; white-space:nowrap; cursor:pointer; transition:background 0.15s; }
+.bc-table th:hover { background:#E0EAF4; }
+.bc-table td { padding:8px 10px; border-bottom:1px solid #E8EEF4; color:#1A2A3A; vertical-align:middle; text-align:center; white-space:nowrap; }
+.bc-table tr:last-child td { border-bottom:none; }
+.bc-table td.strike-cell { background:#FFFBE0; font-weight:900; font-size:14px; color:#B87A00; border-left:2px solid #E8B840; border-right:2px solid #E8B840; }
+.bc-table td.col-green { color:var(--green); font-weight:700; }
+.bc-table td.col-red   { color:var(--red);   font-weight:700; }
+.bc-table td.col-blue  { color:var(--blue);  font-weight:700; }
+.bc-table td.col-muted { color:#8090A0; font-size:11px; }
+.bc-atm-row td { background:#FFFBE8; }
+.bc-atm-row td.strike-cell { background:#FFF3B0; }
+/* ── Barchart 頂部資訊列 ── */
+.bcg-info-bar { display:flex; flex-wrap:wrap; align-items:center; gap:0; background:#fff; border:1px solid #d0d7df; border-radius:4px; padding:7px 14px; font-family:Arial,"Helvetica Neue",sans-serif; font-size:13px; margin-bottom:10px; }
+.bcg-ibitem { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; cursor:default; border-radius:4px; transition:background 0.15s; }
+.bcg-ibitem:hover { background:#f0f4f8; }
+.bcg-iblbl { color:#6b7884; font-size:12px; white-space:nowrap; }
+.bcg-ibval { color:#1a1a2e; font-weight:700; font-size:13px; }
+.bcg-ibval.gold { color:#c0880a; }
+.bcg-ibval.blue { color:#1773cf; }
+.bcg-ibsep { color:#c5ccd5; padding:0 2px; user-select:none; }
+/* ── Barchart Options Prices 表格 ── */
+.bcg-prices-wrap { overflow-x:auto; border:1px solid #d0d7df; border-radius:4px; }
+.bcg-prices-table { width:100%; border-collapse:collapse; font-size:12.5px; font-family:Arial,"Helvetica Neue",sans-serif; min-width:1120px; }
+.bcg-prices-table tr.row-ghd th { background:#fff; font-size:15px; font-weight:700; padding:8px 4px 4px; text-align:center; border:none; }
+.bcg-prices-table .ghd-calls { color:#1a3c8e; border-bottom:2px solid #1a73e8; }
+.bcg-prices-table .ghd-sk    { background:#fff8d0; border-bottom:2px solid #c8a020; }
+.bcg-prices-table .ghd-puts  { color:#cc2929; border-bottom:2px solid #cc2929; }
+.bcg-prices-table tr.row-cols th { background:#fff; color:#2c3e50; font-weight:700; font-size:12px; padding:7px 8px; text-align:right; white-space:nowrap; cursor:pointer; border-bottom:1.5px solid #c5ccd5; transition:color 0.15s; }
+.bcg-prices-table tr.row-cols th:hover { color:#1773cf; }
+.bcg-prices-table tr.row-cols .th-sk { background:#fff8d0; color:#b87a00; text-align:center; border-left:1px solid #ddc040; border-right:1px solid #ddc040; }
+.bcg-prices-table tbody tr { border-bottom:1px solid #eaeef2; }
+.bcg-prices-table tbody tr:nth-child(odd)  { background:#fff; }
+.bcg-prices-table tbody tr:nth-child(even) { background:#f7f8fa; }
+.bcg-prices-table tbody tr.bcg-atm td     { background:#e8eef5 !important; }
+.bcg-prices-table tbody tr.bcg-atm .td-sk { background:#fff3b0 !important; }
+.bcg-prices-table tbody td { padding:5px 8px; text-align:right; color:#2c3e50; white-space:nowrap; }
+.bcg-prices-table tbody td.td-sk { background:#fff8d0; color:#1773cf; font-weight:600; text-align:center; border-left:1px solid #ddc040; border-right:1px solid #ddc040; text-decoration:underline; text-underline-offset:2px; }
+.bcg-prices-table tbody td.td-cp  { color:#6b7884; font-size:11.5px; }
+.bcg-prices-table tbody td.td-pos { color:#2e9e52; font-weight:600; }
+.bcg-prices-table tbody td.td-neg { color:#cc2929; font-weight:600; }
+.bcg-prices-table tbody td.td-unc { color:#8470c0; font-size:12px; }
+.bcg-prices-table tbody td.td-vhi { background:#cce3f5 !important; color:#0d4f7a; font-weight:700; }
+.bcg-prices-table tbody td.td-vmd { background:#e3f1fb !important; color:#1a5f8a; font-weight:600; }
+.bcg-prices-table tbody td.td-z   { color:#b0b8c1; }
+.bcg-prices-table tbody td.td-na  { color:#b0b8c1; font-size:11.5px; }
+/* ── 兩個表格共用的 Row Hover 亮黃色 ── */
+.bcg-table tbody tr:hover td,
+.bcg-prices-table tbody tr:hover td { background:#FFFD80 !important; color:#1a1a2e !important; }
+/* ── Barchart Greeks 真實風格表格 ── */
+.bcg-puts-title { font-size:15px; font-weight:700; color:#1a1a2e; margin:0 0 8px; }
+.bcg-wrap { overflow-x:auto; border:1px solid #d0d7df; border-radius:4px; }
+.bcg-table { width:100%; border-collapse:collapse; font-size:13px; font-family:Arial,"Helvetica Neue",sans-serif; min-width:860px; }
+.bcg-table thead tr { border-bottom:2px solid #b8c3cc; }
+.bcg-table thead th { background:#fff; color:#2c3e50; font-weight:700; font-size:12.5px; padding:9px 10px; text-align:right; white-space:nowrap; cursor:pointer; transition:color 0.15s; border-bottom:2px solid #c5ccd5; }
+.bcg-table thead th:hover { color:#1773cf; }
+.bcg-table thead th.th-sk { text-align:left; padding-left:14px; }
+.bcg-table tbody tr { border-bottom:1px solid #eaeef2; }
+.bcg-table tbody tr:nth-child(odd)  { background:#fff; }
+.bcg-table tbody tr:nth-child(even) { background:#f7f8fa; }
+.bcg-table tbody tr.bcg-atm { background:#fffce6 !important; }
+.bcg-table tbody tr.bcg-atm .td-sk { border-left:3px solid #e8b840; padding-left:11px; }
+.bcg-table tbody td { padding:7px 10px; text-align:right; color:#2c3e50; white-space:nowrap; font-size:13px; }
+.bcg-table tbody td.td-sk { text-align:left; color:#1773cf; font-weight:600; padding-left:14px; text-decoration:underline; text-underline-offset:2px; }
+.bcg-table tbody td.td-neg { color:#cc2929; }
+.bcg-table tbody td.td-vol { color:#1773cf; font-weight:600; }
+.bcg-table tbody td.td-itp { color:#1773cf; }
+.bcg-table tbody td.td-zero { color:#b0b8c1; }
+.bcg-table tbody td.td-type { color:#6b7884; font-size:12px; }
+.bcg-table tbody td.td-na { color:#b0b8c1; font-size:12px; }
+.bc-note { font-size:11.5px; color:var(--muted); line-height:1.65; background:var(--blue-bg); border:1px solid var(--blue-bdr); border-radius:var(--r-sm); padding:10px 14px; margin-top:10px; }
+.tour-btn { background:var(--ink); color:#FFF9F0; border:none; border-radius:var(--r-sm); padding:10px 24px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; transition:background 0.15s; display:inline-flex; align-items:center; gap:8px; }
+.tour-btn:hover { background:#4A3020; }
+
+/* Greek Badges */
+.greek-badges { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:10px; }
+.greek-badge { background:var(--panel-bg); border:1.5px solid var(--border); border-radius:var(--r-md); padding:12px 14px; text-align:center; cursor:pointer; transition:border-color 0.2s,box-shadow 0.2s; }
+.greek-badge:hover { border-color:var(--gold-bdr); box-shadow:0 2px 8px rgba(212,144,10,0.15); }
+.greek-badge .gb-sym { font-size:22px; font-weight:900; margin-bottom:4px; }
+.greek-badge .gb-name { font-size:11px; font-weight:700; color:var(--ink); }
+.greek-badge .gb-zh { font-size:10px; color:var(--muted); margin-top:2px; }
+.greek-badge.delta   { border-color:var(--blue-bdr); }  .greek-badge.delta .gb-sym   { color:var(--blue); }
+.greek-badge.gamma   { border-color:var(--green-bdr); } .greek-badge.gamma .gb-sym   { color:var(--green); }
+.greek-badge.theta   { border-color:var(--red-bdr); }   .greek-badge.theta .gb-sym   { color:var(--red); }
+.greek-badge.vega    { border-color:var(--gold-bdr); }  .greek-badge.vega .gb-sym    { color:var(--gold); }
+.greek-badge.theor   { border-color:#C4B8FF; }          .greek-badge.theor .gb-sym   { color:#6B5CE7; font-size:18px; }
+.greek-badge.rho     { border-color:#F5AACA; }          .greek-badge.rho .gb-sym     { color:#C0306A; }
+.greek-badge.voloi   { border-color:#A8D8C0; }          .greek-badge.voloi .gb-sym   { color:#1A8A4A; font-size:14px; letter-spacing:-0.5px; }
+.greek-badge.itmprob { border-color:#FDCF9E; }          .greek-badge.itmprob .gb-sym { color:#C06A00; font-size:18px; }
+
+/* Vocab Cards */
+.vocab-filter-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.vocab-filter-row .filter-label { font-size:12px; color:var(--muted); font-weight:600; }
+.filter-btn { background:var(--panel-bg); border:1.5px solid var(--border); border-radius:100px; padding:5px 16px; font-size:12px; font-weight:700; color:var(--muted); cursor:pointer; font-family:inherit; transition:all 0.15s; }
+.filter-btn:hover { border-color:var(--gold-bdr); color:var(--gold); }
+.filter-btn.active { background:var(--ink); border-color:var(--ink); color:#FFF9F0; }
+.vocab-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:14px; }
+.vocab-card { perspective:700px; height:180px; cursor:pointer; }
+.vocab-card-inner { position:relative; width:100%; height:100%; transform-style:preserve-3d; transition:transform 0.45s cubic-bezier(.4,0,.2,1); }
+.vocab-card.flipped .vocab-card-inner { transform:rotateY(180deg); }
+.vocab-front,.vocab-back { position:absolute; width:100%; height:100%; backface-visibility:hidden; -webkit-backface-visibility:hidden; border-radius:var(--r-lg); padding:14px 16px; display:flex; flex-direction:column; border:2px solid var(--border); }
+.vocab-back { transform:rotateY(180deg); }
+.vocab-front.cat-basic { border-color:var(--blue-bdr); background:#EEF5FF; }
+.vocab-front.cat-vol   { border-color:var(--gold-bdr); background:var(--gold-bg); }
+.vocab-front.cat-greek { border-color:var(--green-bdr); background:var(--green-bg); }
+.vocab-back.cat-basic  { background:var(--panel-bg); border-color:var(--blue-bdr); }
+.vocab-back.cat-vol    { background:var(--panel-bg); border-color:var(--gold-bdr); }
+.vocab-back.cat-greek  { background:var(--panel-bg); border-color:var(--green-bdr); }
+.vc-top { display:flex; align-items:flex-start; justify-content:space-between; gap:6px; }
+.vc-badge { font-size:9.5px; font-weight:700; padding:2px 8px; border-radius:100px; letter-spacing:0.5px; white-space:nowrap; flex-shrink:0; }
+.vc-badge.basic { background:#DCEEFF; color:var(--blue); }
+.vc-badge.vol   { background:var(--gold-bg); color:var(--gold); border:1px solid var(--gold-bdr); }
+.vc-badge.greek { background:var(--green-bg); color:var(--green); }
+.vc-en  { font-size:17px; font-weight:900; color:var(--ink); line-height:1.2; margin-top:8px; flex:1; }
+.vc-zh  { font-size:11px; font-weight:600; color:var(--muted); margin-top:4px; }
+.vc-hint { font-size:10.5px; color:var(--muted); margin-top:auto; padding-top:8px; font-style:italic; }
+.vc-actions { display:flex; align-items:center; gap:6px; margin-top:2px; }
+.speak-btn { background:rgba(255,255,255,0.8); border:1.5px solid var(--border); border-radius:100px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; transition:all 0.15s; flex-shrink:0; }
+.speak-btn:hover { background:white; border-color:var(--gold-bdr); transform:scale(1.1); }
+.speak-btn.speaking { border-color:var(--green-bdr); background:var(--green-bg); }
+.vc-back-title { font-size:14px; font-weight:900; color:var(--ink); margin-bottom:8px; }
+.vc-back-body  {  color:var(--ink); line-height:1.65; flex:1; overflow:hidden; }
+.vc-example { font-size:10px; color:var(--muted); margin-top:6px; line-height:1.5; border-top:1px solid var(--border); padding-top:5px; }
+.vocab-reset-btn { background:transparent; border:1.5px solid var(--border); border-radius:var(--r-sm); padding:7px 18px; font-size:12px; font-weight:600; color:var(--muted); cursor:pointer; font-family:inherit; transition:all 0.15s; margin-top:14px; }
+.vocab-reset-btn:hover { border-color:var(--gold-bdr); color:var(--gold); }
+
+/* TTS Subtitle */
+#tts-subtitle { display:none; position:fixed; bottom:0; left:0; right:0; z-index:2999; background:rgba(20,10,0,0.92); backdrop-filter:blur(6px); padding:12px 40px 14px; max-height:90px; overflow-y:auto; font-size:18px; font-weight:600; color:#FFF9F0; font-family:"PingFang TC","Microsoft JhengHei",system-ui,sans-serif; line-height:1.6; letter-spacing:0.02em; }
+#tts-subtitle.active { display:block; }
+.sub-c { color:rgba(255,249,240,0.28); } .sub-c.done { color:rgba(255,249,240,0.75); } .sub-c.now { color:#F5C540; background:rgba(245,197,64,0.18); border-radius:2px; }
+#edit-btn {
+  position: fixed; bottom: 28px; right: 28px; z-index: 2000;
+  background: #2A1A0E; color: #FFF9F0; border: none; border-radius: 100px;
+  padding: 10px 20px; cursor: pointer; font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  font-family: "PingFang TC","Microsoft JhengHei",sans-serif;
+  transition: background 0.15s, transform 0.1s;
+}
+#edit-btn:hover { background: #4A3020; transform: scale(1.03); }
+#edit-btn.active { background: #2E7040; }
+
+#edit-toolbar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #FFFCF7; border-top: 2px solid #E2D4C2;
+  padding: 10px 24px 12px; z-index: 1999;
+  display: flex; align-items: center; gap: 0;
+  box-shadow: 0 -4px 24px rgba(80,40,0,0.10);
+  transform: translateY(100%); transition: transform 0.22s cubic-bezier(.4,0,.2,1);
+  font-family: "PingFang TC","Microsoft JhengHei",sans-serif;
+  flex-wrap: wrap; min-height: 56px;
+}
+#edit-toolbar.visible { transform: translateY(0); }
+.et-hint { font-size: 13px; color: #A08878; padding: 6px 0; font-style: italic; }
+.et-group { display: flex; align-items: center; gap: 0; flex-wrap: wrap; width: 100%; }
+.et-item  { display: flex; flex-direction: column; gap: 3px; padding: 0 14px; }
+.et-label { font-size: 10px; font-weight: 600; color: #9A8878; letter-spacing: 0.5px; text-transform: uppercase; }
+.et-divider { width: 1px; height: 36px; background: #E2D4C2; flex-shrink: 0; }
+#et-font { font-size: 13px; border: 1.5px solid #E2D4C2; border-radius: 6px; padding: 4px 8px; background: white; color: #2A1A0E; cursor: pointer; font-family: inherit; }
+.et-size-ctrl { display: flex; align-items: center; gap: 6px; }
+.et-btn-sm {
+  width: 24px; height: 24px; border: 1.5px solid #E2D4C2; border-radius: 6px;
+  background: white; font-size: 14px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: #2A1A0E;
+}
+.et-btn-sm:hover { background: #F5EFE6; }
+#et-size-val { font-size: 14px; font-weight: 700; min-width: 28px; text-align: center; color: #2A1A0E; }
+.et-fmt-btn {
+  width: 30px; height: 30px; border: 1.5px solid #E2D4C2; border-radius: 6px;
+  background: white; font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: #2A1A0E;
+}
+.et-fmt-btn:hover { background: #F5EFE6; }
+.et-fmt-btn.on { background: #2A1A0E; color: white; border-color: #2A1A0E; }
+#et-color { width: 36px; height: 28px; border: 1.5px solid #E2D4C2; border-radius: 6px; padding: 2px; cursor: pointer; background: white; }
+#et-lh { width: 80px; accent-color: #D4900A; }
+.et-action-btn {
+  font-size: 12px; font-weight: 600; padding: 5px 12px;
+  border: 1.5px solid #E2D4C2; border-radius: 6px; background: white;
+  cursor: pointer; color: #2A1A0E; font-family: inherit;
+}
+.et-action-btn:hover { background: #F5EFE6; }
+.edit-mode .page * { cursor: text; }
+.edit-mode .page [contenteditable]:hover,
+.edit-mode .page *:hover { outline: 1.5px dashed #E8B840; outline-offset: 2px; border-radius: 3px; }
+.el-focus { outline: 2px solid #3A70C0 !important; outline-offset: 3px; border-radius: 3px; }
+.edit-mode .page .el-focus * { outline: none !important; }
+
+/* ── TTS Subtitle ── */
+#tts-subtitle {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  max-width: 700px; width: calc(100% - 40px);
+  background: rgba(8,4,1,0.85); backdrop-filter: blur(8px);
+  color: #FFF9F0; border-radius: 10px; padding: 10px 18px;
+  font-size: 14px; line-height: 1.9; z-index: 2500;
+  display: none; pointer-events: none;
+  max-height: 110px; overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+#tts-subtitle.active { display: block; }
+.sub-c       { color: rgba(255,249,240,0.28); }
+.sub-c.done  { color: rgba(255,249,240,0.75); }
+.sub-c.now   { color: #F5C540; background: rgba(245,197,64,0.18); border-radius: 2px; }
+
+/* ── Drag Layout ── */
+#drag-canvas { position: relative !important; min-height: 3000px; overflow: visible; }
+[data-drag-id] { box-sizing: border-box; }
+.edit-mode [data-drag-id]:hover > .drag-handle,
+[data-drag-id].is-dragging > .drag-handle,
+[data-drag-id].is-resizing > .drag-handle { opacity: 1; }
+.drag-handle {
+  position: absolute; top: -15px; left: 0; right: 0; height: 13px;
+  background: linear-gradient(90deg,#3A70C0,#2255A0);
+  border-radius: 5px 5px 0 0; cursor: grab; opacity: 0;
+  transition: opacity .15s; display: flex; align-items: center;
+  justify-content: center; z-index: 200; user-select: none;
+}
+.drag-handle:active { cursor: grabbing; }
+.drag-handle::before { content: ":::"; font-size: 9px; font-weight: 900; color: rgba(255,255,255,.85); letter-spacing: 4px; }
+.edit-mode [data-drag-id]:hover,
+[data-drag-id].is-dragging,
+[data-drag-id].is-resizing { outline: 2px dashed rgba(58,112,192,.45); outline-offset: 3px; }
+.rh { position: absolute; width: 10px; height: 10px; background: #3A70C0; border: 2px solid #fff; border-radius: 2px; opacity: 0; transition: opacity .15s; z-index: 201; }
+.edit-mode [data-drag-id]:hover .rh, [data-drag-id].is-resizing .rh { opacity: 1; }
+.rh-nw { top:-5px; left:-5px; cursor:nw-resize; } .rh-n  { top:-5px; left:50%; transform:translateX(-50%); cursor:n-resize; }
+.rh-ne { top:-5px; right:-5px; cursor:ne-resize; } .rh-e  { top:50%; right:-5px; transform:translateY(-50%); cursor:e-resize; }
+.rh-se { bottom:-5px; right:-5px; cursor:se-resize; } .rh-s { bottom:-5px; left:50%; transform:translateX(-50%); cursor:s-resize; }
+.rh-sw { bottom:-5px; left:-5px; cursor:sw-resize; } .rh-w { top:50%; left:-5px; transform:translateY(-50%); cursor:w-resize; }
+#layout-reset-btn {
+  position: fixed; bottom: 70px; right: 20px;
+  background: #FAF3E8; border: 1.5px solid #E2D4C2; border-radius: 8px;
+  padding: 7px 16px; font-size: 12px; cursor: pointer; z-index: 10001;
+  color: #7A6555; font-family: inherit; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+#layout-reset-btn:hover { background: #F0E4D0; }
+
+  .stock-price-row{display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:12px 16px;background:linear-gradient(135deg,rgba(212,144,10,0.08),rgba(212,144,10,0.04));border:1.5px solid rgba(212,144,10,0.35);border-radius:10px;}
+  .sp-label{font-size:0.8rem;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;}
+  .sp-prefix{font-size:1.15rem;font-weight:700;color:var(--gold);margin-left:4px;}
+  .sp-input{width:110px;padding:6px 10px;font-size:1.05rem;font-weight:700;border:2px solid var(--gold);border-radius:8px;background:var(--bg);color:var(--txt);text-align:center;}
+  .sp-input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,144,10,0.2);}
+  .sp-hint{font-size:0.75rem;color:var(--muted);margin-left:4px;}
+
+  
+  .btn-edit{margin-left:4px;padding:2px 8px;font-size:0.72rem;font-weight:600;background:transparent;border:1.5px solid var(--gold);color:var(--gold);border-radius:5px;cursor:pointer;}
+  .btn-edit:hover{background:rgba(212,144,10,0.12);}
+  .btn-done{padding:2px 10px;font-size:0.72rem;font-weight:700;background:var(--gold);border:none;color:#fff;border-radius:5px;cursor:pointer;}
+  .btn-done:hover{opacity:0.85;}
+  .chain-row.editing{background:rgba(212,144,10,0.06);}
+  .edit-inp{width:72px;padding:2px 4px;font-size:0.78rem;border:1.5px solid var(--gold);border-radius:4px;background:var(--bg);color:var(--txt);}
+  .edit-inp:focus{outline:none;box-shadow:0 0 0 2px rgba(212,144,10,0.25);}
+  .edit-num{width:64px;text-align:center;}
+
+  
+  .mode-toggle-row { display:flex; gap:6px; margin-bottom:10px; }
+  .mode-btn { flex:1; padding:6px 10px; font-size:0.78rem; font-weight:700; border:2px solid var(--gold); border-radius:8px; background:transparent; color:var(--gold); cursor:pointer; transition:all .15s; }
+  .mode-btn.active { background:var(--gold); color:#fff; }
+  .mode-btn:hover:not(.active) { background:rgba(212,144,10,0.12); }
+
+
+  /* ── Put / Call Toggle ── */
+  .opt-type-row { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .opt-type-label { font-size:11px; font-weight:700; color:var(--muted); letter-spacing:0.5px; text-transform:uppercase; }
+  .opt-type-toggle { display:flex; border-radius:8px; overflow:hidden; border:1.5px solid var(--border); }
+  .opt-type-btn { all:unset; padding:6px 20px; font-size:12px; font-weight:700; cursor:pointer;
+    color:var(--muted); background:transparent; transition:background 0.15s,color 0.15s; }
+  .opt-type-btn.active { background:var(--ink); color:#fff; }
+  .opt-type-btn:not(.active):hover { background:var(--gold-bg); }
+
+
+
+
+
+body.edit-mode .drag-handle { opacity: 1; }
+.rh { position:absolute; width:10px; height:10px; z-index:10; opacity:0; }
+body.edit-mode .rh { opacity:1; background:var(--gold-bdr); border-radius:2px; }
+.rh-se{bottom:-5px;right:-5px;cursor:se-resize;}.rh-s{bottom:-5px;left:50%;transform:translateX(-50%);cursor:s-resize;}
+.rh-sw{bottom:-5px;left:-5px;cursor:sw-resize;}.rh-w{top:50%;left:-5px;transform:translateY(-50%);cursor:w-resize;}
+.rh-nw{top:-5px;left:-5px;cursor:nw-resize;}.rh-n{top:-5px;left:50%;transform:translateX(-50%);cursor:n-resize;}
+.rh-ne{top:-5px;right:-5px;cursor:ne-resize;}.rh-e{top:50%;right:-5px;transform:translateY(-50%);cursor:e-resize;}
+body.edit-mode .full-card { outline:1.5px dashed rgba(212,144,10,0.3); }
+.full-card.is-dragging { opacity:0.85; box-shadow:0 8px 32px rgba(0,0,0,0.25); cursor:grabbing; }
+.full-card.is-resizing { opacity:0.9; }
+.el-focus { outline: 2px solid #3A70C0 !important; outline-offset: 3px; border-radius: 3px; }
+#tts-bar { position:fixed; top:0; left:0; right:0; z-index:3000; background:rgba(42,26,14,0.97); backdrop-filter:blur(8px); border-bottom:1px solid rgba(255,255,255,0.1); padding:8px 20px; display:flex; align-items:center; gap:12px; font-family:"PingFang TC","Microsoft JhengHei",system-ui,sans-serif; }
+.tts-btn { background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:#FFF9F0; border-radius:100px; padding:5px 14px; font-size:12px; cursor:pointer; font-family:inherit; font-weight:700; transition:background 0.15s; display:flex; align-items:center; gap:5px; white-space:nowrap; }
+.tts-btn:hover { background:rgba(255,255,255,0.22); }
+.tts-btn.playing { background:#1E7A3A; border-color:#2E9E52; color:#fff; }
+.tts-sep { width:1px; height:20px; background:rgba(255,255,255,0.15); flex-shrink:0; }
+.tts-dots { display:flex; gap:5px; align-items:center; }
+.tts-dot { width:7px; height:7px; border-radius:100px; background:rgba(255,255,255,0.2); cursor:pointer; transition:background 0.2s,transform 0.2s; }
+.tts-dot.done { background:rgba(255,255,255,0.45); }
+.tts-dot.current { background:var(--gold); transform:scale(1.5); }
+.tts-section { font-size:12px; color:#E8C060; font-weight:700; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#tts-speed { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#FFF9F0; border-radius:6px; padding:3px 7px; font-size:12px; cursor:pointer; font-family:inherit; }
+
+/* ── Hover tooltip ── */
+#col-tip{position:fixed;z-index:99999;max-width:300px;min-width:200px;background:#1a2535;border:1.5px solid var(--gold);border-radius:11px;padding:12px 15px;box-shadow:0 6px 28px rgba(0,0,0,.5);pointer-events:none;opacity:0;transition:opacity .18s ease;font-size:12.5px;color:#d8e6f3;line-height:1.65;}
+#col-tip .tip-t{font-weight:700;font-size:13px;color:var(--gold);margin-bottom:6px;}
+.tip-hover{cursor:help;}
+/* ── Vocab phonetics ── */
+.vc-pron{font-size:11px;color:#8aaac8;font-style:italic;margin-top:2px;letter-spacing:.02em;}
+
+/* ── IV PR Section ── */
+.ivpr-explain-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:12px 0; }
+.ivpr-box { background:var(--panel-bg); border:1.5px solid var(--border); border-radius:var(--r-md); padding:12px 14px; }
+.ivpr-box-title { font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+.ivpr-box-body { font-size:12.5px; color:var(--ink); line-height:1.65; }
+.ivpr-gauge-wrap { margin:16px 0 8px; }
+.ivpr-gauge-bar { position:relative; height:28px; border-radius:100px; overflow:hidden; display:flex; }
+.ivpr-zone { display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#fff; }
+.ivpr-zone.z-low  { background:#2E9E52; flex:30; }
+.ivpr-zone.z-mid  { background:#D4900A; flex:20; }
+.ivpr-zone.z-high { background:#D07020; flex:20; }
+.ivpr-zone.z-top  { background:#D04040; flex:30; }
+.ivpr-needle { position:absolute; top:0; bottom:0; width:3px; background:#1A0E0A; border-radius:2px; transform:translateX(-50%); transition:left 0.4s; }
+.ivpr-labels { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:4px; padding:0 4px; }
+.ivpr-label-val { font-size:12px; font-weight:900; color:var(--ink); margin-top:2px; }
+.where-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:12px; }
+.where-card { background:var(--panel-bg); border:1.5px solid var(--border); border-radius:var(--r-md); padding:10px 12px; }
+.where-card-name { font-size:13px; font-weight:800; color:var(--ink); margin-bottom:4px; }
+.where-card-path { font-size:11px; color:var(--muted); line-height:1.5; }
+.where-card-label { display:inline-block; margin-top:5px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:100px; }
+.where-card-label.free { background:var(--green-bg); color:var(--green); border:1px solid var(--green-bdr); }
+.where-card-label.paid { background:var(--gold-bg); color:var(--gold); border:1px solid var(--gold-bdr); }
+.ivpr-diff-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
+.ivpr-diff-box { background:var(--panel-bg); border-radius:var(--r-md); padding:11px 14px; }
+.ivpr-diff-box.rank { border:2px solid var(--gold-bdr); }
+.ivpr-diff-box.pct  { border:2px solid var(--blue-bdr); }
+</style>
+</head>
+<body>
+<div id="tts-bar">
+  <button id="tts-play-btn" class="tts-btn" onclick="ttsToggle()">&#9654; 朗讀全文</button>
+  <button class="tts-btn" onclick="ttsStop()" title="停止並重設">&#9646;&#9646;</button>
+  <div class="tts-sep"></div>
+  <div class="tts-dots" id="tts-dots"></div>
+  <div class="tts-sep"></div>
+  <span class="tts-section" id="tts-section-name">點擊「朗讀全文」開始</span>
+  <select id="tts-speed" title="語速" onchange="ttsSetRate(this.value)">
+    <option value="0.7">慢速 0.7×</option>
+    <option value="0.9" selected>正常 0.9×</option>
+    <option value="1.1">快速 1.1×</option>
+    <option value="1.3">很快 1.3×</option>
+  </select>
+  <div class="tts-sep"></div>
+  <span style="font-size:11px;color:#8A7A5A;">🔊</span>
+  <input type="range" id="tts-vol" min="0" max="1" step="0.05" value="1" style="width:60px;accent-color:var(--gold);cursor:pointer;" title="音量">
+  <div class="tts-sep"></div>
+  <button class="tts-btn" onclick="adjustPageFont(-1)" style="padding:4px 9px;font-size:11px;font-weight:900;" title="縮小字體">A−</button>
+  <button class="tts-btn" onclick="adjustPageFont(1)"  style="padding:4px 9px;font-size:11px;font-weight:900;" title="放大字體">A+</button>
+</div>
+<button id="layout-reset-btn" onclick="window.resetLayout&&window.resetLayout()" title="重設版面排列">↺ 重設版面</button>
+<div id="tts-subtitle"></div>
+<button id="edit-btn" onclick="toggleEditMode()" title="Ctrl+E">
+  <span id="edit-icon">✏️</span>
+  <span id="edit-label">編輯模式</span>
+</button>
+<div id="edit-toolbar">
+  <div class="et-hint" id="et-hint">← 點擊頁面任意文字開始編輯</div>
+  <div class="et-group" id="et-controls" style="display:none;">
+    <div class="et-item"><div class="et-label">字體</div>
+      <select id="et-font" onchange="applyStyle('fontFamily',this.value)">
+        <option value='"PingFang TC","Microsoft JhengHei",sans-serif'>PingFang TC</option>
+        <option value='Georgia,"Times New Roman",serif'>Georgia</option>
+        <option value='system-ui,sans-serif'>System UI</option>
+        <option value='"Courier New",monospace'>等寬字體</option>
+      </select></div>
+    <div class="et-divider"></div>
+    <div class="et-item"><div class="et-label">大小</div>
+      <div class="et-size-ctrl">
+        <button class="et-btn-sm" onclick="adjustSize(-1)">−</button>
+        <span id="et-size-val">16</span>
+        <button class="et-btn-sm" onclick="adjustSize(1)">+</button>
+      </div></div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button id="et-bold" class="et-fmt-btn" onclick="toggleBold()"><b>B</b></button>
+      <button id="et-italic" class="et-fmt-btn" onclick="toggleItalic()"><i>I</i></button>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item"><div class="et-label">顏色</div>
+      <input type="color" id="et-color" oninput="applyStyle('color',this.value)" title="文字顏色"></div>
+    <div class="et-divider"></div>
+    <div class="et-item"><div class="et-label">行距</div>
+      <input type="range" id="et-lh" min="1" max="3" step="0.05" value="1.4"
+             oninput="applyStyle('lineHeight',this.value);document.getElementById('et-lh-val').textContent=parseFloat(this.value).toFixed(1);">
+      <span id="et-lh-val" style="font-size:11px;min-width:22px;">1.4</span></div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button class="et-action-btn" onclick="resetElement()">重設</button>
+      <button class="et-action-btn" id="et-copy-btn" onclick="copyHtml()">複製</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN PAGE -->
+<div class="page" id="drag-canvas">
+
+<!-- ── Section 1: Header ── -->
+<div class="full-card" data-drag-id="l8-header" id="l8-header">
+  <div class="course-tag">📚 期權小學堂 · 第8課</div>
+  <div class="page-header">
+    <div>
+      <div class="page-title">如何看懂 Barchart 期權鏈 📋</div>
+      <div class="page-subtitle">Options Prices &amp; Volatility &amp; Greeks — 欄位全解析</div>
+      <div class="page-desc">Barchart 有兩個重要的期權分析頁籤：<strong>Options Prices</strong> 顯示市場成交資訊，<strong>Volatility &amp; Greeks</strong> 顯示理論估值與敏感度。本課帶你逐一看懂每個欄位，並用互動字卡幫你記住術語。</div>
+    </div>
+    <div class="contract-box">
+      <div class="cb-title">📋 本課結構</div>
+      <div class="cb-ticker">NOK <small>· 示範標的</small></div>
+      <div class="cb-grid">
+        <div class="cb-item"><div class="ci-l">① 頁籤</div><div class="ci-v blue">Options Prices</div></div>
+        <div class="cb-item"><div class="ci-l">② 頁籤</div><div class="ci-v green">Vol. &amp; Greeks</div></div>
+        <div class="cb-item"><div class="ci-l">③ 互動</div><div class="ci-v gold">Driver.js 導覽</div></div>
+        <div class="cb-item"><div class="ci-l">④ 記憶</div><div class="ci-v">15 張字卡</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="bullets">
+    <div class="bullet"><div class="bullet-num">①</div><span><strong>Options Prices</strong> 頁籤：顯示每個 Strike 的市場報價（Bid/Ask）、成交量（Volume）、未平倉量（Open Interest）、以及隱含波動率（IV）——這是選 Strike 的第一步。</span></div>
+    <div class="bullet"><div class="bullet-num">②</div><span><strong>Volatility &amp; Greeks</strong> 頁籤：顯示相同 Strike 的 BSM 理論價、以及 Delta / Gamma / Theta / Vega——這是評估風險敏感度的工具。</span></div>
+    <div class="bullet"><div class="bullet-num">③</div><span>點擊各欄位標題或「啟動導覽」按鈕，可以看到 Driver.js 即時說明；下方的術語字卡點一下就翻面，🔊 按鈕讓你聽到正確英文發音。</span></div>
+  </div>
+</div>
+
+<!-- ── Section 2: Options Prices ── -->
+<div class="full-card" data-drag-id="l8-options-prices" id="l8-options-prices">
+  <div class="tag-row">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="step-badge">1</div>
+      <div class="pill-outline chart">OPTIONS PRICES</div>
+    </div>
+    <div class="pill chart">市場報價頁籤</div>
+  </div>
+  <div class="ptitle">Barchart Options Prices<br>看懂頂部資訊列 &amp; 期權鏈欄位</div>
+
+  <div class="bcg-info-bar" id="bc-header-bar">
+    <span class="bcg-ibitem tip-hover" id="bc-expiry" data-tip-key="expiry" data-tip-type="col"><span class="bcg-iblbl">Expiration:</span> <span class="bcg-ibval">2026-07-02</span> <span class="bcg-iblbl">(40 DTE)</span></span>
+    <span class="bcg-ibsep">|</span>
+    <span class="bcg-ibitem tip-hover" id="bc-earnings" data-tip-key="earnings" data-tip-type="col"><span class="bcg-iblbl">Latest Earnings:</span> <span class="bcg-ibval">07/23/26</span></span>
+    <span class="bcg-ibsep">|</span>
+    <span class="bcg-ibitem tip-hover" id="bc-iv-atm" data-tip-key="iv_atm" data-tip-type="col"><span class="bcg-iblbl">Implied Volatility (ATM):</span> <span class="bcg-ibval gold">76.57%</span></span>
+    <span class="bcg-ibsep">|</span>
+    <span class="bcg-ibitem tip-hover" id="bc-hv" data-tip-key="hv" data-tip-type="col"><span class="bcg-iblbl">Historic Volatility:</span> <span class="bcg-ibval">72.68%</span></span>
+    <span class="bcg-ibsep">|</span>
+    <span class="bcg-ibitem tip-hover" id="bc-ivrank" data-tip-key="ivrank" data-tip-type="col"><span class="bcg-iblbl">IV Rank:</span> <span class="bcg-ibval blue">41.58%</span></span>
+  </div>
+
+  <div class="bcg-prices-wrap" id="bc-prices-table">
+    <table class="bcg-prices-table">
+      <thead>
+        <tr class="row-ghd">
+          <th colspan="9" class="ghd-calls">Calls</th>
+          <th class="ghd-sk"></th>
+          <th colspan="9" class="ghd-puts">Puts</th>
+        </tr>
+        <tr class="row-cols">
+          <th id="th-type-c" data-tip-key="type" data-tip-type="col">Type</th>
+          <th id="th-latest-c" data-tip-key="latest" data-tip-type="col">Latest</th>
+          <th id="th-bid-c" data-tip-key="bid" data-tip-type="col">Bid</th>
+          <th id="th-ask-c" data-tip-key="ask" data-tip-type="col">Ask</th>
+          <th id="th-change-c" data-tip-key="change" data-tip-type="col">Change</th>
+          <th id="th-volume-c" data-tip-key="volume" data-tip-type="col">Volume</th>
+          <th id="th-oi-c" data-tip-key="oi" data-tip-type="col">Open Int</th>
+          <th id="th-iv-c" data-tip-key="iv" data-tip-type="col">IV</th>
+          <th id="th-lt-c" data-tip-key="lt" data-tip-type="col">Last Trade</th>
+          <th class="th-sk" id="th-strike" data-tip-key="strike" data-tip-type="col">Strike</th>
+          <th data-tip-key="type" data-tip-type="col">Type</th>
+          <th data-tip-key="latest" data-tip-type="col">Latest</th>
+          <th data-tip-key="bid" data-tip-type="col">Bid</th>
+          <th data-tip-key="ask" data-tip-type="col">Ask</th>
+          <th data-tip-key="change" data-tip-type="col">Change</th>
+          <th id="th-volume-p" data-tip-key="volume" data-tip-type="col">Volume</th>
+          <th id="th-oi-p" data-tip-key="oi" data-tip-type="col">Open Int</th>
+          <th data-tip-key="iv" data-tip-type="col">IV</th>
+          <th data-tip-key="lt" data-tip-type="col">Last Trade</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="td-cp">Call</td><td class="td-z">0.00</td><td>3.65</td><td>7.15</td><td class="td-unc">unch</td><td class="td-z">0</td><td class="td-z">0</td><td>116.99%</td><td class="td-na">N/A</td>
+          <td class="td-sk">10.50</td>
+          <td class="td-cp">Put</td><td class="td-z">0.00</td><td class="td-z">0.00</td><td>2.19</td><td class="td-unc">unch</td><td class="td-z">0</td><td class="td-z">0</td><td>176.62%</td><td class="td-na">N/A</td>
+        </tr>
+        <tr>
+          <td class="td-cp">Call</td><td class="td-z">0.00</td><td>3.25</td><td>6.70</td><td class="td-unc">unch</td><td class="td-z">0</td><td class="td-z">0</td><td>113.50%</td><td class="td-na">N/A</td>
+          <td class="td-sk">11.00</td>
+          <td class="td-cp">Put</td><td class="td-z">0.00</td><td class="td-z">0.00</td><td>2.22</td><td class="td-unc">unch</td><td class="td-z">0</td><td class="td-z">0</td><td>164.32%</td><td class="td-na">N/A</td>
+        </tr>
+        <tr>
+          <td class="td-cp">Call</td><td class="td-z">0.00</td><td>2.07</td><td>5.15</td><td class="td-unc">unch</td><td class="td-z">0</td><td class="td-z">0</td><td class="td-z">0.00%</td><td class="td-na">N/A</td>
+          <td class="td-sk">11.50</td>
+          <td class="td-cp">Put</td><td>0.17</td><td class="td-z">0.00</td><td>2.26</td><td class="td-neg">-0.09</td><td class="td-vmd">1</td><td>5</td><td>73.57%</td><td>05/22/26</td>
+        </tr>
+        <tr>
+          <td class="td-cp">Call</td><td class="td-z">0.00</td><td>1.79</td><td>4.95</td><td class="td-unc">unch</td><td class="td-z">0</td><td class="td-z">0</td><td class="td-z">0.00%</td><td class="td-na">N/A</td>
+          <td class="td-sk">12.00</td>
+          <td class="td-cp">Put</td><td>0.19</td><td>0.19</td><td>2.32</td><td class="td-pos">+0.19</td><td class="td-vhi">101</td><td class="td-z">0</td><td>67.75%</td><td>05/22/26</td>
+        </tr>
+        <tr>
+          <td class="td-cp">Call</td><td class="td-z">0.00</td><td>2.96</td><td>3.55</td><td class="td-unc">unch</td><td class="td-z">0</td><td class="td-z">0</td><td>65.04%</td><td class="td-na">N/A</td>
+          <td class="td-sk">12.50</td>
+          <td class="td-cp">Put</td><td class="td-z">0.00</td><td class="td-z">0.00</td><td>0.45</td><td class="td-unc">unch</td><td class="td-z">0</td><td class="td-z">0</td><td>63.10%</td><td class="td-na">N/A</td>
+        </tr>
+        <tr>
+          <td class="td-cp">Call</td><td class="td-z">0.00</td><td>1.25</td><td>5.00</td><td class="td-unc">unch</td><td class="td-z">0</td><td class="td-z">0</td><td>83.51%</td><td class="td-na">N/A</td>
+          <td class="td-sk">13.00</td>
+          <td class="td-cp">Put</td><td>0.37</td><td>0.18</td><td>0.53</td><td class="td-pos">+0.37</td><td class="td-vmd">28</td><td class="td-z">0</td><td>66.46%</td><td>05/22/26</td>
+        </tr>
+        <tr>
+          <td class="td-cp">Call</td><td>1.60</td><td>1.76</td><td>3.40</td><td class="td-unc">unch</td><td class="td-z">0</td><td>26</td><td>70.44%</td><td>05/21/26</td>
+          <td class="td-sk">13.50</td>
+          <td class="td-cp">Put</td><td class="td-z">0.00</td><td class="td-z">0.00</td><td>1.45</td><td class="td-unc">unch</td><td class="td-z">0</td><td class="td-z">0</td><td>80.16%</td><td class="td-na">N/A</td>
+        </tr>
+        <tr>
+          <td class="td-cp">Call</td><td>2.36</td><td>0.41</td><td>2.90</td><td class="td-pos">+2.36</td><td class="td-vmd">10</td><td class="td-z">0</td><td>76.52%</td><td>05/22/26</td>
+          <td class="td-sk">14.00</td>
+          <td class="td-cp">Put</td><td>0.69</td><td>0.46</td><td>0.98</td><td class="td-pos">+0.69</td><td class="td-vmd">28</td><td class="td-z">0</td><td>67.61%</td><td>05/22/26</td>
+        </tr>
+        <tr>
+          <td class="td-cp">Call</td><td>1.96</td><td>1.73</td><td>2.17</td><td class="td-pos">+0.75</td><td class="td-vhi">788</td><td>16</td><td>70.71%</td><td>05/22/26</td>
+          <td class="td-sk">14.50</td>
+          <td class="td-cp">Put</td><td>0.89</td><td>0.69</td><td>1.03</td><td class="td-pos">+0.89</td><td class="td-vhi">951</td><td class="td-z">0</td><td>67.79%</td><td>05/22/26</td>
+        </tr>
+        <tr class="bcg-atm">
+          <td class="td-cp">Call</td><td>1.76</td><td>1.69</td><td>2.13</td><td class="td-pos">+0.57</td><td class="td-vhi">4,120</td><td>22</td><td>74.21%</td><td>05/22/26</td>
+          <td class="td-sk">15.00</td>
+          <td class="td-cp">Put</td><td>1.20</td><td>0.96</td><td>1.40</td><td class="td-pos">+1.20</td><td class="td-vhi">96</td><td class="td-z">0</td><td>72.01%</td><td>05/22/26</td>
+        </tr>
+        <tr>
+          <td class="td-cp">Call</td><td>1.51</td><td>1.46</td><td>1.74</td><td class="td-pos">+1.51</td><td class="td-vhi">107</td><td class="td-z">0</td><td>73.66%</td><td>05/22/26</td>
+          <td class="td-sk">15.50</td>
+          <td class="td-cp">Put</td><td class="td-z">0.00</td><td class="td-z">0.00</td><td>3.50</td><td class="td-unc">unch</td><td class="td-z">0</td><td class="td-z">0</td><td>86.41%</td><td class="td-na">N/A</td>
+        </tr>
+        <tr>
+          <td class="td-cp">Call</td><td>1.49</td><td>1.20</td><td>1.44</td><td class="td-pos">+0.72</td><td class="td-vhi">471</td><td>44</td><td>74.80%</td><td>05/22/26</td>
+          <td class="td-sk">16.00</td>
+          <td class="td-cp">Put</td><td class="td-z">0.00</td><td class="td-z">0.00</td><td>3.80</td><td class="td-unc">unch</td><td class="td-z">0</td><td class="td-z">0</td><td>80.62%</td><td class="td-na">N/A</td>
+        </tr>
+        <tr>
+          <td class="td-cp">Call</td><td>1.17</td><td>1.00</td><td>1.37</td><td class="td-pos">+0.49</td><td class="td-vmd">37</td><td>38</td><td>76.70%</td><td>05/22/26</td>
+          <td class="td-sk">16.50</td>
+          <td class="td-cp">Put</td><td class="td-z">0.00</td><td>1.40</td><td>3.60</td><td class="td-unc">unch</td><td class="td-z">0</td><td class="td-z">0</td><td>93.91%</td><td class="td-na">N/A</td>
+        </tr>
+        <tr>
+          <td class="td-cp">Call</td><td>1.12</td><td>0.83</td><td>1.25</td><td class="td-neg">-0.50</td><td class="td-vhi">291</td><td class="td-z">0</td><td>82.55%</td><td>05/22/26</td>
+          <td class="td-sk">17.00</td>
+          <td class="td-cp">Put</td><td class="td-z">0.00</td><td>0.62</td><td>4.50</td><td class="td-unc">unch</td><td class="td-z">0</td><td class="td-z">0</td><td>80.60%</td><td class="td-na">N/A</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="bc-note">💡 <strong>滑鼠懸停任意欄位標題</strong>查看說明。藍底格子（Volume 較高）代表流動性較好的 Strike。<strong>unch</strong> = unchanged，灰紫色代表當日無漲跌。ATM 列（15.00）以淡藍色標示。</div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <button class="tour-btn" onclick="startPricesTour()">🚀 啟動 Options Prices 導覽</button>
+    <span style="font-size:12px;color:var(--muted);">依序介紹所有欄位（8 步驟）</span>
+  </div>
+</div>
+
+<!-- ── Section 3: Greeks ── -->
+<div class="full-card" data-drag-id="l8-greeks" id="l8-greeks">
+  <div class="tag-row">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="step-badge">2</div>
+      <div class="pill-outline win">VOLATILITY &amp; GREEKS</div>
+    </div>
+    <div class="pill win">期權敏感度頁籤</div>
+  </div>
+  <div class="ptitle">Barchart Volatility &amp; Greeks<br>理論估值 + Greeks 完整欄位（含 Rho、Vol/OI、ITM Prob）</div>
+
+  <div class="bc-header" style="margin-bottom:12px;">
+    <div class="bc-info-item tip-hover" id="bc-g-expiry" data-tip-key="expiry" data-tip-type="col"><div class="bc-info-label">Expiration</div><div class="bc-info-value">2026-07-02 <span style="font-size:10px;color:#607080;">(40 DTE)</span></div></div>
+    <div class="bc-info-item tip-hover" id="bc-g-iv-atm" data-tip-key="iv_atm" data-tip-type="col"><div class="bc-info-label">Implied Volatility (ATM)</div><div class="bc-info-value gold">76.57%</div></div>
+    <div class="bc-info-item tip-hover" id="bc-g-hv" data-tip-key="hv" data-tip-type="col"><div class="bc-info-label">Historic Volatility</div><div class="bc-info-value">72.68%</div></div>
+    <div class="bc-info-item tip-hover" id="bc-g-ivrank" data-tip-key="ivrank" data-tip-type="col"><div class="bc-info-label">IV Rank</div><div class="bc-info-value blue">41.58%</div></div>
+  </div>
+
+  <div class="bcg-puts-title">Puts</div>
+  <div class="bcg-wrap" id="bc-greeks-table">
+    <table class="bcg-table">
+      <thead><tr>
+        <th class="th-sk" data-tip-key="strike" data-tip-type="col">Strike</th>
+        <th id="th-latest-g" data-tip-key="latest" data-tip-type="greek">Latest</th>
+        <th id="th-theor-g" data-tip-key="theor" data-tip-type="greek">Theor.</th>
+        <th id="th-iv-g" data-tip-key="iv" data-tip-type="greek">IV</th>
+        <th id="th-delta-g" data-tip-key="delta" data-tip-type="greek">Delta</th>
+        <th id="th-gamma-g" data-tip-key="gamma" data-tip-type="greek">Gamma</th>
+        <th id="th-theta-g" data-tip-key="theta" data-tip-type="greek">Theta</th>
+        <th id="th-vega-g" data-tip-key="vega" data-tip-type="greek">Vega</th>
+        <th id="th-rho-g" data-tip-key="rho" data-tip-type="greek">Rho</th>
+        <th id="th-volume-g" data-tip-key="voloi" data-tip-type="greek">Volume</th>
+        <th id="th-oi-g" data-tip-key="voloi" data-tip-type="greek">Open Int</th>
+        <th id="th-voloi-g" data-tip-key="voloi" data-tip-type="greek">Vol/OI</th>
+        <th id="th-itmprob-g" data-tip-key="itmprob" data-tip-type="greek">ITM Prob</th>
+        <th data-tip-key="lt" data-tip-type="greek" class="td-type">Type</th>
+        <th data-tip-key="lt" data-tip-type="greek">Last Trade</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td class="td-sk">10.50</td>
+          <td class="td-zero">0.00</td><td>1.10</td><td>176.62%</td>
+          <td class="td-neg">-0.1684</td><td>0.0278</td><td class="td-neg">-0.0281</td><td>0.0129</td>
+          <td class="td-neg">-0.0036</td><td class="td-zero">0</td><td class="td-zero">0</td><td class="td-zero">0.00</td>
+          <td class="td-itp">25.37%</td><td class="td-type">Put</td><td class="td-na">N/A</td>
+        </tr>
+        <tr>
+          <td class="td-sk">11.00</td>
+          <td class="td-zero">0.00</td><td>1.11</td><td>164.32%</td>
+          <td class="td-neg">-0.1828</td><td>0.0315</td><td class="td-neg">-0.0276</td><td>0.0136</td>
+          <td class="td-neg">-0.0039</td><td class="td-zero">0</td><td class="td-zero">0</td><td class="td-zero">0.00</td>
+          <td class="td-itp">26.54%</td><td class="td-type">Put</td><td class="td-na">N/A</td>
+        </tr>
+        <tr>
+          <td class="td-sk">11.50</td>
+          <td>0.17</td><td>0.17</td><td>73.57%</td>
+          <td class="td-neg">-0.0881</td><td>0.0425</td><td class="td-neg">-0.0074</td><td>0.0082</td>
+          <td class="td-neg">-0.0016</td><td class="td-vol">1</td><td>5</td><td>0.20</td>
+          <td class="td-itp">11.17%</td><td class="td-type">Put</td><td>05/22/26</td>
+        </tr>
+        <tr>
+          <td class="td-sk">12.00</td>
+          <td>0.19</td><td>0.19</td><td>67.75%</td>
+          <td class="td-neg">-0.1041</td><td>0.0521</td><td class="td-neg">-0.0077</td><td>0.0093</td>
+          <td class="td-neg">-0.0018</td><td class="td-vol">101</td><td class="td-zero">0</td><td class="td-zero">0.00</td>
+          <td class="td-itp">12.87%</td><td class="td-type">Put</td><td>05/22/26</td>
+        </tr>
+        <tr>
+          <td class="td-sk">12.50</td>
+          <td class="td-zero">0.00</td><td>0.22</td><td>63.10%</td>
+          <td class="td-neg">-0.1272</td><td>0.0645</td><td class="td-neg">-0.0082</td><td>0.0107</td>
+          <td class="td-neg">-0.0022</td><td class="td-zero">0</td><td class="td-zero">0</td><td class="td-zero">0.00</td>
+          <td class="td-itp">15.38%</td><td class="td-type">Put</td><td class="td-na">N/A</td>
+        </tr>
+        <tr>
+          <td class="td-sk">13.00</td>
+          <td>0.37</td><td>0.37</td><td>66.46%</td>
+          <td class="td-neg">-0.1802</td><td>0.0772</td><td class="td-neg">-0.0109</td><td>0.0134</td>
+          <td class="td-neg">-0.0031</td><td class="td-vol">28</td><td class="td-zero">0</td><td class="td-zero">0.00</td>
+          <td class="td-itp">21.46%</td><td class="td-type">Put</td><td>05/22/26</td>
+        </tr>
+        <tr>
+          <td class="td-sk">13.50</td>
+          <td class="td-zero">0.00</td><td>0.73</td><td>80.16%</td>
+          <td class="td-neg">-0.2555</td><td>0.0784</td><td class="td-neg">-0.0161</td><td>0.0165</td>
+          <td class="td-neg">-0.0046</td><td class="td-zero">0</td><td class="td-zero">0</td><td class="td-zero">0.00</td>
+          <td class="td-itp">30.39%</td><td class="td-type">Put</td><td class="td-na">N/A</td>
+        </tr>
+        <tr>
+          <td class="td-sk">14.00</td>
+          <td>0.69</td><td>0.69</td><td>67.61%</td>
+          <td class="td-neg">-0.2839</td><td>0.0980</td><td class="td-neg">-0.0143</td><td>0.0173</td>
+          <td class="td-neg">-0.0050</td><td class="td-vol">28</td><td class="td-zero">0</td><td class="td-zero">0.00</td>
+          <td class="td-itp">32.78%</td><td class="td-type">Put</td><td>05/22/26</td>
+        </tr>
+        <tr>
+          <td class="td-sk">14.50</td>
+          <td>0.89</td><td>0.89</td><td>67.79%</td>
+          <td class="td-neg">-0.3396</td><td>0.1057</td><td class="td-neg">-0.0154</td><td>0.0187</td>
+          <td class="td-neg">-0.0059</td><td class="td-vol">951</td><td class="td-zero">0</td><td class="td-zero">0.00</td>
+          <td class="td-itp">38.65%</td><td class="td-type">Put</td><td>05/22/26</td>
+        </tr>
+        <tr class="bcg-atm">
+          <td class="td-sk">15.00</td>
+          <td>1.20</td><td>1.20</td><td>72.01%</td>
+          <td class="td-neg">-0.3974</td><td>0.1048</td><td class="td-neg">-0.0172</td><td>0.0197</td>
+          <td class="td-neg">-0.0070</td><td class="td-vol">96</td><td class="td-zero">0</td><td class="td-zero">0.00</td>
+          <td class="td-itp">44.85%</td><td class="td-type">Put</td><td>05/22/26</td>
+        </tr>
+        <tr>
+          <td class="td-sk">15.50</td>
+          <td class="td-zero">0.00</td><td>1.75</td><td>86.41%</td>
+          <td class="td-neg">-0.4421</td><td>0.0894</td><td class="td-neg">-0.0212</td><td>0.0202</td>
+          <td class="td-neg">-0.0080</td><td class="td-zero">0</td><td class="td-zero">0</td><td class="td-zero">0.00</td>
+          <td class="td-itp">50.27%</td><td class="td-type">Put</td><td class="td-na">N/A</td>
+        </tr>
+        <tr>
+          <td class="td-sk">16.00</td>
+          <td class="td-zero">0.00</td><td>1.92</td><td>80.62%</td>
+          <td class="td-neg">-0.4933</td><td>0.0969</td><td class="td-neg">-0.0199</td><td>0.0204</td>
+          <td class="td-neg">-0.0088</td><td class="td-zero">0</td><td class="td-zero">0</td><td class="td-zero">0.00</td>
+          <td class="td-itp">55.02%</td><td class="td-type">Put</td><td class="td-na">N/A</td>
+        </tr>
+        <tr>
+          <td class="td-sk">16.50</td>
+          <td class="td-zero">0.00</td><td>2.50</td><td>93.91%</td>
+          <td class="td-neg">-0.5175</td><td>0.0831</td><td class="td-neg">-0.0232</td><td>0.0204</td>
+          <td class="td-neg">-0.0096</td><td class="td-zero">0</td><td class="td-zero">0</td><td class="td-zero">0.00</td>
+          <td class="td-itp">58.21%</td><td class="td-type">Put</td><td class="td-na">N/A</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;color:var(--muted);margin-top:10px;">滑鼠懸停符號卡查看欄位詳細說明：</div>
+  <div class="greek-badges" style="grid-template-columns:repeat(4,1fr);">
+    <div class="greek-badge theor" data-tip-key="theor" data-tip-type="greek" id="badge-theor">
+      <div class="gb-sym">≈</div><div class="gb-name">Theor.</div><div class="gb-zh">理論估值（BSM）</div>
+    </div>
+    <div class="greek-badge delta" data-tip-key="delta" data-tip-type="greek" id="badge-delta">
+      <div class="gb-sym">Δ</div><div class="gb-name">Delta</div><div class="gb-zh">方向敏感度</div>
+    </div>
+    <div class="greek-badge gamma" data-tip-key="gamma" data-tip-type="greek" id="badge-gamma">
+      <div class="gb-sym">Γ</div><div class="gb-name">Gamma</div><div class="gb-zh">Delta 變化率</div>
+    </div>
+    <div class="greek-badge theta" data-tip-key="theta" data-tip-type="greek" id="badge-theta">
+      <div class="gb-sym">Θ</div><div class="gb-name">Theta</div><div class="gb-zh">時間衰減（每日）</div>
+    </div>
+    <div class="greek-badge vega" data-tip-key="vega" data-tip-type="greek" id="badge-vega">
+      <div class="gb-sym">ν</div><div class="gb-name">Vega</div><div class="gb-zh">IV 敏感度</div>
+    </div>
+    <div class="greek-badge rho" data-tip-key="rho" data-tip-type="greek" id="badge-rho">
+      <div class="gb-sym">ρ</div><div class="gb-name">Rho</div><div class="gb-zh">利率敏感度</div>
+    </div>
+    <div class="greek-badge voloi" data-tip-key="voloi" data-tip-type="greek" id="badge-voloi">
+      <div class="gb-sym">V/OI</div><div class="gb-name">Vol/OI</div><div class="gb-zh">成交量/未平倉比</div>
+    </div>
+    <div class="greek-badge itmprob" data-tip-key="itmprob" data-tip-type="greek" id="badge-itmprob">
+      <div class="gb-sym">P%</div><div class="gb-name">ITM Prob</div><div class="gb-zh">到期 ITM 機率</div>
+    </div>
+  </div>
+  <div class="bc-note">💡 <strong>滑鼠懸停任意欄位標題</strong>可看詳細說明。黃色底部列為 ATM（Strike ≈ 現股價）。<strong>ITM Prob</strong> 控制在 35% 以下是賣方安全區間。<strong>Volume</strong> 藍色數字代表流動性較佳的 Strike。</div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <button class="tour-btn" onclick="startGreeksTour()">⚡ 啟動 Greeks 導覽</button>
+    <span style="font-size:12px;color:var(--muted);">依序介紹 4 個資訊列 + 8 個 Greeks 欄位（12 步驟）</span>
+  </div>
+</div>
+
+<!-- ── Section 4: IV PR ── -->
+<div class="full-card" data-drag-id="l8-ivpr" id="l8-ivpr">
+  <div class="tag-row">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="step-badge">3</div>
+      <div class="pill-outline blue">IV PERCENTILE RANK</div>
+    </div>
+    <div class="pill blue">重要指標解析</div>
+  </div>
+  <div class="ptitle">📊 IV Percentile Rank（IV PR）<br>決定開倉時機的核心指標</div>
+
+  <!-- What + Why -->
+  <div class="ivpr-explain-grid">
+    <div class="ivpr-box">
+      <div class="ivpr-box-title">📌 IV PR 是什麼？</div>
+      <div class="ivpr-box-body">
+        過去一年（約 252 個交易日）中，有多少百分比的交易日 IV 低於今天的 IV。<br><br>
+        <strong>IV PR = 60%</strong> → 過去一年有 <strong>60% 的天數</strong> IV 比今天低<br>
+        → 目前 IV 處於過去一年的前 40% 高位<br><br>
+        ⚠️ 計算的是「天數比例」，對極端值（黑天鵝）的敏感度低於 IV Rank。
+      </div>
+    </div>
+    <div class="ivpr-box">
+      <div class="ivpr-box-title">💡 為什麼重要？</div>
+      <div class="ivpr-box-body">
+        IV PR 告訴你現在的期權 Premium 是「貴」還是「便宜」：<br><br>
+        <span style="color:var(--red);font-weight:800;">IV PR &gt; 50%</span> → Premium 偏高 → <strong>賣方有利</strong>（CSP / CC）<br>
+        <span style="color:var(--green);font-weight:800;">IV PR &lt; 30%</span> → Premium 偏低 → <strong>買方有利</strong>（Long Call/Put）<br><br>
+        策略規則：<strong>高 IV PR 賣期權，低 IV PR 買期權。</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Visual gauge -->
+  <div class="ivpr-gauge-wrap">
+    <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">IV PR 位置計（以 NOK 目前 41.58% 為例）</div>
+    <div class="ivpr-gauge-bar" id="ivpr-gauge">
+      <div class="ivpr-zone z-low">0–30%<br>買方區</div>
+      <div class="ivpr-zone z-mid">30–50%<br>中性</div>
+      <div class="ivpr-zone z-high">50–70%<br>賣方區</div>
+      <div class="ivpr-zone z-top">70–100%<br>強勢賣</div>
+      <div class="ivpr-needle" id="ivpr-needle"></div>
+    </div>
+    <div class="ivpr-labels">
+      <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+    </div>
+    <div class="ivpr-label-val">▲ NOK 目前：41.58%（中性偏低，Premium 薄，非最佳賣出時機）</div>
+  </div>
+
+  <!-- IV Rank vs IV PR difference -->
+  <div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:14px;margin-bottom:4px;">IV Rank vs IV Percentile — 常混淆的兩個名詞</div>
+  <div class="ivpr-diff-row">
+    <div class="ivpr-diff-box rank">
+      <div style="font-size:12px;font-weight:800;color:var(--gold);margin-bottom:6px;">🏆 IV Rank</div>
+      <div style="font-size:12px;color:var(--ink);line-height:1.6;">
+        公式：<code>(今日IV − 52週最低) ÷ (52週最高 − 52週最低)</code><br>
+        比較：只看最高和最低兩個極值<br>
+        缺點：一次黑天鵝大漲 IV，之後長期 Rank 都會偏低<br>
+        <span style="color:var(--muted);font-size:11px;">Barchart 顯示的是此版本</span>
+      </div>
+    </div>
+    <div class="ivpr-diff-box pct">
+      <div style="font-size:12px;font-weight:800;color:var(--blue);margin-bottom:6px;">📊 IV Percentile (IV PR)</div>
+      <div style="font-size:12px;color:var(--ink);line-height:1.6;">
+        公式：<code>過去一年中 IV 低於今日的天數 ÷ 總交易日數</code><br>
+        比較：統計每一天的 IV，更能反映「一般水準」<br>
+        優點：對黑天鵝更穩健，分佈更均勻<br>
+        <span style="color:var(--muted);font-size:11px;">TastyTrade / Market Chameleon 常用此版本</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Where to find -->
+  <div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:16px;margin-bottom:4px;">🔍 在哪裡查看 IV PR / IV Rank？</div>
+  <div class="where-grid">
+    <div class="where-card">
+      <div class="where-card-name">📈 Barchart.com</div>
+      <div class="where-card-path">Options → 選標的 → 頂部資訊列<br>顯示欄位：<strong>IV Rank</strong></div>
+      <span class="where-card-label free">免費</span>
+    </div>
+    <div class="where-card">
+      <div class="where-card-name">🌶️ TastyTrade</div>
+      <div class="where-card-path">Watchlist → 右鍵欄位 → Add Column → <strong>IV Rank / IV %ile</strong></div>
+      <span class="where-card-label free">免費帳號</span>
+    </div>
+    <div class="where-card">
+      <div class="where-card-name">📊 Market Chameleon</div>
+      <div class="where-card-path">搜尋標的 → Volatility → <strong>IV Rank &amp; Percentile</strong> 圖表</div>
+      <span class="where-card-label free">基礎免費</span>
+    </div>
+    <div class="where-card">
+      <div class="where-card-name">💹 Think or Swim</div>
+      <div class="where-card-path">MarketWatch / Scan → 加入欄位 → <strong>IV Percentile</strong></div>
+      <span class="where-card-label paid">需帳號</span>
+    </div>
+    <div class="where-card">
+      <div class="where-card-name">🏦 IBKR TWS</div>
+      <div class="where-card-path">Option Chain → Volatility 欄 → <strong>IV Rank</strong></div>
+      <span class="where-card-label paid">需帳號</span>
+    </div>
+    <div class="where-card" style="background:var(--gold-bg);border-color:var(--gold-bdr);">
+      <div class="where-card-name" style="color:var(--gold);">⭐ 建議</div>
+      <div class="where-card-path" style="color:var(--ink);">入門先用 <strong>Barchart</strong>（已在本課練習），進階再配合 <strong>Market Chameleon</strong> 看歷史趨勢圖</div>
+    </div>
+  </div>
+  <div class="bc-note" style="margin-top:10px;">💡 <strong>實戰記住一句話：IV PR &gt; 50 賣出，IV PR &lt; 30 考慮買入，30~50 之間謹慎評估。</strong></div>
+
+  <!-- Real-world example -->
+  <div style="margin-top:16px;">
+    <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;">🌐 實例：Market Chameleon — NOK 的 IV Percentile Rank 頁面</div>
+    <a href="https://marketchameleon.com/Overview/NOK/IV/" target="_blank" rel="noopener"
+       style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--blue);background:var(--blue-bg);border:1.5px solid var(--blue-bdr);border-radius:100px;padding:5px 14px;margin-bottom:10px;text-decoration:none;">
+      🔗 marketchameleon.com/Overview/NOK/IV/
+    </a>
+    <div style="border:2px solid var(--border);border-radius:var(--r-md);overflow:hidden;">
+      <img src="images/nok-iv-marketchameleon.png"
+           alt="Market Chameleon NOK IV Percentile Rank 截圖"
+           style="width:100%;display:block;" />
+    </div>
+    <div style="font-size:11.5px;color:var(--ink);line-height:1.7;margin-top:8px;background:var(--gold-bg);border:1.5px solid var(--gold-bdr);border-radius:var(--r-md);padding:10px 14px;">
+      📌 上圖說明：NOK 的 IV Percentile Rank 目前為 <strong>98th percentile</strong>——代表過去一年有 <strong>98% 的交易日</strong> IV 低於今天。左側面板的
+      <strong>IVR</strong>（IV Rank）和 <strong>IVP</strong>（IV Percentile）兩個數字並排顯示，一眼看出差異。
+      這個水位在賣方眼中屬於「極高 Premium」，是 CSP / Covered Call 的強力開倉信號。
+    </div>
+  </div>
+</div>
+
+
+<!-- ── Section 5: Vocab Cards ── -->
+<div class="full-card" data-drag-id="l8-vocab" id="l8-vocab">
+  <div class="tag-row">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="step-badge">4</div>
+      <div class="pill-outline gold">VOCABULARY</div>
+    </div>
+    <div class="pill gold">術語字卡 · 點擊翻面</div>
+  </div>
+  <div class="ptitle">15 張術語字卡<br>點擊翻面看解釋 · 🔊 聽發音</div>
+  <div class="vocab-filter-row" id="vocab-filters">
+    <span class="filter-label">篩選：</span>
+    <button class="filter-btn active" onclick="filterVocab('all',this)">全部 (18)</button>
+    <button class="filter-btn" onclick="filterVocab('basic',this)">🔵 基礎欄位 (9)</button>
+    <button class="filter-btn" onclick="filterVocab('vol',this)">🟡 波動率 (4)</button>
+    <button class="filter-btn" onclick="filterVocab('greek',this)">🟢 Greeks (5)</button>
+  </div>
+  <div class="vocab-grid" id="vocab-grid"></div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:4px;">
+    <button class="vocab-reset-btn" onclick="resetAllCards()">↺ 全部翻回正面</button>
+    <span style="font-size:11.5px;color:var(--muted);">點擊字卡翻面看解釋，🔊 只朗讀英文不翻面</span>
+  </div>
+</div>
+
+</div><!-- /drag-canvas -->
+<style id="driver-css">
+.driver-active .driver-overlay,.driver-active *{pointer-events:none}.driver-active .driver-active-element,.driver-active .driver-active-element *,.driver-popover,.driver-popover *{pointer-events:auto}@keyframes animate-fade-in{0%{opacity:0}to{opacity:1}}.driver-fade .driver-overlay{animation:animate-fade-in .2s ease-in-out}.driver-fade .driver-popover{animation:animate-fade-in .2s}.driver-popover{all:unset;box-sizing:border-box;color:#2d2d2d;margin:0;padding:15px;border-radius:5px;min-width:250px;max-width:300px;box-shadow:0 1px 10px #0006;z-index:1000000000;position:fixed;top:0;right:0;background-color:#fff}.driver-popover *{font-family:Helvetica Neue,Inter,ui-sans-serif,"Apple Color Emoji",Helvetica,Arial,sans-serif}.driver-popover-title{font:19px/normal sans-serif;font-weight:700;display:block;position:relative;line-height:1.5;zoom:1;margin:0}.driver-popover-close-btn{all:unset;position:absolute;top:0;right:0;width:32px;height:28px;cursor:pointer;font-size:18px;font-weight:500;color:#d2d2d2;z-index:1;text-align:center;transition:color;transition-duration:.2s}.driver-popover-close-btn:hover,.driver-popover-close-btn:focus{color:#2d2d2d}.driver-popover-title[style*=block]+.driver-popover-description{margin-top:5px}.driver-popover-description{margin-bottom:0;font:14px/normal sans-serif;line-height:1.5;font-weight:400;zoom:1}.driver-popover-footer{margin-top:15px;text-align:right;zoom:1;display:flex;align-items:center;justify-content:space-between}.driver-popover-progress-text{font-size:13px;font-weight:400;color:#727272;zoom:1}.driver-popover-footer button{all:unset;display:inline-block;box-sizing:border-box;padding:3px 7px;text-decoration:none;text-shadow:1px 1px 0 #fff;background-color:#fff;color:#2d2d2d;font:12px/normal sans-serif;cursor:pointer;outline:0;zoom:1;line-height:1.3;border:1px solid #ccc;border-radius:3px}.driver-popover-footer .driver-popover-btn-disabled{opacity:.5;pointer-events:none}:not(body):has(>.driver-active-element){overflow:hidden!important}.driver-no-interaction,.driver-no-interaction *{pointer-events:none!important}.driver-popover-footer button:hover,.driver-popover-footer button:focus{background-color:#f7f7f7}.driver-popover-navigation-btns{display:flex;flex-grow:1;justify-content:flex-end}.driver-popover-navigation-btns button+button{margin-left:4px}.driver-popover-arrow{content:"";position:absolute;border:5px solid #fff}.driver-popover-arrow-side-over{display:none}.driver-popover-arrow-side-left{left:100%;border-right-color:transparent;border-bottom-color:transparent;border-top-color:transparent}.driver-popover-arrow-side-right{right:100%;border-left-color:transparent;border-bottom-color:transparent;border-top-color:transparent}.driver-popover-arrow-side-top{top:100%;border-right-color:transparent;border-bottom-color:transparent;border-left-color:transparent}.driver-popover-arrow-side-bottom{bottom:100%;border-left-color:transparent;border-top-color:transparent;border-right-color:transparent}.driver-popover-arrow-side-center{display:none}.driver-popover-arrow-side-left.driver-popover-arrow-align-start,.driver-popover-arrow-side-right.driver-popover-arrow-align-start{top:15px}.driver-popover-arrow-side-top.driver-popover-arrow-align-start,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-start{left:15px}.driver-popover-arrow-align-end.driver-popover-arrow-side-left,.driver-popover-arrow-align-end.driver-popover-arrow-side-right{bottom:15px}.driver-popover-arrow-side-top.driver-popover-arrow-align-end,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-end{right:15px}.driver-popover-arrow-side-left.driver-popover-arrow-align-center,.driver-popover-arrow-side-right.driver-popover-arrow-align-center{top:50%;margin-top:-5px}.driver-popover-arrow-side-top.driver-popover-arrow-align-center,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-center{left:50%;margin-left:-5px}.driver-popover-arrow-none{display:none}
+.driver-popover {
+  background-color: #FFFCF7 !important;
+  border: 2px solid #E8B840 !important;
+  border-radius: 12px !important;
+  max-width: 360px !important;
+  font-family: "PingFang TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15) !important;
+}
+.driver-popover-title {
+  color: #2A1A0E !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+}
+.driver-popover-description {
+  color: #2A1A0E !important;
+  font-size: 13px !important;
+  line-height: 1.8 !important;
+}
+.driver-popover-footer button {
+  background: #D4900A !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 5px 14px !important;
+  font-weight: 700 !important;
+}
+.driver-popover-footer button:hover {
+  background: #b87a08 !important;
+}
+</style>
+<script id="driver-js">this.driver=this.driver||{};this.driver.js=function(F){"use strict";let z={},q;function V(e={}){z={animate:!0,allowClose:!0,overlayClickBehavior:"close",overlayOpacity:.7,smoothScroll:!1,disableActiveInteraction:!1,showProgress:!1,stagePadding:10,stageRadius:5,popoverOffset:10,showButtons:["next","previous","close"],disableButtons:[],overlayColor:"#000",...e}}function s(e){return e?z[e]:z}function le(e){q=e}function k(){return q}let A={};function N(e,o){A[e]=o}function T(e){var o;(o=A[e])==null||o.call(A)}function de(){A={}}function O(e,o,t,i){return(e/=i/2)<1?t/2*e*e+o:-t/2*(--e*(e-2)-1)+o}function K(e){const o='a[href]:not([disabled]), button:not([disabled]), textarea:not([disabled]), input[type="text"]:not([disabled]), input[type="radio"]:not([disabled]), input[type="checkbox"]:not([disabled]), select:not([disabled])';return e.flatMap(t=>{const i=t.matches(o),d=Array.from(t.querySelectorAll(o));return[...i?[t]:[],...d]}).filter(t=>getComputedStyle(t).pointerEvents!=="none"&&ve(t))}function Y(e){if(!e||ue(e))return;const o=s("smoothScroll"),t=e.offsetHeight>window.innerHeight;e.scrollIntoView({behavior:!o||pe(e)?"auto":"smooth",inline:"center",block:t?"start":"center"})}function pe(e){if(!e||!e.parentElement)return;const o=e.parentElement;return o.scrollHeight>o.clientHeight}function ue(e){const o=e.getBoundingClientRect();return o.top>=0&&o.left>=0&&o.bottom<=(window.innerHeight||document.documentElement.clientHeight)&&o.right<=(window.innerWidth||document.documentElement.clientWidth)}function ve(e){return!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)}let D={};function S(e,o){D[e]=o}function l(e){return e?D[e]:D}function X(){D={}}function fe(e,o,t,i){let d=l("__activeStagePosition");const n=d||t.getBoundingClientRect(),f=i.getBoundingClientRect(),w=O(e,n.x,f.x-n.x,o),r=O(e,n.y,f.y-n.y,o),v=O(e,n.width,f.width-n.width,o),g=O(e,n.height,f.height-n.height,o);d={x:w,y:r,width:v,height:g},Q(d),S("__activeStagePosition",d)}function j(e){if(!e)return;const o=e.getBoundingClientRect(),t={x:o.x,y:o.y,width:o.width,height:o.height};S("__activeStagePosition",t),Q(t)}function he(){const e=l("__activeStagePosition"),o=l("__overlaySvg");if(!e)return;if(!o){console.warn("No stage svg found.");return}const t=window.innerWidth,i=window.innerHeight;o.setAttribute("viewBox",`0 0 ${t} ${i}`)}function ge(e){const o=we(e);document.body.appendChild(o),U(o,t=>{t.target.tagName==="path"&&T("overlayClick")}),S("__overlaySvg",o)}function Q(e){const o=l("__overlaySvg");if(!o){ge(e);return}const t=o.firstElementChild;if((t==null?void 0:t.tagName)!=="path")throw new Error("no path element found in stage svg");t.setAttribute("d",Z(e))}function we(e){const o=window.innerWidth,t=window.innerHeight,i=document.createElementNS("http://www.w3.org/2000/svg","svg");i.classList.add("driver-overlay","driver-overlay-animated"),i.setAttribute("viewBox",`0 0 ${o} ${t}`),i.setAttribute("xmlSpace","preserve"),i.setAttribute("xmlnsXlink","http://www.w3.org/1999/xlink"),i.setAttribute("version","1.1"),i.setAttribute("preserveAspectRatio","xMinYMin slice"),i.style.fillRule="evenodd",i.style.clipRule="evenodd",i.style.strokeLinejoin="round",i.style.strokeMiterlimit="2",i.style.zIndex="10000",i.style.position="fixed",i.style.top="0",i.style.left="0",i.style.width="100%",i.style.height="100%";const d=document.createElementNS("http://www.w3.org/2000/svg","path");return d.setAttribute("d",Z(e)),d.style.fill=s("overlayColor")||"rgb(0,0,0)",d.style.opacity=`${s("overlayOpacity")}`,d.style.pointerEvents="auto",d.style.cursor="auto",i.appendChild(d),i}function Z(e){const o=window.innerWidth,t=window.innerHeight,i=s("stagePadding")||0,d=s("stageRadius")||0,n=e.width+i*2,f=e.height+i*2,w=Math.min(d,n/2,f/2),r=Math.floor(Math.max(w,0)),v=e.x-i+r,g=e.y-i,y=n-r*2,a=f-r*2;return`M${o},0L0,0L0,${t}L${o},${t}L${o},0Z
+    M${v},${g} h${y} a${r},${r} 0 0 1 ${r},${r} v${a} a${r},${r} 0 0 1 -${r},${r} h-${y} a${r},${r} 0 0 1 -${r},-${r} v-${a} a${r},${r} 0 0 1 ${r},-${r} z`}function me(){const e=l("__overlaySvg");e&&e.remove()}function ye(){const e=document.getElementById("driver-dummy-element");if(e)return e;let o=document.createElement("div");return o.id="driver-dummy-element",o.style.width="0",o.style.height="0",o.style.pointerEvents="none",o.style.opacity="0",o.style.position="fixed",o.style.top="50%",o.style.left="50%",document.body.appendChild(o),o}function G(e){const{element:o}=e;let t=typeof o=="function"?o():typeof o=="string"?document.querySelector(o):o;t||(t=ye()),xe(t,e)}function be(){const e=l("__activeElement"),o=l("__activeStep");e&&(j(e),he(),ne(e,o))}function xe(e,o){var C;const i=Date.now(),d=l("__activeStep"),n=l("__activeElement")||e,f=!n||n===e,w=e.id==="driver-dummy-element",r=n.id==="driver-dummy-element",v=s("animate"),g=o.onHighlightStarted||s("onHighlightStarted"),y=(o==null?void 0:o.onHighlighted)||s("onHighlighted"),a=(d==null?void 0:d.onDeselected)||s("onDeselected"),p=s(),c=l();!f&&a&&a(r?void 0:n,d,{config:p,state:c,driver:k()}),g&&g(w?void 0:e,o,{config:p,state:c,driver:k()});const u=!f&&v;let h=!1;_e(),S("previousStep",d),S("previousElement",n),S("activeStep",o),S("activeElement",e);const m=()=>{if(l("__transitionCallback")!==m)return;const x=Date.now()-i,E=400-x<=400/2;o.popover&&E&&!h&&u&&(ee(e,o),h=!0),s("animate")&&x<400?fe(x,400,n,e):(j(e),y&&y(w?void 0:e,o,{config:s(),state:l(),driver:k()}),S("__transitionCallback",void 0),S("__previousStep",d),S("__previousElement",n),S("__activeStep",o),S("__activeElement",e)),window.requestAnimationFrame(m)};S("__transitionCallback",m),window.requestAnimationFrame(m),Y(e),!u&&o.popover&&ee(e,o),n.classList.remove("driver-active-element","driver-no-interaction"),n.removeAttribute("aria-haspopup"),n.removeAttribute("aria-expanded"),n.removeAttribute("aria-controls"),((C=o.disableActiveInteraction)!=null?C:s("disableActiveInteraction"))&&e.classList.add("driver-no-interaction"),e.classList.add("driver-active-element"),e.setAttribute("aria-haspopup","dialog"),e.setAttribute("aria-expanded","true"),e.setAttribute("aria-controls","driver-popover-content")}function Ce(){var e;(e=document.getElementById("driver-dummy-element"))==null||e.remove(),document.querySelectorAll(".driver-active-element").forEach(o=>{o.classList.remove("driver-active-element","driver-no-interaction"),o.removeAttribute("aria-haspopup"),o.removeAttribute("aria-expanded"),o.removeAttribute("aria-controls")})}function H(){const e=l("__resizeTimeout");e&&window.cancelAnimationFrame(e),S("__resizeTimeout",window.requestAnimationFrame(be))}function Pe(e){var r;if(!l("isInitialized")||!(e.key==="Tab"||e.keyCode===9))return;const i=l("__activeElement"),d=(r=l("popover"))==null?void 0:r.wrapper,n=K([...d?[d]:[],...i?[i]:[]]),f=n[0],w=n[n.length-1];if(e.preventDefault(),e.shiftKey){const v=n[n.indexOf(document.activeElement)-1]||w;v==null||v.focus()}else{const v=n[n.indexOf(document.activeElement)+1]||f;v==null||v.focus()}}function J(e){var t;((t=s("allowKeyboardControl"))==null||t)&&(e.key==="Escape"?T("escapePress"):e.key==="ArrowRight"?T("arrowRightPress"):e.key==="ArrowLeft"&&T("arrowLeftPress"))}function U(e,o,t){const i=(n,f)=>{const w=n.target;e.contains(w)&&((!t||t(w))&&(n.preventDefault(),n.stopPropagation(),n.stopImmediatePropagation()),f==null||f(n))};document.addEventListener("pointerdown",i,!0),document.addEventListener("mousedown",i,!0),document.addEventListener("pointerup",i,!0),document.addEventListener("mouseup",i,!0),document.addEventListener("click",n=>{i(n,o)},!0)}function Se(){window.addEventListener("keyup",J,!1),window.addEventListener("keydown",Pe,!1),window.addEventListener("resize",H),window.addEventListener("scroll",H)}function ke(){window.removeEventListener("keyup",J),window.removeEventListener("resize",H),window.removeEventListener("scroll",H)}function _e(){const e=l("popover");e&&(e.wrapper.style.display="none")}function ee(e,o){var x,P;let t=l("popover");t&&document.body.removeChild(t.wrapper),t=Te(),document.body.appendChild(t.wrapper);const{title:i,description:d,showButtons:n,disableButtons:f,showProgress:w,nextBtnText:r=s("nextBtnText")||"Next &rarr;",prevBtnText:v=s("prevBtnText")||"&larr; Previous",progressText:g=s("progressText")||"{current} of {total}"}=o.popover||{};t.nextButton.innerHTML=r,t.previousButton.innerHTML=v,t.progress.innerHTML=g,i?(t.title.innerHTML=i,t.title.style.display="block"):t.title.style.display="none",d?(t.description.innerHTML=d,t.description.style.display="block"):t.description.style.display="none";const y=n||s("showButtons"),a=w||s("showProgress")||!1,p=(y==null?void 0:y.includes("next"))||(y==null?void 0:y.includes("previous"))||a;t.closeButton.style.display=y.includes("close")?"block":"none",p?(t.footer.style.display="flex",t.progress.style.display=a?"block":"none",t.nextButton.style.display=y.includes("next")?"block":"none",t.previousButton.style.display=y.includes("previous")?"block":"none"):t.footer.style.display="none";const c=f||s("disableButtons")||[];c!=null&&c.includes("next")&&(t.nextButton.disabled=!0,t.nextButton.classList.add("driver-popover-btn-disabled")),c!=null&&c.includes("previous")&&(t.previousButton.disabled=!0,t.previousButton.classList.add("driver-popover-btn-disabled")),c!=null&&c.includes("close")&&(t.closeButton.disabled=!0,t.closeButton.classList.add("driver-popover-btn-disabled"));const u=t.wrapper;u.style.display="block",u.style.left="",u.style.top="",u.style.bottom="",u.style.right="",u.id="driver-popover-content",u.setAttribute("role","dialog"),u.setAttribute("aria-labelledby","driver-popover-title"),u.setAttribute("aria-describedby","driver-popover-description");const h=t.arrow;h.className="driver-popover-arrow";const m=((x=o.popover)==null?void 0:x.popoverClass)||s("popoverClass")||"";u.className=`driver-popover ${m}`.trim(),U(t.wrapper,E=>{var W,I,M;const L=E.target,$=((W=o.popover)==null?void 0:W.onNextClick)||s("onNextClick"),B=((I=o.popover)==null?void 0:I.onPrevClick)||s("onPrevClick"),R=((M=o.popover)==null?void 0:M.onCloseClick)||s("onCloseClick");if(L.closest(".driver-popover-next-btn"))return $?$(e,o,{config:s(),state:l(),driver:k()}):T("nextClick");if(L.closest(".driver-popover-prev-btn"))return B?B(e,o,{config:s(),state:l(),driver:k()}):T("prevClick");if(L.closest(".driver-popover-close-btn"))return R?R(e,o,{config:s(),state:l(),driver:k()}):T("closeClick")},E=>!(t!=null&&t.description.contains(E))&&!(t!=null&&t.title.contains(E))&&typeof E.className=="string"&&E.className.includes("driver-popover")),S("popover",t);const b=((P=o.popover)==null?void 0:P.onPopoverRender)||s("onPopoverRender");b&&b(t,{config:s(),state:l(),driver:k()}),ne(e,o),Y(u);const C=e.classList.contains("driver-dummy-element"),_=K([u,...C?[]:[e]]);_.length>0&&_[0].focus()}function te(){const e=l("popover");if(!(e!=null&&e.wrapper))return;const o=e.wrapper.getBoundingClientRect(),t=s("stagePadding")||0,i=s("popoverOffset")||0;return{width:o.width+t+i,height:o.height+t+i,realWidth:o.width,realHeight:o.height}}function oe(e,o){const{elementDimensions:t,popoverDimensions:i,popoverPadding:d,popoverArrowDimensions:n}=o;return e==="start"?Math.max(Math.min(t.top-d,window.innerHeight-i.realHeight-n.width),n.width):e==="end"?Math.max(Math.min(t.top-(i==null?void 0:i.realHeight)+t.height+d,window.innerHeight-(i==null?void 0:i.realHeight)-n.width),n.width):e==="center"?Math.max(Math.min(t.top+t.height/2-(i==null?void 0:i.realHeight)/2,window.innerHeight-(i==null?void 0:i.realHeight)-n.width),n.width):0}function ie(e,o){const{elementDimensions:t,popoverDimensions:i,popoverPadding:d,popoverArrowDimensions:n}=o;return e==="start"?Math.max(Math.min(t.left-d,window.innerWidth-i.realWidth-n.width),n.width):e==="end"?Math.max(Math.min(t.left-(i==null?void 0:i.realWidth)+t.width+d,window.innerWidth-(i==null?void 0:i.realWidth)-n.width),n.width):e==="center"?Math.max(Math.min(t.left+t.width/2-(i==null?void 0:i.realWidth)/2,window.innerWidth-(i==null?void 0:i.realWidth)-n.width),n.width):0}function ne(e,o){const t=l("popover");if(!t)return;const{align:i="start",side:d="left"}=(o==null?void 0:o.popover)||{},n=i,f=e.id==="driver-dummy-element"?"over":d,w=s("stagePadding")||0,r=te(),v=t.arrow.getBoundingClientRect(),g=e.getBoundingClientRect(),y=g.top-r.height;let a=y>=0;const p=window.innerHeight-(g.bottom+r.height);let c=p>=0;const u=g.left-r.width;let h=u>=0;const m=window.innerWidth-(g.right+r.width);let b=m>=0;const C=!a&&!c&&!h&&!b;let _=f;if(f==="top"&&a?b=h=c=!1:f==="bottom"&&c?b=h=a=!1:f==="left"&&h?b=a=c=!1:f==="right"&&b&&(h=a=c=!1),f==="over"){const x=window.innerWidth/2-r.realWidth/2,P=window.innerHeight/2-r.realHeight/2;t.wrapper.style.left=`${x}px`,t.wrapper.style.right="auto",t.wrapper.style.top=`${P}px`,t.wrapper.style.bottom="auto"}else if(C){const x=window.innerWidth/2-(r==null?void 0:r.realWidth)/2,P=10;t.wrapper.style.left=`${x}px`,t.wrapper.style.right="auto",t.wrapper.style.bottom=`${P}px`,t.wrapper.style.top="auto"}else if(h){const x=Math.min(u,window.innerWidth-(r==null?void 0:r.realWidth)-v.width),P=oe(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.left=`${x}px`,t.wrapper.style.top=`${P}px`,t.wrapper.style.bottom="auto",t.wrapper.style.right="auto",_="left"}else if(b){const x=Math.min(m,window.innerWidth-(r==null?void 0:r.realWidth)-v.width),P=oe(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.right=`${x}px`,t.wrapper.style.top=`${P}px`,t.wrapper.style.bottom="auto",t.wrapper.style.left="auto",_="right"}else if(a){const x=Math.min(y,window.innerHeight-r.realHeight-v.width);let P=ie(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.top=`${x}px`,t.wrapper.style.left=`${P}px`,t.wrapper.style.bottom="auto",t.wrapper.style.right="auto",_="top"}else if(c){const x=Math.min(p,window.innerHeight-(r==null?void 0:r.realHeight)-v.width);let P=ie(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.left=`${P}px`,t.wrapper.style.bottom=`${x}px`,t.wrapper.style.top="auto",t.wrapper.style.right="auto",_="bottom"}C?t.arrow.classList.add("driver-popover-arrow-none"):Ee(n,_,e)}function Ee(e,o,t){const i=l("popover");if(!i)return;const d=t.getBoundingClientRect(),n=te(),f=i.arrow,w=n.width,r=window.innerWidth,v=d.width,g=d.left,y=n.height,a=window.innerHeight,p=d.top,c=d.height;f.className="driver-popover-arrow";let u=o,h=e;if(o==="top"?(g+v<=0?(u="right",h="end"):g+v-w<=0&&(u="top",h="start"),g>=r?(u="left",h="end"):g+w>=r&&(u="top",h="end")):o==="bottom"?(g+v<=0?(u="right",h="start"):g+v-w<=0&&(u="bottom",h="start"),g>=r?(u="left",h="start"):g+w>=r&&(u="bottom",h="end")):o==="left"?(p+c<=0?(u="bottom",h="end"):p+c-y<=0&&(u="left",h="start"),p>=a?(u="top",h="end"):p+y>=a&&(u="left",h="end")):o==="right"&&(p+c<=0?(u="bottom",h="start"):p+c-y<=0&&(u="right",h="start"),p>=a?(u="top",h="start"):p+y>=a&&(u="right",h="end")),!u)f.classList.add("driver-popover-arrow-none");else{f.classList.add(`driver-popover-arrow-side-${u}`),f.classList.add(`driver-popover-arrow-align-${h}`);const m=t.getBoundingClientRect(),b=f.getBoundingClientRect(),C=s("stagePadding")||0,_=m.left-C<window.innerWidth&&m.right+C>0&&m.top-C<window.innerHeight&&m.bottom+C>0;o==="bottom"&&_&&(b.x>m.x&&b.x+b.width<m.x+m.width?i.wrapper.style.transform="translateY(0)":(f.classList.remove(`driver-popover-arrow-align-${h}`),f.classList.add("driver-popover-arrow-none"),i.wrapper.style.transform=`translateY(-${C/2}px)`))}}function Te(){const e=document.createElement("div");e.classList.add("driver-popover");const o=document.createElement("div");o.classList.add("driver-popover-arrow");const t=document.createElement("header");t.id="driver-popover-title",t.classList.add("driver-popover-title"),t.style.display="none",t.innerText="Popover Title";const i=document.createElement("div");i.id="driver-popover-description",i.classList.add("driver-popover-description"),i.style.display="none",i.innerText="Popover description is here";const d=document.createElement("button");d.type="button",d.classList.add("driver-popover-close-btn"),d.setAttribute("aria-label","Close"),d.innerHTML="&times;";const n=document.createElement("footer");n.classList.add("driver-popover-footer");const f=document.createElement("span");f.classList.add("driver-popover-progress-text"),f.innerText="";const w=document.createElement("span");w.classList.add("driver-popover-navigation-btns");const r=document.createElement("button");r.type="button",r.classList.add("driver-popover-prev-btn"),r.innerHTML="&larr; Previous";const v=document.createElement("button");return v.type="button",v.classList.add("driver-popover-next-btn"),v.innerHTML="Next &rarr;",w.appendChild(r),w.appendChild(v),n.appendChild(f),n.appendChild(w),e.appendChild(d),e.appendChild(o),e.appendChild(t),e.appendChild(i),e.appendChild(n),{wrapper:e,arrow:o,title:t,description:i,footer:n,previousButton:r,nextButton:v,closeButton:d,footerButtons:w,progress:f}}function Le(){var o;const e=l("popover");e&&((o=e.wrapper.parentElement)==null||o.removeChild(e.wrapper))}const $e="";function Ae(e={}){V(e);function o(){s("allowClose")&&g()}function t(){const a=s("overlayClickBehavior");if(s("allowClose")&&a==="close"){g();return}if(typeof a=="function"){const p=l("__activeStep"),c=l("__activeElement");a(c,p,{config:s(),state:l(),driver:k()});return}a==="nextStep"&&i()}function i(){const a=l("activeIndex"),p=s("steps")||[];if(typeof a=="undefined")return;const c=a+1;p[c]?v(c):g()}function d(){const a=l("activeIndex"),p=s("steps")||[];if(typeof a=="undefined")return;const c=a-1;p[c]?v(c):g()}function n(a){(s("steps")||[])[a]?v(a):g()}function f(){var b;if(l("__transitionCallback"))return;const p=l("activeIndex"),c=l("__activeStep"),u=l("__activeElement");if(typeof p=="undefined"||typeof c=="undefined"||typeof l("activeIndex")=="undefined")return;const m=((b=c.popover)==null?void 0:b.onPrevClick)||s("onPrevClick");if(m)return m(u,c,{config:s(),state:l(),driver:k()});d()}function w(){var m;if(l("__transitionCallback"))return;const p=l("activeIndex"),c=l("__activeStep"),u=l("__activeElement");if(typeof p=="undefined"||typeof c=="undefined")return;const h=((m=c.popover)==null?void 0:m.onNextClick)||s("onNextClick");if(h)return h(u,c,{config:s(),state:l(),driver:k()});i()}function r(){l("isInitialized")||(S("isInitialized",!0),document.body.classList.add("driver-active",s("animate")?"driver-fade":"driver-simple"),Se(),N("overlayClick",t),N("escapePress",o),N("arrowLeftPress",f),N("arrowRightPress",w))}function v(a=0){var R,W,I,M,re,se,ae,ce;const p=s("steps");if(!p){console.error("No steps to drive through"),g();return}if(!p[a]){g();return}S("__activeOnDestroyed",document.activeElement),S("activeIndex",a);const c=p[a],u=p[a+1],h=p[a-1],m=((R=c.popover)==null?void 0:R.doneBtnText)||s("doneBtnText")||"Done",b=s("allowClose"),C=typeof((W=c.popover)==null?void 0:W.showProgress)!="undefined"?(I=c.popover)==null?void 0:I.showProgress:s("showProgress"),x=(((M=c.popover)==null?void 0:M.progressText)||s("progressText")||"{{current}} of {{total}}").replace("{{current}}",`${a+1}`).replace("{{total}}",`${p.length}`),P=((re=c.popover)==null?void 0:re.showButtons)||s("showButtons"),E=["next","previous",...b?["close"]:[]].filter(He=>!(P!=null&&P.length)||P.includes(He)),L=((se=c.popover)==null?void 0:se.onNextClick)||s("onNextClick"),$=((ae=c.popover)==null?void 0:ae.onPrevClick)||s("onPrevClick"),B=((ce=c.popover)==null?void 0:ce.onCloseClick)||s("onCloseClick");G({...c,popover:{showButtons:E,nextBtnText:u?void 0:m,disableButtons:[...h?[]:["previous"]],showProgress:C,progressText:x,onNextClick:L||(()=>{u?v(a+1):g()}),onPrevClick:$||(()=>{v(a-1)}),onCloseClick:B||(()=>{g()}),...(c==null?void 0:c.popover)||{}}})}function g(a=!0){const p=l("__activeElement"),c=l("__activeStep"),u=l("__activeOnDestroyed"),h=s("onDestroyStarted");if(a&&h){const C=!p||(p==null?void 0:p.id)==="driver-dummy-element";h(C?void 0:p,c,{config:s(),state:l(),driver:k()});return}const m=(c==null?void 0:c.onDeselected)||s("onDeselected"),b=s("onDestroyed");if(document.body.classList.remove("driver-active","driver-fade","driver-simple"),ke(),Le(),Ce(),me(),de(),X(),p&&c){const C=p.id==="driver-dummy-element";m&&m(C?void 0:p,c,{config:s(),state:l(),driver:k()}),b&&b(C?void 0:p,c,{config:s(),state:l(),driver:k()})}u&&u.focus()}const y={isActive:()=>l("isInitialized")||!1,refresh:H,drive:(a=0)=>{r(),v(a)},setConfig:V,setSteps:a=>{X(),V({...s(),steps:a})},getConfig:s,getState:l,getActiveIndex:()=>l("activeIndex"),isFirstStep:()=>l("activeIndex")===0,isLastStep:()=>{const a=s("steps")||[],p=l("activeIndex");return p!==void 0&&p===a.length-1},getActiveStep:()=>l("activeStep"),getActiveElement:()=>l("activeElement"),getPreviousElement:()=>l("previousElement"),getPreviousStep:()=>l("previousStep"),moveNext:i,movePrevious:d,moveTo:n,hasNextStep:()=>{const a=s("steps")||[],p=l("activeIndex");return p!==void 0&&!!a[p+1]},hasPreviousStep:()=>{const a=s("steps")||[],p=l("activeIndex");return p!==void 0&&!!a[p-1]},highlight:a=>{r(),G({...a,popover:a.popover?{showButtons:[],showProgress:!1,progressText:"",...a.popover}:void 0})},destroy:()=>{g(!1)}};return le(y),y}return F.driver=Ae,Object.defineProperty(F,Symbol.toStringTag,{value:"Module"}),F}({});</script>
+</head>
+<body>
+
+<!-- TTS Bar -->
+
+
+<script>
+var COL_EXPLAIN = {
+  expiry: { el: '#bc-expiry', title: '📅 Expiration (到期日) &amp; DTE', desc: '選擇要查看的期權<strong>到期月份</strong>。括號內 <code>40 DTE</code>（Days to Expiration）是從今天到到期日的自然日天數。<br><br>CSP / Covered Call 通常選 <strong>30~45 DTE</strong> 開倉，Theta 衰減最有效率。DTE &lt; 21 天時考慮滾倉。', side: 'bottom' },
+  earnings: { el: '#bc-earnings', title: '📊 Latest Earnings（最近財報日）', desc: '公司最近一次財報公佈的日期。<br><br>⚠️ <strong>重要：</strong>若到期日跨過財報日，IV 會被拉高（財報 Premium），到期後通常大幅回落（IV Crush）。賣方應確認是否願意承擔財報風險。', side: 'bottom' },
+  iv_atm: { el: '#bc-iv-atm', title: '🌊 Implied Volatility ATM（平值 IV）', desc: '最接近現股價的 ATM 行權價之<strong>隱含波動率</strong>，代表市場對未來波動的共識預期。<br><br>IV 越高 → Premium 越貴 → 賣方收入越多。<strong>IV &gt; HV</strong> 稱為波動率溢價，是賣方的黃金時機。', side: 'bottom' },
+  hv: { el: '#bc-hv', title: '📈 Historic Volatility（歷史波動率）', desc: '根據過去 30 天股價實際走勢計算的波動率。<br><br>• <strong>IV &gt; HV</strong>（本例 76.57% vs 72.68%）：市場預期比過去更波動，Premium 溢價，賣方有利<br>• <strong>IV &lt; HV</strong>：買方可能更有優勢', side: 'bottom' },
+  ivrank: { el: '#bc-ivrank', title: '🏆 IV Rank（IV 百分位）', desc: '過去一年中目前 IV 所在的相對位置（0~100%）。<br><br>• <strong>&gt; 50%</strong>：IV 偏高，Premium 豐厚，賣方有利 ✅<br>• <strong>&lt; 30%</strong>：IV 偏低，Premium 薄<br><br>本例 41.58% → 中等水準。', side: 'bottom' },
+  type: { el: '#th-type-c', title: '📝 Type（Call / Put 類型）', desc: '顯示該行是 <strong>Call（買權）</strong>還是 <strong>Put（賣權）</strong>。左半邊全是 Call，右半邊全是 Put，中間是 Strike。<br><br>• <strong>Call</strong>：給持有人以 Strike 買入股票的<em>權利</em><br>• <strong>Put</strong>：給持有人以 Strike 賣出股票的<em>權利</em>', side: 'top' },
+  latest: { el: '#th-latest-c', title: '💰 Latest（最新成交價）', desc: '該期權合約最近一筆實際成交的價格。<br><br>⚠️ Latest 是歷史成交，非現在可交易的價格！要查看現在可交易的價格，看 <strong>Bid</strong>（賣出）或 <strong>Ask</strong>（買入）。', side: 'top' },
+  bid: { el: '#th-bid-c', title: '⬇️ Bid（買方最高出價）', desc: '市場上<strong>買方願意支付的最高價格</strong>。<br><br>賣方（Sell to Open）若以 Bid 下單可立即成交，但拿最低價。更好的做法是掛 <strong>Mid-Price = (Bid+Ask)/2</strong>，耐心等候造市商撮合。<br><br>本例 Bid $0.96：立刻賣出最多收 $0.96。', side: 'top' },
+  ask: { el: '#th-ask-c', title: '⬆️ Ask（賣方最低要求）', desc: '市場上<strong>賣方願意接受的最低價格</strong>。<br><br>買入期權（Buy to Open）若以 Ask 下單可立即成交。<strong>Mid-Price = (Bid+Ask)/2</strong> 通常是最佳掛單位置。<br><br>本例 Ask $1.40：至少需付 $1.40 才能立即買入。', side: 'top' },
+  change: { el: '#th-change-c', title: '📊 Change（日漲跌幅）', desc: '與<strong>前一交易日收盤價</strong>的差距。<br><br>• 綠色正數 → 期權漲價<br>• 紅色負數 → 期權跌價<br>• <strong>unch</strong> = unchanged，表示未變動<br><br>賣方希望 Change 是負值（期權跌價 = 持倉獲利）。', side: 'top' },
+  volume: { el: '#th-volume-c', title: '📦 Volume（當日成交量）', desc: '今天已成交的期權合約張數。<br><br>• Volume 高 → 流動性好，Spread 較窄，容易成交<br>• Volume 低 → 流動性差，滑點風險高<br><br>選 Strike 時建議優先選 Volume 較高的，如本例 $15 Strike 的 4,120 張。', side: 'top' },
+  oi: { el: '#th-oi-c', title: '🔓 Open Interest（未平倉量）', desc: '目前市場上<strong>尚未平倉</strong>的合約總數（跨日累積）。<br><br>• OI 高 → 市場關注度高，流動性通常較好<br>• OI 低 → 交易稀少，滑點風險高<br><br>⚠️ OI 只在盤後更新，不是即時數字。Volume 才是當日即時的。', side: 'top' },
+  iv: { el: '#th-iv-c', title: '🌊 IV（個別 Strike 的隱含波動率）', desc: '每個行權價各自的<strong>隱含波動率</strong>，從各 Strike 的市場價格反推。通常呈現 <strong>IV Skew（偏斜）</strong>：<br>• OTM Put（下方 Strike）IV 通常偏高（保護需求大）<br>• OTM Call IV 通常偏低', side: 'top' },
+  lt: { el: '#th-lt-c', title: '🗓️ Last Trade（最後成交日期）', desc: '該合約<strong>最後一次成交</strong>的日期。<br><br>• 今天日期 → 當日有成交，流動性佳<br>• 顯示 N/A 或很久以前 → 流動性極差，避免交易<br><br>賣方應優先選 Last Trade 日期最近的行權價。', side: 'top' },
+  strike: { el: '#th-strike', title: '🎯 Strike Price（行權價）', desc: '期權合約雙方<strong>約定的買賣股票價格</strong>，是合約的核心參數。<br><br>• <strong>ATM</strong>：Strike ≈ 現股價（黃色高亮）<br>• <strong>OTM Put</strong>：Strike &lt; 現股價（CSP 常選此範圍）<br>• <strong>ITM</strong>：反之<br><br>CSP 通常選現股價下方 10~20% 的 OTM Strike。', side: 'top' }
+};
+var GREEK_EXPLAIN = {
+  latest: { el: '#th-latest-gc', title: '💰 Latest', desc: '與 Options Prices 頁籤相同，是該合約最近一筆實際成交的市場價格。可與 Theor. 欄對比，判斷市場是否溢價或折價。', side: 'top' },
+  theor: { el: '#th-theor-c', title: '🔬 Theor.（Black-Scholes 理論價值）', desc: '用 <strong>Black-Scholes 模型</strong>計算的期權理論公平價值。<br><br>• <strong>Latest &gt; Theor.</strong>：市場溢價，期權偏貴<br>• <strong>Latest &lt; Theor.</strong>：市場折價，期權偏便宜<br>• 本例 ATM Put：Latest $1.20 ≈ Theor. $1.20（公平定價）', side: 'top' },
+  iv: { el: '#th-iv-gc', title: '🌊 IV', desc: 'Greeks 頁籤也顯示每個 Strike 的 IV，與 Options Prices 頁籤一致。在此頁籤可以對比：<strong>IV 高的 Strike 對應更大的 Vega 值</strong>，代表 IV 變動對該 Strike 影響更大。', side: 'top' },
+  delta: { el: '#th-delta-c', title: '⚡ Delta Δ — 方向敏感度', desc: '標的股票每漲 $1，期權價格的<strong>理論變化</strong>：<br><br>• <strong>Call Delta</strong>：0 到 +1<br>• <strong>Put Delta</strong>：-1 到 0（Delta 絕對值 ≈ ITM 機率）<br><br>CSP 常以 Delta <strong>-0.20 ~ -0.30</strong> 為選 Strike 目標（ITM 機率 20~30%）。<br><br>本例 $15 Put Delta = -0.3974，約有 40% 機率到期 ITM。', side: 'top' },
+  gamma: { el: '#th-gamma-c', title: '🔄 Gamma Γ — Delta 的加速度', desc: '標的股票每變動 $1，<strong>Delta 的改變量</strong>。<br><br>• ATM 時最大，到期日近時急升<br>• DTE &lt; 7 尤其危險（賣方要特別注意）<br>• 賣方持有 Short Gamma：急漲急跌時 Delta 快速偏離<br><br>本例 ATM Put Gamma = 0.1048：每漲 $1，Put Delta 增加 0.10。', side: 'top' },
+  theta: { el: '#th-theta-c', title: '⏳ Theta Θ — 時間衰減（每日）', desc: '每過一天，期權自動減少的價值（負值）。<br><br>• 賣方每天「收取」Theta ✅<br>• DTE 越少，衰減越快（非線性加速）<br>• DTE 30~45 是 Theta 甜蜜區<br><br>本例 ATM Put Theta = -0.0189 → 每天約損失 $0.019，每口 $1.89/天。', side: 'top' },
+  vega: { el: '#th-vega-c', title: '🌀 Vega ν — IV 敏感度', desc: 'IV 每上升 1%，期權價格的理論變化。<br><br>• IV 上升對<strong>買方有利</strong>，對<strong>賣方不利</strong><br>• DTE 越長，Vega 越大<br>• IV 高時賣出，若未來 IV 下降可額外獲利（IV Crush）<br><br>本例 ATM Put Vega = 0.0197 → IV 升 1%，Put 漲約 $0.02（每口 $1.97）。', side: 'top' },
+  lt: { el: '#th-delta-g', title: '🗓️ Last Trade', desc: '與 Options Prices 頁籤相同，顯示最後成交日期，用於判斷流動性。', side: 'top' },
+  rho: { el: '#th-rho-g', title: '📈 Rho ρ — 利率敏感度', desc: '無風險利率每上升 1%，期權價格的理論變化量。<br><br>• <strong>Call Rho</strong>：正值（利率升，Call 升值）<br>• <strong>Put Rho</strong>：負值（利率升，Put 貶值）<br>• 短期期權（DTE &lt; 45）Rho 影響極小，通常可忽略<br>• 長期 LEAPS 才需要特別關注 Rho<br><br>本例 ATM Put Rho = -0.0070 → 利率升 1%，Put 跌約 $0.007。', side: 'top' },
+  voloi: { el: '#th-voloi-g', title: '📊 Vol/OI — 成交量 / 未平倉比', desc: '當日成交量（Volume）除以未平倉量（Open Interest）的比值。<br><br>• <strong>Vol/OI &gt; 1</strong>：今天新開倉數量超過既有未平倉，新資金正在湧入<br>• <strong>Vol/OI &lt; 0.1</strong>：今天幾乎沒有新動作，市場冷清<br>• <strong>Volume 大但 OI 為 0</strong>：全是當日開平（日內交易），無隔夜部位<br><br>本例多數 Strike OI = 0，為剛上市或冷門到期日的正常現象。', side: 'top' },
+  itmprob: { el: '#th-itmprob-g', title: '🎯 ITM Prob — 到期 ITM 機率', desc: 'Barchart 估算該期權在到期日時處於 <strong>價內（ITM）</strong> 的機率。<br><br>• 與 Delta 絕對值高度相關（但不完全相同，Barchart 用獨立模型計算）<br>• <strong>ITM Prob &gt; 50%</strong>：到期被行使的機率偏高（賣方需特別注意）<br>• <strong>ITM Prob &lt; 30%</strong>：較安全的賣方區間<br>• 賣 CSP 通常控制在 ITM Prob 20~35%<br><br>本例 $15 Put ITM Prob = 44.85% → 接近 ATM，約有 45% 機率到期需買入股票。', side: 'top' }
+};
+function showColExplain(key) {
+  var info = COL_EXPLAIN[key]; if (!info) return;
+  window.driver.js.driver({ animate:true, allowClose:true, overlayOpacity:0.35, steps:[{ element:info.el, popover:{ title:info.title, description:info.desc, side:info.side, align:'center' } }] }).drive();
+}
+function showGreekExplain(key) {
+  var info = GREEK_EXPLAIN[key]; if (!info) return;
+  window.driver.js.driver({ animate:true, allowClose:true, overlayOpacity:0.35, steps:[{ element:info.el, popover:{ title:info.title, description:info.desc, side:info.side, align:'center' } }] }).drive();
+}
+/* ── Hover tooltip engine ── */
+(function(){
+  var tip=document.createElement('div');tip.id='col-tip';
+  tip.innerHTML='<div class="tip-t" id="tip-t"></div><div id="tip-b"></div>';
+  document.body.appendChild(tip);
+  var tT=document.getElementById('tip-t'),tB=document.getElementById('tip-b');
+  function getData(key,type){return type==='greek'?GREEK_EXPLAIN[key]:COL_EXPLAIN[key];}
+  function show(e,key,type){
+    var d=getData(key,type);if(!d)return;
+    tT.innerHTML=d.title;tB.innerHTML=d.desc;
+    tip.style.opacity='1';pos(e);
+  }
+  function pos(e){
+    var x=e.clientX+14,y=e.clientY+12,w=tip.offsetWidth||280,h=tip.offsetHeight||120;
+    if(x+w>window.innerWidth-10)x=e.clientX-w-10;
+    if(y+h>window.innerHeight-10)y=e.clientY-h-10;
+    tip.style.left=x+'px';tip.style.top=y+'px';
+  }
+  document.addEventListener('mouseover',function(e){
+    var el=e.target.closest('[data-tip-key]');
+    if(el){show(e,el.dataset.tipKey,el.dataset.tipType||'col');}
+    else{tip.style.opacity='0';}
+  });
+  document.addEventListener('mousemove',function(e){
+    if(tip.style.opacity!=='0'){pos(e);}
+  });
+  document.addEventListener('mouseout',function(e){
+    if(!e.target.closest('[data-tip-key]'))tip.style.opacity='0';
+  });
+}());
+
+window.startPricesTour = function() {
+  window.driver.js.driver({ animate:true, allowClose:true, overlayOpacity:0.4, showProgress:true, steps:[
+    { element:'#bc-header-bar', popover:{ title:'📊 頂部資訊列', description:'顯示目前選定期權的關鍵背景資訊：到期日、財報日、IV(ATM)、歷史波動率、IV Rank。<strong>點擊任意格子</strong>可看詳細說明。', side:'bottom', align:'start' } },
+    { element:'#bc-iv-atm', popover:{ title:COL_EXPLAIN.iv_atm.title, description:COL_EXPLAIN.iv_atm.desc, side:'bottom', align:'center' } },
+    { element:'#bc-ivrank', popover:{ title:COL_EXPLAIN.ivrank.title, description:COL_EXPLAIN.ivrank.desc, side:'bottom', align:'center' } },
+    { element:'#th-strike', popover:{ title:COL_EXPLAIN.strike.title, description:COL_EXPLAIN.strike.desc, side:'top', align:'center' } },
+    { element:'#th-bid-c', popover:{ title:'⬇️ Bid / ⬆️ Ask — 掛單的兩端', description:'Bid 是最高買價，Ask 是最低賣價。賣方最好以 <strong>Mid-Price = (Bid+Ask)/2</strong> 掛限價單，比直接打 Bid 多收約 $0.05~$0.20。', side:'top', align:'center' } },
+    { element:'#th-iv-c', popover:{ title:COL_EXPLAIN.iv.title, description:COL_EXPLAIN.iv.desc, side:'top', align:'center' } },
+    { element:'#th-volume-c', popover:{ title:COL_EXPLAIN.volume.title, description:COL_EXPLAIN.volume.desc, side:'top', align:'center' } },
+    { element:'#th-oi-c', popover:{ title:COL_EXPLAIN.oi.title, description:COL_EXPLAIN.oi.desc, side:'top', align:'center' } }
+  ] }).drive();
+};
+window.startGreeksTour = function() {
+  window.driver.js.driver({ animate:true, allowClose:true, overlayOpacity:0.4, showProgress:true, steps:[
+    { element:'#bc-g-expiry',   popover:{ title:COL_EXPLAIN.expiry.title,    description:COL_EXPLAIN.expiry.desc,    side:'bottom', align:'center' } },
+    { element:'#bc-g-iv-atm',  popover:{ title:COL_EXPLAIN.iv_atm.title,   description:COL_EXPLAIN.iv_atm.desc,   side:'bottom', align:'center' } },
+    { element:'#bc-g-hv',      popover:{ title:COL_EXPLAIN.hv.title,        description:COL_EXPLAIN.hv.desc,        side:'bottom', align:'center' } },
+    { element:'#bc-g-ivrank',  popover:{ title:COL_EXPLAIN.ivrank.title,    description:COL_EXPLAIN.ivrank.desc,    side:'bottom', align:'center' } },
+    { element:'#th-theor-g',   popover:{ title:GREEK_EXPLAIN.theor.title,   description:GREEK_EXPLAIN.theor.desc,   side:'top', align:'center' } },
+    { element:'#th-delta-g',   popover:{ title:GREEK_EXPLAIN.delta.title,   description:GREEK_EXPLAIN.delta.desc,   side:'top', align:'center' } },
+    { element:'#th-gamma-g',   popover:{ title:GREEK_EXPLAIN.gamma.title,   description:GREEK_EXPLAIN.gamma.desc,   side:'top', align:'center' } },
+    { element:'#th-theta-g',   popover:{ title:GREEK_EXPLAIN.theta.title,   description:GREEK_EXPLAIN.theta.desc,   side:'top', align:'center' } },
+    { element:'#th-vega-g',    popover:{ title:GREEK_EXPLAIN.vega.title,    description:GREEK_EXPLAIN.vega.desc,    side:'top', align:'center' } },
+    { element:'#th-rho-g',     popover:{ title:GREEK_EXPLAIN.rho.title,     description:GREEK_EXPLAIN.rho.desc,     side:'top', align:'center' } },
+    { element:'#th-voloi-g',   popover:{ title:GREEK_EXPLAIN.voloi.title,   description:GREEK_EXPLAIN.voloi.desc,   side:'top', align:'center' } },
+    { element:'#th-itmprob-g', popover:{ title:GREEK_EXPLAIN.itmprob.title, description:GREEK_EXPLAIN.itmprob.desc, side:'top', align:'center' } }
+  ] }).drive();
+};
+</script>
+<script>
+var VOCAB = [
+  { en:'Strike Price', pron:'/straɪk praɪs/', zh:'行權價', cat:'basic', catZh:'基礎欄位', hint:'合約約定的買賣股票價格', back:'期權合約雙方約定在到期日以此價格買賣標的股票的固定價格。CSP（賣 Put）通常選 OTM Strike，即低於現股價的行權價，保留被行使的安全距離。選 Strike 時參考 Delta 值作為風險指引。', example:'例：Strike $15 Put，若股價跌破 $15 且持倉未平，賣方需以 $15 買入股票' },
+  { en:'Bid', pron:'/bɪd/', zh:'買方最高出價', cat:'basic', catZh:'基礎欄位', hint:'市場上最高的買方出價', back:'市場上買方目前願意支付的最高價格。若賣方（Sell to Open）想立即成交，以 Bid 下單可立刻執行，但拿到的是市場能給的最低 Premium。更好的策略是掛 Mid-Price。', example:'例：Bid $0.96 / Ask $1.40 → 打 Bid 立即收 $0.96；掛 Mid $1.18 多收 $0.22' },
+  { en:'Ask', pron:'/æsk/', zh:'賣方最低要求', cat:'basic', catZh:'基礎欄位', hint:'市場上最低的賣方要求', back:'市場上賣方目前願意接受的最低價格。Buy to Open（買入期權）若打 Ask 可立即成交。賣方應優先嘗試掛 Mid-Price = (Bid + Ask) / 2，等候造市商撮合以獲得更好成交價。', example:'例：Mid-Price = (0.96 + 1.40) / 2 = $1.18，比打 Ask 少付，比打 Bid 多收' },
+  { en:'Volume', pron:'/ˈvɑːljuːm/', zh:'當日成交量', cat:'basic', catZh:'基礎欄位', hint:'今天已成交的合約張數', back:'今天（當日）已實際成交的期權合約總張數。Volume 高代表流動性佳，Bid-Ask Spread 較窄，掛限價單容易成交。選 Strike 時建議優先考慮 Volume 較高的行權價。', example:'例：Strike $15 Call Volume 4,120 >> Strike $14 Call Volume 10，流動性差異明顯' },
+  { en:'Open Interest', pron:'/ˈoʊpən ˈɪntrəst/', zh:'未平倉量', cat:'basic', catZh:'基礎欄位', hint:'所有未到期且未平倉的合約數', back:'市場上目前所有未到期且未平倉的合約數量（跨多日累積）。OI 高代表市場對該 Strike 關注度高，流動性通常較好。注意：OI 在每日盤後更新，非即時數字，當日實時流動性看 Volume。', example:'例：OI 951 vs OI 0，優先選 OI 951 的行權價，流動性更佳' },
+  { en:'Change', pron:'/tʃeɪndʒ/', zh:'日漲跌幅', cat:'basic', catZh:'基礎欄位', hint:'與昨日收盤的差距', back:'期權價格與前一交易日收盤價的差距。綠色正數表示期權漲價，紅色負數表示跌價。顯示「unch」代表 unchanged（未變動）。賣方希望持倉的 Change 是負值（期權跌價即獲利）。', example:'例：Put Change +1.20 → 市場恐慌股跌，Put 大幅升值（對已賣出的賣方不利）' },
+  { en:'Implied Volatility', pron:'/ɪmˈplaɪd ˌvɑːləˈtɪlɪti/', zh:'隱含波動率 IV', cat:'vol', catZh:'波動率', hint:'市場對未來波動幅度的預期', back:'從期權市場價格反推出來的波動率，代表市場對未來波動的共識預期。IV 越高 → Premium 越貴。賣方喜歡 IV 偏高時開倉，因為可收取更多 Premium，未來若 IV 下降還有額外獲利（IV Crush）。', example:'例：IV 74% 表示市場預期未來一年年化波動率約 74%（即每月約 ±21%）' },
+  { en:'Historic Volatility', pron:'/hɪˈstɔːrɪk ˌvɑːləˈtɪlɪti/', zh:'歷史波動率 HV', cat:'vol', catZh:'波動率', hint:'過去 30 天股價的實際波動', back:'根據過去一段時間（通常 30 天）股價實際走勢計算的波動率。IV > HV 時稱「波動率溢價」，代表市場正為未來不確定性多付費，是賣方策略的有利環境。', example:'例：IV 76.57% > HV 72.68% → 輕微溢價，Premium 略豐厚' },
+  { en:'IV Rank', pron:'/ˌaɪ ˈviː ræŋk/', zh:'IV 百分位', cat:'vol', catZh:'波動率', hint:'過去一年中 IV 的相對高低', back:'過去 52 週（一年）中，目前 IV 所在的百分位排名（0~100%）。IV Rank > 50% 代表目前 IV 在過去一年屬於偏高水準，Premium 相對豐厚，是賣方開倉的有利時機。', example:'例：IV Rank 41.58% → 過去一年有 58% 的時間 IV 比現在更高，目前屬中等水準' },
+  { en:'DTE', pron:'/ˌdiː tiː ˈiː/', zh:'距到期天數', cat:'vol', catZh:'波動率', hint:'Days to Expiration', back:'從今天到期權到期日的自然日天數。DTE 越少，時間價值越少，Theta 衰減越快。賣方策略通常選 30~45 DTE 開倉（Theta 甜蜜區），DTE 降至 21 天以下時考慮滾倉或平倉。', example:'例：DTE 40 → Theta 衰減尚溫和；DTE 5 → Theta 加速，Gamma 風險劇增' },
+  { en:'Theoretical Value', pron:'/ˌθɪəriˈetɪkl ˈvæljuː/', zh:'理論價值', cat:'greek', catZh:'Greeks', hint:'Black-Scholes 公式估算值', back:'Barchart 用 Black-Scholes-Merton 模型計算的期權理論公平價值，輸入：標的現價、Strike、DTE、IV、無風險利率。Theor. 是評估「市場定價是否合理」的參考基準，與 Latest 對比看溢折價。', example:'例：Theor. $1.76 = Latest $1.76 → 公平定價；Theor. $2.00 > Latest $1.50 → 市場折價' },
+  { en:'Delta', pron:'/ˈdeltə/', zh:'Delta 方向敏感度', cat:'greek', catZh:'Greeks', hint:'標的漲 $1，期權價格的變化', back:'標的股票每上漲 $1，期權價格的理論變化量。Call Delta 為正（0~+1），Put Delta 為負（−1~0）。|Delta| 的絕對值近似於到期時 ITM 的機率，是選 Strike 的重要參考指標。', example:'例：Put Delta −0.3974 → 股票漲 $1，Put 跌 $0.40；約 40% 機率到期 ITM' },
+  { en:'Gamma', pron:'/ˈɡæmə/', zh:'Gamma Delta變化率', cat:'greek', catZh:'Greeks', hint:'Delta 的加速度（二階導數）', back:'標的股票每變動 $1，Delta 的改變量。Gamma 在平值（ATM）和到期日臨近時最大。賣方持有 Short Gamma 部位：股票急漲急跌時 Delta 快速偏離，需要更頻繁的管理。', example:'例：Gamma 0.1048 → 股票漲 $1，Put Delta 從 −0.3974 變成 −0.2926' },
+  { en:'Theta', pron:'/ˈθeɪtə/', zh:'Theta 時間衰減', cat:'greek', catZh:'Greeks', hint:'每天自動流失的時間價值（負值）', back:'每過一天，期權理論上自動減少的價值（顯示為負值）。賣方每天「收取」Theta，這是 CSP/Covered Call 策略的核心獲利來源。DTE 30~45 是 Theta 最有效率的「甜蜜區」。', example:'例：Theta −0.0189 → 每日衰減 $0.019，每口合約每天賺約 $1.89（賣方角度）' },
+  { en:'Vega', pron:'/ˈveɪɡə/', zh:'Vega IV敏感度', cat:'greek', catZh:'Greeks', hint:'IV 每變動 1%，期權漲多少', back:'隱含波動率（IV）每上升 1%，期權價格的理論變化。DTE 越長，Vega 越大。賣方是 Short Vega：IV 升時期權變貴（虧損），IV 降時期權變便宜（獲利）。IV 高時賣出是最佳時機。', example:'例：Vega 0.0197 → IV 升 10%，Put 漲約 $0.197（每口 +$19.7，對賣方是虧損）' },
+  { en:'ATM', pron:'/ˌeɪ tiː ˈem/', zh:'平值（At The Money）', cat:'basic', catZh:'基礎欄位', hint:'Strike ≈ 現股價', back:'Strike 最接近當前股票市場價格的期權。ATM 期權的時間價值最高、Delta 約 ±0.5、Gamma 最大。ATM 的 IV 就是頂部資訊列顯示的「Implied Volatility (ATM)」，是整條期權鏈 IV 的代表值。', example:'例：NOK 股價 $15.07，Strike $15.00 Put 為 ATM；Delta 約 −0.50，時間價值最豐厚' },
+  { en:'ITM', pron:'/ˌɪn ðə ˈmʌni/', zh:'價內（In The Money）', cat:'basic', catZh:'基礎欄位', hint:'期權具有內在價值', back:'Put ITM：Strike > 現股價（已有內在價值，立即行使可獲利）。Call ITM：Strike < 現股價。ITM 期權的 Delta 絕對值 > 0.5，Premium 高但時間價值佔比低。賣方應避免持有 ITM 部位到期，否則必定被指派。', example:'例：NOK $15.07，Strike $16 Put 為 ITM（內在價值 $0.93）；被行使機率 > 50%' },
+  { en:'OTM', pron:'/ˌaʊt əv ðə ˈmʌni/', zh:'價外（Out of The Money）', cat:'basic', catZh:'基礎欄位', hint:'Strike 遠離現股價，無內在價值', back:'Put OTM：Strike < 現股價（股價需下跌才會被行使）。Call OTM：Strike > 現股價。OTM 期權全部是時間價值，Delta 絕對值 < 0.5。CSP 賣方通常選 OTM Put（Delta −0.2 ~ −0.3），保留安全距離。', example:'例：NOK $15.07，Strike $14 Put 為 OTM；股價需跌超過 $1.07 才有被行使風險' }
+];
+(function(){
+  var grid = document.getElementById('vocab-grid');
+  function buildCards(filter){
+    grid.innerHTML='';
+    VOCAB.forEach(function(v,idx){
+      if(filter!=='all'&&v.cat!==filter)return;
+      var card=document.createElement('div');
+      card.className='vocab-card';card.dataset.idx=idx;card.dataset.cat=v.cat;
+      var catCls=v.cat;
+      card.innerHTML='<div class="vocab-card-inner">'+
+        '<div class="vocab-front cat-'+catCls+'">'+
+          '<div class="vc-top">'+
+            '<div class="vc-badge '+catCls+'">'+v.catZh+'</div>'+
+            '<div class="vc-actions">'+
+              '<button class="speak-btn" title="朗讀英文術語" data-term="'+v.en+'" onclick="speakTerm(event,this.dataset.term)" aria-label="朗讀">🔊</button>'+
+            '</div>'+
+          '</div>'+
+          '<div class="vc-en">'+v.en+'</div>'+
+          '<div class="vc-pron">'+v.pron+'</div>'+
+          '<div class="vc-zh">'+v.zh+'</div>'+
+          '<div class="vc-hint">'+v.hint+'</div>'+
+        '</div>'+
+        '<div class="vocab-back cat-'+catCls+'">'+
+          '<div class="vc-back-title">'+v.en+' — '+v.zh+'</div>'+
+          '<div class="vc-back-body">'+v.back+'</div>'+
+          '<div class="vc-example">'+v.example+'</div>'+
+        '</div>'+
+      '</div>';
+      card.addEventListener('click',function(e){if(e.target.closest('.speak-btn'))return;this.classList.toggle('flipped');});
+      grid.appendChild(card);
+    });
+  }
+  buildCards('all');
+  window.filterVocab=function(cat,btn){
+    document.querySelectorAll('.filter-btn').forEach(function(b){b.classList.remove('active');});
+    btn.classList.add('active');buildCards(cat);
+  };
+  window.resetAllCards=function(){document.querySelectorAll('.vocab-card').forEach(function(c){c.classList.remove('flipped');});};
+  window.speakTerm=function(e,term){
+    e.stopPropagation();var btn=e.currentTarget;
+    if(speechSynthesis.speaking)speechSynthesis.cancel();
+    var utt=new SpeechSynthesisUtterance(term);
+    utt.lang='en-US';utt.rate=0.85;utt.pitch=1.0;
+    btn.classList.add('speaking');
+    utt.onend=function(){btn.classList.remove('speaking');};
+    utt.onerror=function(){btn.classList.remove('speaking');};
+    speechSynthesis.speak(utt);
+  };
+}());
+</script>
+<script>
+(function(){
+  var _fontBaseMap = new Map();
+  var _fontZoom = 1;
+  function applyFontZoom() {
+    document.querySelectorAll('#drag-canvas [data-drag-id] *').forEach(function (el) {
+      if (!_fontBaseMap.has(el)) {
+        _fontBaseMap.set(el, parseFloat(window.getComputedStyle(el).fontSize) || 14);
+      }
+      el.style.fontSize = (_fontBaseMap.get(el) * _fontZoom) + 'px';
+    });
+  }
+  function relayoutAfterZoom() {
+    var canvas = document.getElementById('drag-canvas');
+    if (!canvas) return;
+    var panels = Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    if (!panels.length) return;
+    panels.sort(function (a, b) { return (parseFloat(a.style.top) || 0) - (parseFloat(b.style.top) || 0); });
+    var GAP = 16, y = GAP;
+    panels.forEach(function (el) {
+      el.style.top = y + 'px';
+      y += el.getBoundingClientRect().height + GAP;
+    });
+    try { localStorage.removeItem('l8-layout-v9'); } catch (e) {}
+    canvas.style.minHeight = (y + 40) + 'px';
+  }
+  window.adjustPageFont = function (d) {
+    _fontZoom = Math.max(0.7, Math.min(1.5, _fontZoom + d * 0.05));
+    applyFontZoom();
+    requestAnimationFrame(function () { requestAnimationFrame(relayoutAfterZoom); });
+  };
+  window.addEventListener('load', function () {
+    if (_fontZoom !== 1) {
+      applyFontZoom();
+      requestAnimationFrame(function () { requestAnimationFrame(relayoutAfterZoom); });
+    }
+  });
+  var SCRIPT=[
+    {id:null,label:'開場白',text:'歡迎來到期權小學堂第八課。這一課我們學習如何看懂 Barchart 的兩個期權分析頁籤：Options Prices 和 Volatility and Greeks。每次在 Barchart 研究期權機會時，這兩個頁籤是你最常用到的工具，搞懂它們的每個欄位，才能做出有根據的開倉決策。'},
+    {id:'l8-options-prices',label:'Options Prices 欄位',text:'Options Prices 頁籤分為三個區域：頂部資訊列、左邊的 Calls、右邊的 Puts，中間是 Strike 行權價。頂部資訊列最重要的是隱含波動率 IV 和 IV Rank。IV Rank 超過五十代表目前 Premium 相對豐厚，是賣方開倉的好時機。表格中的 Bid 是買方出價，Ask 是賣方要求，掛限價單時建議用中間價 Mid-Price 等候成交。Volume 成交量越高，流動性越好，掛單越容易成交。Open Interest 代表目前市場上未平倉的合約總數，OI 高通常流動性也較佳。'},
+    {id:'l8-greeks',label:'Greeks 欄位',text:'Volatility and Greeks 頁籤顯示更深層的理論數值。Theor. 是 Black-Scholes 公式算出的理論公平價值，可判斷市場是否溢價。Delta 最重要：Put 的 Delta 為負值，絕對值就近似於到期時被行使的機率，CSP 策略通常選 Delta 負零點二到負零點三的 Strike。Theta 是每天流失的時間價值，對賣方來說是每日收入。Gamma 代表 Delta 的加速度，到期日越近 Gamma 越大，風險越高。Vega 代表 IV 變動時期權的漲跌幅度，IV 高時賣出的賣方，若未來 IV 下降還能額外獲利。'},
+    {id:'l8-ivpr',label:'IV Percentile Rank',text:'第三區是 IV Percentile Rank，也叫 IV PR。這是一個告訴你目前隱含波動率處於過去一年哪個水位的指標。IV PR 60% 的意思是：過去一年有六成的交易日，IV 比今天還要低，代表現在 IV 偏高，Premium 相對豐厚。賣方最愛的入場條件是 IV PR 高於五十，此時賣出期權收取的 Premium 在歷史上屬於偏高水準。相反地，IV PR 低於三十代表 Premium 偏薄，此時買入期權更划算。要注意 IV Rank 和 IV Percentile 是兩種不同的計算方式：IV Rank 比較最高最低極值，IV Percentile 統計每一天，後者對黑天鵝事件更穩健。Barchart 顯示的是 IV Rank，TastyTrade 和 Market Chameleon 常顯示 IV Percentile。'},
+    {id:'l8-vocab',label:'術語字卡',text:'最後是十五張術語字卡。每張卡的正面顯示英文術語和中文名稱，點擊喇叭圖示就能聽到正確的英文發音。點擊卡片翻面可以看到詳細解釋和實際數字範例。你可以用上方的篩選按鈕，分別查看基礎欄位、波動率術語、或是 Greeks。建議先看完前兩個模擬表格，再用字卡複習，這樣記憶效果最好。'}
+  ];
+  var ttsIdx=0,ttsPlaying=false,ttsPaused=false,ttsRate=0.9,activePanelId=null;
+  function initDots(){var c=document.getElementById('tts-dots');c.innerHTML='';SCRIPT.forEach(function(s,i){var d=document.createElement('div');d.className='tts-dot';d.id='tts-dot-'+i;d.title=s.label;d.onclick=function(){ttsJumpTo(i);};c.appendChild(d);});}
+  function updateDots(){SCRIPT.forEach(function(_,i){var d=document.getElementById('tts-dot-'+i);if(!d)return;d.className='tts-dot'+(i<ttsIdx?' done':i===ttsIdx?' current':'');});}
+  function setActivePanel(id){if(activePanelId){var prev=document.getElementById(activePanelId);if(prev)prev.classList.remove('tts-active');}activePanelId=id;if(id){var el=document.getElementById(id);if(el){el.classList.add('tts-active');el.scrollIntoView({behavior:'smooth',block:'nearest'});}}}
+  function updateUI(){var btn=document.getElementById('tts-play-btn');var sec=document.getElementById('tts-section-name');if(ttsPlaying&&!ttsPaused){btn.textContent='⏸ 暫停';btn.className='tts-btn playing';}else if(ttsPaused){btn.textContent='▶ 繼續';btn.className='tts-btn';}else if(ttsIdx>=SCRIPT.length){btn.textContent='↺ 重新朗讀';btn.className='tts-btn';}else{btn.textContent=ttsIdx===0?'▶ 朗讀全文':'▶ 繼續朗讀';btn.className='tts-btn';}sec.textContent=ttsIdx<SCRIPT.length?'▸ '+SCRIPT[ttsIdx].label:'✓ 朗讀完畢';setActivePanel(ttsIdx<SCRIPT.length?SCRIPT[ttsIdx].id:null);updateDots();}
+  function showSubtitle(text){var el=document.getElementById('tts-subtitle');if(!el)return;el.innerHTML=text.split('').map(function(c,i){var s=c==='<'?'&lt;':c==='>'?'&gt;':c==='&'?'&amp;':c;return'<span class="sub-c" id="sc-'+i+'">'+s+'</span>';}).join('');el.scrollTop=0;el.classList.add('active');}
+  function clearSubtitle(){var el=document.getElementById('tts-subtitle');if(el){el.innerHTML='';el.classList.remove('active');}}
+  function speakSection(){if(!ttsPlaying)return;if(ttsIdx>=SCRIPT.length){ttsPlaying=false;ttsIdx=0;updateUI();return;}updateUI();var item=SCRIPT[ttsIdx];var utt=new SpeechSynthesisUtterance(item.text);utt.lang='zh-TW';utt.rate=ttsRate;utt.pitch=1.0;showSubtitle(item.text);utt.onboundary=function(e){var chars=document.querySelectorAll('#tts-subtitle .sub-c');var len=e.charLength||1;chars.forEach(function(c,i){c.className='sub-c'+(i<e.charIndex?' done':i<e.charIndex+len?' now':'');});var cur=document.getElementById('sc-'+e.charIndex);if(cur)cur.scrollIntoView({block:'nearest'});};utt.onend=function(){if(!ttsPlaying)return;ttsIdx++;setTimeout(speakSection,350);};utt.onerror=function(e){if(e.error==='interrupted')return;if(!ttsPlaying)return;ttsIdx++;speakSection();};setTimeout(function(){speechSynthesis.speak(utt);},50);}
+  window.ttsToggle=function(){if(speechSynthesis.speaking&&!speechSynthesis.paused){speechSynthesis.pause();ttsPlaying=false;ttsPaused=true;updateUI();}else if(speechSynthesis.paused){speechSynthesis.resume();ttsPlaying=true;ttsPaused=false;updateUI();}else{if(ttsIdx>=SCRIPT.length)ttsIdx=0;ttsPlaying=true;ttsPaused=false;speakSection();}};
+  window.ttsStop=function(){speechSynthesis.cancel();clearSubtitle();ttsPlaying=false;ttsPaused=false;ttsIdx=0;setActivePanel(null);document.getElementById('tts-section-name').textContent='點擊「朗讀全文」開始';updateDots();document.getElementById('tts-play-btn').textContent='▶ 朗讀全文';document.getElementById('tts-play-btn').className='tts-btn';};
+  window.ttsJumpTo=function(i){speechSynthesis.cancel();ttsIdx=i;ttsPlaying=true;ttsPaused=false;setTimeout(speakSection,80);};
+  window.ttsSetRate=function(v){ttsRate=parseFloat(v);};
+  initDots();
+}());
+</script>
+<!-- ═══════════════════ Edit Mode JS ═══════════════════ -->
+<script>
+(function () {
+  var _editMode = false, _focusEl = null;
+
+  window.toggleEditMode = function () {
+    _editMode = !_editMode;
+    document.body.classList.toggle('edit-mode', _editMode);
+    document.getElementById('edit-btn').classList.toggle('active', _editMode);
+    document.getElementById('edit-icon').textContent  = _editMode ? '🔒' : '✏️';
+    document.getElementById('edit-label').textContent = _editMode ? '完成編輯' : '編輯模式';
+    document.getElementById('edit-toolbar').classList.toggle('visible', _editMode);
+    if (!_editMode) { blurCurrent(); document.getElementById('et-hint').style.display = ''; document.getElementById('et-controls').style.display = 'none'; }
+  };
+
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); window.toggleEditMode(); }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!_editMode) return;
+    var el = e.target;
+    if (!el || el.closest('#edit-toolbar') || el.closest('#edit-btn') || el.closest('#tts-bar')) return;
+    if (el.closest('#drag-canvas') && !el.matches('button,input,select,a,textarea')) {
+      e.preventDefault(); focusEl(el);
+    }
+  });
+
+  function focusEl(el) {
+    blurCurrent(); _focusEl = el;
+    el.classList.add('el-focus'); el.contentEditable = 'true'; el.focus();
+    document.getElementById('et-hint').style.display = 'none';
+    document.getElementById('et-controls').style.display = '';
+    updateToolbar(el);
+  }
+
+  function blurCurrent() {
+    if (_focusEl) { _focusEl.classList.remove('el-focus'); _focusEl.contentEditable = 'false'; _focusEl = null; }
+  }
+
+  function updateToolbar(el) {
+    var cs = window.getComputedStyle(el);
+    document.getElementById('et-size-val').textContent = Math.round(parseFloat(cs.fontSize));
+    document.getElementById('et-bold').classList.toggle('on', parseFloat(cs.fontWeight) >= 700);
+    document.getElementById('et-italic').classList.toggle('on', cs.fontStyle === 'italic');
+    var hex = rgbToHex(cs.color);
+    if (hex) document.getElementById('et-color').value = hex;
+    document.getElementById('et-lh').value = parseFloat(cs.lineHeight) / parseFloat(cs.fontSize) || 1.4;
+  }
+
+  function rgbToHex(rgb) {
+    var m = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+    if (!m) return null;
+    return '#' + [1,2,3].map(function (i) { return parseInt(m[i]).toString(16).padStart(2,'0'); }).join('');
+  }
+
+  window.applyStyle  = function (p, v)  { if (_focusEl) _focusEl.style[p] = v; };
+  window.adjustSize  = function (d)  {
+    if (!_focusEl) return;
+    var nv = Math.max(8, Math.min(72, (parseFloat(window.getComputedStyle(_focusEl).fontSize) || 16) + d));
+    _focusEl.style.fontSize = nv + 'px'; document.getElementById('et-size-val').textContent = Math.round(nv);
+  };
+  window.toggleBold  = function () {
+    if (!_focusEl) return;
+    var b = parseFloat(window.getComputedStyle(_focusEl).fontWeight) >= 700;
+    _focusEl.style.fontWeight = b ? '400' : '700'; document.getElementById('et-bold').classList.toggle('on', !b);
+  };
+  window.toggleItalic = function () {
+    if (!_focusEl) return;
+    var it = window.getComputedStyle(_focusEl).fontStyle === 'italic';
+    _focusEl.style.fontStyle = it ? 'normal' : 'italic'; document.getElementById('et-italic').classList.toggle('on', !it);
+  };
+  window.resetElement = function () { if (_focusEl) { _focusEl.style.cssText = ''; updateToolbar(_focusEl); } };
+  window.copyHtml = function () {
+    if (!_focusEl) return;
+    navigator.clipboard.writeText(_focusEl.outerHTML).then(function () {
+      var btn = document.getElementById('et-copy-btn');
+      btn.textContent = '✓ 已複製'; setTimeout(function () { btn.textContent = '複製'; }, 1500);
+    });
+  };
+}());
+/* ── IV PR Gauge needle ── */
+window.addEventListener('load', function() {
+  var needle = document.getElementById('ivpr-needle');
+  var gauge  = document.getElementById('ivpr-gauge');
+  if (!needle || !gauge) return;
+  var pct = 41.58;
+  needle.style.left = pct + '%';
+});
+
+</script>
+
+
+<!-- ═══════════════════ Drag Layout JS ═══════════════════ -->
+<script>
+(function () {
+  var L8_LAY = 'l8-layout-v9';
+  var canvas = null, dragging = null, resizing = null, dragOX = 0, dragOY = 0, rzS = {};
+
+  function getSL() { try { return JSON.parse(localStorage.getItem(L8_LAY) || 'null'); } catch (e) { return null; } }
+  function putSL(s) { try { localStorage.setItem(L8_LAY, JSON.stringify(s)); } catch (e) {} }
+  function saveItem(id, x, y, w, h) {
+    var s = getSL() || {}; s[id] = { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: h ? Math.round(h) : null }; putSL(s);
+  }
+  function applyPos(el, x, y, w, h) {
+    el.style.position = 'absolute'; el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.width = w + 'px';
+    if (h) el.style.minHeight = h + 'px';
+  }
+
+  function addHandles(el) {
+    var dh = document.createElement('div');
+    dh.className = 'drag-handle';
+    el.insertBefore(dh, el.firstChild);
+    dh.addEventListener('mousedown', function (e) {
+      if (!document.body.classList.contains('edit-mode')) return;
+      e.preventDefault(); e.stopPropagation();
+      dragging = el; var r = el.getBoundingClientRect();
+      dragOX = e.clientX - r.left; dragOY = e.clientY - r.top;
+      el.classList.add('is-dragging'); el.style.zIndex = '1000';
+    });
+    ['nw','n','ne','e','se','s','sw','w'].forEach(function (dir) {
+      var rh = document.createElement('div');
+      rh.className = 'rh rh-' + dir;
+      el.appendChild(rh);
+      rh.addEventListener('mousedown', function (e) {
+        if (!document.body.classList.contains('edit-mode')) return;
+        e.preventDefault(); e.stopPropagation();
+        resizing = { el: el, dir: dir };
+        rzS = { mx: e.clientX, my: e.clientY, w: el.offsetWidth, h: el.offsetHeight, l: parseFloat(el.style.left) || 0, t: parseFloat(el.style.top) || 0 };
+        el.classList.add('is-resizing'); el.style.zIndex = '1000';
+      });
+    });
+  }
+
+  document.addEventListener('mousemove', function (e) {
+    if (dragging) {
+      var cr = canvas.getBoundingClientRect();
+      var x = Math.max(0, e.clientX - cr.left - dragOX);
+      var y = Math.max(0, e.clientY - cr.top  - dragOY);
+      dragging.style.left = x + 'px'; dragging.style.top = y + 'px';
+      var bot = y + dragging.offsetHeight, cm = parseInt(canvas.style.minHeight) || 3000;
+      if (bot + 100 > cm) canvas.style.minHeight = (bot + 300) + 'px';
+    }
+    if (resizing) {
+      var el = resizing.el, dir = resizing.dir;
+      var dx = e.clientX - rzS.mx, dy = e.clientY - rzS.my;
+      var w = rzS.w, h = rzS.h, l = rzS.l, t = rzS.t;
+      if (dir.indexOf('e') >= 0) w = Math.max(200, rzS.w + dx);
+      if (dir.indexOf('w') >= 0) { w = Math.max(200, rzS.w - dx); l = rzS.l + (rzS.w - w); }
+      if (dir.indexOf('s') >= 0) h = Math.max(80,  rzS.h + dy);
+      if (dir.indexOf('n') >= 0) { h = Math.max(80, rzS.h - dy);  t = rzS.t + (rzS.h - h); }
+      el.style.width = w + 'px'; el.style.minHeight = h + 'px';
+      el.style.left  = l + 'px'; el.style.top = t + 'px';
+    }
+  });
+
+  document.addEventListener('mouseup', function () {
+    if (dragging) {
+      dragging.classList.remove('is-dragging'); dragging.style.zIndex = '';
+      saveItem(dragging.dataset.dragId, parseFloat(dragging.style.left) || 0, parseFloat(dragging.style.top) || 0, dragging.offsetWidth, null);
+      dragging = null;
+    }
+    if (resizing) {
+      var el = resizing.el; el.classList.remove('is-resizing'); el.style.zIndex = '';
+      saveItem(el.dataset.dragId, parseFloat(el.style.left) || 0, parseFloat(el.style.top) || 0, el.offsetWidth, el.offsetHeight);
+      resizing = null;
+    }
+  });
+
+  window.resetLayout = function () { localStorage.removeItem(L8_LAY); location.reload(); };
+
+  /* ── reflow：資料變動後重新排列各區塊，避免高度增長後交疊 ── */
+  window.reflow = function reflow() {
+    if (!canvas) return;
+    var items = Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    if (!items.length) return;
+
+    // 依 top 排序
+    items.sort(function (a, b) {
+      return (parseFloat(a.style.top) || 0) - (parseFloat(b.style.top) || 0);
+    });
+
+    // 把同 top（±3px）的元素視為同一列（如 sliders + target 並排）
+    var rows = [];
+    var i = 0;
+    while (i < items.length) {
+      var tA = parseFloat(items[i].style.top) || 0;
+      if (i + 1 < items.length) {
+        var tB = parseFloat(items[i + 1].style.top) || 0;
+        if (Math.abs(tA - tB) < 3) { rows.push([items[i], items[i + 1]]); i += 2; continue; }
+      }
+      rows.push([items[i]]);
+      i++;
+    }
+
+    // 由上往下重新排位，保持 16px 間距
+    var GAP = 16, cursor = 0;
+    var saved = getSL() || {};
+    rows.forEach(function (row) {
+      var origTop = parseFloat(row[0].style.top) || 0;
+      var newTop  = cursor > 0 ? Math.max(cursor + GAP, origTop) : origTop;
+      var rowH    = 0;
+      row.forEach(function (el) {
+        el.style.top = newTop + 'px';
+        if (!saved[el.dataset.dragId]) saved[el.dataset.dragId] = { x: parseFloat(el.style.left) || 0, w: el.offsetWidth, h: null };
+        saved[el.dataset.dragId].y = Math.round(newTop);
+        rowH = Math.max(rowH, el.offsetHeight);
+      });
+      cursor = newTop + rowH;
+    });
+
+    canvas.style.minHeight = Math.max(3000, cursor + 200) + 'px';
+    putSL(saved);
+  };
+
+  function initLayout() {
+    canvas = document.getElementById('drag-canvas');
+    if (!canvas) return;
+    var saved = getSL();
+    var items = Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    items.forEach(function (el) { addHandles(el); });
+
+    var _REQ = ['l8-header','l8-options-prices','l8-greeks','l8-ivpr','l8-vocab'];
+    if (saved) {
+      var miss = _REQ.some(function (id) { return !saved[id]; });
+      if (miss) { saved = null; localStorage.removeItem(L8_LAY); }
+    }
+
+    if (saved) {
+      items.forEach(function (el) {
+        var s = saved[el.dataset.dragId];
+        if (el.parentElement !== canvas) canvas.appendChild(el);
+        if (s) applyPos(el, s.x, s.y, s.w, s.h);
+      });
+      var maxB = 0;
+      items.forEach(function (el) {
+        var b = (parseFloat(el.style.top) || 0) + el.offsetHeight;
+        if (b > maxB) maxB = b;
+      });
+      canvas.style.minHeight = Math.max(3000, maxB + 200) + 'px';
+    } else {
+      requestAnimationFrame(function () { requestAnimationFrame(function () {
+        var GAP = 20;
+        var cr = canvas.getBoundingClientRect(), caps = [];
+        items.forEach(function (el) {
+          var r = el.getBoundingClientRect();
+          caps.push({ el: el, x: r.left - cr.left, y: r.top - cr.top, w: r.width, h: r.height });
+        });
+        /* 按自然 y 排序，同行（y 差 < 5px）視為並排 */
+        caps.sort(function (a, b) { return a.y !== b.y ? a.y - b.y : a.x - b.x; });
+        var rows = [], rem = caps.slice();
+        while (rem.length) {
+          var first = rem.shift(), row = [first];
+          rem = rem.filter(function (p) {
+            if (Math.abs(p.y - first.y) < 5) { row.push(p); return false; }
+            return true;
+          });
+          rows.push(row);
+        }
+        /* 重新指定 y，每行之間插入 GAP */
+        var curY = rows.length ? rows[0][0].y : 0;
+        rows.forEach(function (row) {
+          var rowH = Math.max.apply(null, row.map(function (p) { return p.h; }));
+          row.forEach(function (p) { p.y = curY; });
+          curY += rowH + GAP;
+        });
+        var ns = {}, maxB = 0;
+        caps.forEach(function (p) {
+          if (p.el.parentElement !== canvas) canvas.appendChild(p.el);
+          applyPos(p.el, p.x, p.y, p.w, null);
+          ns[p.el.dataset.dragId] = { x: Math.round(p.x), y: Math.round(p.y), w: Math.round(p.w), h: null };
+          if (p.y + p.h > maxB) maxB = p.y + p.h;
+        });
+        canvas.style.minHeight = Math.max(3000, maxB + 200) + 'px';
+        putSL(ns);
+      }); });
+    }
+  }
+
+  window.addEventListener('load', initLayout);
+}());
+
+  /* ── Driver.js: Assign 機率說明 ── */
+
+
+  /* ── Driver.js: IV Percentile Rank 說明 ── */
+  window.showIVPRExplain = function () {
+    var driverObj = window.driver.js.driver({
+      animate: true,
+      allowClose: true,
+      overlayOpacity: 0.4,
+      steps: [
+        {
+          element: '#iv-pr-info-btn',
+          popover: {
+            title: '📊 IV Percentile Rank（IV PR）是什麼？',
+            description: [
+              '<strong>IV Percentile Rank</strong> 衡量當前 IV 在過去一年（252 個交易日）歷史中的相對位置。',
+              '',
+              '📐 <strong>計算方式：</strong>',
+              '<code style="background:#F5EDE0;padding:2px 6px;border-radius:4px;font-size:12px;">IV PR = (當前 IV − 52週最低 IV) ÷ (52週最高 IV − 52週最低 IV) × 100</code>',
+              '',
+              '📖 <strong>另一種版本 — IV Percentile（IVP）：</strong>',
+              '• 過去 252 個交易日中，IV 低於今日的天數佔比',
+              '• 例如 IVP = 80% 代表過去一年有 80% 的日子 IV 比今天低',
+              '',
+              '🎯 <strong>判讀建議：</strong>',
+              '• <span style="color:#c0392b;font-weight:700;">≥ 50%</span> — IV 偏高，賣出 Premium 較划算（Sell Put / Sell Call）',
+              '• <span style="color:#27ae60;font-weight:700;">< 30%</span> — IV 偏低，買入保護成本低（Buy Put / Buy Call）',
+              '• 介於 30–50% — IV 中性，視個股情況決定',
+              '',
+              '🔍 <strong>查詢來源：</strong> marketchameleon.com → 輸入股票代號 → IV 頁籤'
+            ].join('<br>'),
+            side: 'bottom',
+            align: 'center'
+          }
+        }
+      ]
+    });
+    driverObj.drive();
+  };
+  /* ── Driver.js: IV 反推說明 ── */
+  window.showIVExplain = function () {
+    var driverObj = window.driver.js.driver({
+      animate: true,
+      allowClose: true,
+      overlayOpacity: 0.4,
+      steps: [
+        {
+          element: '#iv-result-area',
+          popover: {
+            title: '📈 IV 需升至的計算原理',
+            description: [
+              '程式用<strong>二分法反推 σ（隱含波動率）</strong>，找出讓 BSM 理論價等於你設定目標 Premium 的 IV：',
+              '',
+              '<code style="background:#F5EDE0;padding:2px 6px;border-radius:4px;font-size:12px;">BSM Put(S, K, T, r, σ) = 目標 Premium</code>',
+              '',
+              '<strong>搜尋過程：</strong>',
+              '• 範圍：σ ∈ [0.1%, 2000%]，收斂約 80 步',
+              '• 每步取中點，比較 BSM 價與目標，縮小區間',
+              '',
+              '<strong>範例解讀（+78 pp 代表）：</strong>',
+              '• 目前 IV = 70.68%',
+              '• 達到目標 Premium，IV 需升至 ~149%',
+              '• 即 IV 需<strong>再漲 78 個百分點</strong>（pp = percentage points）',
+              '',
+              '⚠️ <strong>重要提醒：</strong>IV 飆升通常發生在財報或大新聞前後，平時很難達到如此高位。若反推 IV 遠超目前水平，說明此目標 Premium 在當前市況下<strong>幾乎無法達到</strong>。'
+            ].join('<br>'),
+            side: 'top',
+            align: 'center'
+          }
+        }
+      ]
+    });
+    driverObj.drive();
+  };
+
+  /* ── Driver.js: Call 走機率說明 ── */
+  window.showCallExplain = function () {
+    var driverObj = window.driver.js.driver({
+      animate: true,
+      allowClose: true,
+      overlayOpacity: 0.4,
+      steps: [
+        {
+          element: '#call-assign-box',
+          popover: {
+            title: '📐 被 Call 走機率的計算原理',
+            description: [
+              '程式使用 <strong>BSM 公式的 N(d₂)</strong>，這是計算「到期時 Call 進入 ITM 機率」的標準公式：',
+              '',
+              '<code style="background:#F5EDE0;padding:2px 6px;border-radius:4px;font-size:12px;">d₂ = d₁ − σ√T</code>',
+              '<code style="background:#F5EDE0;padding:2px 6px;border-radius:4px;font-size:12px;margin-top:4px;display:block;">ITM 機率 = N(d₂)</code>',
+              '',
+              '（Put 使用 N(−d₂)；Call 使用 N(d₂)）',
+              '',
+              '<strong>範例解讀：</strong>',
+              '• 反推到達目標股價時，N(d₂) 就是股價漲至該點後 Call 被行使的機率',
+              '• 機率越高 → 行權價越 ITM → 被 Call 走風險越大',
+              '',
+              '⚠️ <strong>重要提醒：</strong>N(d₂) 是「<em>風險中性機率</em>」，非真實世界機率。用於比較不同行權價的<strong>相對風險</strong>完全適合。'
+            ].join('<br>'),
+            side: 'top',
+            align: 'center'
+          }
+        }
+      ]
+    });
+    driverObj.drive();
+  };
+  window.showAssignExplain = function () {
+    var driverObj = window.driver.js.driver({
+      animate: true,
+      allowClose: true,
+      overlayOpacity: 0.4,
+      steps: [
+        {
+          element: '#assign-box',
+          popover: {
+            title: '📐 被 Assign 機率的計算原理',
+            description: [
+              '程式使用 <strong>BSM 公式的 N(−d₂)</strong>，這是期權理論計算「到期時 ITM 機率」的標準公式：',
+              '',
+              '<code style="background:#F5EDE0;padding:2px 6px;border-radius:4px;font-size:12px;">d₂ = d₁ − σ√T</code>',
+              '<code style="background:#F5EDE0;padding:2px 6px;border-radius:4px;font-size:12px;margin-top:4px;display:block;">ITM 機率 = N(−d₂)</code>',
+              '',
+              '<strong>範例：</strong>',
+              '• 現價 $15.47（從 OTM −9.5% 反推）',
+              '• 目標 Premium $2.00 → 股價需跌至 $12.50',
+              '• IV = 70.68%、DTE = 34 天',
+              '• ∴ N(−d₂) = <strong>73.07%</strong>',
+              '',
+              '⚠️ <strong>重要提醒：</strong>N(−d₂) 是「<em>風險中性機率</em>」，非真實世界機率。若要估計股票真實跌至目標價的機率，需額外考慮股票預期報酬率。但此值用於比較不同行權價的<strong>相對風險</strong>完全適合。'
+            ].join('<br>'),
+            side: 'top',
+            align: 'center'
+          }
+        }
+      ]
+    });
+    driverObj.drive();
+  };
+</script>
+
+</body>
+</html>

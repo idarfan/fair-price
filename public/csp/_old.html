@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>期權小學堂第三課 · Long Strangle 買入寬跨式</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #FAF3E8;
+  --page-bg:    #FFF9F2;
+  --panel-bg:   #FFFCF7;
+  --ink:        #2A1A0E;
+  --muted:      #7A6555;
+  --border:     #E2D4C2;
+  --gold:       #D4900A;
+  --gold-bg:    #FEF4D8;
+  --gold-bdr:   #E8B840;
+  --green:      #2E9E52;
+  --green-bg:   #E8F8EE;
+  --green-bdr:  #8ED4A8;
+  --red:        #D04040;
+  --red-bg:     #FDEAEA;
+  --red-bdr:    #F5AAAA;
+  --blue:       #3A70C0;
+  --blue-bg:    #EBF2FF;
+  --blue-bdr:   #9ABCE8;
+  --purple:     #7050C0;
+  --purple-bg:  #F0EAFF;
+  --r-lg: 16px;
+  --r-md: 10px;
+  --r-sm: 6px;
+}
+
+body {
+  background: var(--bg);
+  font-family: "PingFang TC", "Microsoft JhengHei", "Heiti TC", system-ui, sans-serif;
+  padding: 0; margin: 0;
+}
+
+.page {
+  background: var(--page-bg);
+  max-width: 100%; width: 100%;
+  padding: 32px 40px 36px;
+}
+
+.course-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--ink); color: #FFF9F0;
+  font-size: 12px; font-weight: 700;
+  padding: 5px 14px; border-radius: 100px;
+  letter-spacing: 1px; margin-bottom: 18px;
+}
+
+.page-title { font-size: 32px; font-weight: 900; color: var(--ink); line-height: 1.2; }
+.page-subtitle { font-size: 14px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+.page-desc { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+
+/* ── Contract box ── */
+.spread-box { display: flex; flex-direction: column; gap: 8px; min-width: 285px; }
+
+.spread-leg { border: 2px solid; border-radius: var(--r-md); padding: 10px 14px; }
+.spread-leg.put  { background: var(--blue-bg);  border-color: var(--blue-bdr); }
+.spread-leg.call { background: var(--green-bg); border-color: var(--green-bdr); }
+
+.leg-title { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+.leg-title.put  { color: var(--blue); }
+.leg-title.call { color: var(--green); }
+
+.leg-main { font-size: 17px; font-weight: 900; color: var(--ink); margin-bottom: 4px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.leg-sub  { font-size: 11px; color: var(--muted); }
+.leg-qty-row { display:flex; align-items:center; gap:5px; margin-top:7px; font-size:12px; font-weight:600; color:var(--muted); }
+
+.leg-input {
+  display: inline-block; width: 56px;
+  font-size: 18px; font-weight: 900; color: var(--ink);
+  border: none; border-bottom: 2.5px solid;
+  background: transparent; text-align: center;
+  padding: 0 2px; font-family: inherit;
+  -moz-appearance: textfield;
+}
+.leg-input::-webkit-inner-spin-button,
+.leg-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.spread-leg.put  .leg-input { border-color: var(--blue-bdr); }
+.spread-leg.call .leg-input { border-color: var(--green-bdr); }
+.leg-input:focus { outline: none; border-color: var(--gold); }
+
+.net-bar {
+  background: var(--red-bg); border: 1.5px solid var(--red-bdr);
+  border-radius: var(--r-sm); padding: 6px 14px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px; font-weight: 700;
+}
+.net-bar .nl { color: var(--muted); }
+.net-bar .nv { font-size: 15px; }
+.nv.debit  { color: var(--red); }
+.nv.credit { color: var(--green); }
+
+/* ── Panel grid ── */
+.panel {
+  background: var(--panel-bg); border: 2px solid var(--border);
+  border-radius: var(--r-lg); padding: 20px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+
+.tag-row { display: flex; align-items: center; justify-content: space-between; }
+
+.step-badge {
+  width: 26px; height: 26px; background: var(--ink); color: #FFFDF8;
+  border-radius: 100px; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; flex-shrink: 0;
+}
+
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 100px;
+}
+.pill-outline {
+  background: transparent; border: 1.5px solid;
+  font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+}
+.pill.setup,   .pill-outline.setup   { color: #7A6555; background: #F0E8DC; border-color: #C4B49A; }
+.pill.win,     .pill-outline.win     { color: var(--green);  background: var(--green-bg);  border-color: var(--green-bdr); }
+.pill.loss,    .pill-outline.loss    { color: var(--red);    background: var(--red-bg);    border-color: var(--red-bdr); }
+.pill.chart,   .pill-outline.chart   { color: var(--blue);   background: var(--blue-bg);   border-color: var(--blue-bdr); }
+.pill.bonus,   .pill-outline.bonus   { color: var(--purple); background: var(--purple-bg); border-color: #C0A8F0; }
+
+.ptitle { font-size: 18px; font-weight: 800; color: var(--ink); line-height: 1.35; }
+
+/* ── Leg visual (2-leg setup) ── */
+.legs-visual { display: flex; align-items: center; gap: 8px; }
+.leg-block { flex: 1; border-radius: var(--r-md); padding: 10px 12px; text-align: center; }
+.leg-block.put-block  { background: var(--blue-bg);  border: 1.5px solid var(--blue-bdr); }
+.leg-block.call-block { background: var(--green-bg); border: 1.5px solid var(--green-bdr); }
+.lb-action { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 3px; }
+.leg-block.put-block  .lb-action { color: var(--blue); }
+.leg-block.call-block .lb-action { color: var(--green); }
+.lb-strike { font-size: 20px; font-weight: 900; color: var(--ink); line-height: 1.1; }
+.lb-prem   { font-size: 12px; font-weight: 600; margin-top: 2px; color: var(--red); }
+.leg-arrow { font-size: 18px; color: var(--muted); flex-shrink: 0; }
+.leg-result {
+  flex: 0 0 auto; background: var(--red-bg);
+  border: 1.5px solid var(--red-bdr); border-radius: var(--r-md);
+  padding: 8px 12px; text-align: center;
+}
+.leg-result .lr-lbl { font-size: 9px; color: var(--muted); font-weight: 600; }
+.leg-result .lr-val { font-size: 16px; font-weight: 900; color: var(--red); }
+
+/* ── Zone bar ── */
+.zone-bar {
+  display: flex; border-radius: var(--r-md); overflow: hidden;
+  border: 1.5px solid var(--border); font-size: 11px; font-weight: 700; text-align: center;
+}
+.zone-bar .zb-seg {
+  padding: 8px 4px; display: flex; flex-direction: column;
+  align-items: center; gap: 2px;
+}
+.zb-seg.loss    { background: var(--red-bg);   color: var(--red);   }
+.zb-seg.profit  { background: var(--green-bg); color: var(--green); }
+.zb-label { font-size: 9px; font-weight: 600; color: inherit; white-space: nowrap; }
+.zb-val   { font-size: 13px; font-weight: 900; }
+
+/* ── Bullets ── */
+.bullets { display: flex; flex-direction: column; gap: 7px; }
+.bullet { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.bullet-num {
+  width: 20px; height: 20px; background: var(--gold-bg); border: 1.5px solid var(--gold-bdr);
+  border-radius: 100px; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 800; color: var(--gold); flex-shrink: 0; margin-top: 1px;
+}
+
+/* ── Stat pills ── */
+.stat-pills { display: grid; gap: 8px; }
+.stat-pills.cols-2 { grid-template-columns: 1fr 1fr; }
+.stat-pills.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.stat-pills.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.spill { background: #F5EFE6; border: 1.5px solid var(--border); border-radius: var(--r-md); padding: 8px 10px; }
+.spill .sl { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+.spill .sv { font-size: 15px; font-weight: 800; color: var(--ink); }
+.spill .sv.green  { color: var(--green); }
+.spill .sv.red    { color: var(--red); }
+.spill .sv.gold   { color: var(--gold); }
+.spill .sv.blue   { color: var(--blue); }
+
+/* ── Result box ── */
+.result-box {
+  border-radius: var(--r-md); padding: 10px 14px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.result-box.green { background: var(--green-bg); border: 1.5px solid var(--green-bdr); }
+.result-box.gold  { background: var(--gold-bg);  border: 1.5px solid var(--gold-bdr); }
+.result-box.red   { background: var(--red-bg);   border: 1.5px solid var(--red-bdr); }
+.rb-label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.rb-val   { font-size: 20px; font-weight: 900; }
+.rb-val.green { color: var(--green); }
+.rb-val.red   { color: var(--red); }
+
+/* ── Payoff stats ── */
+.payoff-stats { display: flex; flex-direction: column; gap: 7px; }
+.ps-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.ps-dot { width: 10px; height: 10px; border-radius: 100px; flex-shrink: 0; }
+.ps-dot.green { background: var(--green); }
+.ps-dot.gold  { background: var(--gold); }
+.ps-dot.red   { background: var(--red); }
+.ps-label { color: var(--muted); flex: 1; }
+.ps-val   { font-weight: 800; color: var(--ink); }
+.ps-val.green { color: var(--green); }
+.ps-val.gold  { color: var(--gold); }
+.ps-val.red   { color: var(--red); }
+
+/* ── Bonus panel ── */
+.bonus-panel {
+  background: var(--panel-bg); border: 2px solid var(--border);
+  border-radius: var(--r-lg); padding: 22px;
+}
+.bonus-body { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 16px; }
+
+/* ── Greeks grid ── */
+.greeks-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.greek-card { background: #F5EFE6; border: 1.5px solid var(--border); border-radius: var(--r-md); padding: 8px 10px; }
+.gc-name { font-size: 9px; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 4px; }
+.gc-val  { font-size: 14px; font-weight: 800; }
+.gc-val.green  { color: var(--green); }
+.gc-val.red    { color: var(--red); }
+.gc-val.gold   { color: var(--gold); }
+.gc-val.blue   { color: var(--blue); }
+.gc-desc { font-size: 10px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
+/* ── When-to-use ── */
+.when-list { display: flex; flex-direction: column; gap: 8px; }
+.when-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 12.5px; color: var(--muted); line-height: 1.5;
+  background: var(--purple-bg); border: 1px solid #C0A8F0;
+  border-radius: var(--r-sm); padding: 8px 10px;
+}
+.when-icon { font-size: 16px; flex-shrink: 0; margin-top: -1px; }
+
+.warning {
+  margin-top: 14px; background: #FFF8E8; border: 1.5px solid var(--gold-bdr);
+  border-radius: var(--r-sm); padding: 10px 14px;
+  font-size: 12px; color: #8A6000; line-height: 1.7; display: flex; gap: 8px;
+}
+
+/* ── Edit mode ── */
+#edit-btn {
+  position: fixed; bottom: 28px; right: 28px; z-index: 2000;
+  background: #2A1A0E; color: #FFF9F0; border: none;
+  border-radius: 100px; padding: 10px 20px;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  font-family: "PingFang TC","Microsoft JhengHei",sans-serif;
+  transition: background 0.15s, transform 0.1s;
+}
+#edit-btn:hover { background: #4A3020; transform: scale(1.03); }
+#edit-btn.active { background: #2E7040; }
+
+#edit-toolbar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #FFFCF7; border-top: 2px solid #E2D4C2;
+  padding: 10px 24px 12px; z-index: 1999;
+  display: flex; align-items: center; gap: 0;
+  box-shadow: 0 -4px 24px rgba(80,40,0,0.10);
+  transform: translateY(100%);
+  transition: transform 0.22s cubic-bezier(.4,0,.2,1);
+  font-family: "PingFang TC","Microsoft JhengHei",sans-serif;
+  flex-wrap: wrap; min-height: 56px;
+}
+#edit-toolbar.visible { transform: translateY(0); }
+.et-hint { font-size:13px; color:#A08878; padding:6px 0; font-style:italic; }
+.et-group { display:flex; align-items:center; gap:0; flex-wrap:wrap; width:100%; }
+.et-item { display:flex; flex-direction:column; gap:3px; padding:0 14px; }
+.et-label { font-size:10px; font-weight:600; color:#9A8878; letter-spacing:0.5px; text-transform:uppercase; }
+.et-divider { width:1px; height:36px; background:#E2D4C2; flex-shrink:0; }
+#et-font { font-size:13px; border:1.5px solid #E2D4C2; border-radius:6px; padding:4px 8px; background:white; color:#2A1A0E; cursor:pointer; font-family:inherit; }
+.et-size-ctrl { display:flex; align-items:center; gap:6px; }
+.et-btn-sm { width:24px; height:24px; border:1.5px solid #E2D4C2; border-radius:6px; background:white; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#2A1A0E; line-height:1; }
+.et-btn-sm:hover { background:#F5EFE6; }
+#et-size-val { font-size:14px; font-weight:700; min-width:28px; text-align:center; color:#2A1A0E; }
+.et-fmt-btn { width:30px; height:30px; border:1.5px solid #E2D4C2; border-radius:6px; background:white; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#2A1A0E; }
+.et-fmt-btn:hover { background:#F5EFE6; }
+.et-fmt-btn.on { background:#2A1A0E; color:white; border-color:#2A1A0E; }
+#et-color { width:36px; height:28px; border:1.5px solid #E2D4C2; border-radius:6px; padding:2px; cursor:pointer; background:white; }
+#et-lh { width:80px; accent-color:#D4900A; }
+.et-action-btn { font-size:12px; font-weight:600; padding:5px 12px; border:1.5px solid #E2D4C2; border-radius:6px; background:white; cursor:pointer; color:#2A1A0E; font-family:inherit; }
+.et-action-btn:hover { background:#F5EFE6; }
+.edit-mode .page *:hover { outline:1.5px dashed #E8B840; outline-offset:2px; border-radius:3px; }
+.edit-mode .page input[type="number"]:hover,
+.edit-mode .page input[type="number"]:focus { outline:none !important; pointer-events:auto !important; }
+.el-focus { outline:2px solid #3A70C0 !important; outline-offset:3px; border-radius:3px; }
+.edit-mode .page .el-focus * { outline:none !important; }
+
+/* ── Layout wrappers ── */
+.page-header-layout {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 20px; align-items: start; margin-bottom: 28px;
+}
+.panels-layout {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 16px; margin-bottom: 16px;
+}
+.page-header-text { display: flex; flex-direction: column; gap: 4px; }
+
+/* ── Drag system ── */
+#drag-canvas { position: relative !important; min-height: 3000px; overflow: visible; }
+[data-drag-id] { box-sizing: border-box; }
+.edit-mode [data-drag-id]:hover > .drag-handle,
+[data-drag-id].is-dragging > .drag-handle,
+[data-drag-id].is-resizing > .drag-handle { opacity: 1; }
+.drag-handle {
+  position: absolute; top: -15px; left: 0; right: 0; height: 13px;
+  background: linear-gradient(90deg, #3A70C0, #2255A0);
+  border-radius: 5px 5px 0 0; cursor: grab; opacity: 0;
+  transition: opacity 0.15s; display: flex; align-items: center;
+  justify-content: center; z-index: 200; user-select: none;
+}
+.drag-handle:active { cursor: grabbing; }
+.drag-handle::before { content: ':::'; font-size: 9px; font-weight: 900; color: rgba(255,255,255,0.85); letter-spacing: 4px; }
+.edit-mode [data-drag-id]:hover,
+[data-drag-id].is-dragging,
+[data-drag-id].is-resizing { outline: 2px dashed rgba(58,112,192,0.45); outline-offset: 3px; }
+.rh {
+  position: absolute; width: 10px; height: 10px;
+  background: #3A70C0; border: 2px solid #fff; border-radius: 2px;
+  opacity: 0; transition: opacity 0.15s; z-index: 201;
+}
+.edit-mode [data-drag-id]:hover .rh,
+[data-drag-id].is-resizing .rh { opacity: 1; }
+.rh-nw { top:-5px; left:-5px; cursor:nw-resize; }
+.rh-n  { top:-5px; left:50%; transform:translateX(-50%); cursor:n-resize; }
+.rh-ne { top:-5px; right:-5px; cursor:ne-resize; }
+.rh-e  { top:50%; right:-5px; transform:translateY(-50%); cursor:e-resize; }
+.rh-se { bottom:-5px; right:-5px; cursor:se-resize; }
+.rh-s  { bottom:-5px; left:50%; transform:translateX(-50%); cursor:s-resize; }
+.rh-sw { bottom:-5px; left:-5px; cursor:sw-resize; }
+.rh-w  { top:50%; left:-5px; transform:translateY(-50%); cursor:w-resize; }
+#layout-reset-btn {
+  position: fixed; bottom: 70px; right: 20px;
+  background: #FAF3E8; border: 1.5px solid #E2D4C2;
+  border-radius: 8px; padding: 7px 16px;
+  font-size: 12px; cursor: pointer; z-index: 10001;
+  color: #7A6555; font-family: inherit;
+  transition: background 0.15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+#layout-reset-btn:hover { background: #F0E4D0; }
+</style>
+</head>
+<body>
+<div class="page" id="drag-canvas">
+
+  <div data-drag-id="course-tag" class="course-tag">📚 期權小學堂 · 第3課</div>
+
+  <!-- ── Header ── -->
+  <div class="page-header-layout">
+  <div data-drag-id="header-text" class="page-header-text">
+    <div class="page-title">Long Strangle 買入寬跨式</div>
+    <div class="page-subtitle">Debit Strategy · 雙向押注 · 無限獲利、有限虧損</div>
+    <div class="page-desc">
+      同時買入 OTM Put 和 OTM Call，兩腿都在價外，成本比 Straddle 低 30–50%。<br>
+      但需要股票移動更大幅度才能獲利，Break-even 區間更寬。適合預期「超大波動」但預算有限的情況。
+    </div>
+  </div>
+
+  <!-- ── Interactive contract box ── -->
+  <div data-drag-id="spread-box" class="spread-box">
+    <div class="spread-leg put">
+      <div class="leg-title put">🔵 買入 · Long Put（下護腳）</div>
+      <div class="leg-main">
+        Strike&nbsp;$<input id="inp-ps-strike" class="leg-input" type="number" value="12" min="1" step="0.5" oninput="recalculate()">
+        &nbsp;付&nbsp;$<input id="inp-ps-prem" class="leg-input" type="number" value="1.00" min="0.01" step="0.05" oninput="recalculate()">
+      </div>
+      <div class="leg-sub">Delta −0.23 · IV 52% · Theta −0.8/日</div>
+      <div class="leg-qty-row">口數&nbsp;<input id="inp-ps-qty" class="leg-input" type="number" value="1" min="1" max="100" step="1" style="width:42px;font-size:14px;" oninput="recalculate()">&nbsp;口</div>
+    </div>
+    <div class="spread-leg call">
+      <div class="leg-title call">🟢 買入 · Long Call（上護腳）</div>
+      <div class="leg-main">
+        Strike&nbsp;$<input id="inp-cs-strike" class="leg-input" type="number" value="14" min="1" step="0.5" oninput="recalculate()">
+        &nbsp;付&nbsp;$<input id="inp-cs-prem" class="leg-input" type="number" value="0.95" min="0.01" step="0.05" oninput="recalculate()">
+      </div>
+      <div class="leg-sub">Delta +0.34 · IV 50% · Theta −0.9/日</div>
+      <div class="leg-qty-row">口數&nbsp;<input id="inp-cs-qty" class="leg-input" type="number" value="1" min="1" max="100" step="1" style="width:42px;font-size:14px;" oninput="recalculate()">&nbsp;口</div>
+    </div>
+    <div class="net-bar" style="flex-direction:column;align-items:stretch;gap:5px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span class="nl">每股成本</span>
+        <span class="nv debit" id="disp-net-val">−$1.95/股</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:4px;border-top:1px solid #F5AAAA;">
+        <span class="nl" id="disp-qty-label" style="font-size:11px;">總成本（Put 1口＋Call 1口）</span>
+        <span class="nv debit" id="disp-total-cost">−$195.00</span>
+      </div>
+    </div>
+  </div>
+  </div><!-- end header-layout -->
+
+  <!-- ── 4 Panels ── -->
+  <div class="panels-layout">
+
+  <!-- Panel 1: Setup -->
+  <div data-drag-id="panel-1" class="panel">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge">1</div>
+        <div class="pill-outline setup">STEP ONE</div>
+      </div>
+      <div class="pill setup">建倉</div>
+    </div>
+
+    <div class="ptitle">同時買入 OTM Put ＋ OTM Call<br>以較低成本押注超大波動</div>
+
+    <div class="legs-visual">
+      <div class="leg-block put-block">
+        <div class="lb-action">買入 BUY</div>
+        <div class="lb-strike" id="p1-ps-strike">Put $12</div>
+        <div class="lb-prem"   id="p1-ps-prem">付 −$1.00</div>
+      </div>
+      <div class="leg-arrow">➕</div>
+      <div class="leg-block call-block">
+        <div class="lb-action">買入 BUY</div>
+        <div class="lb-strike" id="p1-cs-strike">Call $14</div>
+        <div class="lb-prem"   id="p1-cs-prem">付 −$0.95</div>
+      </div>
+      <div class="leg-arrow">＝</div>
+      <div class="leg-result">
+        <div class="lr-lbl">每股</div>
+        <div class="lr-val" id="p1-net-val">−$1.95</div>
+        <div class="lr-lbl" style="margin-top:5px;font-size:8px;">合計</div>
+        <div class="lr-val" style="font-size:12px;" id="p1-total-val">−$195</div>
+      </div>
+    </div>
+
+    <div class="zone-bar">
+      <div class="zb-seg profit" style="flex:2.5;">
+        <div class="zb-label">Put 獲利 ↙</div>
+        <div class="zb-val" id="zb-put-profit">&lt;$10.05</div>
+        <div class="zb-label">大跌突破</div>
+      </div>
+      <div class="zb-seg loss" style="flex:4;">
+        <div class="zb-label">最大虧損</div>
+        <div class="zb-val" id="zb-loss-range">$10.05↔$15.95</div>
+        <div class="zb-label" id="zb-loss-pl">−$1.95/股</div>
+      </div>
+      <div class="zb-seg profit" style="flex:2.5;">
+        <div class="zb-label">↗ Call 獲利</div>
+        <div class="zb-val" id="zb-call-profit">&gt;$15.95</div>
+        <div class="zb-label">大漲突破</div>
+      </div>
+    </div>
+
+    <div class="bullets">
+      <div class="bullet"><div class="bullet-num">①</div><span id="p1-b1">買入 Long Put $12.00，付 $1.00/股。股價跌破 $10.05（下 Break-even）後開始獲利。</span></div>
+      <div class="bullet"><div class="bullet-num">②</div><span id="p1-b2">買入 Long Call $14.00，付 $0.95/股。股價突破 $15.95（上 Break-even）後開始獲利。</span></div>
+      <div class="bullet"><div class="bullet-num">③</div><span id="p1-b3">兩腿合計總成本 $1.95/股（$195/組），盈虧兩平走廊寬 $5.90，需大幅波動才能回本。</span></div>
+    </div>
+  </div>
+
+  <!-- Panel 2: Scenario A (Big Move Up) -->
+  <div data-drag-id="panel-2" class="panel">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge">2</div>
+        <div class="pill-outline win">SCENARIO A</div>
+      </div>
+      <div class="pill win">情境 A · 大漲突破 ☀️</div>
+    </div>
+
+    <div class="ptitle" id="p2-title">到期股價 &gt; $15.95 ☀️<br>Call 大漲，Put 廢棄，右側突破！</div>
+
+    <div style="margin:-4px 0 4px;font-size:14px;color:#888;">
+      到期目標股價 $<input id="inp-up-price" type="number" value="17" min="1" step="0.5"
+        style="width:60px;font-size:17px;font-weight:900;color:var(--ink);border:none;border-bottom:2.5px solid var(--green);background:transparent;text-align:center;-moz-appearance:textfield;"
+        oninput="recalculate()">
+    </div>
+
+    <div id="p2-svg-wrap" style="background:#F4FDF7;border:1.5px dashed var(--green-bdr);border-radius:var(--r-md);padding:12px 10px;"></div>
+
+    <div class="stat-pills cols-2">
+      <div class="spill"><div class="sl" id="p2-cs-lbl">Long Call $14（1口）</div><div class="sv green" id="p2-cs-val">行權獲利 +$3.00/股</div><div style="font-size:11px;font-weight:600;color:var(--green);" id="p2-cs-total">= +$300.00</div></div>
+      <div class="spill"><div class="sl" id="p2-ps-lbl">Long Put $12（1口）</div><div class="sv red" id="p2-ps-val">廢棄 −$1.00/股</div><div style="font-size:11px;font-weight:600;color:var(--red);" id="p2-ps-total">= −$100.00</div></div>
+    </div>
+
+    <div class="result-box green" id="p2-result-box">
+      <span class="rb-label">📋 損益</span>
+      <div style="text-align:right;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:3px;" id="p2-result-detail">+$1.05/股（每口 +$105）</div>
+        <div class="rb-val green" id="p2-result-val">合計 +$105.00</div>
+      </div>
+    </div>
+
+    <div style="font-size:12px;color:var(--muted);line-height:1.6;" id="p2-note">
+      ✅ Call 行權獲利遠超 Put 損失，整組淨賺。股價越高獲利越大，上方無限空間。
+    </div>
+  </div>
+
+  <!-- Panel 3: Scenario B (Big Move Down) -->
+  <div data-drag-id="panel-3" class="panel">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge">3</div>
+        <div class="pill-outline loss">SCENARIO B</div>
+      </div>
+      <div class="pill loss">情境 B · 大跌突破 📉</div>
+    </div>
+
+    <div class="ptitle" id="p3-title">到期股價 &lt; $10.05 🧊<br>Put 大漲，Call 廢棄，左側突破！</div>
+
+    <div style="margin:-4px 0 4px;font-size:14px;color:#888;">
+      到期目標股價 $<input id="inp-dn-price" type="number" value="9" min="0.5" step="0.5"
+        style="width:60px;font-size:17px;font-weight:900;color:var(--ink);border:none;border-bottom:2.5px solid var(--red);background:transparent;text-align:center;-moz-appearance:textfield;"
+        oninput="recalculate()">
+    </div>
+
+    <div id="p3-svg-wrap" style="background:#FFF8F8;border:1.5px dashed var(--red-bdr);border-radius:var(--r-md);padding:12px 10px;"></div>
+
+    <div class="stat-pills cols-2">
+      <div class="spill"><div class="sl" id="p3-ps-lbl">Long Put $12（1口）</div><div class="sv green" id="p3-ps-val">行權獲利 +$3.00/股</div><div style="font-size:11px;font-weight:600;color:var(--green);" id="p3-ps-total">= +$300.00</div></div>
+      <div class="spill"><div class="sl" id="p3-cs-lbl">Long Call $14（1口）</div><div class="sv red" id="p3-cs-val">廢棄 −$0.95/股</div><div style="font-size:11px;font-weight:600;color:var(--red);" id="p3-cs-total">= −$95.00</div></div>
+    </div>
+
+    <div class="stat-pills cols-3">
+      <div class="spill"><div class="sl">Put 行權收益</div><div class="sv green" id="p3-intrinsic">+$3.00/股</div></div>
+      <div class="spill"><div class="sl">含口數總成本</div><div class="sv red" id="p3-total-cost">−$195.00</div></div>
+      <div class="spill"><div class="sl">淨損益合計</div><div class="sv green" id="p3-net-pl">+$105.00</div></div>
+    </div>
+
+    <div class="result-box green" id="p3-result-box">
+      <span class="rb-label" id="p3-result-label">📋 股價 $9 淨損益</span>
+      <div style="text-align:right;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:3px;" id="p3-result-detail">+$1.05/股（每口 +$105）</div>
+        <div class="rb-val green" id="p3-result-val">合計 +$105.00</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 4: Payoff Chart -->
+  <div data-drag-id="panel-4" class="panel">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge">4</div>
+        <div class="pill-outline chart">PAYOFF CHART</div>
+      </div>
+      <div class="pill chart">損益圖 📊</div>
+    </div>
+
+    <div class="ptitle" style="font-size:16px;">
+      V 形損益圖——兩側無限獲利<br>
+      <span id="p4-detail" style="font-size:13px;font-weight:500;color:var(--muted)">最大虧損 −$1.95（中間地帶），突破兩側即獲利</span>
+    </div>
+
+    <div id="p4-svg-wrap"></div>
+
+    <div class="payoff-stats">
+      <div class="ps-row"><div class="ps-dot green"></div><span class="ps-label" id="p4-stat-a">Call 突破獲利（股價 &gt; $15.95）</span><span class="ps-val green" id="p4-stat-up">無限 ↗</span></div>
+      <div class="ps-row"><div class="ps-dot red"></div><span class="ps-label">最大虧損（股價在兩 Strike 之間）</span><div style="text-align:right;"><div class="ps-val red" id="p4-stat-loss">−$1.95/股</div><div style="font-size:11px;color:var(--red);font-weight:600;" id="p4-stat-loss-total">合計 −$195.00</div></div></div>
+      <div class="ps-row"><div class="ps-dot green"></div><span class="ps-label" id="p4-stat-b">Put 突破獲利（股價 &lt; $10.05）</span><span class="ps-val green" id="p4-stat-dn">無限 ↙</span></div>
+      <div class="ps-row"><div class="ps-dot gold"></div><span class="ps-label">損益兩平走廊寬度</span><span class="ps-val gold" id="p4-stat-corridor">$5.90</span></div>
+    </div>
+  </div>
+
+  </div><!-- end panels-layout -->
+
+  <!-- ── Bonus Panel 5 ── -->
+  <div data-drag-id="bonus-panel" class="bonus-panel">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge" style="background:var(--purple);">5</div>
+        <div class="pill-outline bonus">BONUS</div>
+      </div>
+      <div class="pill bonus">進階：何時用？ + Greeks 解讀 📐</div>
+    </div>
+
+    <div class="ptitle" style="margin-top:14px;" id="b5-title">中間情境（$12 &lt; 股價 &lt; $14）＝最大虧損＋策略判斷框架</div>
+    <div style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.65;">
+      股價收在兩 Strike 之間為最大虧損情境，Long Put 和 Long Call 均廢棄，損失全部 Premium。<br>
+      以下為 Greeks 淨值（Put + Call 合計）及何時適合使用此策略。
+    </div>
+
+    <div class="bonus-body">
+
+      <!-- Left: Greeks + mid example -->
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px;">📐 Greeks 淨值（整組策略）</div>
+        <div class="greeks-grid">
+          <div class="greek-card">
+            <div class="gc-name">Delta（方向性）</div>
+            <div class="gc-val gold">+0.11</div>
+            <div class="gc-desc">略偏多頭；股票上漲對你稍有利，但大方向性不明顯</div>
+          </div>
+          <div class="greek-card">
+            <div class="gc-name">Theta（時間損耗）</div>
+            <div class="gc-val red">−1.8/日</div>
+            <div class="gc-desc">每天損失 $1.8/股（$180/組），時間是最大敵人</div>
+          </div>
+          <div class="greek-card">
+            <div class="gc-name">Vega（波動率敏感度）</div>
+            <div class="gc-val green">正向</div>
+            <div class="gc-desc">IV 上升對你有利；事件前 IV 低時買入最佳</div>
+          </div>
+          <div class="greek-card">
+            <div class="gc-name">Gamma（加速度）</div>
+            <div class="gc-val green">正向</div>
+            <div class="gc-desc">股票大幅移動時 Delta 加速增加，放大你的獲利</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;background:var(--gold-bg);border:1.5px solid var(--gold-bdr);border-radius:var(--r-md);padding:12px;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <div style="font-size:11px;font-weight:700;color:var(--gold);letter-spacing:0.5px;">⚡ 到期損益模擬：股價 $</div>
+            <input id="inp-mid-price" type="number" value="13" min="1" step="0.5"
+              style="display:inline-block;width:56px;font-size:14px;font-weight:900;color:var(--ink);border:none;border-bottom:2px solid var(--gold);background:transparent;text-align:center;-moz-appearance:textfield;padding:0;"
+              oninput="recalculate()">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <div class="spill"><div class="sl" id="b5-ps-lbl">Long Put $12（1口）</div><div class="sv red" id="b5-ps-val">廢棄 −$1.00/股</div><div style="font-size:11px;font-weight:600;color:var(--red);" id="b5-ps-total">= −$100</div></div>
+            <div class="spill"><div class="sl" id="b5-cs-lbl">Long Call $14（1口）</div><div class="sv red" id="b5-cs-val">廢棄 −$0.95/股</div><div style="font-size:11px;font-weight:600;color:var(--red);" id="b5-cs-total">= −$95</div></div>
+            <div class="spill"><div class="sl">淨損益合計</div><div class="sv red" id="b5-net-val">−$195</div></div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px;" id="b5-desc">（股價在兩 Strike 之間：兩腿全廢，損失全部 Premium $1.95/股）</div>
+        </div>
+      </div>
+
+      <!-- Right: When to use + warning -->
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px;">🎯 何時使用 Long Strangle？</div>
+        <div class="when-list">
+          <div class="when-item"><span class="when-icon">📰</span><span><strong>重大事件前（ATM 太貴）：</strong>財報、FDA 審批、法院判決等，預期大波動但 Straddle 成本太高。</span></div>
+          <div class="when-item"><span class="when-icon">💸</span><span><strong>預算有限：</strong>比 Straddle 便宜 30–50%，以 OTM 換取較低成本，代價是需要更大幅度波動才能獲利。</span></div>
+          <div class="when-item"><span class="when-icon">📉</span><span><strong>IV 相對低時買入：</strong>事件前 IV 尚未完全定價時建倉，讓 Vega 也幫你賺錢（IV 上升時 Options 變貴）。</span></div>
+          <div class="when-item"><span class="when-icon">⚖️</span><span id="b5-when-4"><strong>方向傾向微調：</strong>買更多 OTM Put（看跌）或多一腿 Call（看漲），靈活調整方向性偏好。</span></div>
+        </div>
+        <div class="warning">⚠️ <span id="b5-warning">主要風險：①&nbsp;IV Crush——事件後 IV 暴跌（即使股票移動也可能虧損）；②&nbsp;Theta 衰減每日 $1.8/股；③&nbsp;OTM Delta 小，初期漲/跌對損益影響較 Straddle 弱；④&nbsp;需要移動超過 $<span id="b5-be-width">5.90</span> 才能回本，要求比 Straddle 高。建議事件前 1–2 週建倉，不要太早。</span></div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- end drag-canvas -->
+
+<!-- ══ EDIT MODE UI ════════════════════════════════════ -->
+<button id="edit-btn" onclick="toggleEditMode()" title="Ctrl+E">
+  <span id="edit-icon">✏️</span>
+  <span id="edit-label">編輯模式</span>
+</button>
+
+<div id="edit-toolbar">
+  <div class="et-hint" id="et-hint">← 點擊頁面任意文字開始編輯</div>
+  <div class="et-group" id="et-controls" style="display:none;">
+    <div class="et-item">
+      <div class="et-label">字體</div>
+      <select id="et-font" onchange="applyStyle('fontFamily', this.value)">
+        <option value='"PingFang TC","Microsoft JhengHei",sans-serif'>PingFang TC</option>
+        <option value='Georgia,"Times New Roman",serif'>Georgia (serif)</option>
+        <option value='system-ui,sans-serif'>System UI</option>
+        <option value='"Courier New",monospace'>等寬字體</option>
+      </select>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">大小</div>
+      <div class="et-size-ctrl">
+        <button class="et-btn-sm" onclick="adjustSize(-1)">−</button>
+        <span id="et-size-val">16</span>
+        <button class="et-btn-sm" onclick="adjustSize(1)">+</button>
+      </div>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button id="et-bold"   class="et-fmt-btn" onclick="toggleBold()"><b>B</b></button>
+      <button id="et-italic" class="et-fmt-btn" onclick="toggleItalic()"><i>I</i></button>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">顏色</div>
+      <input type="color" id="et-color" oninput="applyStyle('color', this.value)">
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">行距</div>
+      <input type="range" id="et-lh" min="1" max="3" step="0.05" value="1.4"
+             oninput="applyStyle('lineHeight', this.value); document.getElementById('et-lh-val').textContent = parseFloat(this.value).toFixed(1);">
+      <span id="et-lh-val" style="font-size:11px;min-width:22px;">1.4</span>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button class="et-action-btn" onclick="resetElement()">重設</button>
+      <button class="et-action-btn" id="et-copy-btn" onclick="copyHtml()">複製 HTML</button>
+      <button class="et-action-btn" onclick="clearSavedState()" style="color:#D04040;">🗑 重設</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   RECALCULATE
+   ══════════════════════════════════════════════════════ */
+function recalculate() {
+  var PS     = parseFloat(document.getElementById('inp-ps-strike').value);
+  var PS_p   = parseFloat(document.getElementById('inp-ps-prem').value);
+  var PS_qty = Math.max(1, parseInt(document.getElementById('inp-ps-qty').value) || 1);
+  var CS     = parseFloat(document.getElementById('inp-cs-strike').value);
+  var CS_p   = parseFloat(document.getElementById('inp-cs-prem').value);
+  var CS_qty = Math.max(1, parseInt(document.getElementById('inp-cs-qty').value) || 1);
+
+  if (isNaN(PS) || isNaN(PS_p) || isNaN(CS) || isNaN(CS_p)) return;
+  if (CS <= PS) return;
+
+  var totalCostDollar = +((PS_p * PS_qty + CS_p * CS_qty) * 100).toFixed(2);
+  var total  = +(PS_p + CS_p).toFixed(2);
+  var loBE   = +(PS - totalCostDollar / (PS_qty * 100)).toFixed(2);
+  var hiBE   = +(CS + totalCostDollar / (CS_qty * 100)).toFixed(2);
+  var beW    = +(hiBE - loBE).toFixed(2);
+  var SW     = +(CS - PS).toFixed(2);
+
+  function fmt(v) { return (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2); }
+
+  /* ── Contract box ── */
+  document.getElementById('disp-net-val').textContent = '-$' + total.toFixed(2) + '/股';
+  document.getElementById('disp-qty-label').textContent = '總成本（Put ' + PS_qty + '口＋Call ' + CS_qty + '口）';
+  document.getElementById('disp-total-cost').textContent = '−$' + totalCostDollar.toFixed(2);
+
+  /* ── Panel 1 ── */
+  document.getElementById('p1-ps-strike').textContent = 'Put $' + PS;
+  document.getElementById('p1-ps-prem').textContent   = '付 −$' + PS_p.toFixed(2);
+  document.getElementById('p1-cs-strike').textContent = 'Call $' + CS;
+  document.getElementById('p1-cs-prem').textContent   = '付 −$' + CS_p.toFixed(2);
+  document.getElementById('p1-net-val').textContent   = '-$' + total.toFixed(2);
+  document.getElementById('p1-total-val').textContent = '−$' + totalCostDollar.toFixed(0);
+
+  document.getElementById('zb-put-profit').textContent  = '<$' + loBE;
+  document.getElementById('zb-loss-range').textContent  = '$' + loBE + '↔$' + hiBE;
+  document.getElementById('zb-loss-pl').textContent     = '-$' + total.toFixed(2) + '/股';
+  document.getElementById('zb-call-profit').textContent = '>$' + hiBE;
+
+  document.getElementById('p1-b1').textContent = '買入 Long Put $' + PS + '.00，付 $' + PS_p.toFixed(2) + '/股。股價跌破 $' + loBE + '（下 Break-even）後開始獲利。';
+  document.getElementById('p1-b2').textContent = '買入 Long Call $' + CS + '.00，付 $' + CS_p.toFixed(2) + '/股。股價突破 $' + hiBE + '（上 Break-even）後開始獲利。';
+  document.getElementById('p1-b3').textContent = '兩腿合計總成本 $' + total.toFixed(2) + '/股（Put ' + PS_qty + '口＋Call ' + CS_qty + '口，合計 $' + totalCostDollar.toFixed(0) + '），損益兩平走廊寬 $' + beW + '，需大幅波動才能回本。';
+
+  /* ── Panel 2: Big move up ── */
+  var upEl  = document.getElementById('inp-up-price');
+  var upTgt = parseFloat(upEl.value);
+  if (isNaN(upTgt) || upTgt <= CS) { upTgt = +(CS + total + 1).toFixed(1); upEl.value = upTgt; }
+  var callPL2 = +(upTgt - CS - CS_p).toFixed(2);
+  var putPL2  = -PS_p;
+  var net2    = +(callPL2 + putPL2).toFixed(2);
+
+  document.getElementById('p2-title').innerHTML = '到期股價 &gt; $' + hiBE + ' ☀️<br>Call 大漲，Put 廢棄，右側突破！';
+  document.getElementById('p2-svg-wrap').innerHTML = genP2Svg(PS, CS, hiBE, upTgt);
+  var callPL2total = +(callPL2 * CS_qty * 100).toFixed(2);
+  var putPL2total  = +(putPL2 * PS_qty * 100).toFixed(2);
+  var net2total    = +(callPL2total + putPL2total).toFixed(2);
+  document.getElementById('p2-cs-lbl').textContent = 'Long Call $' + CS + '（' + CS_qty + '口）';
+  document.getElementById('p2-cs-val').textContent = (upTgt > CS ? '行權獲利 +$' + (upTgt - CS).toFixed(2) + '/股' : '廢棄');
+  document.getElementById('p2-cs-val').className   = 'sv ' + (upTgt > CS ? 'green' : 'red');
+  document.getElementById('p2-cs-total').textContent = (callPL2 >= 0 ? '= +$' : '= −$') + Math.abs(callPL2total).toFixed(2);
+  document.getElementById('p2-cs-total').style.color = callPL2 >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('p2-ps-lbl').textContent = 'Long Put $' + PS + '（' + PS_qty + '口）';
+  document.getElementById('p2-ps-val').textContent = '廢棄 −$' + PS_p.toFixed(2) + '/股';
+  document.getElementById('p2-ps-val').className   = 'sv red';
+  document.getElementById('p2-ps-total').textContent = '= −$' + Math.abs(putPL2total).toFixed(2);
+  document.getElementById('p2-ps-total').style.color = 'var(--red)';
+  document.getElementById('p2-result-detail').textContent = fmt(net2) + '/股（合計 ' + (net2total >= 0 ? '+$' : '−$') + Math.abs(net2total).toFixed(2) + '）';
+  document.getElementById('p2-result-val').textContent =
+    (upTgt > CS ? '+$' + (upTgt - CS).toFixed(2) : '$0') +
+    ' − $' + CS_p.toFixed(2) + ' − $' + PS_p.toFixed(2) + ' = ' + fmt(net2) + '/股';
+  document.getElementById('p2-result-val').className = 'rb-val ' + (net2 >= 0 ? 'green' : 'red');
+  document.getElementById('p2-note').innerHTML = net2 >= 0
+    ? '✅ Call 行權獲利超過兩腿 Premium 之和，整組淨賺 $' + net2.toFixed(2) + '/股（合計 +$' + Math.abs(net2total).toFixed(2) + '）。股價越高獲利越大，上方無限空間。'
+    : '⚠️ 股價 $' + upTgt + ' 尚未突破上 Break-even $' + hiBE + '，仍在虧損。需突破後才開始獲利。';
+
+  /* ── Panel 3: Big move down ── */
+  var dnEl  = document.getElementById('inp-dn-price');
+  var dnTgt = parseFloat(dnEl.value);
+  if (isNaN(dnTgt) || dnTgt >= PS) { dnTgt = +(PS - total - 1).toFixed(1); dnEl.value = dnTgt; }
+  dnTgt = Math.max(0.5, dnTgt);
+  var putPL3  = +(PS - dnTgt - PS_p).toFixed(2);
+  var callPL3 = -CS_p;
+  var net3    = +(putPL3 + callPL3).toFixed(2);
+  var intrinsic3 = +(PS - dnTgt).toFixed(2);
+
+  document.getElementById('p3-title').innerHTML = '到期股價 &lt; $' + loBE + ' 🧊<br>Put 大漲，Call 廢棄，左側突破！';
+  document.getElementById('p3-svg-wrap').innerHTML = genP3Svg(PS, CS, loBE, dnTgt);
+  var putPL3total  = +(putPL3 * PS_qty * 100).toFixed(2);
+  var callPL3total = +(callPL3 * CS_qty * 100).toFixed(2);
+  var net3total    = +(putPL3total + callPL3total).toFixed(2);
+  document.getElementById('p3-ps-lbl').textContent = 'Long Put $' + PS + '（' + PS_qty + '口）';
+  document.getElementById('p3-ps-val').textContent = (dnTgt < PS ? '行權獲利 +$' + intrinsic3.toFixed(2) + '/股' : '廢棄');
+  document.getElementById('p3-ps-val').className   = 'sv ' + (dnTgt < PS ? 'green' : 'red');
+  document.getElementById('p3-ps-total').textContent = (putPL3 >= 0 ? '= +$' : '= −$') + Math.abs(putPL3total).toFixed(2);
+  document.getElementById('p3-ps-total').style.color = putPL3 >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('p3-cs-lbl').textContent = 'Long Call $' + CS + '（' + CS_qty + '口）';
+  document.getElementById('p3-cs-val').textContent = '廢棄 −$' + CS_p.toFixed(2) + '/股';
+  document.getElementById('p3-cs-val').className   = 'sv red';
+  document.getElementById('p3-cs-total').textContent = '= −$' + Math.abs(callPL3total).toFixed(2);
+  document.getElementById('p3-cs-total').style.color = 'var(--red)';
+  document.getElementById('p3-intrinsic').textContent = '+$' + intrinsic3.toFixed(2) + '/股';
+  document.getElementById('p3-intrinsic').className   = intrinsic3 > 0 ? 'sv green' : 'sv red';
+  document.getElementById('p3-total-cost').textContent = '-$' + total.toFixed(2) + '/股';
+  document.getElementById('p3-net-pl').textContent = fmt(net3) + '/股';
+  document.getElementById('p3-net-pl').className   = 'sv ' + (net3 >= 0 ? 'green' : 'red');
+  document.getElementById('p3-result-detail').textContent = fmt(net3) + '/股（合計 ' + (net3total >= 0 ? '+$' : '−$') + Math.abs(net3total).toFixed(2) + '）';
+  document.getElementById('p3-result-label').textContent = '📋 股價 $' + dnTgt + ' 淨損益';
+  document.getElementById('p3-result-val').textContent   = fmt(net3) + ' ／ 股';
+  document.getElementById('p3-result-val').className     = 'rb-val ' + (net3 >= 0 ? 'green' : 'red');
+  document.getElementById('p3-result-box').className     = 'result-box ' + (net3 >= 0 ? 'green' : 'red');
+
+  /* ── Panel 4 ── */
+  document.getElementById('p4-svg-wrap').innerHTML = genP4Svg(PS, PS_p, CS, CS_p, total, loBE, hiBE);
+  document.getElementById('p4-detail').textContent = '最大虧損 -$' + total.toFixed(2) + '/股（合計 $' + totalCostDollar.toFixed(2) + '），兩 Break-even：$' + loBE + ' / $' + hiBE;
+  document.getElementById('p4-stat-a').textContent = 'Call 突破獲利（股價 > $' + hiBE + '）';
+  document.getElementById('p4-stat-b').textContent = 'Put 突破獲利（股價 < $' + loBE + '）';
+  document.getElementById('p4-stat-loss').textContent = '-$' + total.toFixed(2) + ' ／ 股';
+  document.getElementById('p4-stat-loss-total').textContent = '合計 −$' + totalCostDollar.toFixed(2);
+  document.getElementById('p4-stat-corridor').textContent = '$' + beW;
+
+  /* ── Bonus Panel 5 ── */
+  var midEl  = document.getElementById('inp-mid-price');
+  var exMid  = parseFloat(midEl.value);
+  if (isNaN(exMid) || exMid <= 0) exMid = +((PS + CS) / 2).toFixed(1);
+
+  var putPLm, callPLm, netPLm, psDesc, csDesc, b5Desc;
+  if (exMid >= CS) {
+    putPLm  = -PS_p;
+    callPLm = +(exMid - CS - CS_p).toFixed(2);
+    netPLm  = +(putPLm + callPLm).toFixed(2);
+    psDesc  = '廢棄 −$' + PS_p.toFixed(2) + '/股';
+    csDesc  = '行權 +$' + (exMid - CS).toFixed(2) + ' − $' + CS_p.toFixed(2) + ' = ' + fmt(callPLm) + '/股';
+    b5Desc  = '（股價 ≥ $' + CS + '：Call 行權獲利 ' + fmt(callPLm) + '，Put 廢棄 -$' + PS_p.toFixed(2) + '；合計 ' + fmt(netPLm) + '/股）';
+  } else if (exMid <= PS) {
+    putPLm  = +(PS - exMid - PS_p).toFixed(2);
+    callPLm = -CS_p;
+    netPLm  = +(putPLm + callPLm).toFixed(2);
+    psDesc  = '行權 +$' + (PS - exMid).toFixed(2) + ' − $' + PS_p.toFixed(2) + ' = ' + fmt(putPLm) + '/股';
+    csDesc  = '廢棄 −$' + CS_p.toFixed(2) + '/股';
+    b5Desc  = '（股價 ≤ $' + PS + '：Put 行權獲利 ' + fmt(putPLm) + '，Call 廢棄 -$' + CS_p.toFixed(2) + '；合計 ' + fmt(netPLm) + '/股）';
+  } else {
+    putPLm  = -PS_p;
+    callPLm = -CS_p;
+    netPLm  = -total;
+    psDesc  = '廢棄 −$' + PS_p.toFixed(2) + '/股';
+    csDesc  = '廢棄 −$' + CS_p.toFixed(2) + '/股';
+    b5Desc  = '（股價在 $' + PS + '–$' + CS + ' 之間：兩腿全廢，損失全部 Premium -$' + total.toFixed(2) + '/股）';
+  }
+
+  document.getElementById('b5-title').innerHTML = '模擬到期損益（股價 $' + exMid + '）＋策略判斷框架';
+  var putPLmTotal  = +(putPLm * PS_qty * 100).toFixed(2);
+  var callPLmTotal = +(callPLm * CS_qty * 100).toFixed(2);
+  var netPLmTotal  = +(putPLmTotal + callPLmTotal).toFixed(2);
+  document.getElementById('b5-ps-lbl').textContent  = 'Long Put $' + PS + '（' + PS_qty + '口）';
+  document.getElementById('b5-ps-val').textContent  = psDesc;
+  document.getElementById('b5-ps-val').className    = 'sv ' + (putPLm >= 0 ? 'green' : 'red');
+  document.getElementById('b5-ps-total').textContent = (putPLm >= 0 ? '= +$' : '= −$') + Math.abs(putPLmTotal).toFixed(2);
+  document.getElementById('b5-ps-total').style.color = putPLm >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('b5-cs-lbl').textContent  = 'Long Call $' + CS + '（' + CS_qty + '口）';
+  document.getElementById('b5-cs-val').textContent  = csDesc;
+  document.getElementById('b5-cs-val').className    = 'sv ' + (callPLm >= 0 ? 'green' : 'red');
+  document.getElementById('b5-cs-total').textContent = (callPLm >= 0 ? '= +$' : '= −$') + Math.abs(callPLmTotal).toFixed(2);
+  document.getElementById('b5-cs-total').style.color = callPLm >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('b5-net-val').textContent = fmt(netPLm) + '/股（合計 ' + (netPLmTotal >= 0 ? '+$' : '−$') + Math.abs(netPLmTotal).toFixed(2) + '）';
+  document.getElementById('b5-net-val').className   = 'sv ' + (netPLm >= 0 ? 'green' : 'red');
+  document.getElementById('b5-desc').textContent    = b5Desc;
+  document.getElementById('b5-be-width').textContent = beW;
+  document.getElementById('b5-warning').innerHTML   = '主要風險：①&nbsp;IV Crush——事件後 IV 暴跌（即使股票移動也可能虧損）；②&nbsp;Theta 衰減每日 $' + (PS_p * 0.8 + CS_p * 0.9).toFixed(1) + '/股；③&nbsp;OTM Delta 小，初期漲/跌對損益影響較 Straddle 弱；④&nbsp;需要移動超過 $<span id="b5-be-width">' + beW + '</span> 才能回本，要求比 Straddle 高。建議事件前 1–2 週建倉，不要太早。';
+
+  saveInputs();
+}
+
+/* ══ SVG Generators ══════════════════════════════════ */
+
+function genP2Svg(PS, CS, hiBE, upTgt) {
+  return '<svg width="100%" viewBox="0 0 260 96" style="display:block;overflow:visible;">'
+    + '<defs><marker id="a2A" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">'
+    + '<path d="M1 1.5L8 5L1 8.5" fill="none" stroke="#AAAAAA" stroke-width="1.5" stroke-linecap="round"/></marker></defs>'
+    + '<line x1="28" y1="5" x2="28" y2="88" stroke="#CCCCCC" stroke-width="1.2" marker-end="url(#a2A)"/>'
+    + '<line x1="28" y1="84" x2="255" y2="84" stroke="#CCCCCC" stroke-width="1.2" marker-end="url(#a2A)"/>'
+    + '<line x1="28" y1="62" x2="250" y2="62" stroke="#3A70C0" stroke-width="1" stroke-dasharray="4,3"/>'
+    + '<text x="30" y="58" font-size="9.5" fill="#3A70C0" font-family="sans-serif" font-weight="700">Put $' + PS + ' (OTM 廢棄)</text>'
+    + '<line x1="28" y1="40" x2="250" y2="40" stroke="#2E9E52" stroke-width="1" stroke-dasharray="3,3"/>'
+    + '<text x="30" y="36" font-size="9.5" fill="#2E9E52" font-family="sans-serif" font-weight="700">Call $' + CS + ' → 行權獲利</text>'
+    + '<polyline points="28,68 60,60 95,50 130,40 175,28 215,18 248,10" fill="none" stroke="#2E9E52" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    + '<circle cx="248" cy="10" r="10" fill="#FEF4D8" stroke="#E8B840" stroke-width="1.5"/>'
+    + '<text x="248" y="14" font-size="11" text-anchor="middle" dominant-baseline="central">☀️</text>'
+    + '<text x="178" y="14" font-size="9.5" fill="#2E9E52" font-family="sans-serif" font-weight="700">到期 $' + upTgt + '</text>'
+    + '<text x="3" y="87" font-size="9" fill="#AAAAAA" font-family="sans-serif">今天</text>'
+    + '<text x="208" y="93" font-size="9" fill="#AAAAAA" font-family="sans-serif">到期日</text>'
+    + '</svg>';
+}
+
+function genP3Svg(PS, CS, loBE, dnTgt) {
+  return '<svg width="100%" viewBox="0 0 260 96" style="display:block;overflow:visible;">'
+    + '<defs><marker id="a3A" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">'
+    + '<path d="M1 1.5L8 5L1 8.5" fill="none" stroke="#AAAAAA" stroke-width="1.5" stroke-linecap="round"/></marker></defs>'
+    + '<line x1="28" y1="5" x2="28" y2="88" stroke="#CCCCCC" stroke-width="1.2" marker-end="url(#a3A)"/>'
+    + '<line x1="28" y1="84" x2="255" y2="84" stroke="#CCCCCC" stroke-width="1.2" marker-end="url(#a3A)"/>'
+    + '<line x1="28" y1="28" x2="250" y2="28" stroke="#3A70C0" stroke-width="1.5" stroke-dasharray="3,3"/>'
+    + '<text x="30" y="23" font-size="9.5" fill="#3A70C0" font-family="sans-serif" font-weight="700">Put $' + PS + ' → 行權獲利 🎯</text>'
+    + '<line x1="28" y1="52" x2="250" y2="52" stroke="#2E9E52" stroke-width="1" stroke-dasharray="3,3"/>'
+    + '<text x="30" y="47" font-size="9.5" fill="#2E9E52" font-family="sans-serif" font-weight="700">Call $' + CS + ' (OTM 廢棄)</text>'
+    + '<polyline points="28,18 65,22 100,30 145,48 185,62 220,70 250,74" fill="none" stroke="#D04040" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    + '<text x="30" y="82" font-size="9" fill="#D04040" font-family="sans-serif" font-weight="700">到期 $' + dnTgt + '</text>'
+    + '<text x="3" y="87" font-size="9" fill="#AAAAAA" font-family="sans-serif">今天</text>'
+    + '<text x="208" y="93" font-size="9" fill="#AAAAAA" font-family="sans-serif">到期日</text>'
+    + '</svg>';
+}
+
+function genP4Svg(PS, PS_p, CS, CS_p, total, loBE, hiBE) {
+  var VW = 300, VH = 158;
+  var xL = 44, xR = 285;
+  var yTop = 14, yBase = 132;
+
+  var margin = Math.max(+(total * 1.05).toFixed(2), 1.5);
+  var pMin   = +(loBE - margin).toFixed(2);
+  var pMax   = +(hiBE + margin).toFixed(2);
+  var pRange = pMax - pMin;
+  var xPx    = xR - xL;
+
+  var maxVis  = margin;
+  var totVis  = maxVis + total;
+  var yPx     = yBase - yTop;
+  var zeroY   = +(yTop + (maxVis / totVis) * yPx).toFixed(1);
+  var maxLossY= +(yTop + ((maxVis + total) / totVis) * yPx).toFixed(1);
+  var profTopY= yTop;
+
+  function px(p) { return +(xL + (p - pMin) / pRange * xPx).toFixed(1); }
+
+  var xLoBE  = px(loBE);
+  var xHiBE  = px(hiBE);
+  var xPS    = px(PS);
+  var xCS    = px(CS);
+  var xPMin  = px(pMin);
+  var xPMax  = px(pMax);
+  var xMid   = px((PS + CS) / 2);
+
+  /* ── zone fills ── */
+  var lossZone = '<polygon points="'
+    + xLoBE + ',' + zeroY + ' '
+    + xPS   + ',' + maxLossY + ' '
+    + xCS   + ',' + maxLossY + ' '
+    + xHiBE + ',' + zeroY
+    + '" fill="#D04040" opacity="0.10"/>';
+  var leftGreen = '<polygon points="'
+    + xPMin + ',' + zeroY + ' '
+    + xPMin + ',' + profTopY + ' '
+    + xLoBE + ',' + zeroY
+    + '" fill="#2E9E52" opacity="0.10"/>';
+  var rightGreen = '<polygon points="'
+    + xHiBE + ',' + zeroY + ' '
+    + xPMax + ',' + profTopY + ' '
+    + xPMax + ',' + zeroY
+    + '" fill="#2E9E52" opacity="0.10"/>';
+
+  /* ── payoff line ── */
+  var pts = xPMin + ',' + profTopY + ' '
+    + xLoBE + ',' + zeroY + ' '
+    + xPS   + ',' + maxLossY + ' '
+    + xCS   + ',' + maxLossY + ' '
+    + xHiBE + ',' + zeroY + ' '
+    + xPMax + ',' + profTopY;
+
+  /* ── axis labels ── */
+  var p1 = +(pMin + pRange * 0.15).toFixed(2);
+  var p2 = +(pMin + pRange * 0.85).toFixed(2);
+
+  return '<svg width="100%" viewBox="0 0 ' + VW + ' ' + VH + '" style="display:block;overflow:visible;">'
+    + '<defs>'
+    + '<marker id="p4axLS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M1 1.5L8 5L1 8.5" fill="none" stroke="#888" stroke-width="1.5" stroke-linecap="round"/></marker>'
+    + '<marker id="p4ayLS" viewBox="0 0 10 10" refX="5" refY="9" markerWidth="5" markerHeight="5" orient="auto"><path d="M1 9L5 1L9 9" fill="none" stroke="#888" stroke-width="1.5" stroke-linecap="round"/></marker>'
+    + '</defs>'
+    + lossZone + leftGreen + rightGreen
+    /* axes */
+    + '<line x1="' + xL + '" y1="' + (VH - 18) + '" x2="' + xR + '" y2="' + (VH - 18) + '" stroke="#AAAAAA" stroke-width="1.5" marker-end="url(#p4axLS)"/>'
+    + '<line x1="' + xL + '" y1="' + (VH - 15) + '" x2="' + xL + '" y2="10" stroke="#AAAAAA" stroke-width="1.5" marker-end="url(#p4ayLS)"/>'
+    /* zero line */
+    + '<line x1="' + xL + '" y1="' + zeroY + '" x2="' + xR + '" y2="' + zeroY + '" stroke="#CCCCCC" stroke-width="1" stroke-dasharray="4,3"/>'
+    /* strike dashes */
+    + '<line x1="' + xPS + '" y1="' + yTop + '" x2="' + xPS + '" y2="' + maxLossY + '" stroke="#3A70C0" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>'
+    + '<line x1="' + xCS + '" y1="' + yTop + '" x2="' + xCS + '" y2="' + maxLossY + '" stroke="#2E9E52" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>'
+    /* payoff polyline */
+    + '<polyline points="' + pts + '" fill="none" stroke="#2A1A0E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    /* BE dots */
+    + '<circle cx="' + xLoBE + '" cy="' + zeroY + '" r="4.5" fill="#D4900A" stroke="#FFF9F2" stroke-width="1.5"/>'
+    + '<circle cx="' + xHiBE + '" cy="' + zeroY + '" r="4.5" fill="#D4900A" stroke="#FFF9F2" stroke-width="1.5"/>'
+    /* max loss dot */
+    + '<circle cx="' + xMid + '" cy="' + maxLossY + '" r="4.5" fill="#D04040" stroke="#FFF9F2" stroke-width="1.5"/>'
+    /* kink dots at strikes */
+    + '<circle cx="' + xPS + '" cy="' + maxLossY + '" r="3.5" fill="#3A70C0" stroke="#FFF9F2" stroke-width="1.5"/>'
+    + '<circle cx="' + xCS + '" cy="' + maxLossY + '" r="3.5" fill="#2E9E52" stroke="#FFF9F2" stroke-width="1.5"/>'
+    /* profit arrows */
+    + '<text x="' + (+xPMin + 4) + '" y="' + (+profTopY + 12) + '" font-size="9" fill="#2E9E52" font-family="sans-serif" font-weight="700">↙ 無限</text>'
+    + '<text x="' + (+xPMax - 38) + '" y="' + (+profTopY + 12) + '" font-size="9" fill="#2E9E52" font-family="sans-serif" font-weight="700">無限 ↗</text>'
+    /* labels BE */
+    + '<text x="' + xLoBE + '" y="' + (+zeroY - 6) + '" font-size="8.5" fill="#D4900A" text-anchor="middle" font-family="sans-serif" font-weight="700">$' + loBE + ' BE</text>'
+    + '<text x="' + xHiBE + '" y="' + (+zeroY - 6) + '" font-size="8.5" fill="#D4900A" text-anchor="middle" font-family="sans-serif" font-weight="700">$' + hiBE + ' BE</text>'
+    /* max loss label */
+    + '<text x="' + xMid + '" y="' + (+maxLossY + 12) + '" font-size="8.5" fill="#D04040" text-anchor="middle" font-family="sans-serif" font-weight="700">最大虧損 −$' + total.toFixed(2) + '</text>'
+    /* strike labels */
+    + '<text x="' + xPS + '" y="' + (VH - 4) + '" font-size="8.5" fill="#3A70C0" text-anchor="middle" font-family="sans-serif" font-weight="700">Put $' + PS + '</text>'
+    + '<text x="' + xCS + '" y="' + (VH - 4) + '" font-size="8.5" fill="#2E9E52" text-anchor="middle" font-family="sans-serif" font-weight="700">Call $' + CS + '</text>'
+    /* axis labels */
+    + '<text x="' + (+xL - 2) + '" y="' + (+zeroY + 4) + '" font-size="8" fill="#AAAAAA" text-anchor="end" font-family="sans-serif">$0</text>'
+    + '<text x="' + (+xL - 2) + '" y="' + (+maxLossY + 4) + '" font-size="8" fill="#D04040" text-anchor="end" font-family="sans-serif">−$' + total.toFixed(2) + '</text>'
+    + '<text x="' + px(p1) + '" y="' + (VH - 4) + '" font-size="8.5" fill="#AAAAAA" text-anchor="middle" font-family="sans-serif">$' + p1 + '</text>'
+    + '<text x="' + px(p2) + '" y="' + (VH - 4) + '" font-size="8.5" fill="#AAAAAA" text-anchor="middle" font-family="sans-serif">$' + p2 + '</text>'
+    + '</svg>';
+}
+
+/* ── Persistence ── */
+var LSKEY = 'ls-state-v1';
+var LSINPUTS = ['inp-ps-strike','inp-ps-prem','inp-ps-qty','inp-cs-strike','inp-cs-prem','inp-cs-qty','inp-up-price','inp-dn-price','inp-mid-price'];
+
+function saveInputs() {
+  try {
+    var s = JSON.parse(localStorage.getItem(LSKEY) || '{}');
+    LSINPUTS.forEach(function(id) { var el = document.getElementById(id); if (el) s['i:' + id] = el.value; });
+    localStorage.setItem(LSKEY, JSON.stringify(s));
+  } catch(e) {}
+}
+function restoreInputs() {
+  try {
+    var s = JSON.parse(localStorage.getItem(LSKEY) || '{}');
+    LSINPUTS.forEach(function(id) { var v = s['i:' + id]; if (v !== undefined) { var el = document.getElementById(id); if (el) el.value = v; } });
+  } catch(e) {}
+}
+function saveTextEdit(el) {
+  if (!el || !el.id) return;
+  try {
+    var s = JSON.parse(localStorage.getItem(LSKEY) || '{}');
+    s['t:' + el.id] = { html: el.innerHTML, style: el.getAttribute('style') || '' };
+    localStorage.setItem(LSKEY, JSON.stringify(s));
+  } catch(e) {}
+}
+function restoreTextEdits() {
+  try {
+    var s = JSON.parse(localStorage.getItem(LSKEY) || '{}');
+    Object.keys(s).forEach(function(k) {
+      if (k.indexOf('t:') !== 0) return;
+      var el = document.getElementById(k.slice(2));
+      if (!el) return;
+      if (s[k].html !== undefined) el.innerHTML = s[k].html;
+      if (s[k].style) el.setAttribute('style', s[k].style);
+    });
+  } catch(e) {}
+}
+window.clearSavedState = function() { localStorage.removeItem(LSKEY); location.reload(); };
+
+window.addEventListener('load', function() { restoreInputs(); recalculate(); restoreTextEdits(); });
+
+/* ══ EDIT MODE ══════════════════════════════════════ */
+(function() {
+  var editMode = false;
+  var focused = null;
+  var originalStyles = new WeakMap();
+
+  window.toggleEditMode = function() {
+    editMode = !editMode;
+    document.body.classList.toggle('edit-mode', editMode);
+    document.getElementById('edit-btn').classList.toggle('active', editMode);
+    document.getElementById('edit-label').textContent = editMode ? '退出編輯' : '編輯模式';
+    document.getElementById('edit-icon').textContent  = editMode ? '✕' : '✏️';
+    document.getElementById('edit-toolbar').classList.toggle('visible', editMode);
+    if (!editMode) blurCurrent();
+  };
+
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); window.toggleEditMode(); }
+    if (e.key === 'Escape' && editMode) blurCurrent();
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!editMode) return;
+    var btn = document.getElementById('edit-btn');
+    var tb  = document.getElementById('edit-toolbar');
+    if (btn.contains(e.target) || tb.contains(e.target)) return;
+    if (e.target.tagName === 'INPUT') return;
+    blurCurrent();
+    var el = e.target;
+    var allowed = ['div','p','span','h1','h2','h3','h4','label','td','th','li','small','b','strong'];
+    while (el && el !== document.body) {
+      if (allowed.indexOf(el.tagName.toLowerCase()) !== -1) break;
+      el = el.parentElement;
+    }
+    if (!el || el === document.body) return;
+    if (el.querySelector('input[type="number"]')) return;
+    if (el.closest && el.closest('[id^="inp-"]')) return;
+    focused = el;
+    if (!originalStyles.has(el)) originalStyles.set(el, el.getAttribute('style') || '');
+    el.contentEditable = 'true';
+    el.classList.add('el-focus');
+    el.focus();
+    updateToolbar(el);
+    document.getElementById('et-hint').style.display = 'none';
+    document.getElementById('et-controls').style.display = 'flex';
+  });
+
+  function blurCurrent() {
+    if (focused) {
+      saveTextEdit(focused);
+      focused.contentEditable = 'false';
+      focused.classList.remove('el-focus');
+      focused = null;
+      document.getElementById('et-hint').style.display = '';
+      document.getElementById('et-controls').style.display = 'none';
+    }
+  }
+
+  function updateToolbar(el) {
+    var cs = window.getComputedStyle(el);
+    var ff = (el.style.fontFamily || cs.fontFamily || '').replace(/"/g,'');
+    var sel = document.getElementById('et-font');
+    var matched = false;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value.replace(/"/g,'').split(',')[0].trim() === ff.split(',')[0].trim()) { sel.selectedIndex = i; matched = true; break; }
+    }
+    if (!matched) sel.selectedIndex = 0;
+    var fs = parseFloat(cs.fontSize) || 14;
+    document.getElementById('et-size-val').textContent = Math.round(fs);
+    document.getElementById('et-bold').classList.toggle('on', parseInt(cs.fontWeight) >= 600);
+    document.getElementById('et-italic').classList.toggle('on', cs.fontStyle === 'italic');
+    document.getElementById('et-color').value = rgbToHex(cs.color);
+    var lhRaw = cs.lineHeight;
+    var lhNum = lhRaw === 'normal' ? 1.4 : parseFloat(lhRaw) / fs;
+    var lhSlider = document.getElementById('et-lh');
+    lhSlider.value = isNaN(lhNum) ? 1.4 : Math.min(3, Math.max(1, lhNum));
+    document.getElementById('et-lh-val').textContent = parseFloat(lhSlider.value).toFixed(1);
+  }
+
+  window.applyStyle  = function(prop, val) { if (focused) focused.style[prop] = val; };
+  window.adjustSize  = function(delta) {
+    if (!focused) return;
+    var cur = Math.round(parseFloat(window.getComputedStyle(focused).fontSize) || 14);
+    var next = Math.max(8, Math.min(72, cur + delta));
+    focused.style.fontSize = next + 'px';
+    document.getElementById('et-size-val').textContent = next;
+  };
+  window.toggleBold  = function() {
+    if (!focused) return;
+    var isBold = parseInt(window.getComputedStyle(focused).fontWeight) >= 600;
+    focused.style.fontWeight = isBold ? '400' : '800';
+    document.getElementById('et-bold').classList.toggle('on', !isBold);
+  };
+  window.toggleItalic = function() {
+    if (!focused) return;
+    var isItalic = window.getComputedStyle(focused).fontStyle === 'italic';
+    focused.style.fontStyle = isItalic ? 'normal' : 'italic';
+    document.getElementById('et-italic').classList.toggle('on', !isItalic);
+  };
+  window.resetElement = function() {
+    if (!focused) return;
+    focused.style.cssText = originalStyles.get(focused) || '';
+    updateToolbar(focused);
+  };
+  window.copyHtml = function() {
+    var html = document.querySelector('.page').outerHTML;
+    navigator.clipboard.writeText(html).then(function() {
+      var btn = document.getElementById('et-copy-btn');
+      btn.textContent = '已複製 ✓';
+      setTimeout(function() { btn.textContent = '複製 HTML'; }, 2000);
+    });
+  };
+  function rgbToHex(rgb) {
+    var m = rgb.match(/\d+/g);
+    if (!m || m.length < 3) return '#000000';
+    return '#' + [m[0],m[1],m[2]].map(function(x) { return ('0' + parseInt(x).toString(16)).slice(-2); }).join('');
+  }
+})();
+
+/* ══ DRAG & RESIZE SYSTEM ══════════════════════════ */
+(function() {
+  var LAYOUT_KEY = 'ls-layout-v1';
+  var canvas = null;
+  var dragging = null, resizing = null;
+  var dragOX = 0, dragOY = 0;
+  var rzS = {};
+
+  function getSaved() { try { return JSON.parse(localStorage.getItem(LAYOUT_KEY) || 'null'); } catch(e) { return null; } }
+  function putSaved(s) { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(s)); } catch(e) {} }
+  function saveItem(id, x, y, w, h) {
+    var s = getSaved() || {};
+    s[id] = { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: h ? Math.round(h) : null };
+    putSaved(s);
+  }
+  function applyPos(el, x, y, w, h) {
+    el.style.position = 'absolute';
+    el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.width = w + 'px';
+    if (h) el.style.minHeight = h + 'px';
+  }
+  function addHandles(el) {
+    var dh = document.createElement('div');
+    dh.className = 'drag-handle';
+    el.insertBefore(dh, el.firstChild);
+    dh.addEventListener('mousedown', function(e) {
+      if (!document.body.classList.contains('edit-mode')) return;
+      e.preventDefault(); e.stopPropagation();
+      dragging = el;
+      var r = el.getBoundingClientRect();
+      dragOX = e.clientX - r.left; dragOY = e.clientY - r.top;
+      el.classList.add('is-dragging'); el.style.zIndex = '1000';
+    });
+    ['nw','n','ne','e','se','s','sw','w'].forEach(function(dir) {
+      var rh = document.createElement('div');
+      rh.className = 'rh rh-' + dir;
+      el.appendChild(rh);
+      rh.addEventListener('mousedown', function(e) {
+        if (!document.body.classList.contains('edit-mode')) return;
+        e.preventDefault(); e.stopPropagation();
+        resizing = { el: el, dir: dir };
+        rzS = { mx: e.clientX, my: e.clientY, w: el.offsetWidth, h: el.offsetHeight, l: parseFloat(el.style.left)||0, t: parseFloat(el.style.top)||0 };
+        el.classList.add('is-resizing'); el.style.zIndex = '1000';
+      });
+    });
+  }
+  document.addEventListener('mousemove', function(e) {
+    if (dragging) {
+      var cr = canvas.getBoundingClientRect();
+      var x = Math.max(0, e.clientX - cr.left - dragOX);
+      var y = Math.max(0, e.clientY - cr.top  - dragOY);
+      dragging.style.left = x + 'px'; dragging.style.top = y + 'px';
+      var bottom = y + dragging.offsetHeight;
+      var curMin = parseInt(canvas.style.minHeight) || 3000;
+      if (bottom + 100 > curMin) canvas.style.minHeight = (bottom + 300) + 'px';
+    }
+    if (resizing) {
+      var el = resizing.el, dir = resizing.dir;
+      var dx = e.clientX - rzS.mx, dy = e.clientY - rzS.my;
+      var w = rzS.w, h = rzS.h, l = rzS.l, t = rzS.t;
+      if (dir.indexOf('e') >= 0) w = Math.max(180, rzS.w + dx);
+      if (dir.indexOf('w') >= 0) { w = Math.max(180, rzS.w - dx); l = rzS.l + (rzS.w - w); }
+      if (dir.indexOf('s') >= 0) h = Math.max(80, rzS.h + dy);
+      if (dir.indexOf('n') >= 0) { h = Math.max(80, rzS.h - dy); t = rzS.t + (rzS.h - h); }
+      el.style.width = w + 'px'; el.style.minHeight = h + 'px'; el.style.left = l + 'px'; el.style.top = t + 'px';
+    }
+  });
+  document.addEventListener('mouseup', function() {
+    if (dragging) {
+      dragging.classList.remove('is-dragging'); dragging.style.zIndex = '';
+      saveItem(dragging.dataset.dragId, parseFloat(dragging.style.left)||0, parseFloat(dragging.style.top)||0, dragging.offsetWidth, null);
+      dragging = null;
+    }
+    if (resizing) {
+      var el = resizing.el; el.classList.remove('is-resizing'); el.style.zIndex = '';
+      saveItem(el.dataset.dragId, parseFloat(el.style.left)||0, parseFloat(el.style.top)||0, el.offsetWidth, el.offsetHeight);
+      resizing = null;
+    }
+  });
+  window.resetLayout = function() { localStorage.removeItem(LAYOUT_KEY); location.reload(); };
+  function moveToCanvas(el) { if (el.parentElement !== canvas) canvas.appendChild(el); }
+  function initLayout() {
+    canvas = document.getElementById('drag-canvas');
+    if (!canvas) return;
+    var saved = getSaved();
+    var items = Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    items.forEach(function(el) { addHandles(el); });
+    if (saved) {
+      items.forEach(function(el) {
+        var s = saved[el.dataset.dragId];
+        moveToCanvas(el);
+        if (s) applyPos(el, s.x, s.y, s.w, s.h);
+      });
+      var maxB = 0;
+      items.forEach(function(el) { var b = (parseFloat(el.style.top)||0) + el.offsetHeight; if (b > maxB) maxB = b; });
+      canvas.style.minHeight = Math.max(3000, maxB + 200) + 'px';
+    } else {
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          var cr = canvas.getBoundingClientRect();
+          var newSaved = {}, maxB = 0;
+          var captures = [];
+          items.forEach(function(el) {
+            var r = el.getBoundingClientRect();
+            captures.push({ el: el, x: r.left - cr.left, y: r.top - cr.top, w: r.width, h: r.height });
+          });
+          captures.forEach(function(p) {
+            moveToCanvas(p.el);
+            applyPos(p.el, p.x, p.y, p.w, null);
+            newSaved[p.el.dataset.dragId] = { x: Math.round(p.x), y: Math.round(p.y), w: Math.round(p.w), h: null };
+            if (p.y + p.h > maxB) maxB = p.y + p.h;
+          });
+          canvas.style.minHeight = Math.max(3000, maxB + 200) + 'px';
+          putSaved(newSaved);
+        });
+      });
+    }
+  }
+  window.addEventListener('load', initLayout);
+})();
+</script>
+
+<button id="layout-reset-btn" onclick="resetLayout()" title="重設為預設版面">↺ 重設版面</button>
+</body>
+</html>

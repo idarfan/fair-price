@@ -1,0 +1,2020 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>期權小學堂 · 第7課 · Put 權利金反推計算器</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #FAF3E8;
+  --page-bg:    #FFF9F2;
+  --panel-bg:   #FFFCF7;
+  --ink:        #2A1A0E;
+  --muted:      #7A6555;
+  --border:     #E2D4C2;
+  --gold:       #D4900A;
+  --gold-bg:    #FEF4D8;
+  --gold-bdr:   #E8B840;
+  --green:      #2E9E52;
+  --green-bg:   #E8F8EE;
+  --green-bdr:  #8ED4A8;
+  --red:        #D04040;
+  --red-bg:     #FDEAEA;
+  --red-bdr:    #F5AAAA;
+  --blue:       #3A70C0;
+  --blue-bg:    #EBF2FF;
+  --blue-bdr:   #9ABCE8;
+  --r-lg: 16px; --r-md: 10px; --r-sm: 6px;
+}
+
+body {
+  background: var(--bg);
+  font-family: "PingFang TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif;
+  padding: 0; margin: 0;
+  padding-top: 52px;
+  padding-bottom: 70px;
+}
+
+.page {
+  background: var(--page-bg);
+  max-width: 100%; width: 100%;
+  padding: 32px 40px 36px;
+}
+
+.course-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--ink); color: #FFF9F0;
+  font-size: 12px; font-weight: 700;
+  padding: 5px 14px; border-radius: 100px;
+  letter-spacing: 1px; margin-bottom: 18px;
+}
+
+.page-header {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 20px; align-items: start; margin-bottom: 28px;
+}
+.page-title   { font-size: 32px; font-weight: 900; color: var(--ink); line-height: 1.2; }
+.page-subtitle{ font-size: 14px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+.page-desc    { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+
+.contract-box {
+  background: var(--gold-bg); border: 2px solid var(--gold-bdr);
+  border-radius: var(--r-lg); padding: 14px 18px; min-width: 190px;
+}
+.cb-title {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--gold);
+  margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.cb-ticker {
+  font-size: 20px; font-weight: 900; color: var(--ink);
+  margin-bottom: 10px; display: flex; align-items: baseline; gap: 6px;
+}
+.cb-ticker small { font-size: 12px; font-weight: 500; color: var(--muted); }
+.cb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cb-item .ci-l { font-size: 10px; color: var(--muted); margin-bottom: 1px; }
+.cb-item .ci-v { font-size: 14px; font-weight: 700; color: var(--ink); }
+.cb-item .ci-v.green { color: var(--green); }
+.cb-item .ci-v.gold  { color: var(--gold); }
+
+.panels {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 16px; margin-bottom: 16px;
+}
+.panel {
+  background: var(--panel-bg); border: 2px solid var(--border);
+  border-radius: var(--r-lg); padding: 20px;
+  display: flex; flex-direction: column; gap: 14px;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.panel.tts-active, .full-card.tts-active {
+  border-color: var(--gold-bdr);
+  box-shadow: 0 0 0 3px rgba(212,144,10,0.18);
+}
+.full-card {
+  background: var(--panel-bg); border: 2px solid var(--border);
+  border-radius: var(--r-lg); padding: 20px;
+  display: flex; flex-direction: column; gap: 14px;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+.tag-row { display: flex; align-items: center; justify-content: space-between; }
+.step-badge {
+  width: 26px; height: 26px; background: var(--ink); color: #FFFDF8;
+  border-radius: 100px; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; flex-shrink: 0;
+}
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700;
+  padding: 4px 12px; border-radius: 100px; letter-spacing: 0.3px;
+}
+.pill-outline {
+  background: transparent; border: 1.5px solid;
+  font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+}
+.pill.setup,  .pill-outline.setup  { color: #7A6555; background: #F0E8DC; border-color: #C4B49A; }
+.pill.win,    .pill-outline.win    { color: var(--green); background: var(--green-bg); border-color: var(--green-bdr); }
+.pill.chart,  .pill-outline.chart  { color: var(--blue);  background: var(--blue-bg);  border-color: var(--blue-bdr); }
+.pill.gold,   .pill-outline.gold   { color: var(--gold);  background: var(--gold-bg);  border-color: var(--gold-bdr); }
+.pill.red,    .pill-outline.red    { color: var(--red);   background: var(--red-bg);   border-color: var(--red-bdr); }
+.ptitle { font-size: 18px; font-weight: 800; color: var(--ink); line-height: 1.35; }
+
+/* ── Calculator: Input Form ── */
+.input-form-row {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+}
+.field-grp { display: flex; flex-direction: column; gap: 4px; }
+.field-grp label {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  letter-spacing: 0.5px; text-transform: uppercase;
+}
+.field-grp input {
+  border: 1.5px solid var(--border); border-radius: var(--r-sm);
+  padding: 7px 10px; font-size: 13px; color: var(--ink);
+  background: white; font-family: inherit; outline: none;
+  transition: border-color 0.15s;
+}
+.field-grp input:focus { border-color: var(--gold-bdr); }
+.field-grp.w-ticker input { width: 72px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; }
+  .field-grp.w-expiry input { width: 110px; }
+.field-grp.w-dte    input { width: 62px; }
+.field-grp.w-k      input { width: 80px; }
+.field-grp.w-iv     input { width: 78px; }
+.field-grp.w-delta  input { width: 88px; }
+.field-grp.w-itm    input { width: 78px; }
+.field-grp.w-mkt    input { width: 78px; }
+
+.btn-add {
+  background: var(--ink); color: #FFF9F0;
+  border: none; border-radius: var(--r-sm);
+  padding: 8px 18px; font-size: 13px; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+  transition: background 0.15s; white-space: nowrap;
+}
+.btn-add:hover { background: #4A3020; }
+.btn-clear-all {
+  background: transparent; color: var(--muted);
+  border: 1.5px solid var(--border); border-radius: var(--r-sm);
+  padding: 8px 14px; font-size: 12px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+  transition: all 0.15s; white-space: nowrap;
+}
+.btn-clear-all:hover { border-color: var(--red-bdr); color: var(--red); }
+
+/* ── Chain Table ── */
+.chain-table-wrap {
+  overflow-x: auto;
+  border: 1.5px solid var(--border); border-radius: var(--r-md);
+}
+.chain-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.chain-table th {
+  background: #F5EDE0; color: var(--muted);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+  text-transform: uppercase; padding: 8px 12px;
+  border-bottom: 1.5px solid var(--border);
+  text-align: left; white-space: nowrap;
+}
+.chain-table td {
+  padding: 10px 12px; border-bottom: 1px solid #F0E8DC;
+  color: var(--ink); vertical-align: middle;
+}
+.chain-row { cursor: pointer; transition: background 0.12s; }
+.chain-row:hover { background: #FFFBF4; }
+.chain-row.selected { background: var(--gold-bg); }
+.chain-row.selected td { font-weight: 700; }
+.chain-row:last-child td { border-bottom: none; }
+.chain-table td.k-cell { font-weight: 800; font-size: 14px; }
+.chain-table td.col-green { color: var(--green); font-weight: 700; }
+.chain-table td.col-red   { color: var(--red);   font-weight: 700; }
+.chain-table td.col-muted { color: var(--muted); }
+.btn-del {
+  background: transparent; border: 1.5px solid var(--red-bdr);
+  color: var(--red); border-radius: var(--r-sm);
+  padding: 3px 10px; font-size: 11px; font-weight: 700;
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.btn-del:hover { background: var(--red-bg); }
+.chain-empty {
+  text-align: center; padding: 32px; color: var(--muted); font-size: 13px;
+}
+
+/* ── Info Card Grid ── */
+.info-grid-top { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+.info-grid-bot { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; margin-top: 10px; }
+.info-item {
+  background: var(--panel-bg); border: 1.5px solid var(--border);
+  border-radius: var(--r-sm); padding: 10px 12px;
+}
+.info-item .il { font-size: 10px; color: var(--muted); font-weight: 600; letter-spacing: 0.3px; }
+.info-item .iv { font-size: 16px; font-weight: 800; color: var(--ink); margin-top: 2px; }
+.info-item .iv.green  { color: var(--green); }
+.info-item .iv.gold   { color: var(--gold); }
+.info-item .iv.blue   { color: var(--blue); }
+.info-item .iv.red    { color: var(--red); }
+.info-item .iv.muted  { color: var(--muted); }
+.info-placeholder {
+  text-align: center; padding: 28px 0; color: var(--muted); font-size: 13px;
+}
+
+/* ── Sliders ── */
+.slider-rows { display: flex; flex-direction: column; gap: 12px; }
+.slider-row { display: flex; align-items: center; gap: 12px; }
+.slider-row label {
+  font-size: 12px; font-weight: 700; color: var(--ink);
+  min-width: 88px; white-space: nowrap;
+}
+.slider-row input[type=range] { flex: 1; accent-color: var(--gold); cursor: pointer; }
+.slider-val {
+  font-size: 17px; font-weight: 800; color: var(--gold);
+  min-width: 65px; text-align: right;
+}
+.price-input {
+  width: 72px; padding: 4px 8px;
+  border: 2px solid var(--gold-bdr); border-radius: var(--r-sm);
+  background: var(--gold-bg); color: var(--ink);
+  font-size: 15px; font-weight: 700; text-align: center;
+  font-family: inherit;
+}
+.price-input:focus { outline: none; border-color: var(--gold); }
+
+/* ── Target Premium ── */
+.target-row {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.target-label { font-size: 14px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.target-input {
+  border: 2px solid var(--gold-bdr); border-radius: var(--r-sm);
+  padding: 8px 12px; font-size: 20px; font-weight: 800; color: var(--ink);
+  background: var(--gold-bg); font-family: inherit; outline: none;
+  width: 100px; text-align: center;
+}
+.target-unit { font-size: 14px; font-weight: 600; color: var(--muted); }
+.target-current {
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  background: var(--panel-bg); border: 1.5px solid var(--border);
+  border-radius: 100px; padding: 4px 14px;
+}
+.target-current span { color: var(--ink); }
+
+/* ── Result ── */
+.result-main-area { text-align: center; padding: 20px 0 16px; }
+.result-label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+.result-price { font-size: 54px; font-weight: 900; color: var(--ink); line-height: 1; }
+.result-change { font-size: 16px; font-weight: 700; color: var(--red); margin-top: 8px; }
+
+.result-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.metric-card {
+  background: var(--panel-bg); border: 1.5px solid var(--border);
+  border-radius: var(--r-md); padding: 14px 16px; text-align: center;
+}
+.mc-label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.5px; }
+.mc-value { font-size: 24px; font-weight: 900; color: var(--ink); margin-top: 4px; }
+
+.assign-box {
+  background: var(--red-bg); border: 2px solid var(--red-bdr);
+  border-radius: var(--r-md); padding: 20px;
+  text-align: center; margin-top: 12px;
+}
+.ab-label { font-size: 12px; font-weight: 700; color: var(--red); letter-spacing: 0.5px; }
+.ab-value { font-size: 48px; font-weight: 900; color: var(--red); margin-top: 6px; }
+
+.result-warning {
+  background: #FFF8E8; border: 1.5px solid var(--gold-bdr);
+  border-radius: var(--r-sm); padding: 14px 16px;
+  font-size: 13px; color: #8A6000; line-height: 1.7; text-align: center;
+}
+.result-placeholder {
+  text-align: center; padding: 36px; color: var(--muted); font-size: 13px;
+}
+
+/* ── Iteration Details ── */
+details.iter-wrap {
+  border: 1.5px solid var(--border); border-radius: var(--r-md); overflow: hidden;
+}
+details.iter-wrap summary {
+  padding: 10px 16px; font-size: 13px; font-weight: 700;
+  color: var(--muted); cursor: pointer; background: #F5EDE0;
+  user-select: none; list-style: none;
+}
+details.iter-wrap summary::-webkit-details-marker { display: none; }
+details.iter-wrap summary:hover { background: #EFDED0; }
+details.iter-wrap[open] summary { border-bottom: 1.5px solid var(--border); }
+.iter-code {
+  background: #1C1C1A; padding: 16px 18px;
+  font-family: "Courier New", monospace; font-size: 12px;
+  color: #A8C8A0; line-height: 1.9; white-space: pre;
+  overflow-x: auto;
+}
+.hint-note {
+  font-size: 12px; color: var(--muted); line-height: 1.7;
+  background: #F5EDE0; border-radius: var(--r-sm); padding: 10px 14px;
+}
+
+/* ── TTS Bar (fixed top) ── */
+#tts-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 3000;
+  background: rgba(42,26,14,0.97); backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 8px 20px; display: flex; align-items: center; gap: 12px;
+  font-family: "PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+.tts-btn {
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+  color: #FFF9F0; border-radius: 100px; padding: 5px 14px; font-size: 12px;
+  cursor: pointer; font-family: inherit; font-weight: 700;
+  transition: background 0.15s; display: flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.tts-btn:hover { background: rgba(255,255,255,0.22); }
+.tts-btn.playing { background: #1E7A3A; border-color: #2E9E52; color: #fff; }
+.tts-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.15); flex-shrink: 0; }
+.tts-dots { display: flex; gap: 5px; align-items: center; }
+.tts-dot {
+  width: 7px; height: 7px; border-radius: 100px;
+  background: rgba(255,255,255,0.2); cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.tts-dot.done    { background: rgba(255,255,255,0.45); }
+.tts-dot.current { background: var(--gold); transform: scale(1.5); }
+.tts-section { font-size: 12px; color: #E8C060; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tts-speed {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #FFF9F0; border-radius: 6px; padding: 3px 7px; font-size: 12px;
+  cursor: pointer; font-family: inherit;
+}
+
+/* ── Edit mode ── */
+#edit-btn {
+  position: fixed; bottom: 28px; right: 28px; z-index: 2000;
+  background: #2A1A0E; color: #FFF9F0; border: none; border-radius: 100px;
+  padding: 10px 20px; cursor: pointer; font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  font-family: "PingFang TC","Microsoft JhengHei",sans-serif;
+  transition: background 0.15s, transform 0.1s;
+}
+#edit-btn:hover { background: #4A3020; transform: scale(1.03); }
+#edit-btn.active { background: #2E7040; }
+
+#edit-toolbar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #FFFCF7; border-top: 2px solid #E2D4C2;
+  padding: 10px 24px 12px; z-index: 1999;
+  display: flex; align-items: center; gap: 0;
+  box-shadow: 0 -4px 24px rgba(80,40,0,0.10);
+  transform: translateY(100%); transition: transform 0.22s cubic-bezier(.4,0,.2,1);
+  font-family: "PingFang TC","Microsoft JhengHei",sans-serif;
+  flex-wrap: wrap; min-height: 56px;
+}
+#edit-toolbar.visible { transform: translateY(0); }
+.et-hint { font-size: 13px; color: #A08878; padding: 6px 0; font-style: italic; }
+.et-group { display: flex; align-items: center; gap: 0; flex-wrap: wrap; width: 100%; }
+.et-item  { display: flex; flex-direction: column; gap: 3px; padding: 0 14px; }
+.et-label { font-size: 10px; font-weight: 600; color: #9A8878; letter-spacing: 0.5px; text-transform: uppercase; }
+.et-divider { width: 1px; height: 36px; background: #E2D4C2; flex-shrink: 0; }
+#et-font { font-size: 13px; border: 1.5px solid #E2D4C2; border-radius: 6px; padding: 4px 8px; background: white; color: #2A1A0E; cursor: pointer; font-family: inherit; }
+.et-size-ctrl { display: flex; align-items: center; gap: 6px; }
+.et-btn-sm {
+  width: 24px; height: 24px; border: 1.5px solid #E2D4C2; border-radius: 6px;
+  background: white; font-size: 14px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: #2A1A0E;
+}
+.et-btn-sm:hover { background: #F5EFE6; }
+#et-size-val { font-size: 14px; font-weight: 700; min-width: 28px; text-align: center; color: #2A1A0E; }
+.et-fmt-btn {
+  width: 30px; height: 30px; border: 1.5px solid #E2D4C2; border-radius: 6px;
+  background: white; font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: #2A1A0E;
+}
+.et-fmt-btn:hover { background: #F5EFE6; }
+.et-fmt-btn.on { background: #2A1A0E; color: white; border-color: #2A1A0E; }
+#et-color { width: 36px; height: 28px; border: 1.5px solid #E2D4C2; border-radius: 6px; padding: 2px; cursor: pointer; background: white; }
+#et-lh { width: 80px; accent-color: #D4900A; }
+.et-action-btn {
+  font-size: 12px; font-weight: 600; padding: 5px 12px;
+  border: 1.5px solid #E2D4C2; border-radius: 6px; background: white;
+  cursor: pointer; color: #2A1A0E; font-family: inherit;
+}
+.et-action-btn:hover { background: #F5EFE6; }
+.edit-mode .page * { cursor: text; }
+.edit-mode .page [contenteditable]:hover,
+.edit-mode .page *:hover { outline: 1.5px dashed #E8B840; outline-offset: 2px; border-radius: 3px; }
+.el-focus { outline: 2px solid #3A70C0 !important; outline-offset: 3px; border-radius: 3px; }
+.edit-mode .page .el-focus * { outline: none !important; }
+
+/* ── TTS Subtitle ── */
+#tts-subtitle {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  max-width: 700px; width: calc(100% - 40px);
+  background: rgba(8,4,1,0.85); backdrop-filter: blur(8px);
+  color: #FFF9F0; border-radius: 10px; padding: 10px 18px;
+  font-size: 14px; line-height: 1.9; z-index: 2500;
+  display: none; pointer-events: none;
+  max-height: 110px; overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+#tts-subtitle.active { display: block; }
+.sub-c       { color: rgba(255,249,240,0.28); }
+.sub-c.done  { color: rgba(255,249,240,0.75); }
+.sub-c.now   { color: #F5C540; background: rgba(245,197,64,0.18); border-radius: 2px; }
+
+/* ── Drag Layout ── */
+#drag-canvas { position: relative !important; min-height: 3000px; overflow: visible; }
+[data-drag-id] { box-sizing: border-box; }
+.edit-mode [data-drag-id]:hover > .drag-handle,
+[data-drag-id].is-dragging > .drag-handle,
+[data-drag-id].is-resizing > .drag-handle { opacity: 1; }
+.drag-handle {
+  position: absolute; top: -15px; left: 0; right: 0; height: 13px;
+  background: linear-gradient(90deg,#3A70C0,#2255A0);
+  border-radius: 5px 5px 0 0; cursor: grab; opacity: 0;
+  transition: opacity .15s; display: flex; align-items: center;
+  justify-content: center; z-index: 200; user-select: none;
+}
+.drag-handle:active { cursor: grabbing; }
+.drag-handle::before { content: ":::"; font-size: 9px; font-weight: 900; color: rgba(255,255,255,.85); letter-spacing: 4px; }
+.edit-mode [data-drag-id]:hover,
+[data-drag-id].is-dragging,
+[data-drag-id].is-resizing { outline: 2px dashed rgba(58,112,192,.45); outline-offset: 3px; }
+.rh { position: absolute; width: 10px; height: 10px; background: #3A70C0; border: 2px solid #fff; border-radius: 2px; opacity: 0; transition: opacity .15s; z-index: 201; }
+.edit-mode [data-drag-id]:hover .rh, [data-drag-id].is-resizing .rh { opacity: 1; }
+.rh-nw { top:-5px; left:-5px; cursor:nw-resize; } .rh-n  { top:-5px; left:50%; transform:translateX(-50%); cursor:n-resize; }
+.rh-ne { top:-5px; right:-5px; cursor:ne-resize; } .rh-e  { top:50%; right:-5px; transform:translateY(-50%); cursor:e-resize; }
+.rh-se { bottom:-5px; right:-5px; cursor:se-resize; } .rh-s { bottom:-5px; left:50%; transform:translateX(-50%); cursor:s-resize; }
+.rh-sw { bottom:-5px; left:-5px; cursor:sw-resize; } .rh-w { top:50%; left:-5px; transform:translateY(-50%); cursor:w-resize; }
+#layout-reset-btn {
+  position: fixed; bottom: 70px; right: 20px;
+  background: #FAF3E8; border: 1.5px solid #E2D4C2; border-radius: 8px;
+  padding: 7px 16px; font-size: 12px; cursor: pointer; z-index: 10001;
+  color: #7A6555; font-family: inherit; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+#layout-reset-btn:hover { background: #F0E4D0; }
+
+  .stock-price-row{display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:12px 16px;background:linear-gradient(135deg,rgba(212,144,10,0.08),rgba(212,144,10,0.04));border:1.5px solid rgba(212,144,10,0.35);border-radius:10px;}
+  .sp-label{font-size:0.8rem;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;}
+  .sp-prefix{font-size:1.15rem;font-weight:700;color:var(--gold);margin-left:4px;}
+  .sp-input{width:110px;padding:6px 10px;font-size:1.05rem;font-weight:700;border:2px solid var(--gold);border-radius:8px;background:var(--bg);color:var(--txt);text-align:center;}
+  .sp-input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,144,10,0.2);}
+  .sp-hint{font-size:0.75rem;color:var(--muted);margin-left:4px;}
+
+  
+  .btn-edit{margin-left:4px;padding:2px 8px;font-size:0.72rem;font-weight:600;background:transparent;border:1.5px solid var(--gold);color:var(--gold);border-radius:5px;cursor:pointer;}
+  .btn-edit:hover{background:rgba(212,144,10,0.12);}
+  .btn-done{padding:2px 10px;font-size:0.72rem;font-weight:700;background:var(--gold);border:none;color:#fff;border-radius:5px;cursor:pointer;}
+  .btn-done:hover{opacity:0.85;}
+  .chain-row.editing{background:rgba(212,144,10,0.06);}
+  .edit-inp{width:72px;padding:2px 4px;font-size:0.78rem;border:1.5px solid var(--gold);border-radius:4px;background:var(--bg);color:var(--txt);}
+  .edit-inp:focus{outline:none;box-shadow:0 0 0 2px rgba(212,144,10,0.25);}
+  .edit-num{width:64px;text-align:center;}
+
+  
+  .mode-toggle-row { display:flex; gap:6px; margin-bottom:10px; }
+  .mode-btn { flex:1; padding:6px 10px; font-size:0.78rem; font-weight:700; border:2px solid var(--gold); border-radius:8px; background:transparent; color:var(--gold); cursor:pointer; transition:all .15s; }
+  .mode-btn.active { background:var(--gold); color:#fff; }
+  .mode-btn:hover:not(.active) { background:rgba(212,144,10,0.12); }
+
+
+  /* ── Put / Call Toggle ── */
+  .opt-type-row { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .opt-type-label { font-size:11px; font-weight:700; color:var(--muted); letter-spacing:0.5px; text-transform:uppercase; }
+  .opt-type-toggle { display:flex; border-radius:8px; overflow:hidden; border:1.5px solid var(--border); }
+  .opt-type-btn { all:unset; padding:6px 20px; font-size:12px; font-weight:700; cursor:pointer;
+    color:var(--muted); background:transparent; transition:background 0.15s,color 0.15s; }
+  .opt-type-btn.active { background:var(--ink); color:#fff; }
+  .opt-type-btn:not(.active):hover { background:var(--gold-bg); }
+
+  </style>
+
+<style id="driver-css">
+.driver-active .driver-overlay,.driver-active *{pointer-events:none}.driver-active .driver-active-element,.driver-active .driver-active-element *,.driver-popover,.driver-popover *{pointer-events:auto}@keyframes animate-fade-in{0%{opacity:0}to{opacity:1}}.driver-fade .driver-overlay{animation:animate-fade-in .2s ease-in-out}.driver-fade .driver-popover{animation:animate-fade-in .2s}.driver-popover{all:unset;box-sizing:border-box;color:#2d2d2d;margin:0;padding:15px;border-radius:5px;min-width:250px;max-width:300px;box-shadow:0 1px 10px #0006;z-index:1000000000;position:fixed;top:0;right:0;background-color:#fff}.driver-popover *{font-family:Helvetica Neue,Inter,ui-sans-serif,"Apple Color Emoji",Helvetica,Arial,sans-serif}.driver-popover-title{font:19px/normal sans-serif;font-weight:700;display:block;position:relative;line-height:1.5;zoom:1;margin:0}.driver-popover-close-btn{all:unset;position:absolute;top:0;right:0;width:32px;height:28px;cursor:pointer;font-size:18px;font-weight:500;color:#d2d2d2;z-index:1;text-align:center;transition:color;transition-duration:.2s}.driver-popover-close-btn:hover,.driver-popover-close-btn:focus{color:#2d2d2d}.driver-popover-title[style*=block]+.driver-popover-description{margin-top:5px}.driver-popover-description{margin-bottom:0;font:14px/normal sans-serif;line-height:1.5;font-weight:400;zoom:1}.driver-popover-footer{margin-top:15px;text-align:right;zoom:1;display:flex;align-items:center;justify-content:space-between}.driver-popover-progress-text{font-size:13px;font-weight:400;color:#727272;zoom:1}.driver-popover-footer button{all:unset;display:inline-block;box-sizing:border-box;padding:3px 7px;text-decoration:none;text-shadow:1px 1px 0 #fff;background-color:#fff;color:#2d2d2d;font:12px/normal sans-serif;cursor:pointer;outline:0;zoom:1;line-height:1.3;border:1px solid #ccc;border-radius:3px}.driver-popover-footer .driver-popover-btn-disabled{opacity:.5;pointer-events:none}:not(body):has(>.driver-active-element){overflow:hidden!important}.driver-no-interaction,.driver-no-interaction *{pointer-events:none!important}.driver-popover-footer button:hover,.driver-popover-footer button:focus{background-color:#f7f7f7}.driver-popover-navigation-btns{display:flex;flex-grow:1;justify-content:flex-end}.driver-popover-navigation-btns button+button{margin-left:4px}.driver-popover-arrow{content:"";position:absolute;border:5px solid #fff}.driver-popover-arrow-side-over{display:none}.driver-popover-arrow-side-left{left:100%;border-right-color:transparent;border-bottom-color:transparent;border-top-color:transparent}.driver-popover-arrow-side-right{right:100%;border-left-color:transparent;border-bottom-color:transparent;border-top-color:transparent}.driver-popover-arrow-side-top{top:100%;border-right-color:transparent;border-bottom-color:transparent;border-left-color:transparent}.driver-popover-arrow-side-bottom{bottom:100%;border-left-color:transparent;border-top-color:transparent;border-right-color:transparent}.driver-popover-arrow-side-center{display:none}.driver-popover-arrow-side-left.driver-popover-arrow-align-start,.driver-popover-arrow-side-right.driver-popover-arrow-align-start{top:15px}.driver-popover-arrow-side-top.driver-popover-arrow-align-start,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-start{left:15px}.driver-popover-arrow-align-end.driver-popover-arrow-side-left,.driver-popover-arrow-align-end.driver-popover-arrow-side-right{bottom:15px}.driver-popover-arrow-side-top.driver-popover-arrow-align-end,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-end{right:15px}.driver-popover-arrow-side-left.driver-popover-arrow-align-center,.driver-popover-arrow-side-right.driver-popover-arrow-align-center{top:50%;margin-top:-5px}.driver-popover-arrow-side-top.driver-popover-arrow-align-center,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-center{left:50%;margin-left:-5px}.driver-popover-arrow-none{display:none}
+.driver-popover {
+  background-color: #FFFCF7 !important;
+  border: 2px solid #E8B840 !important;
+  border-radius: 12px !important;
+  max-width: 360px !important;
+  font-family: "PingFang TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15) !important;
+}
+.driver-popover-title {
+  color: #2A1A0E !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+}
+.driver-popover-description {
+  color: #2A1A0E !important;
+  font-size: 13px !important;
+  line-height: 1.8 !important;
+}
+.driver-popover-footer button {
+  background: #D4900A !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 5px 14px !important;
+  font-weight: 700 !important;
+}
+.driver-popover-footer button:hover {
+  background: #b87a08 !important;
+}
+</style>
+<script id="driver-js">this.driver=this.driver||{};this.driver.js=function(F){"use strict";let z={},q;function V(e={}){z={animate:!0,allowClose:!0,overlayClickBehavior:"close",overlayOpacity:.7,smoothScroll:!1,disableActiveInteraction:!1,showProgress:!1,stagePadding:10,stageRadius:5,popoverOffset:10,showButtons:["next","previous","close"],disableButtons:[],overlayColor:"#000",...e}}function s(e){return e?z[e]:z}function le(e){q=e}function k(){return q}let A={};function N(e,o){A[e]=o}function T(e){var o;(o=A[e])==null||o.call(A)}function de(){A={}}function O(e,o,t,i){return(e/=i/2)<1?t/2*e*e+o:-t/2*(--e*(e-2)-1)+o}function K(e){const o='a[href]:not([disabled]), button:not([disabled]), textarea:not([disabled]), input[type="text"]:not([disabled]), input[type="radio"]:not([disabled]), input[type="checkbox"]:not([disabled]), select:not([disabled])';return e.flatMap(t=>{const i=t.matches(o),d=Array.from(t.querySelectorAll(o));return[...i?[t]:[],...d]}).filter(t=>getComputedStyle(t).pointerEvents!=="none"&&ve(t))}function Y(e){if(!e||ue(e))return;const o=s("smoothScroll"),t=e.offsetHeight>window.innerHeight;e.scrollIntoView({behavior:!o||pe(e)?"auto":"smooth",inline:"center",block:t?"start":"center"})}function pe(e){if(!e||!e.parentElement)return;const o=e.parentElement;return o.scrollHeight>o.clientHeight}function ue(e){const o=e.getBoundingClientRect();return o.top>=0&&o.left>=0&&o.bottom<=(window.innerHeight||document.documentElement.clientHeight)&&o.right<=(window.innerWidth||document.documentElement.clientWidth)}function ve(e){return!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)}let D={};function S(e,o){D[e]=o}function l(e){return e?D[e]:D}function X(){D={}}function fe(e,o,t,i){let d=l("__activeStagePosition");const n=d||t.getBoundingClientRect(),f=i.getBoundingClientRect(),w=O(e,n.x,f.x-n.x,o),r=O(e,n.y,f.y-n.y,o),v=O(e,n.width,f.width-n.width,o),g=O(e,n.height,f.height-n.height,o);d={x:w,y:r,width:v,height:g},Q(d),S("__activeStagePosition",d)}function j(e){if(!e)return;const o=e.getBoundingClientRect(),t={x:o.x,y:o.y,width:o.width,height:o.height};S("__activeStagePosition",t),Q(t)}function he(){const e=l("__activeStagePosition"),o=l("__overlaySvg");if(!e)return;if(!o){console.warn("No stage svg found.");return}const t=window.innerWidth,i=window.innerHeight;o.setAttribute("viewBox",`0 0 ${t} ${i}`)}function ge(e){const o=we(e);document.body.appendChild(o),U(o,t=>{t.target.tagName==="path"&&T("overlayClick")}),S("__overlaySvg",o)}function Q(e){const o=l("__overlaySvg");if(!o){ge(e);return}const t=o.firstElementChild;if((t==null?void 0:t.tagName)!=="path")throw new Error("no path element found in stage svg");t.setAttribute("d",Z(e))}function we(e){const o=window.innerWidth,t=window.innerHeight,i=document.createElementNS("http://www.w3.org/2000/svg","svg");i.classList.add("driver-overlay","driver-overlay-animated"),i.setAttribute("viewBox",`0 0 ${o} ${t}`),i.setAttribute("xmlSpace","preserve"),i.setAttribute("xmlnsXlink","http://www.w3.org/1999/xlink"),i.setAttribute("version","1.1"),i.setAttribute("preserveAspectRatio","xMinYMin slice"),i.style.fillRule="evenodd",i.style.clipRule="evenodd",i.style.strokeLinejoin="round",i.style.strokeMiterlimit="2",i.style.zIndex="10000",i.style.position="fixed",i.style.top="0",i.style.left="0",i.style.width="100%",i.style.height="100%";const d=document.createElementNS("http://www.w3.org/2000/svg","path");return d.setAttribute("d",Z(e)),d.style.fill=s("overlayColor")||"rgb(0,0,0)",d.style.opacity=`${s("overlayOpacity")}`,d.style.pointerEvents="auto",d.style.cursor="auto",i.appendChild(d),i}function Z(e){const o=window.innerWidth,t=window.innerHeight,i=s("stagePadding")||0,d=s("stageRadius")||0,n=e.width+i*2,f=e.height+i*2,w=Math.min(d,n/2,f/2),r=Math.floor(Math.max(w,0)),v=e.x-i+r,g=e.y-i,y=n-r*2,a=f-r*2;return`M${o},0L0,0L0,${t}L${o},${t}L${o},0Z
+    M${v},${g} h${y} a${r},${r} 0 0 1 ${r},${r} v${a} a${r},${r} 0 0 1 -${r},${r} h-${y} a${r},${r} 0 0 1 -${r},-${r} v-${a} a${r},${r} 0 0 1 ${r},-${r} z`}function me(){const e=l("__overlaySvg");e&&e.remove()}function ye(){const e=document.getElementById("driver-dummy-element");if(e)return e;let o=document.createElement("div");return o.id="driver-dummy-element",o.style.width="0",o.style.height="0",o.style.pointerEvents="none",o.style.opacity="0",o.style.position="fixed",o.style.top="50%",o.style.left="50%",document.body.appendChild(o),o}function G(e){const{element:o}=e;let t=typeof o=="function"?o():typeof o=="string"?document.querySelector(o):o;t||(t=ye()),xe(t,e)}function be(){const e=l("__activeElement"),o=l("__activeStep");e&&(j(e),he(),ne(e,o))}function xe(e,o){var C;const i=Date.now(),d=l("__activeStep"),n=l("__activeElement")||e,f=!n||n===e,w=e.id==="driver-dummy-element",r=n.id==="driver-dummy-element",v=s("animate"),g=o.onHighlightStarted||s("onHighlightStarted"),y=(o==null?void 0:o.onHighlighted)||s("onHighlighted"),a=(d==null?void 0:d.onDeselected)||s("onDeselected"),p=s(),c=l();!f&&a&&a(r?void 0:n,d,{config:p,state:c,driver:k()}),g&&g(w?void 0:e,o,{config:p,state:c,driver:k()});const u=!f&&v;let h=!1;_e(),S("previousStep",d),S("previousElement",n),S("activeStep",o),S("activeElement",e);const m=()=>{if(l("__transitionCallback")!==m)return;const x=Date.now()-i,E=400-x<=400/2;o.popover&&E&&!h&&u&&(ee(e,o),h=!0),s("animate")&&x<400?fe(x,400,n,e):(j(e),y&&y(w?void 0:e,o,{config:s(),state:l(),driver:k()}),S("__transitionCallback",void 0),S("__previousStep",d),S("__previousElement",n),S("__activeStep",o),S("__activeElement",e)),window.requestAnimationFrame(m)};S("__transitionCallback",m),window.requestAnimationFrame(m),Y(e),!u&&o.popover&&ee(e,o),n.classList.remove("driver-active-element","driver-no-interaction"),n.removeAttribute("aria-haspopup"),n.removeAttribute("aria-expanded"),n.removeAttribute("aria-controls"),((C=o.disableActiveInteraction)!=null?C:s("disableActiveInteraction"))&&e.classList.add("driver-no-interaction"),e.classList.add("driver-active-element"),e.setAttribute("aria-haspopup","dialog"),e.setAttribute("aria-expanded","true"),e.setAttribute("aria-controls","driver-popover-content")}function Ce(){var e;(e=document.getElementById("driver-dummy-element"))==null||e.remove(),document.querySelectorAll(".driver-active-element").forEach(o=>{o.classList.remove("driver-active-element","driver-no-interaction"),o.removeAttribute("aria-haspopup"),o.removeAttribute("aria-expanded"),o.removeAttribute("aria-controls")})}function H(){const e=l("__resizeTimeout");e&&window.cancelAnimationFrame(e),S("__resizeTimeout",window.requestAnimationFrame(be))}function Pe(e){var r;if(!l("isInitialized")||!(e.key==="Tab"||e.keyCode===9))return;const i=l("__activeElement"),d=(r=l("popover"))==null?void 0:r.wrapper,n=K([...d?[d]:[],...i?[i]:[]]),f=n[0],w=n[n.length-1];if(e.preventDefault(),e.shiftKey){const v=n[n.indexOf(document.activeElement)-1]||w;v==null||v.focus()}else{const v=n[n.indexOf(document.activeElement)+1]||f;v==null||v.focus()}}function J(e){var t;((t=s("allowKeyboardControl"))==null||t)&&(e.key==="Escape"?T("escapePress"):e.key==="ArrowRight"?T("arrowRightPress"):e.key==="ArrowLeft"&&T("arrowLeftPress"))}function U(e,o,t){const i=(n,f)=>{const w=n.target;e.contains(w)&&((!t||t(w))&&(n.preventDefault(),n.stopPropagation(),n.stopImmediatePropagation()),f==null||f(n))};document.addEventListener("pointerdown",i,!0),document.addEventListener("mousedown",i,!0),document.addEventListener("pointerup",i,!0),document.addEventListener("mouseup",i,!0),document.addEventListener("click",n=>{i(n,o)},!0)}function Se(){window.addEventListener("keyup",J,!1),window.addEventListener("keydown",Pe,!1),window.addEventListener("resize",H),window.addEventListener("scroll",H)}function ke(){window.removeEventListener("keyup",J),window.removeEventListener("resize",H),window.removeEventListener("scroll",H)}function _e(){const e=l("popover");e&&(e.wrapper.style.display="none")}function ee(e,o){var x,P;let t=l("popover");t&&document.body.removeChild(t.wrapper),t=Te(),document.body.appendChild(t.wrapper);const{title:i,description:d,showButtons:n,disableButtons:f,showProgress:w,nextBtnText:r=s("nextBtnText")||"Next &rarr;",prevBtnText:v=s("prevBtnText")||"&larr; Previous",progressText:g=s("progressText")||"{current} of {total}"}=o.popover||{};t.nextButton.innerHTML=r,t.previousButton.innerHTML=v,t.progress.innerHTML=g,i?(t.title.innerHTML=i,t.title.style.display="block"):t.title.style.display="none",d?(t.description.innerHTML=d,t.description.style.display="block"):t.description.style.display="none";const y=n||s("showButtons"),a=w||s("showProgress")||!1,p=(y==null?void 0:y.includes("next"))||(y==null?void 0:y.includes("previous"))||a;t.closeButton.style.display=y.includes("close")?"block":"none",p?(t.footer.style.display="flex",t.progress.style.display=a?"block":"none",t.nextButton.style.display=y.includes("next")?"block":"none",t.previousButton.style.display=y.includes("previous")?"block":"none"):t.footer.style.display="none";const c=f||s("disableButtons")||[];c!=null&&c.includes("next")&&(t.nextButton.disabled=!0,t.nextButton.classList.add("driver-popover-btn-disabled")),c!=null&&c.includes("previous")&&(t.previousButton.disabled=!0,t.previousButton.classList.add("driver-popover-btn-disabled")),c!=null&&c.includes("close")&&(t.closeButton.disabled=!0,t.closeButton.classList.add("driver-popover-btn-disabled"));const u=t.wrapper;u.style.display="block",u.style.left="",u.style.top="",u.style.bottom="",u.style.right="",u.id="driver-popover-content",u.setAttribute("role","dialog"),u.setAttribute("aria-labelledby","driver-popover-title"),u.setAttribute("aria-describedby","driver-popover-description");const h=t.arrow;h.className="driver-popover-arrow";const m=((x=o.popover)==null?void 0:x.popoverClass)||s("popoverClass")||"";u.className=`driver-popover ${m}`.trim(),U(t.wrapper,E=>{var W,I,M;const L=E.target,$=((W=o.popover)==null?void 0:W.onNextClick)||s("onNextClick"),B=((I=o.popover)==null?void 0:I.onPrevClick)||s("onPrevClick"),R=((M=o.popover)==null?void 0:M.onCloseClick)||s("onCloseClick");if(L.closest(".driver-popover-next-btn"))return $?$(e,o,{config:s(),state:l(),driver:k()}):T("nextClick");if(L.closest(".driver-popover-prev-btn"))return B?B(e,o,{config:s(),state:l(),driver:k()}):T("prevClick");if(L.closest(".driver-popover-close-btn"))return R?R(e,o,{config:s(),state:l(),driver:k()}):T("closeClick")},E=>!(t!=null&&t.description.contains(E))&&!(t!=null&&t.title.contains(E))&&typeof E.className=="string"&&E.className.includes("driver-popover")),S("popover",t);const b=((P=o.popover)==null?void 0:P.onPopoverRender)||s("onPopoverRender");b&&b(t,{config:s(),state:l(),driver:k()}),ne(e,o),Y(u);const C=e.classList.contains("driver-dummy-element"),_=K([u,...C?[]:[e]]);_.length>0&&_[0].focus()}function te(){const e=l("popover");if(!(e!=null&&e.wrapper))return;const o=e.wrapper.getBoundingClientRect(),t=s("stagePadding")||0,i=s("popoverOffset")||0;return{width:o.width+t+i,height:o.height+t+i,realWidth:o.width,realHeight:o.height}}function oe(e,o){const{elementDimensions:t,popoverDimensions:i,popoverPadding:d,popoverArrowDimensions:n}=o;return e==="start"?Math.max(Math.min(t.top-d,window.innerHeight-i.realHeight-n.width),n.width):e==="end"?Math.max(Math.min(t.top-(i==null?void 0:i.realHeight)+t.height+d,window.innerHeight-(i==null?void 0:i.realHeight)-n.width),n.width):e==="center"?Math.max(Math.min(t.top+t.height/2-(i==null?void 0:i.realHeight)/2,window.innerHeight-(i==null?void 0:i.realHeight)-n.width),n.width):0}function ie(e,o){const{elementDimensions:t,popoverDimensions:i,popoverPadding:d,popoverArrowDimensions:n}=o;return e==="start"?Math.max(Math.min(t.left-d,window.innerWidth-i.realWidth-n.width),n.width):e==="end"?Math.max(Math.min(t.left-(i==null?void 0:i.realWidth)+t.width+d,window.innerWidth-(i==null?void 0:i.realWidth)-n.width),n.width):e==="center"?Math.max(Math.min(t.left+t.width/2-(i==null?void 0:i.realWidth)/2,window.innerWidth-(i==null?void 0:i.realWidth)-n.width),n.width):0}function ne(e,o){const t=l("popover");if(!t)return;const{align:i="start",side:d="left"}=(o==null?void 0:o.popover)||{},n=i,f=e.id==="driver-dummy-element"?"over":d,w=s("stagePadding")||0,r=te(),v=t.arrow.getBoundingClientRect(),g=e.getBoundingClientRect(),y=g.top-r.height;let a=y>=0;const p=window.innerHeight-(g.bottom+r.height);let c=p>=0;const u=g.left-r.width;let h=u>=0;const m=window.innerWidth-(g.right+r.width);let b=m>=0;const C=!a&&!c&&!h&&!b;let _=f;if(f==="top"&&a?b=h=c=!1:f==="bottom"&&c?b=h=a=!1:f==="left"&&h?b=a=c=!1:f==="right"&&b&&(h=a=c=!1),f==="over"){const x=window.innerWidth/2-r.realWidth/2,P=window.innerHeight/2-r.realHeight/2;t.wrapper.style.left=`${x}px`,t.wrapper.style.right="auto",t.wrapper.style.top=`${P}px`,t.wrapper.style.bottom="auto"}else if(C){const x=window.innerWidth/2-(r==null?void 0:r.realWidth)/2,P=10;t.wrapper.style.left=`${x}px`,t.wrapper.style.right="auto",t.wrapper.style.bottom=`${P}px`,t.wrapper.style.top="auto"}else if(h){const x=Math.min(u,window.innerWidth-(r==null?void 0:r.realWidth)-v.width),P=oe(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.left=`${x}px`,t.wrapper.style.top=`${P}px`,t.wrapper.style.bottom="auto",t.wrapper.style.right="auto",_="left"}else if(b){const x=Math.min(m,window.innerWidth-(r==null?void 0:r.realWidth)-v.width),P=oe(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.right=`${x}px`,t.wrapper.style.top=`${P}px`,t.wrapper.style.bottom="auto",t.wrapper.style.left="auto",_="right"}else if(a){const x=Math.min(y,window.innerHeight-r.realHeight-v.width);let P=ie(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.top=`${x}px`,t.wrapper.style.left=`${P}px`,t.wrapper.style.bottom="auto",t.wrapper.style.right="auto",_="top"}else if(c){const x=Math.min(p,window.innerHeight-(r==null?void 0:r.realHeight)-v.width);let P=ie(n,{elementDimensions:g,popoverDimensions:r,popoverPadding:w,popoverArrowDimensions:v});t.wrapper.style.left=`${P}px`,t.wrapper.style.bottom=`${x}px`,t.wrapper.style.top="auto",t.wrapper.style.right="auto",_="bottom"}C?t.arrow.classList.add("driver-popover-arrow-none"):Ee(n,_,e)}function Ee(e,o,t){const i=l("popover");if(!i)return;const d=t.getBoundingClientRect(),n=te(),f=i.arrow,w=n.width,r=window.innerWidth,v=d.width,g=d.left,y=n.height,a=window.innerHeight,p=d.top,c=d.height;f.className="driver-popover-arrow";let u=o,h=e;if(o==="top"?(g+v<=0?(u="right",h="end"):g+v-w<=0&&(u="top",h="start"),g>=r?(u="left",h="end"):g+w>=r&&(u="top",h="end")):o==="bottom"?(g+v<=0?(u="right",h="start"):g+v-w<=0&&(u="bottom",h="start"),g>=r?(u="left",h="start"):g+w>=r&&(u="bottom",h="end")):o==="left"?(p+c<=0?(u="bottom",h="end"):p+c-y<=0&&(u="left",h="start"),p>=a?(u="top",h="end"):p+y>=a&&(u="left",h="end")):o==="right"&&(p+c<=0?(u="bottom",h="start"):p+c-y<=0&&(u="right",h="start"),p>=a?(u="top",h="start"):p+y>=a&&(u="right",h="end")),!u)f.classList.add("driver-popover-arrow-none");else{f.classList.add(`driver-popover-arrow-side-${u}`),f.classList.add(`driver-popover-arrow-align-${h}`);const m=t.getBoundingClientRect(),b=f.getBoundingClientRect(),C=s("stagePadding")||0,_=m.left-C<window.innerWidth&&m.right+C>0&&m.top-C<window.innerHeight&&m.bottom+C>0;o==="bottom"&&_&&(b.x>m.x&&b.x+b.width<m.x+m.width?i.wrapper.style.transform="translateY(0)":(f.classList.remove(`driver-popover-arrow-align-${h}`),f.classList.add("driver-popover-arrow-none"),i.wrapper.style.transform=`translateY(-${C/2}px)`))}}function Te(){const e=document.createElement("div");e.classList.add("driver-popover");const o=document.createElement("div");o.classList.add("driver-popover-arrow");const t=document.createElement("header");t.id="driver-popover-title",t.classList.add("driver-popover-title"),t.style.display="none",t.innerText="Popover Title";const i=document.createElement("div");i.id="driver-popover-description",i.classList.add("driver-popover-description"),i.style.display="none",i.innerText="Popover description is here";const d=document.createElement("button");d.type="button",d.classList.add("driver-popover-close-btn"),d.setAttribute("aria-label","Close"),d.innerHTML="&times;";const n=document.createElement("footer");n.classList.add("driver-popover-footer");const f=document.createElement("span");f.classList.add("driver-popover-progress-text"),f.innerText="";const w=document.createElement("span");w.classList.add("driver-popover-navigation-btns");const r=document.createElement("button");r.type="button",r.classList.add("driver-popover-prev-btn"),r.innerHTML="&larr; Previous";const v=document.createElement("button");return v.type="button",v.classList.add("driver-popover-next-btn"),v.innerHTML="Next &rarr;",w.appendChild(r),w.appendChild(v),n.appendChild(f),n.appendChild(w),e.appendChild(d),e.appendChild(o),e.appendChild(t),e.appendChild(i),e.appendChild(n),{wrapper:e,arrow:o,title:t,description:i,footer:n,previousButton:r,nextButton:v,closeButton:d,footerButtons:w,progress:f}}function Le(){var o;const e=l("popover");e&&((o=e.wrapper.parentElement)==null||o.removeChild(e.wrapper))}const $e="";function Ae(e={}){V(e);function o(){s("allowClose")&&g()}function t(){const a=s("overlayClickBehavior");if(s("allowClose")&&a==="close"){g();return}if(typeof a=="function"){const p=l("__activeStep"),c=l("__activeElement");a(c,p,{config:s(),state:l(),driver:k()});return}a==="nextStep"&&i()}function i(){const a=l("activeIndex"),p=s("steps")||[];if(typeof a=="undefined")return;const c=a+1;p[c]?v(c):g()}function d(){const a=l("activeIndex"),p=s("steps")||[];if(typeof a=="undefined")return;const c=a-1;p[c]?v(c):g()}function n(a){(s("steps")||[])[a]?v(a):g()}function f(){var b;if(l("__transitionCallback"))return;const p=l("activeIndex"),c=l("__activeStep"),u=l("__activeElement");if(typeof p=="undefined"||typeof c=="undefined"||typeof l("activeIndex")=="undefined")return;const m=((b=c.popover)==null?void 0:b.onPrevClick)||s("onPrevClick");if(m)return m(u,c,{config:s(),state:l(),driver:k()});d()}function w(){var m;if(l("__transitionCallback"))return;const p=l("activeIndex"),c=l("__activeStep"),u=l("__activeElement");if(typeof p=="undefined"||typeof c=="undefined")return;const h=((m=c.popover)==null?void 0:m.onNextClick)||s("onNextClick");if(h)return h(u,c,{config:s(),state:l(),driver:k()});i()}function r(){l("isInitialized")||(S("isInitialized",!0),document.body.classList.add("driver-active",s("animate")?"driver-fade":"driver-simple"),Se(),N("overlayClick",t),N("escapePress",o),N("arrowLeftPress",f),N("arrowRightPress",w))}function v(a=0){var R,W,I,M,re,se,ae,ce;const p=s("steps");if(!p){console.error("No steps to drive through"),g();return}if(!p[a]){g();return}S("__activeOnDestroyed",document.activeElement),S("activeIndex",a);const c=p[a],u=p[a+1],h=p[a-1],m=((R=c.popover)==null?void 0:R.doneBtnText)||s("doneBtnText")||"Done",b=s("allowClose"),C=typeof((W=c.popover)==null?void 0:W.showProgress)!="undefined"?(I=c.popover)==null?void 0:I.showProgress:s("showProgress"),x=(((M=c.popover)==null?void 0:M.progressText)||s("progressText")||"{{current}} of {{total}}").replace("{{current}}",`${a+1}`).replace("{{total}}",`${p.length}`),P=((re=c.popover)==null?void 0:re.showButtons)||s("showButtons"),E=["next","previous",...b?["close"]:[]].filter(He=>!(P!=null&&P.length)||P.includes(He)),L=((se=c.popover)==null?void 0:se.onNextClick)||s("onNextClick"),$=((ae=c.popover)==null?void 0:ae.onPrevClick)||s("onPrevClick"),B=((ce=c.popover)==null?void 0:ce.onCloseClick)||s("onCloseClick");G({...c,popover:{showButtons:E,nextBtnText:u?void 0:m,disableButtons:[...h?[]:["previous"]],showProgress:C,progressText:x,onNextClick:L||(()=>{u?v(a+1):g()}),onPrevClick:$||(()=>{v(a-1)}),onCloseClick:B||(()=>{g()}),...(c==null?void 0:c.popover)||{}}})}function g(a=!0){const p=l("__activeElement"),c=l("__activeStep"),u=l("__activeOnDestroyed"),h=s("onDestroyStarted");if(a&&h){const C=!p||(p==null?void 0:p.id)==="driver-dummy-element";h(C?void 0:p,c,{config:s(),state:l(),driver:k()});return}const m=(c==null?void 0:c.onDeselected)||s("onDeselected"),b=s("onDestroyed");if(document.body.classList.remove("driver-active","driver-fade","driver-simple"),ke(),Le(),Ce(),me(),de(),X(),p&&c){const C=p.id==="driver-dummy-element";m&&m(C?void 0:p,c,{config:s(),state:l(),driver:k()}),b&&b(C?void 0:p,c,{config:s(),state:l(),driver:k()})}u&&u.focus()}const y={isActive:()=>l("isInitialized")||!1,refresh:H,drive:(a=0)=>{r(),v(a)},setConfig:V,setSteps:a=>{X(),V({...s(),steps:a})},getConfig:s,getState:l,getActiveIndex:()=>l("activeIndex"),isFirstStep:()=>l("activeIndex")===0,isLastStep:()=>{const a=s("steps")||[],p=l("activeIndex");return p!==void 0&&p===a.length-1},getActiveStep:()=>l("activeStep"),getActiveElement:()=>l("activeElement"),getPreviousElement:()=>l("previousElement"),getPreviousStep:()=>l("previousStep"),moveNext:i,movePrevious:d,moveTo:n,hasNextStep:()=>{const a=s("steps")||[],p=l("activeIndex");return p!==void 0&&!!a[p+1]},hasPreviousStep:()=>{const a=s("steps")||[],p=l("activeIndex");return p!==void 0&&!!a[p-1]},highlight:a=>{r(),G({...a,popover:a.popover?{showButtons:[],showProgress:!1,progressText:"",...a.popover}:void 0})},destroy:()=>{g(!1)}};return le(y),y}return F.driver=Ae,Object.defineProperty(F,Symbol.toStringTag,{value:"Module"}),F}({});</script>
+</head>
+<body>
+
+<!-- TTS Bar -->
+<div id="tts-bar">
+  <button id="tts-play-btn" class="tts-btn" onclick="ttsToggle()">▶ 朗讀全文</button>
+  <button class="tts-btn" onclick="ttsStop()" title="停止並重設">⏹</button>
+  <div class="tts-sep"></div>
+  <div class="tts-dots" id="tts-dots"></div>
+  <div class="tts-sep"></div>
+  <span class="tts-section" id="tts-section-name">點擊「朗讀全文」開始</span>
+  <select id="tts-speed" title="語速" onchange="ttsSetRate(this.value)">
+    <option value="0.8">0.8×</option>
+    <option value="0.9" selected>0.9×</option>
+    <option value="1.0">1.0×</option>
+    <option value="1.1">1.1×</option>
+    <option value="1.2">1.2×</option>
+  </select>
+  <div class="tts-sep"></div>
+  <span style="font-size:11px;color:#8A7A5A;">🔊</span>
+  <input type="range" id="tts-vol" min="0" max="1" step="0.05" value="1"
+         style="width:60px;accent-color:var(--gold);cursor:pointer;" title="音量">
+  <div class="tts-sep"></div>
+  <button class="tts-btn" onclick="adjustPageFont(-1)" style="padding:4px 9px;font-size:11px;font-weight:900;" title="縮小字體">A−</button>
+  <button class="tts-btn" onclick="adjustPageFont(1)"  style="padding:4px 9px;font-size:11px;font-weight:900;" title="放大字體">A+</button>
+</div>
+
+<button id="layout-reset-btn" onclick="window.resetLayout && window.resetLayout()" title="重設版面排列">↺ 重設版面</button>
+<div id="tts-subtitle"></div>
+
+<!-- Edit Button -->
+<button id="edit-btn" onclick="toggleEditMode()" title="Ctrl+E">
+  <span id="edit-icon">✏️</span>
+  <span id="edit-label">編輯模式</span>
+</button>
+
+<!-- Edit Toolbar -->
+<div id="edit-toolbar">
+  <div class="et-hint" id="et-hint">← 點擊頁面任意文字開始編輯</div>
+  <div class="et-group" id="et-controls" style="display:none;">
+    <div class="et-item">
+      <div class="et-label">字體</div>
+      <select id="et-font" onchange="applyStyle('fontFamily', this.value)">
+        <option value='"PingFang TC","Microsoft JhengHei",sans-serif'>PingFang TC</option>
+        <option value='Georgia,"Times New Roman",serif'>Georgia</option>
+        <option value='system-ui,sans-serif'>System UI</option>
+        <option value='"Courier New",monospace'>等寬字體</option>
+      </select>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">大小</div>
+      <div class="et-size-ctrl">
+        <button class="et-btn-sm" onclick="adjustSize(-1)">−</button>
+        <span id="et-size-val">16</span>
+        <button class="et-btn-sm" onclick="adjustSize(1)">+</button>
+      </div>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button id="et-bold"   class="et-fmt-btn" onclick="toggleBold()"><b>B</b></button>
+      <button id="et-italic" class="et-fmt-btn" onclick="toggleItalic()"><i>I</i></button>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">顏色</div>
+      <input type="color" id="et-color" oninput="applyStyle('color', this.value)" title="文字顏色">
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">行距</div>
+      <input type="range" id="et-lh" min="1" max="3" step="0.05" value="1.4"
+             oninput="applyStyle('lineHeight', this.value); document.getElementById('et-lh-val').textContent = parseFloat(this.value).toFixed(1);">
+      <span id="et-lh-val" style="font-size:11px;min-width:22px;">1.4</span>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button class="et-action-btn" onclick="resetElement()">重設</button>
+      <button class="et-action-btn" id="et-copy-btn" onclick="copyHtml()">複製</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ MAIN PAGE ═══════════════════ -->
+<div class="page" id="drag-canvas">
+
+  <!-- Course Tag -->
+  <div class="course-tag" data-drag-id="l7-course-tag">📚 期權小學堂 · 第7課</div>
+
+  <!-- Header -->
+  <div data-drag-id="l7-header">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Put 反推計算器 📊</div>
+        <div class="page-subtitle">BSM Reverse Calculator — 股價需跌多少，Put Premium 才夠吸引人？</div>
+        <div class="page-desc">手動輸入期權鏈數值，選定行權價，設定目標 Premium，即時用 BSM 二分法反推股價需下跌的幅度。</div>
+      </div>
+      <div class="contract-box">
+        <div class="cb-title">🔢 計算流程</div>
+        <div class="cb-ticker">BSM <small>· 反推</small></div>
+        <div class="cb-grid">
+          <div class="cb-item"><div class="ci-l">① 輸入</div><div class="ci-v">期權鏈</div></div>
+          <div class="cb-item"><div class="ci-l">② 選擇</div><div class="ci-v">行權價</div></div>
+          <div class="cb-item"><div class="ci-l">③ 設定</div><div class="ci-v gold">目標 Premium</div></div>
+          <div class="cb-item"><div class="ci-l">④ 得出</div><div class="ci-v green">需跌幅度</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 1: Input Form + Chain Table -->
+  <div class="full-card" data-drag-id="l7-chain-input" id="l7-chain-input">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge">1</div>
+        <div class="pill-outline setup">OPTION CHAIN</div>
+      </div>
+      <div class="pill setup" id="ticker-badge">—</div>
+    </div>
+    <div class="ptitle">輸入期權鏈數據 — 每行按「+ 新增」加入</div>
+
+
+    <div class="stock-price-row">
+      <label class="sp-label">股票現價 S</label>
+      <span class="sp-prefix">$</span>
+      <input type="number" id="in-stock-price" class="sp-input" value="14.90"
+             step="0.01" min="0.01" placeholder="14.90"
+             oninput="onStockPriceInput(this.value)">
+      <span class="sp-hint">調整後即時更新所有計算</span>
+    </div>
+
+    <div class="opt-type-row">
+      <span class="opt-type-label">期權類型</span>
+      <div class="opt-type-toggle">
+        <button id="opt-btn-put"  class="opt-type-btn active" onclick="setOptionType('put')">📉 Put</button>
+        <button id="opt-btn-call" class="opt-type-btn"        onclick="setOptionType('call')">📈 Call</button>
+      </div>
+    </div>
+    <div class="input-form-row">
+      <div class="field-grp w-ticker">
+        <label>股票代號</label>
+        <input type="text" id="in-ticker" placeholder="NOK" maxlength="8"
+               oninput="onTickerChange(this.value)" title="輸入股票代號（如 NOK、AAPL）">
+      </div>
+      <div class="field-grp w-expiry">
+        <label>到期日</label>
+        <input type="text" id="in-expiry" placeholder="2026-06-18">
+      </div>
+      <div class="field-grp w-dte">
+        <label>DTE</label>
+        <input type="number" id="in-dte" placeholder="28" min="1" max="730">
+      </div>
+      <div class="field-grp w-k">
+        <label>行權價 K *</label>
+        <input type="number" id="in-k" placeholder="14.50" step="0.5" min="0.01">
+      </div>
+      <div class="field-grp w-iv">
+        <label>IV (%) *</label>
+        <input type="number" id="in-iv" placeholder="68.85" step="0.01" min="0.01">
+      </div>
+      <div class="field-grp w-delta">
+        <label id="in-delta-label">Put Delta</label>
+        <input type="number" id="in-delta" placeholder="-0.5042" step="0.0001">
+      </div>
+      <div class="field-grp w-itm">
+        <label>ITM Prob %</label>
+        <input type="number" id="in-itm" placeholder="45.34" step="0.01" min="0" max="100">
+      </div>
+      <div class="field-grp w-mkt">
+        <label id="in-mkt-label">Put 市價</label>
+        <input type="number" id="in-mkt" placeholder="1.20" step="0.01" min="0">
+      </div>
+      <div class="field-grp w-itm">
+        <label>IV PR %</label>
+        <input type="number" id="in-iv-pr" placeholder="75" step="1" min="0" max="100">
+      </div>
+      <button class="btn-add" onclick="addStrike()">+ 新增</button>
+      <button class="btn-clear-all" onclick="clearAll()">清除全部</button>
+    </div>
+
+    <div class="chain-table-wrap">
+      <table class="chain-table">
+        <thead>
+          <tr>
+            <th>到期日</th>
+            <th>DTE</th>
+            <th>行權價</th>
+            <th>IV</th>
+            <th id="th-delta">Put Delta</th>
+            <th>ITM Prob</th>
+            <th>OTM 距離</th>
+            <th id="th-mkt">Put 市價</th>
+            <th>IV PR <button id="iv-pr-info-btn" onclick="showIVPRExplain()" style="all:unset;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#D4900A;color:#fff;font-size:10px;font-weight:900;margin-left:4px;vertical-align:middle;" title="IV PR 說明">?</button></th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="chain-tbody">
+          <tr><td colspan="10" class="chain-empty">尚未新增行權價 — 填入上方欄位後按「+ 新增」</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Section 2: Selected Strike Info Card -->
+  <div class="full-card" data-drag-id="l7-info-card" id="l7-info-card">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge">2</div>
+        <div class="pill-outline chart">SELECTED STRIKE</div>
+      </div>
+      <div class="pill chart" id="info-k-label">選定行權價資訊</div>
+    </div>
+    <div id="info-card-content">
+      <div class="info-placeholder">↑ 點擊上方表格中的任意一行，即可查看詳細資訊並開始計算</div>
+    </div>
+  </div>
+
+  <!-- Section 3+4: Sliders / Target — 並排 -->
+  <div class="panels" id="sliders-target-row">
+  <div class="panel" data-drag-id="l7-sliders" id="panel-sliders">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge">3</div>
+        <div class="pill-outline gold">PARAMETERS</div>
+      </div>
+      <div class="pill gold">微調參數</div>
+    </div>
+    <div class="ptitle">調整股價與無風險利率</div>
+    <div class="slider-rows">
+      <div class="slider-row">
+        <label>當前股價 S</label>
+        <input type="range" id="slider-s" min="5" max="50" step="0.01" value="14.90"
+               oninput="onSliderS(this.value)">
+        <input type="number" id="input-s" class="price-input" value="14.90"
+               step="0.01" min="0.01" oninput="onInputS(this.value)" title="直接輸入股價">
+      </div>
+      <div class="slider-row">
+        <label>無風險利率</label>
+        <input type="range" id="slider-r" min="1" max="8" step="0.1" value="4.5"
+               oninput="onSliderR(this.value)">
+        <div class="slider-val" id="val-r">4.5%</div>
+      </div>
+    </div>
+    <div class="hint-note">📌 調整股價 slider 會即時更新表格中的 OTM 距離、資訊卡及計算結果。無風險利率通常設為美國短期國債殖利率。</div>
+  </div>
+
+  <!-- Section 4: Target Premium (right half) -->
+  <div class="panel" data-drag-id="l7-target" id="panel-target">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge">4</div>
+        <div class="pill-outline gold">TARGET PREMIUM</div>
+      </div>
+      <div class="pill gold">目標 Premium</div>
+    </div>
+    <div class="mode-toggle-row">
+      <button class="mode-btn active" id="mode-btn-a" onclick="setCalcMode('A')">📉 反推股價</button>
+      <button class="mode-btn"        id="mode-btn-b" onclick="setCalcMode('B')">📈 反推 IV</button>
+    </div>
+    <div class="ptitle" id="target-ptitle">我希望 Put 權利金達到多少？</div>
+    <div class="target-row">
+      <div class="target-label">目標</div>
+      <input type="number" class="target-input" id="target-premium"
+             value="2.00" step="0.05" min="0.05" oninput="calcResult()">
+      <div class="target-unit">美元 / 口</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div class="target-current">市場現價 <span id="current-mkt-badge" style="font-weight:800;color:var(--gold);">—</span></div>
+      <div class="target-current">BSM 理論 <span id="current-put-badge" style="color:var(--blue);">—</span></div>
+    </div>
+    <div class="hint-note">💡 股價越低，Put 越貴。若目前 Put 已達目標，下方顯示提示。<br>S slider 往左拖也可以手動模擬股價下跌後的 Put 估值。</div>
+  </div>
+
+  </div><!-- .panels sliders-target-row -->
+
+  <!-- Section 5: Results -->
+  <div class="full-card" data-drag-id="l7-result" id="l7-result">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge">5</div>
+        <div class="pill-outline red">RESULT</div>
+      </div>
+      <div class="pill red">計算結果</div>
+    </div>
+    <div id="result-content">
+      <div class="result-placeholder">選定行權價並設定目標 Premium 後，計算結果將顯示於此</div>
+    </div>
+  </div>
+
+  <!-- Section 6: Iteration Details -->
+  <div class="full-card" data-drag-id="l7-detail" id="l7-detail">
+    <div class="tag-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="step-badge">6</div>
+        <div class="pill-outline setup">ALGORITHM</div>
+      </div>
+      <div class="pill setup">二分法迭代</div>
+    </div>
+    <details class="iter-wrap" id="iter-details-wrap">
+      <summary>▸ 查看二分法迭代過程（前8步）</summary>
+      <div class="iter-code" id="iter-content">尚無迭代資料 — 請先選定行權價並設定目標 Premium</div>
+    </details>
+    <div class="hint-note">
+      BSM 無法直接從 Put 價格倒推股價，改用<strong>二分搜尋法</strong>逐步逼近：<br>
+      在 [0.01, S] 區間反覆對分 → 計算中點的 BSM Put → 誤差 &lt; $0.00005 即停止，通常 20–50 步收斂。<br>
+      <strong>diff &gt; 0</strong>（Put 太高）→ lo = mid，往高股價找；<strong>diff &lt; 0</strong>（Put 太低）→ hi = mid，往低股價找。
+    </div>
+  </div>
+
+</div><!-- end #drag-canvas -->
+
+<!-- ═══════════════════ Calculator JS ═══════════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  var allChain   = { put: {}, call: {} };
+  function cd() { return allChain[optionType]; }
+  var selectedK  = null;
+  var stockPrice = 14.90;
+  var tickerSymbol = '';
+  var _editingK = null;
+  var calcMode  = 'A';
+  var optionType = 'put'; // 'put' or 'call'
+  var riskRate   = 0.045;
+
+  /* ── BSM ─────────────────────────────── */
+  function ncdf(x) {
+    var a = [0.254829592, -0.284496736, 1.421413741, -1.453152027, 1.061405429];
+    var p = 0.3275911;
+    var sign = x < 0 ? -1 : 1;
+    x = Math.abs(x) / Math.sqrt(2);
+    var t = 1 / (1 + p * x);
+    var y = 1 - (((((a[4]*t+a[3])*t+a[2])*t+a[1])*t+a[0])*t) * Math.exp(-x*x);
+    return 0.5 * (1 + sign * y);
+  }
+
+  function bsmPut(S, K, T, r, sigma) {
+    if (S <= 0 || T <= 0 || sigma <= 0) return { put: NaN, delta: NaN, itm: NaN };
+    var d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+    var d2 = d1 - sigma * Math.sqrt(T);
+    return {
+      put:   K * Math.exp(-r * T) * ncdf(-d2) - S * ncdf(-d1),
+      delta: -ncdf(-d1),
+      itm:   ncdf(-d2) * 100
+    };
+  }
+
+
+  function bsmCall(S, K, T, r, sigma) {
+    if (S <= 0 || T <= 0 || sigma <= 0) return { call: NaN, delta: NaN, itm: NaN };
+    var d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+    var d2 = d1 - sigma * Math.sqrt(T);
+    return {
+      call:  S * ncdf(d1) - K * Math.exp(-r * T) * ncdf(d2),
+      delta: ncdf(d1),
+      itm:   ncdf(d2) * 100
+    };
+  }
+
+  function inversePut(S_cur, K, T, r, sigma, target) {
+    var lo = 0.01, hi = S_cur;
+    var steps = [];
+    for (var i = 0; i < 80; i++) {
+      var mid  = (lo + hi) / 2;
+      var res  = bsmPut(mid, K, T, r, sigma);
+      var diff = res.put - target;
+      if (i < 8) {
+        steps.push('步驟 ' + (i + 1) + '：S = ' + mid.toFixed(3) +
+                   '，Put = ' + res.put.toFixed(4) +
+                   '，誤差 = ' + diff.toFixed(5));
+      }
+      if (Math.abs(diff) < 0.00005) return { S: mid, steps: steps, delta: res.delta, itm: res.itm };
+      if (diff > 0) lo = mid; else hi = mid;
+    }
+    var fS  = (lo + hi) / 2;
+    var fR  = bsmPut(fS, K, T, r, sigma);
+    return { S: fS, steps: steps, delta: fR.delta, itm: fR.itm };
+  }
+
+  function inverseCall(S_cur, K, T, r, sigma, target) {
+    var lo = S_cur, hi = S_cur * 20;
+    var steps = [];
+    for (var i = 0; i < 80; i++) {
+      var mid  = (lo + hi) / 2;
+      var res  = bsmCall(mid, K, T, r, sigma);
+      var diff = res.call - target;
+      if (i < 8) {
+        steps.push('步驟 ' + (i + 1) + '：S = ' + mid.toFixed(3) +
+                   '，Call = ' + res.call.toFixed(4) +
+                   '，誤差 = ' + diff.toFixed(5));
+      }
+      if (Math.abs(diff) < 0.00005) return { S: mid, steps: steps, delta: res.delta, itm: res.itm };
+      if (diff > 0) hi = mid; else lo = mid;
+    }
+    var fS = (lo + hi) / 2;
+    var fR = bsmCall(fS, K, T, r, sigma);
+    return { S: fS, steps: steps, delta: fR.delta, itm: fR.itm };
+  }
+
+
+  /* ── Inverse IV (Mode B) ─────────────── */
+  function inverseIV(S, K, T, r, target) {
+    var lo = 0.001, hi = 20.0;
+    var steps = [];
+    var isCall = (optionType === 'call');
+    for (var i = 0; i < 80; i++) {
+      var mid  = (lo + hi) / 2;
+      var res  = isCall ? bsmCall(S, K, T, r, mid) : bsmPut(S, K, T, r, mid);
+      var px   = isCall ? res.call : res.put;
+      var diff = px - target;
+      if (i < 8) {
+        steps.push('步驟 ' + (i + 1) + '：IV = ' + (mid * 100).toFixed(2) +
+                   '%，' + (isCall ? 'Call' : 'Put') + ' = ' + px.toFixed(4) +
+                   '，誤差 = ' + diff.toFixed(5));
+      }
+      if (Math.abs(diff) < 0.00005) return { iv: mid, steps: steps, delta: res.delta, itm: res.itm };
+      if (diff > 0) hi = mid; else lo = mid;
+    }
+    var fM = (lo + hi) / 2;
+    var fR = isCall ? bsmCall(S, K, T, r, fM) : bsmPut(S, K, T, r, fM);
+    return { iv: fM, steps: steps, delta: fR.delta, itm: fR.itm };
+  }
+
+  /* ── Add Strike ──────────────────────── */
+  window.addStrike = function () {
+    var kEl     = document.getElementById('in-k');
+    var ivEl    = document.getElementById('in-iv');
+    var expEl   = document.getElementById('in-expiry');
+    var dteEl   = document.getElementById('in-dte');
+    var deltaEl = document.getElementById('in-delta');
+    var itmEl   = document.getElementById('in-itm');
+
+    var k  = parseFloat(kEl.value);
+    var iv = parseFloat(ivEl.value);
+    if (isNaN(k) || k <= 0)  { alert('請輸入有效的行權價 K'); kEl.focus();  return; }
+    if (isNaN(iv) || iv <= 0) { alert('請輸入有效的 IV (%)'); ivEl.focus(); return; }
+
+    var mktEl  = document.getElementById('in-mkt');
+    var expiry = expEl.value.trim();
+    var dte    = parseInt(dteEl.value)    || 28;
+    var delta  = deltaEl.value.trim() !== '' ? parseFloat(deltaEl.value) : null;
+    var itm    = itmEl.value.trim()   !== '' ? parseFloat(itmEl.value)   : null;
+    var mkt    = mktEl && mktEl.value.trim() !== '' ? parseFloat(mktEl.value) : null;
+    var ivPrEl = document.getElementById('in-iv-pr');
+    var ivPr   = ivPrEl && ivPrEl.value.trim() !== '' ? parseFloat(ivPrEl.value) : null;
+
+    cd()[k] = { expiry: expiry, dte: dte, iv: iv, put_delta: delta, itm_prob: itm, market_price: mkt, iv_pr: ivPr };
+
+    kEl.value = ''; ivEl.value = ''; deltaEl.value = ''; itmEl.value = '';
+    if (mktEl) mktEl.value = '';
+    if (ivPrEl) ivPrEl.value = '';
+    updateTable();
+    if (selectedK === null) { selectStrike(k); } else { calcResult(); }
+    requestAnimationFrame(function () { requestAnimationFrame(reflow); });
+  };
+
+  /* ── Remove Strike ───────────────────── */
+  window.removeStrike = function (k) {
+    delete cd()[k];
+    if (selectedK == k) { selectedK = null; renderInfoCard(); }
+    updateTable();
+    calcResult();
+    requestAnimationFrame(function () { requestAnimationFrame(reflow); });
+  };
+
+
+  /* ── Edit Strike (inline) ────────────── */
+  window.editStrike = function (k) {
+    var d = cd()[k];
+    if (!d) return;
+    _editingK = k;
+    var tbody = document.getElementById('chain-tbody');
+    var row = tbody.querySelector('tr[data-k="' + k + '"]');
+    if (!row) return;
+    var otm = stockPrice > 0 ? ((parseFloat(k) - stockPrice) / stockPrice * 100) : null;
+    var otmStr = otm != null ? (otm >= 0 ? '+' : '') + otm.toFixed(1) + '%' : '—';
+    var otmCls = otm == null ? 'col-muted' : (otm > 0 ? 'col-green' : 'col-red');
+    row.className = 'chain-row editing selected';
+    row.onclick = null;
+    row.innerHTML =
+      '<td><input class="edit-inp" value="' + (d.expiry||'') + '" placeholder="2026-06-18" oninput="saveEditField(' + k + ',\'expiry\',this.value)"></td>' +
+      '<td><input class="edit-inp edit-num" type="number" value="' + d.dte + '" min="1" step="1" oninput="saveEditField(' + k + ',\'dte\',this.value)"></td>' +
+      '<td class="k-cell">$' + parseFloat(k).toFixed(2) + '</td>' +
+      '<td><input class="edit-inp edit-num" type="number" value="' + d.iv.toFixed(2) + '" step="0.01" min="0.01" oninput="saveEditField(' + k + ',\'iv\',this.value)"></td>' +
+      '<td><input class="edit-inp edit-num" type="number" value="' + (d.put_delta!=null?d.put_delta:'') + '" step="0.0001" placeholder="選填" oninput="saveEditField(' + k + ',\'put_delta\',this.value)"></td>' +
+      '<td><input class="edit-inp edit-num" type="number" value="' + (d.itm_prob!=null?d.itm_prob:'') + '" step="0.01" placeholder="選填" oninput="saveEditField(' + k + ',\'itm_prob\',this.value)"></td>' +
+      '<td class="' + otmCls + '">' + otmStr + '</td>' +
+      '<td><input class="edit-inp edit-num" type="number" value="' + (d.market_price!=null?d.market_price:'') + '" step="0.01" placeholder="選填" oninput="saveEditField(' + k + ',\'market_price\',this.value)"></td>' +
+      '<td><input class="edit-inp edit-num" type="number" value="' + (d.iv_pr!=null?d.iv_pr:'') + '" step="1" min="0" max="100" placeholder="選填" oninput="saveEditField(' + k + ',\'iv_pr\',this.value)"></td>' +
+      '<td><button class="btn-done" onclick="event.stopPropagation();_editingK=null;updateTable()">✓ 完成</button></td>';
+  };
+  window.saveEditField = function (k, field, value) {
+    if (!cd()[k]) return;
+    if (field === 'expiry') {
+      cd()[k].expiry = value.trim();
+    } else {
+      var val = parseFloat(value);
+      if (field === 'dte'          && !isNaN(val) && val >= 1) cd()[k].dte = Math.round(val);
+      else if (field === 'iv'      && !isNaN(val) && val > 0)  cd()[k].iv  = val;
+      else if (field === 'put_delta')   cd()[k].put_delta   = isNaN(val) ? null : val;
+      else if (field === 'itm_prob')    cd()[k].itm_prob    = isNaN(val) ? null : val;
+      else if (field === 'market_price') cd()[k].market_price = isNaN(val) ? null : val;
+      else if (field === 'iv_pr')         cd()[k].iv_pr        = isNaN(val) ? null : val;
+    }
+    renderInfoCard();
+    calcResult();
+  };
+
+  /* ── Clear All ───────────────────────── */
+  window.clearAll = function () {
+    if (!confirm('確定清除所有已輸入的行權價？')) return;
+    allChain[optionType] = {}; selectedK = null;
+    updateTable(); renderInfoCard(); calcResult();
+    requestAnimationFrame(function () { requestAnimationFrame(reflow); });
+  };
+
+  /* ── Select Strike ───────────────────── */
+  window.selectStrike = function (k) {
+    selectedK = k;
+    // Sync slider max to a sensible range around K
+    var kNum = parseFloat(k);
+    var sliderEl = document.getElementById('slider-s');
+    if (sliderEl) {
+      var curMax = parseFloat(sliderEl.max);
+      if (kNum * 1.5 > curMax) sliderEl.max = Math.ceil(kNum * 2);
+    }
+    updateTable(); renderInfoCard(); calcResult();
+    requestAnimationFrame(function () { requestAnimationFrame(reflow); });
+  };
+
+  /* ── Update Table ────────────────────── */
+  function updateTable() {
+    var tbody = document.getElementById('chain-tbody');
+    var keys  = Object.keys(cd()).map(Number).sort(function (a, b) { return a - b; });
+    if (keys.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" class="chain-empty">尚未新增行權價 — 填入上方欄位後按「+ 新增」</td></tr>';
+      return;
+    }
+    tbody.innerHTML = keys.map(function (k) {
+      var d   = cd()[k];
+      var sel = selectedK == k;
+      var otm = stockPrice > 0 ? ((k - stockPrice) / stockPrice * 100) : null;
+      var otmStr = otm != null ? (otm >= 0 ? '+' : '') + otm.toFixed(1) + '%' : '—';
+      var otmCls = otm == null ? 'col-muted' : (otm > 0 ? 'col-green' : 'col-red');
+      var dStr   = d.put_delta    != null ? d.put_delta.toFixed(4) : '—';
+      var iStr   = d.itm_prob    != null ? d.itm_prob.toFixed(2) + '%' : '—';
+      var mktStr = d.market_price != null ? '$' + d.market_price.toFixed(2) : '—';
+      var mktCls = d.market_price != null ? 'col-gold' : 'col-muted';
+      return '<tr class="chain-row' + (sel ? ' selected' : '') + '" data-k="' + k + '" onclick="selectStrike(' + k + ')">' +
+        '<td class="col-muted">' + (d.expiry || '—') + '</td>' +
+        '<td class="col-muted">' + d.dte + 'd</td>' +
+        '<td class="k-cell">$' + parseFloat(k).toFixed(2) + '</td>' +
+        '<td>' + d.iv.toFixed(2) + '%</td>' +
+        '<td class="' + (d.put_delta != null ? 'col-red' : 'col-muted') + '">' + dStr + '</td>' +
+        '<td class="col-muted">' + iStr + '</td>' +
+        '<td class="' + otmCls + '">' + otmStr + '</td>' +
+        '<td class="' + mktCls + '">' + mktStr + '</td>' +
+        '<td class="' + (d.iv_pr != null ? 'col-gold' : 'col-muted') + '">' + (d.iv_pr != null ? d.iv_pr.toFixed(0) + '%' : '—') + '</td>' +
+        '<td><button class="btn-del" onclick="event.stopPropagation();removeStrike(' + k + ')">刪除</button>' +
+        '<button class="btn-edit" onclick="event.stopPropagation();editStrike(' + k + ')">編輯</button></td>' +
+        '</tr>';
+    }).join('');
+    if (_editingK !== null && cd()[_editingK]) { editStrike(_editingK); }
+  }
+
+  /* ── Render Info Card ────────────────── */
+  function renderInfoCard() {
+    var el    = document.getElementById('info-card-content');
+    var label = document.getElementById('info-k-label');
+    if (selectedK === null || !cd()[selectedK]) {
+      if (label) label.textContent = '選定行權價資訊';
+      el.innerHTML = '<div class="info-placeholder">↑ 點擊上方表格中的任意一行，即可查看詳細資訊並開始計算</div>';
+      return;
+    }
+    var d    = cd()[selectedK];
+    var kNum = parseFloat(selectedK);
+    if (label) label.textContent = (tickerSymbol ? tickerSymbol + ' · ' : '') + 'K = $' + kNum.toFixed(2);
+
+    var T     = d.dte / 365;
+    var sigma = d.iv / 100;
+    var bsm   = bsmPut(stockPrice, kNum, T, riskRate, sigma);
+    var otm   = stockPrice > 0 ? ((kNum - stockPrice) / stockPrice * 100) : 0;
+    var otmCls = otm >= 0 ? 'green' : 'red';
+
+    var deltaDisplay = d.put_delta  != null ? d.put_delta.toFixed(4)   : (isNaN(bsm.delta) ? '—' : bsm.delta.toFixed(4));
+    var itmDisplay   = d.itm_prob   != null ? d.itm_prob.toFixed(2) + '%' : (isNaN(bsm.itm) ? '—' : bsm.itm.toFixed(2) + '%');
+
+    el.innerHTML =
+      '<div class="info-grid-top">' +
+        '<div class="info-item"><div class="il">到期日</div><div class="iv">' + (d.expiry || '—') + '</div></div>' +
+        '<div class="info-item"><div class="il">DTE</div><div class="iv">' + d.dte + ' 天</div></div>' +
+        '<div class="info-item"><div class="il">IV (σ)</div><div class="iv gold">' + d.iv.toFixed(2) + '%</div></div>' +
+      '</div>' +
+      '<div class="info-grid-bot">' +
+        '<div class="info-item"><div class="il">Put Delta</div><div class="iv red">' + deltaDisplay + '</div></div>' +
+        '<div class="info-item"><div class="il">ITM Prob</div><div class="iv blue">' + itmDisplay + '</div></div>' +
+        '<div class="info-item"><div class="il">OTM 距離</div><div class="iv ' + otmCls + '">' + (otm >= 0 ? '+' : '') + otm.toFixed(2) + '%</div></div>' +
+        '<div class="info-item"><div class="il">當前股價 S</div><div class="iv">$' + stockPrice.toFixed(2) + '</div></div>' +
+        '<div class="info-item"><div class="il">Put 市場現價</div><div class="iv gold">' + (d.market_price != null ? '$' + d.market_price.toFixed(2) : '—') + '</div></div>' +
+        '<div class="info-item"><div class="il">IV PR</div><div class="iv ' + (d.iv_pr != null ? (d.iv_pr >= 50 ? 'red' : 'green') + '" style="font-weight:700' : 'col-muted') + '">' + (d.iv_pr != null ? d.iv_pr.toFixed(0) + '%' : '—') + '</div></div>' +
+        '<div class="info-item"><div class="il">Put BSM 理論價</div><div class="iv ' + (isNaN(bsm.put) ? 'col-muted' : 'blue') + '">' + (isNaN(bsm.put) ? '—' : '$' + bsm.put.toFixed(3)) + '</div></div>' +
+      '</div>';
+  }
+
+  /* ── Calc Result ─────────────────────── */
+  window.calcResult = function calcResult() {
+    var resultEl = document.getElementById('result-content');
+    var badgeEl  = document.getElementById('current-put-badge');
+
+    if (!_editingK) updateTable();
+    renderInfoCard();
+
+    if (selectedK === null || !cd()[selectedK]) {
+      if (badgeEl) badgeEl.textContent = '—';
+      resultEl.innerHTML = '<div class="result-placeholder">選定行權價並設定目標 Premium 後，計算結果將顯示於此</div>';
+      return;
+    }
+
+    var d      = cd()[selectedK];
+    var kNum   = parseFloat(selectedK);
+    var T      = d.dte / 365;
+    var sigma  = d.iv / 100;
+    var target = parseFloat(document.getElementById('target-premium').value);
+
+    if (isNaN(target) || target <= 0) {
+      resultEl.innerHTML = '<div class="result-placeholder">請輸入有效的目標 Premium（大於 0）</div>';
+      return;
+    }
+
+    var isCall   = (optionType === 'call');
+    var typeLabel = isCall ? 'Call' : 'Put';
+    var bsm      = isCall ? bsmCall(stockPrice, kNum, T, riskRate, sigma) : bsmPut(stockPrice, kNum, T, riskRate, sigma);
+    var bsmPrice = isCall ? bsm.call : bsm.put;
+    var mktBdg   = document.getElementById('current-mkt-badge');
+    if (badgeEl) badgeEl.textContent = isNaN(bsmPrice) ? '—' : '$' + bsmPrice.toFixed(3);
+    if (mktBdg)  mktBdg.textContent  = d.market_price != null ? '$' + d.market_price.toFixed(2) : '—';
+
+    if (isNaN(bsmPrice)) {
+      resultEl.innerHTML = '<div class="result-placeholder">BSM 計算失敗，請確認 IV 與 DTE 均大於零</div>';
+      return;
+    }
+
+    var currentPrice = (d.market_price != null) ? d.market_price : bsmPrice;
+    var currentLabel = (d.market_price != null) ? '市場現價' : 'BSM 理論價';
+
+    /* ── Mode A: 反推股價 ── */
+    if (calcMode !== 'B') {
+      if (currentPrice >= target) {
+        resultEl.innerHTML =
+          '<div class="result-warning">✅ 目前 ' + currentLabel + ' 已達 <strong>$' + currentPrice.toFixed(3) + '</strong>，' +
+          '已超過目標 <strong>$' + target.toFixed(2) + '</strong>，無需股價' + (isCall ? '上漲' : '下跌') + '。<br>' +
+          '現在就是賣出 ' + typeLabel + ' 的好時機！</div>';
+        document.getElementById('iter-content').textContent = '目前 ' + typeLabel + ' 已達目標，無需反推。';
+        saveState(); return;
+      }
+      var inv = isCall
+        ? inverseCall(stockPrice, kNum, T, riskRate, sigma, target)
+        : inversePut(stockPrice, kNum, T, riskRate, sigma, target);
+      var changeAbs   = isCall ? (inv.S - stockPrice) : (stockPrice - inv.S);
+      var changePct   = (changeAbs / stockPrice) * 100;
+      var clr         = isCall ? 'var(--green)' : 'var(--red)';
+      var priceLabel  = isCall ? '股價需漲至' : '股價需跌至';
+      var changeWord  = isCall ? '上漲' : '下跌';
+      var dirChar     = isCall ? '漲' : '跌';
+      var assignLabel = isCall ? '到達目標股價時，被 Call 走機率' : '到達目標股價時，被 Assign 機率';
+      var aBoxStyle   = isCall ? 'background:var(--green-bg);border-color:var(--green-bdr);' : '';
+      var aLblStyle   = isCall ? 'color:var(--green);' : '';
+      var aValStyle   = isCall ? 'color:var(--green);' : '';
+      var infoBtn     = isCall
+        ? ' <button id=\'call-assign-info-btn\' onclick=\'showCallExplain()\' style=\'all:unset;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#D4900A;color:#fff;font-size:11px;font-weight:900;margin-left:6px;vertical-align:middle;\' title=\'計算說明\'>?</button>'
+        : ' <button id=\'assign-info-btn\' onclick=\'showAssignExplain()\' style=\'all:unset;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#D4900A;color:#fff;font-size:11px;font-weight:900;margin-left:6px;vertical-align:middle;\' title=\'計算說明\'>?</button>';
+      resultEl.innerHTML =
+        '<div class="result-main-area">' +
+          '<div class="result-label">' + priceLabel + '</div>' +
+          '<div class="result-price" style="color:' + clr + '">$' + inv.S.toFixed(2) + '</div>' +
+          '<div class="result-change" style="color:' + clr + '">需' + changeWord + ' ' + changePct.toFixed(2) + '%（' + dirChar + ' $' + changeAbs.toFixed(2) + '）</div>' +
+        '</div>' +
+        '<div class="result-metrics">' +
+          '<div class="metric-card"><div class="mc-label">目前 ' + typeLabel + ' 理論價</div><div class="mc-value">$' + bsmPrice.toFixed(3) + '</div></div>' +
+          '<div class="metric-card"><div class="mc-label">目標時 ' + typeLabel + ' Delta</div><div class="mc-value">' + (inv.delta != null && !isNaN(inv.delta) ? inv.delta.toFixed(4) : '—') + '</div></div>' +
+        '</div>' +
+        '<div class="assign-box" id="' + (isCall ? 'call-assign-box' : 'assign-box') + '" style="' + aBoxStyle + '">' +
+          '<div class="ab-label" style="' + aLblStyle + '">' + assignLabel + infoBtn + '</div>' +
+          '<div class="ab-value" style="' + aValStyle + '">' + (inv.itm != null && !isNaN(inv.itm) ? inv.itm.toFixed(2) + '%' : '—') + '</div>' +
+        '</div>';
+      var iterEl = document.getElementById('iter-content');
+      if (iterEl) iterEl.textContent = inv.steps.join('\n') +
+        (inv.steps.length >= 8 ? '\n... (後續步驟省略，最終收斂至 S = $' + inv.S.toFixed(3) + ')' : '');
+      saveState(); return;
+    }
+
+    /* ── Mode B: 反推 IV ── */
+    if (currentPrice >= target) {
+      resultEl.innerHTML =
+        '<div class="result-warning">✅ 目前 ' + currentLabel + ' 已達 <strong>$' + currentPrice.toFixed(3) + '</strong>，' +
+        '已超過目標 <strong>$' + target.toFixed(2) + '</strong>，<strong>現在就能賣！</strong></div>';
+      document.getElementById('iter-content').textContent = '目前 ' + typeLabel + ' 已達目標，無需反推 IV。';
+      saveState(); return;
+    }
+    var ivr      = inverseIV(stockPrice, kNum, T, riskRate, target);
+    var ivPct    = ivr.iv * 100;
+    var ivDiff   = ivPct - d.iv;
+    var assignItm = bsm.itm;
+    resultEl.innerHTML =
+      '<div class="result-main-area" id="iv-result-area">' +
+        '<div class="result-label">IV 需升至 <button id=\'iv-info-btn\' onclick=\'showIVExplain()\' style=\'all:unset;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#D4900A;color:#fff;font-size:11px;font-weight:900;margin-left:6px;vertical-align:middle;\' title=\'計算說明\'>?</button></div>' +
+        '<div class="result-price">' + ivPct.toFixed(2) + '%</div>' +
+        '<div class="result-change" style="color:var(--gold)">需升 +' + ivDiff.toFixed(2) + ' pp（從 ' + d.iv.toFixed(2) + '%）</div>' +
+      '</div>' +
+      '<div class="result-metrics">' +
+        '<div class="metric-card"><div class="mc-label">目前 ' + typeLabel + ' 理論價</div><div class="mc-value">$' + bsmPrice.toFixed(3) + '</div></div>' +
+        '<div class="metric-card"><div class="mc-label">達標時 ' + typeLabel + ' Delta</div><div class="mc-value">' + (ivr.delta != null && !isNaN(ivr.delta) ? ivr.delta.toFixed(4) : '—') + '</div></div>' +
+      '</div>' +
+      '<div class="assign-box" style="background:rgba(34,139,34,0.08);border-color:rgba(34,139,34,0.4);">' +
+        '<div class="ab-label" style="color:#2a7a2a">賣出當下被' + (isCall ? ' Call 走' : ' Assign') + '機率（以目前股價 $' + stockPrice.toFixed(2) + ' 計算）</div>' +
+        '<div class="ab-value" style="color:#2a7a2a">' + (assignItm != null && !isNaN(assignItm) ? assignItm.toFixed(2) + '%' : '—') + '</div>' +
+      '</div>';
+    var iterEl = document.getElementById('iter-content');
+    if (iterEl) iterEl.textContent = ivr.steps.join('\n') +
+      (ivr.steps.length >= 8 ? '\n... (後續步驟省略，最終收斂至 IV = ' + ivPct.toFixed(3) + '%)' : '');
+    saveState();
+  }
+
+
+  /* ── Option Type Switch (Put / Call) ─── */
+  window.setOptionType = function (type) {
+    optionType = type;
+    var btnP = document.getElementById('opt-btn-put');
+    var btnC = document.getElementById('opt-btn-call');
+    if (btnP) btnP.classList.toggle('active', type === 'put');
+    if (btnC) btnC.classList.toggle('active', type === 'call');
+    var dLabel  = document.getElementById('in-delta-label');
+    var mLabel  = document.getElementById('in-mkt-label');
+    var thDelta = document.getElementById('th-delta');
+    var thMkt   = document.getElementById('th-mkt');
+    if (dLabel)  dLabel.textContent  = type === 'put' ? 'Put Delta'  : 'Call Delta';
+    if (mLabel)  mLabel.textContent  = type === 'put' ? 'Put 市價'   : 'Call 市價';
+    if (thDelta) thDelta.textContent = type === 'put' ? 'PUT DELTA'  : 'CALL DELTA';
+    if (thMkt)   thMkt.textContent   = type === 'put' ? 'PUT 市價'   : 'CALL 市價';
+    var ptitle = document.getElementById('target-ptitle');
+    if (ptitle) ptitle.textContent = calcMode === 'A'
+      ? '我希望 ' + (type === 'put' ? 'Put' : 'Call') + ' 權利金達到多少？'
+      : '在目前股價下，IV 需升到多少才達目標（' + (type === 'put' ? 'Put' : 'Call') + '）？';
+    selectedK = null;
+    calcResult();
+  };
+
+  /* ── Calc Mode Switch ────────────────── */
+  window.setCalcMode = function (m) {
+    calcMode = m;
+    var btnA = document.getElementById('mode-btn-a');
+    var btnB = document.getElementById('mode-btn-b');
+    if (btnA) btnA.classList.toggle('active', m === 'A');
+    if (btnB) btnB.classList.toggle('active', m === 'B');
+    var ptitle = document.getElementById('target-ptitle');
+    var tl = optionType === 'call' ? 'Call' : 'Put';
+    if (ptitle) ptitle.textContent = m === 'A'
+      ? '我希望 ' + tl + ' 權利金達到多少？'
+      : '在目前股價下，IV 需升到多少才達目標（' + tl + '）？';
+    calcResult();
+  };
+
+  /* ── Slider Events ───────────────────── */
+  window.onSliderS = function (v) {
+    stockPrice = parseFloat(v);
+    var inp = document.getElementById('input-s');
+    if (inp && document.activeElement !== inp) inp.value = parseFloat(v).toFixed(2);
+    var sp = document.getElementById('in-stock-price');
+    if (sp && document.activeElement !== sp) sp.value = parseFloat(v).toFixed(2);
+    calcResult();
+  };
+  window.onInputS = function (v) {
+    var val = parseFloat(v);
+    if (isNaN(val) || val <= 0) return;
+    stockPrice = val;
+    var sl = document.getElementById('slider-s');
+    if (sl) { if (val > parseFloat(sl.max)) sl.max = Math.ceil(val * 1.5); sl.value = val; }
+    var sp = document.getElementById('in-stock-price');
+    if (sp && document.activeElement !== sp) sp.value = val.toFixed(2);
+    calcResult();
+  };
+  window.onTickerChange = function (v) {
+    tickerSymbol = v.trim().toUpperCase();
+    var el = document.getElementById('in-ticker');
+    if (el) el.value = tickerSymbol;
+    var badge = document.getElementById('ticker-badge');
+    if (badge) badge.textContent = tickerSymbol || '—';
+    renderInfoCard();
+    calcResult();
+  };
+  window.onStockPriceInput = function (v) {
+    var val = parseFloat(v);
+    if (isNaN(val) || val <= 0) return;
+    stockPrice = val;
+    var sl = document.getElementById('slider-s');
+    if (sl) { if (val > parseFloat(sl.max)) sl.max = Math.ceil(val * 1.5); sl.value = val; }
+    var inp = document.getElementById('input-s');
+    if (inp && document.activeElement !== inp) inp.value = val.toFixed(2);
+    calcResult();
+  };
+  window.onSliderR = function (v) {
+    riskRate = parseFloat(v) / 100;
+    document.getElementById('val-r').textContent = parseFloat(v).toFixed(1) + '%';
+    calcResult();
+  };
+
+
+  /* ── State Persistence ───────────────── */
+  var L7_STATE = 'l7-state-v1';
+  function saveState() {
+    try {
+      var target = document.getElementById('target-premium');
+      localStorage.setItem(L7_STATE, JSON.stringify({
+        ticker:    tickerSymbol,
+        calcMode:  calcMode,
+        price:     stockPrice,
+        rate:      riskRate,
+        target:    target ? parseFloat(target.value) : 2,
+        chain:     allChain,
+        selected:  selectedK,
+        optType:   optionType
+      }));
+    } catch (e) {}
+  }
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(L7_STATE);
+      if (!raw) return;
+      var s = JSON.parse(raw);
+      if (s.ticker)   { tickerSymbol = s.ticker; }
+      if (s.calcMode) { calcMode = s.calcMode; }
+      if (s.price > 0){ stockPrice   = s.price; }
+      if (s.rate > 0) { riskRate     = s.rate; }
+      if (s.chain && typeof s.chain === 'object') {
+        if (s.chain.put !== undefined || s.chain.call !== undefined) {
+          allChain = { put: s.chain.put || {}, call: s.chain.call || {} };
+        } else {
+          allChain = { put: s.chain, call: {} }; /* 舊格式遷移：全部歸 put */
+        }
+      }
+      if (s.selected != null) { selectedK = s.selected; }
+      if (s.optType) {
+        optionType = s.optType;
+        var btnP2 = document.getElementById('opt-btn-put');
+        var btnC2 = document.getElementById('opt-btn-call');
+        if (btnP2) btnP2.classList.toggle('active', optionType === 'put');
+        if (btnC2) btnC2.classList.toggle('active', optionType === 'call');
+        var dLbl2 = document.getElementById('in-delta-label');
+        var mLbl2 = document.getElementById('in-mkt-label');
+        if (dLbl2) dLbl2.textContent = optionType === 'put' ? 'Put Delta' : 'Call Delta';
+        if (mLbl2) mLbl2.textContent = optionType === 'put' ? 'Put 市價' : 'Call 市價';
+      }
+      /* sync UI */
+      var sl = document.getElementById('slider-s');
+      if (sl) { if (stockPrice > parseFloat(sl.max)) sl.max = Math.ceil(stockPrice * 1.5); sl.value = stockPrice; }
+      var inp = document.getElementById('input-s');
+      if (inp) inp.value = stockPrice.toFixed(2);
+      var sp = document.getElementById('in-stock-price');
+      if (sp) sp.value = stockPrice.toFixed(2);
+      var slr = document.getElementById('slider-r');
+      if (slr) slr.value = (riskRate * 100).toFixed(1);
+      var valr = document.getElementById('val-r');
+      if (valr) valr.textContent = (riskRate * 100).toFixed(1) + '%';
+      var tgt = document.getElementById('target-premium');
+      if (tgt && s.target > 0) tgt.value = s.target.toFixed(2);
+      var tkr = document.getElementById('in-ticker');
+      if (tkr) tkr.value = tickerSymbol;
+      var badge = document.getElementById('ticker-badge');
+      if (badge) badge.textContent = tickerSymbol || '—';
+    } catch (e) {}
+  }
+
+  /* ── Enter key shortcut in input row ─── */
+  ['in-k','in-iv','in-delta','in-itm','in-mkt'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); window.addStrike(); } });
+  });
+
+  /* ── Init ────────────────────────────── */
+  loadState();
+  updateTable();
+  calcResult();
+}());
+</script>
+
+<!-- ═══════════════════ TTS JS ═══════════════════ -->
+<script>
+(function () {
+  var _fontZoom = parseFloat(localStorage.getItem('l7-font-zoom') || '1');
+  var _fontBaseMap = new WeakMap();
+
+  function applyFontZoom() {
+    document.querySelectorAll('#drag-canvas [data-drag-id] *').forEach(function (el) {
+      if (!_fontBaseMap.has(el)) {
+        _fontBaseMap.set(el, parseFloat(window.getComputedStyle(el).fontSize) || 14);
+      }
+      el.style.fontSize = (_fontBaseMap.get(el) * _fontZoom) + 'px';
+    });
+  }
+  function relayoutAfterZoom() {
+    var canvas = document.getElementById('drag-canvas');
+    if (!canvas) return;
+    var panels = Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    if (!panels.length) return;
+    panels.sort(function (a, b) { return (parseFloat(a.style.top) || 0) - (parseFloat(b.style.top) || 0); });
+    var GAP = 16, y = GAP;
+    panels.forEach(function (el) {
+      el.style.top = y + 'px';
+      y += el.getBoundingClientRect().height + GAP;
+    });
+    try { localStorage.removeItem('l7-layout-v3'); } catch (e) {}
+    canvas.style.minHeight = (y + 40) + 'px';
+  }
+  window.adjustPageFont = function (delta) {
+    _fontZoom = Math.max(0.7, Math.min(2.0, parseFloat((_fontZoom + delta * 0.1).toFixed(2))));
+    applyFontZoom();
+    localStorage.setItem('l7-font-zoom', _fontZoom);
+    requestAnimationFrame(function () { requestAnimationFrame(relayoutAfterZoom); });
+  };
+  window.addEventListener('load', function () {
+    if (_fontZoom !== 1) {
+      applyFontZoom();
+      requestAnimationFrame(function () { requestAnimationFrame(relayoutAfterZoom); });
+    }
+  });
+
+  var SCRIPT = [
+    {
+      id: null, label: '開場白',
+      text: '歡迎來到期權小學堂第七課。這一課我們不學新策略，而是學一個實用的計算工具：Put 權利金反推計算器。當你看上一個股票，想要賣出 Put，但目前的 premium 太低，不夠吸引人——這個工具能告訴你，股價需要跌多少，Put 才會變得夠貴，值得賣出。'
+    },
+    {
+      id: 'l7-chain-input', label: '輸入期權鏈',
+      text: '第一步，輸入期權鏈數據。從 Barchart 或你的券商查詢感興趣的期權鏈，把每個行權價的到期日、距到期天數 DTE、行權價 K、隱含波動率 IV 填入欄位，Put Delta 和 ITM 機率是選填。填完一行後按「新增」加入表格，到期日和 DTE 會保留供下一行使用，你只需要不斷填 K 和 IV 就好。'
+    },
+    {
+      id: 'l7-info-card', label: '查看行權價資訊',
+      text: '第二步，點擊表格中的某一行，選定你想分析的行權價。資訊卡會即時顯示這個行權價的完整資訊：到期日、DTE、IV、Put Delta、ITM 機率、與當前股價的 OTM 距離，以及根據 Black-Scholes 公式算出的目前 Put 理論估值。'
+    },
+    {
+      id: 'panel-sliders', label: '調整參數',
+      text: '第三步，用滑桿調整參數。「當前股價」設定目前的市場股價，是 BSM 計算的關鍵輸入。「無風險利率」通常設為美國短期國債殖利率，目前約百分之四點五。所有計算都會即時更新。'
+    },
+    {
+      id: 'panel-target', label: '設定目標 Premium',
+      text: '第四步，輸入你的目標 Put 權利金。例如你希望每口合約收到兩美元 premium。旁邊的「目前 Put BSM」顯示當前股價下的理論估值。如果目前 Put 已超過目標，會直接顯示綠色提示，告訴你現在就是好時機。'
+    },
+    {
+      id: 'l7-result', label: '計算結果',
+      text: '第五步，查看計算結果。工具用二分搜尋法，反推出 Put premium 等於你目標值時對應的股票價格。結果包含：股價需跌至哪裡、下跌幅度、那個股價下的 Put Delta，以及被 Assign 的機率。Assign 機率越高，說明股價跌到那裡後你的 Put 被行使的可能性越大。'
+    },
+    {
+      id: 'l7-detail', label: '二分法原理',
+      text: '最後是二分搜尋法的原理。BSM 無法直接從 Put 價格倒推股價，所以我們設定搜尋區間從零點零一到當前股價，每次取中點計算 BSM Put，若結果高於目標就往高股價方向縮小，若低於目標就往低股價縮小，每步誤差減半，通常二十到五十步就能達到小數點後五位的精度。展開「查看迭代過程」，可以看到前八步的變化。'
+    }
+  ];
+
+  var ttsIdx = 0, ttsPlaying = false, ttsPaused = false, ttsRate = 0.9;
+  var activePanelId = null;
+
+  function initDots() {
+    var c = document.getElementById('tts-dots');
+    c.innerHTML = '';
+    SCRIPT.forEach(function (s, i) {
+      var d = document.createElement('div');
+      d.className = 'tts-dot'; d.id = 'tts-dot-' + i; d.title = s.label;
+      d.onclick = function () { ttsJumpTo(i); };
+      c.appendChild(d);
+    });
+  }
+
+  function updateDots() {
+    SCRIPT.forEach(function (_, i) {
+      var d = document.getElementById('tts-dot-' + i);
+      if (!d) return;
+      d.className = 'tts-dot' + (i < ttsIdx ? ' done' : i === ttsIdx ? ' current' : '');
+    });
+  }
+
+  function setActivePanel(id) {
+    if (activePanelId) {
+      var prev = document.getElementById(activePanelId);
+      if (prev) prev.classList.remove('tts-active');
+    }
+    activePanelId = id;
+    if (id) {
+      var el = document.getElementById(id);
+      if (el) { el.classList.add('tts-active'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+    }
+  }
+
+  function updateUI() {
+    var btn = document.getElementById('tts-play-btn');
+    var sec = document.getElementById('tts-section-name');
+    if (ttsPlaying && !ttsPaused) {
+      btn.textContent = '⏸ 暫停'; btn.className = 'tts-btn playing';
+    } else if (ttsPaused) {
+      btn.textContent = '▶ 繼續'; btn.className = 'tts-btn';
+    } else if (ttsIdx >= SCRIPT.length) {
+      btn.textContent = '↺ 重新朗讀'; btn.className = 'tts-btn';
+    } else {
+      btn.textContent = ttsIdx === 0 ? '▶ 朗讀全文' : '▶ 繼續朗讀'; btn.className = 'tts-btn';
+    }
+    sec.textContent = ttsIdx < SCRIPT.length ? '▸ ' + SCRIPT[ttsIdx].label : '✓ 朗讀完畢';
+    setActivePanel(ttsIdx < SCRIPT.length ? SCRIPT[ttsIdx].id : null);
+    updateDots();
+  }
+
+  function showSubtitle(text) {
+    var el = document.getElementById('tts-subtitle');
+    if (!el) return;
+    el.innerHTML = text.split('').map(function (c, i) {
+      var s = c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '&' ? '&amp;' : c;
+      return '<span class="sub-c" id="sc-' + i + '">' + s + '</span>';
+    }).join('');
+    el.scrollTop = 0; el.classList.add('active');
+  }
+
+  function clearSubtitle() {
+    var el = document.getElementById('tts-subtitle');
+    if (el) { el.innerHTML = ''; el.classList.remove('active'); }
+  }
+
+  function speakSection() {
+    if (!ttsPlaying) return;
+    if (ttsIdx >= SCRIPT.length) { ttsPlaying = false; ttsIdx = 0; updateUI(); return; }
+    updateUI();
+    var item = SCRIPT[ttsIdx];
+    var utt = new SpeechSynthesisUtterance(item.text);
+    utt.lang = 'zh-TW'; utt.rate = ttsRate; utt.pitch = 1.0;
+    showSubtitle(item.text);
+    utt.onboundary = function (e) {
+      var chars = document.querySelectorAll('#tts-subtitle .sub-c');
+      var len = e.charLength || 1;
+      chars.forEach(function (c, i) {
+        c.className = 'sub-c' + (i < e.charIndex ? ' done' : i < e.charIndex + len ? ' now' : '');
+      });
+      var cur = document.getElementById('sc-' + e.charIndex);
+      if (cur) cur.scrollIntoView({ block: 'nearest' });
+    };
+    utt.onend = function () { if (!ttsPlaying) return; ttsIdx++; setTimeout(speakSection, 350); };
+    utt.onerror = function (e) { if (e.error === 'interrupted') return; if (!ttsPlaying) return; ttsIdx++; speakSection(); };
+    setTimeout(function () { speechSynthesis.speak(utt); }, 50);
+  }
+
+  window.ttsToggle = function () {
+    if (speechSynthesis.speaking && !speechSynthesis.paused) {
+      speechSynthesis.pause(); ttsPlaying = false; ttsPaused = true; updateUI();
+    } else if (speechSynthesis.paused) {
+      speechSynthesis.resume(); ttsPlaying = true; ttsPaused = false; updateUI();
+    } else {
+      if (ttsIdx >= SCRIPT.length) ttsIdx = 0;
+      ttsPlaying = true; ttsPaused = false; speakSection();
+    }
+  };
+
+  window.ttsStop = function () {
+    speechSynthesis.cancel(); clearSubtitle();
+    ttsPlaying = false; ttsPaused = false; ttsIdx = 0;
+    setActivePanel(null);
+    document.getElementById('tts-section-name').textContent = '點擊「朗讀全文」開始';
+    updateDots();
+    document.getElementById('tts-play-btn').textContent = '▶ 朗讀全文';
+    document.getElementById('tts-play-btn').className = 'tts-btn';
+  };
+
+  window.ttsJumpTo = function (i) { speechSynthesis.cancel(); ttsIdx = i; ttsPlaying = true; ttsPaused = false; setTimeout(speakSection, 80); };
+  window.ttsSetRate = function (v) { ttsRate = parseFloat(v); };
+
+  initDots();
+}());
+</script>
+
+<!-- ═══════════════════ Edit Mode JS ═══════════════════ -->
+<script>
+(function () {
+  var _editMode = false, _focusEl = null;
+
+  window.toggleEditMode = function () {
+    _editMode = !_editMode;
+    document.body.classList.toggle('edit-mode', _editMode);
+    document.getElementById('edit-btn').classList.toggle('active', _editMode);
+    document.getElementById('edit-icon').textContent  = _editMode ? '🔒' : '✏️';
+    document.getElementById('edit-label').textContent = _editMode ? '完成編輯' : '編輯模式';
+    document.getElementById('edit-toolbar').classList.toggle('visible', _editMode);
+    if (!_editMode) { blurCurrent(); document.getElementById('et-hint').style.display = ''; document.getElementById('et-controls').style.display = 'none'; }
+  };
+
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); window.toggleEditMode(); }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!_editMode) return;
+    var el = e.target;
+    if (!el || el.closest('#edit-toolbar') || el.closest('#edit-btn') || el.closest('#tts-bar')) return;
+    if (el.closest('#drag-canvas') && !el.matches('button,input,select,a,textarea')) {
+      e.preventDefault(); focusEl(el);
+    }
+  });
+
+  function focusEl(el) {
+    blurCurrent(); _focusEl = el;
+    el.classList.add('el-focus'); el.contentEditable = 'true'; el.focus();
+    document.getElementById('et-hint').style.display = 'none';
+    document.getElementById('et-controls').style.display = '';
+    updateToolbar(el);
+  }
+
+  function blurCurrent() {
+    if (_focusEl) { _focusEl.classList.remove('el-focus'); _focusEl.contentEditable = 'false'; _focusEl = null; }
+  }
+
+  function updateToolbar(el) {
+    var cs = window.getComputedStyle(el);
+    document.getElementById('et-size-val').textContent = Math.round(parseFloat(cs.fontSize));
+    document.getElementById('et-bold').classList.toggle('on', parseFloat(cs.fontWeight) >= 700);
+    document.getElementById('et-italic').classList.toggle('on', cs.fontStyle === 'italic');
+    var hex = rgbToHex(cs.color);
+    if (hex) document.getElementById('et-color').value = hex;
+    document.getElementById('et-lh').value = parseFloat(cs.lineHeight) / parseFloat(cs.fontSize) || 1.4;
+  }
+
+  function rgbToHex(rgb) {
+    var m = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+    if (!m) return null;
+    return '#' + [1,2,3].map(function (i) { return parseInt(m[i]).toString(16).padStart(2,'0'); }).join('');
+  }
+
+  window.applyStyle  = function (p, v)  { if (_focusEl) _focusEl.style[p] = v; };
+  window.adjustSize  = function (d)  {
+    if (!_focusEl) return;
+    var nv = Math.max(8, Math.min(72, (parseFloat(window.getComputedStyle(_focusEl).fontSize) || 16) + d));
+    _focusEl.style.fontSize = nv + 'px'; document.getElementById('et-size-val').textContent = Math.round(nv);
+  };
+  window.toggleBold  = function () {
+    if (!_focusEl) return;
+    var b = parseFloat(window.getComputedStyle(_focusEl).fontWeight) >= 700;
+    _focusEl.style.fontWeight = b ? '400' : '700'; document.getElementById('et-bold').classList.toggle('on', !b);
+  };
+  window.toggleItalic = function () {
+    if (!_focusEl) return;
+    var it = window.getComputedStyle(_focusEl).fontStyle === 'italic';
+    _focusEl.style.fontStyle = it ? 'normal' : 'italic'; document.getElementById('et-italic').classList.toggle('on', !it);
+  };
+  window.resetElement = function () { if (_focusEl) { _focusEl.style.cssText = ''; updateToolbar(_focusEl); } };
+  window.copyHtml = function () {
+    if (!_focusEl) return;
+    navigator.clipboard.writeText(_focusEl.outerHTML).then(function () {
+      var btn = document.getElementById('et-copy-btn');
+      btn.textContent = '✓ 已複製'; setTimeout(function () { btn.textContent = '複製'; }, 1500);
+    });
+  };
+}());
+</script>
+
+<!-- ═══════════════════ Drag Layout JS ═══════════════════ -->
+<script>
+(function () {
+  var L7_LAY = 'l7-layout-v3';
+  var canvas = null, dragging = null, resizing = null, dragOX = 0, dragOY = 0, rzS = {};
+
+  function getSL() { try { return JSON.parse(localStorage.getItem(L7_LAY) || 'null'); } catch (e) { return null; } }
+  function putSL(s) { try { localStorage.setItem(L7_LAY, JSON.stringify(s)); } catch (e) {} }
+  function saveItem(id, x, y, w, h) {
+    var s = getSL() || {}; s[id] = { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: h ? Math.round(h) : null }; putSL(s);
+  }
+  function applyPos(el, x, y, w, h) {
+    el.style.position = 'absolute'; el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.width = w + 'px';
+    if (h) el.style.minHeight = h + 'px';
+  }
+
+  function addHandles(el) {
+    var dh = document.createElement('div');
+    dh.className = 'drag-handle';
+    el.insertBefore(dh, el.firstChild);
+    dh.addEventListener('mousedown', function (e) {
+      if (!document.body.classList.contains('edit-mode')) return;
+      e.preventDefault(); e.stopPropagation();
+      dragging = el; var r = el.getBoundingClientRect();
+      dragOX = e.clientX - r.left; dragOY = e.clientY - r.top;
+      el.classList.add('is-dragging'); el.style.zIndex = '1000';
+    });
+    ['nw','n','ne','e','se','s','sw','w'].forEach(function (dir) {
+      var rh = document.createElement('div');
+      rh.className = 'rh rh-' + dir;
+      el.appendChild(rh);
+      rh.addEventListener('mousedown', function (e) {
+        if (!document.body.classList.contains('edit-mode')) return;
+        e.preventDefault(); e.stopPropagation();
+        resizing = { el: el, dir: dir };
+        rzS = { mx: e.clientX, my: e.clientY, w: el.offsetWidth, h: el.offsetHeight, l: parseFloat(el.style.left) || 0, t: parseFloat(el.style.top) || 0 };
+        el.classList.add('is-resizing'); el.style.zIndex = '1000';
+      });
+    });
+  }
+
+  document.addEventListener('mousemove', function (e) {
+    if (dragging) {
+      var cr = canvas.getBoundingClientRect();
+      var x = Math.max(0, e.clientX - cr.left - dragOX);
+      var y = Math.max(0, e.clientY - cr.top  - dragOY);
+      dragging.style.left = x + 'px'; dragging.style.top = y + 'px';
+      var bot = y + dragging.offsetHeight, cm = parseInt(canvas.style.minHeight) || 3000;
+      if (bot + 100 > cm) canvas.style.minHeight = (bot + 300) + 'px';
+    }
+    if (resizing) {
+      var el = resizing.el, dir = resizing.dir;
+      var dx = e.clientX - rzS.mx, dy = e.clientY - rzS.my;
+      var w = rzS.w, h = rzS.h, l = rzS.l, t = rzS.t;
+      if (dir.indexOf('e') >= 0) w = Math.max(200, rzS.w + dx);
+      if (dir.indexOf('w') >= 0) { w = Math.max(200, rzS.w - dx); l = rzS.l + (rzS.w - w); }
+      if (dir.indexOf('s') >= 0) h = Math.max(80,  rzS.h + dy);
+      if (dir.indexOf('n') >= 0) { h = Math.max(80, rzS.h - dy);  t = rzS.t + (rzS.h - h); }
+      el.style.width = w + 'px'; el.style.minHeight = h + 'px';
+      el.style.left  = l + 'px'; el.style.top = t + 'px';
+    }
+  });
+
+  document.addEventListener('mouseup', function () {
+    if (dragging) {
+      dragging.classList.remove('is-dragging'); dragging.style.zIndex = '';
+      saveItem(dragging.dataset.dragId, parseFloat(dragging.style.left) || 0, parseFloat(dragging.style.top) || 0, dragging.offsetWidth, null);
+      dragging = null;
+    }
+    if (resizing) {
+      var el = resizing.el; el.classList.remove('is-resizing'); el.style.zIndex = '';
+      saveItem(el.dataset.dragId, parseFloat(el.style.left) || 0, parseFloat(el.style.top) || 0, el.offsetWidth, el.offsetHeight);
+      resizing = null;
+    }
+  });
+
+  window.resetLayout = function () { localStorage.removeItem(L7_LAY); location.reload(); };
+
+  /* ── reflow：資料變動後重新排列各區塊，避免高度增長後交疊 ── */
+  window.reflow = function reflow() {
+    if (!canvas) return;
+    var items = Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    if (!items.length) return;
+
+    // 依 top 排序
+    items.sort(function (a, b) {
+      return (parseFloat(a.style.top) || 0) - (parseFloat(b.style.top) || 0);
+    });
+
+    // 把同 top（±3px）的元素視為同一列（如 sliders + target 並排）
+    var rows = [];
+    var i = 0;
+    while (i < items.length) {
+      var tA = parseFloat(items[i].style.top) || 0;
+      if (i + 1 < items.length) {
+        var tB = parseFloat(items[i + 1].style.top) || 0;
+        if (Math.abs(tA - tB) < 3) { rows.push([items[i], items[i + 1]]); i += 2; continue; }
+      }
+      rows.push([items[i]]);
+      i++;
+    }
+
+    // 由上往下重新排位，保持 16px 間距
+    var GAP = 16, cursor = 0;
+    var saved = getSL() || {};
+    rows.forEach(function (row) {
+      var origTop = parseFloat(row[0].style.top) || 0;
+      var newTop  = cursor > 0 ? Math.max(cursor + GAP, origTop) : origTop;
+      var rowH    = 0;
+      row.forEach(function (el) {
+        el.style.top = newTop + 'px';
+        if (!saved[el.dataset.dragId]) saved[el.dataset.dragId] = { x: parseFloat(el.style.left) || 0, w: el.offsetWidth, h: null };
+        saved[el.dataset.dragId].y = Math.round(newTop);
+        rowH = Math.max(rowH, el.offsetHeight);
+      });
+      cursor = newTop + rowH;
+    });
+
+    canvas.style.minHeight = Math.max(3000, cursor + 200) + 'px';
+    putSL(saved);
+  };
+
+  function initLayout() {
+    canvas = document.getElementById('drag-canvas');
+    if (!canvas) return;
+    var saved = getSL();
+    var items = Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    items.forEach(function (el) { addHandles(el); });
+
+    var _REQ = ['l7-course-tag','l7-header','l7-chain-input','l7-info-card','l7-sliders','l7-target','l7-result','l7-detail'];
+    if (saved) {
+      var miss = _REQ.some(function (id) { return !saved[id]; });
+      if (miss) { saved = null; localStorage.removeItem(L7_LAY); }
+    }
+    if (saved) {
+      var _sc = saved['l7-chain-input'], _si = saved['l7-info-card'];
+      var _sr = saved['l7-result'],      _sd = saved['l7-detail'];
+      if (_si.y < _sc.y + 40 || _sr.y < _si.y + 40 || _sd.y < _sr.y + 40) {
+        saved = null; localStorage.removeItem(L7_LAY);
+      }
+    }
+
+    if (saved) {
+      items.forEach(function (el) {
+        var s = saved[el.dataset.dragId];
+        if (el.parentElement !== canvas) canvas.appendChild(el);
+        if (s) applyPos(el, s.x, s.y, s.w, s.h);
+      });
+      var maxB = 0;
+      items.forEach(function (el) {
+        var b = (parseFloat(el.style.top) || 0) + el.offsetHeight;
+        if (b > maxB) maxB = b;
+      });
+      canvas.style.minHeight = Math.max(3000, maxB + 200) + 'px';
+    } else {
+      requestAnimationFrame(function () { requestAnimationFrame(function () {
+        var GAP = 20;
+        var cr = canvas.getBoundingClientRect(), caps = [];
+        items.forEach(function (el) {
+          var r = el.getBoundingClientRect();
+          caps.push({ el: el, x: r.left - cr.left, y: r.top - cr.top, w: r.width, h: r.height });
+        });
+        /* 按自然 y 排序，同行（y 差 < 5px）視為並排 */
+        caps.sort(function (a, b) { return a.y !== b.y ? a.y - b.y : a.x - b.x; });
+        var rows = [], rem = caps.slice();
+        while (rem.length) {
+          var first = rem.shift(), row = [first];
+          rem = rem.filter(function (p) {
+            if (Math.abs(p.y - first.y) < 5) { row.push(p); return false; }
+            return true;
+          });
+          rows.push(row);
+        }
+        /* 重新指定 y，每行之間插入 GAP */
+        var curY = rows.length ? rows[0][0].y : 0;
+        rows.forEach(function (row) {
+          var rowH = Math.max.apply(null, row.map(function (p) { return p.h; }));
+          row.forEach(function (p) { p.y = curY; });
+          curY += rowH + GAP;
+        });
+        var ns = {}, maxB = 0;
+        caps.forEach(function (p) {
+          if (p.el.parentElement !== canvas) canvas.appendChild(p.el);
+          applyPos(p.el, p.x, p.y, p.w, null);
+          ns[p.el.dataset.dragId] = { x: Math.round(p.x), y: Math.round(p.y), w: Math.round(p.w), h: null };
+          if (p.y + p.h > maxB) maxB = p.y + p.h;
+        });
+        canvas.style.minHeight = Math.max(3000, maxB + 200) + 'px';
+        putSL(ns);
+      }); });
+    }
+  }
+
+  window.addEventListener('load', initLayout);
+}());
+
+  /* ── Driver.js: Assign 機率說明 ── */
+
+
+  /* ── Driver.js: IV Percentile Rank 說明 ── */
+  window.showIVPRExplain = function () {
+    var driverObj = window.driver.js.driver({
+      animate: true,
+      allowClose: true,
+      overlayOpacity: 0.4,
+      steps: [
+        {
+          element: '#iv-pr-info-btn',
+          popover: {
+            title: '📊 IV Percentile Rank（IV PR）是什麼？',
+            description: [
+              '<strong>IV Percentile Rank</strong> 衡量當前 IV 在過去一年（252 個交易日）歷史中的相對位置。',
+              '',
+              '📐 <strong>計算方式：</strong>',
+              '<code style="background:#F5EDE0;padding:2px 6px;border-radius:4px;font-size:12px;">IV PR = (當前 IV − 52週最低 IV) ÷ (52週最高 IV − 52週最低 IV) × 100</code>',
+              '',
+              '📖 <strong>另一種版本 — IV Percentile（IVP）：</strong>',
+              '• 過去 252 個交易日中，IV 低於今日的天數佔比',
+              '• 例如 IVP = 80% 代表過去一年有 80% 的日子 IV 比今天低',
+              '',
+              '🎯 <strong>判讀建議：</strong>',
+              '• <span style="color:#c0392b;font-weight:700;">≥ 50%</span> — IV 偏高，賣出 Premium 較划算（Sell Put / Sell Call）',
+              '• <span style="color:#27ae60;font-weight:700;">< 30%</span> — IV 偏低，買入保護成本低（Buy Put / Buy Call）',
+              '• 介於 30–50% — IV 中性，視個股情況決定',
+              '',
+              '🔍 <strong>查詢來源：</strong> marketchameleon.com → 輸入股票代號 → IV 頁籤'
+            ].join('<br>'),
+            side: 'bottom',
+            align: 'center'
+          }
+        }
+      ]
+    });
+    driverObj.drive();
+  };
+  /* ── Driver.js: IV 反推說明 ── */
+  window.showIVExplain = function () {
+    var driverObj = window.driver.js.driver({
+      animate: true,
+      allowClose: true,
+      overlayOpacity: 0.4,
+      steps: [
+        {
+          element: '#iv-result-area',
+          popover: {
+            title: '📈 IV 需升至的計算原理',
+            description: [
+              '程式用<strong>二分法反推 σ（隱含波動率）</strong>，找出讓 BSM 理論價等於你設定目標 Premium 的 IV：',
+              '',
+              '<code style="background:#F5EDE0;padding:2px 6px;border-radius:4px;font-size:12px;">BSM Put(S, K, T, r, σ) = 目標 Premium</code>',
+              '',
+              '<strong>搜尋過程：</strong>',
+              '• 範圍：σ ∈ [0.1%, 2000%]，收斂約 80 步',
+              '• 每步取中點，比較 BSM 價與目標，縮小區間',
+              '',
+              '<strong>範例解讀（+78 pp 代表）：</strong>',
+              '• 目前 IV = 70.68%',
+              '• 達到目標 Premium，IV 需升至 ~149%',
+              '• 即 IV 需<strong>再漲 78 個百分點</strong>（pp = percentage points）',
+              '',
+              '⚠️ <strong>重要提醒：</strong>IV 飆升通常發生在財報或大新聞前後，平時很難達到如此高位。若反推 IV 遠超目前水平，說明此目標 Premium 在當前市況下<strong>幾乎無法達到</strong>。'
+            ].join('<br>'),
+            side: 'top',
+            align: 'center'
+          }
+        }
+      ]
+    });
+    driverObj.drive();
+  };
+
+  /* ── Driver.js: Call 走機率說明 ── */
+  window.showCallExplain = function () {
+    var driverObj = window.driver.js.driver({
+      animate: true,
+      allowClose: true,
+      overlayOpacity: 0.4,
+      steps: [
+        {
+          element: '#call-assign-box',
+          popover: {
+            title: '📐 被 Call 走機率的計算原理',
+            description: [
+              '程式使用 <strong>BSM 公式的 N(d₂)</strong>，這是計算「到期時 Call 進入 ITM 機率」的標準公式：',
+              '',
+              '<code style="background:#F5EDE0;padding:2px 6px;border-radius:4px;font-size:12px;">d₂ = d₁ − σ√T</code>',
+              '<code style="background:#F5EDE0;padding:2px 6px;border-radius:4px;font-size:12px;margin-top:4px;display:block;">ITM 機率 = N(d₂)</code>',
+              '',
+              '（Put 使用 N(−d₂)；Call 使用 N(d₂)）',
+              '',
+              '<strong>範例解讀：</strong>',
+              '• 反推到達目標股價時，N(d₂) 就是股價漲至該點後 Call 被行使的機率',
+              '• 機率越高 → 行權價越 ITM → 被 Call 走風險越大',
+              '',
+              '⚠️ <strong>重要提醒：</strong>N(d₂) 是「<em>風險中性機率</em>」，非真實世界機率。用於比較不同行權價的<strong>相對風險</strong>完全適合。'
+            ].join('<br>'),
+            side: 'top',
+            align: 'center'
+          }
+        }
+      ]
+    });
+    driverObj.drive();
+  };
+  window.showAssignExplain = function () {
+    var driverObj = window.driver.js.driver({
+      animate: true,
+      allowClose: true,
+      overlayOpacity: 0.4,
+      steps: [
+        {
+          element: '#assign-box',
+          popover: {
+            title: '📐 被 Assign 機率的計算原理',
+            description: [
+              '程式使用 <strong>BSM 公式的 N(−d₂)</strong>，這是期權理論計算「到期時 ITM 機率」的標準公式：',
+              '',
+              '<code style="background:#F5EDE0;padding:2px 6px;border-radius:4px;font-size:12px;">d₂ = d₁ − σ√T</code>',
+              '<code style="background:#F5EDE0;padding:2px 6px;border-radius:4px;font-size:12px;margin-top:4px;display:block;">ITM 機率 = N(−d₂)</code>',
+              '',
+              '<strong>範例：</strong>',
+              '• 現價 $15.47（從 OTM −9.5% 反推）',
+              '• 目標 Premium $2.00 → 股價需跌至 $12.50',
+              '• IV = 70.68%、DTE = 34 天',
+              '• ∴ N(−d₂) = <strong>73.07%</strong>',
+              '',
+              '⚠️ <strong>重要提醒：</strong>N(−d₂) 是「<em>風險中性機率</em>」，非真實世界機率。若要估計股票真實跌至目標價的機率，需額外考慮股票預期報酬率。但此值用於比較不同行權價的<strong>相對風險</strong>完全適合。'
+            ].join('<br>'),
+            side: 'top',
+            align: 'center'
+          }
+        }
+      ]
+    });
+    driverObj.drive();
+  };
+</script>
+</body>
+</html>

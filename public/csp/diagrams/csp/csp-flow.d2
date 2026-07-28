@@ -1,0 +1,106 @@
+grid-rows: 2
+
+上排: {
+  style: {stroke-width: 0; fill: transparent}
+  label: ""
+  direction: right
+
+  角色: {
+    direction: down
+    label: ""
+    style: {stroke-width: 0; fill: transparent}
+
+    賣方: {
+      label: "賣方 (我)\n收權利金"
+      shape: person
+    }
+    買方: {
+      label: "買方 (對方)\n付權利金"
+      shape: person
+    }
+  }
+
+  賣出: {
+    label: "賣出 Put 合約\n約定履約價 K\n收取權利金"
+    shape: rectangle
+  }
+
+  角色.賣方 -> 賣出: 開局
+  角色.買方 -> 賣出: 付權利金
+
+  到期比價: {
+    label: "到期日\n股價 vs 履約價"
+    shape: diamond
+  }
+
+  賣出 -> 到期比價: 等待到期
+
+  情境: {
+    direction: down
+    label: ""
+    style: {stroke-width: 0; fill: transparent}
+
+    情境A: {
+      label: "情境 A：股價 ≥ 履約價\nPut 作廢，權利金全賺"
+      shape: rectangle
+      style.fill: "#1f3d2b"
+    }
+
+    情境B: {
+      label: "情境 B：股價 < 履約價\n被行權，買入股票"
+      shape: rectangle
+      style.fill: "#3d1f1f"
+    }
+  }
+
+  到期比價 -> 情境.情境A: "≥ K"
+  到期比價 -> 情境.情境B: "< K"
+
+  結果: {
+    direction: down
+    label: ""
+    style: {stroke-width: 0; fill: transparent}
+
+    獲利: {
+      label: "最大獲利\n= 權利金總額\n(固定)"
+      shape: rectangle
+      style.fill: "#1f3d2b"
+    }
+
+    成本: {
+      label: "實際成本\n履約價 − 權利金\n(損益兩平點)"
+      shape: rectangle
+      style.fill: "#3d2f1f"
+    }
+
+    風險: {
+      label: "最大虧損\n只在股票下市\n才會發生"
+      shape: rectangle
+      style.fill: "#3d1f1f"
+    }
+  }
+
+  情境.情境A -> 結果.獲利: 入袋
+  情境.情境B -> 結果.成本: 買入股票
+  結果.成本 -> 結果.風險: 極端情況
+}
+
+下排: {
+  style: {stroke-width: 0; fill: transparent}
+  label: ""
+  direction: right
+
+  選股心法: {
+    label: "選股心法（建倉前準備）"
+    shape: rectangle
+    style.stroke-dash: 4
+
+    標的: "標的挑選\n大型績優股 / ETF"
+    Delta: "Delta\n-0.15 ~ -0.30"
+    DTE: "DTE\n30 ~ 45 天"
+    財報: "避開財報\n重大事件前後"
+    停利: "停利點\n賺 50% ~ 70% 平倉"
+
+    標的 -> Delta -> DTE -> 財報 -> 停利: {style.stroke-dash: 2}
+  }
+}

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+body{font-family:sans-serif;padding:20px;background:#FAF3E8;}
+.card{border:1.5px solid #86efac;border-radius:12px;padding:16px;max-width:580px;background:#fff;}
+.order-wrap{margin-top:12px;border:1px solid #c8ccd0;border-radius:4px;overflow:hidden;font-size:12px;}
+.order-row1{background:#f4f6f9;padding:6px 8px;display:flex;flex-wrap:wrap;gap:5px;align-items:flex-end;border-bottom:1px solid #e0e3e7;}
+.order-row2{background:#fff;padding:6px 8px;display:flex;flex-wrap:wrap;gap:5px;align-items:flex-end;}
+.ofield{display:flex;flex-direction:column;gap:2px;}
+.olabel{font-size:10px;color:#555;white-space:nowrap;}
+.oinput,.oselect-fake{background:#fff;border:1px solid #bfc3c8;border-radius:3px;padding:3px 5px;font-size:12px;color:#222;font-family:inherit;height:26px;box-sizing:border-box;}
+.oinput:focus{outline:none;border-color:#2771c9;}
+.oselect-fake{display:flex;align-items:center;white-space:nowrap;}
+.oinput[type=number]{width:68px;}
+.oinput.t{width:60px;}
+.oinput.d{width:90px;}
+.oinput.s{width:72px;}
+.oinput.p{width:60px;}
+.obtn{border:1px solid #bfc3c8;border-radius:3px;padding:3px 9px;font-size:11.5px;font-family:inherit;font-weight:600;height:26px;box-sizing:border-box;}
+.obtn-q{background:#2771c9;color:#fff;border-color:#2771c9;}
+.obtn-c{background:#fff;color:#444;}
+.obtn-v{background:#fff;color:#444;}
+.obtn-s{background:#f08c00;color:#fff;border-color:#d97d00;}
+.order-calc{background:#f9fafb;border-top:1px solid #e0e3e7;padding:6px 10px;display:flex;gap:16px;}
+.ci{display:flex;flex-direction:column;gap:1px;}
+.cl{font-size:9.5px;color:#666;}
+.cv{font-size:13px;font-weight:700;}
+.cv.loss{color:#dc2626;}
+.cv.neu{color:#d97706;}
+.cv.win{color:#16a34a;}
+</style></head>
+<body>
+<div class="card">
+  <div style="font-size:18px;font-weight:800;color:#22c55e">Long Call</div>
+  <div class="order-wrap">
+    <div class="order-row1">
+      <div class="ofield"><span class="olabel">訂單類別</span><div class="oselect-fake">Buy Open &#9660;</div></div>
+      <div class="ofield"><span class="olabel">合約數</span><input class="oinput" id="oc-c" type="number" value="1" min="1"></div>
+      <div class="ofield"><span class="olabel">股票代號</span><input class="oinput t" id="oc-t" type="text" value="SQQQ"></div>
+      <div class="ofield"><span class="olabel">到期日</span><input class="oinput d" id="oc-e" type="text" value="05/01/2026"></div>
+      <div class="ofield"><span class="olabel">履約價</span><input class="oinput s" id="oc-k" type="number" value="50.00" step="0.5"></div>
+      <div class="ofield"><span class="olabel">合約類型</span><div class="oselect-fake">買權 Call &#9660;</div></div>
+      <button class="obtn obtn-q" style="align-self:flex-end;">取得報價</button>
+    </div>
+    <div class="order-row2">
+      <div class="ofield"><span class="olabel">價格</span><div class="oselect-fake" style="width:52px;">限價 &#9660;</div></div>
+      <div class="ofield"><span class="olabel">限價</span><input class="oinput p" id="oc-p" type="number" value="1.68" step="0.01"></div>
+      <div class="ofield"><span class="olabel">停損價</span><input class="oinput p" type="number" placeholder="—" style="color:#aaa;"></div>
+      <div class="ofield"><span class="olabel">有效期</span><div class="oselect-fake">90 天有效 &#9660;</div></div>
+      <div class="ofield"><span class="olabel">其他條件</span><div class="oselect-fake">無 &#9660;</div></div>
+      <div style="display:flex;gap:4px;align-self:flex-end;">
+        <button class="obtn obtn-c">清除</button>
+        <button class="obtn obtn-v">檢視</button>
+        <button class="obtn obtn-s">下單</button>
+      </div>
+    </div>
+    <div class="order-calc">
+      <div class="ci"><span class="cl">權利金總成本</span><span class="cv loss" id="oc-cost">$168.00</span></div>
+      <div class="ci"><span class="cl">損益兩平</span><span class="cv neu" id="oc-bp">$51.68</span></div>
+      <div class="ci"><span class="cl">最大虧損</span><span class="cv loss" id="oc-ml">$168.00</span></div>
+      <div class="ci"><span class="cl">最大獲利</span><span class="cv win">無限 ↑</span></div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  function calc(){
+    var c=+document.getElementById('oc-c').value||1;
+    var p=+document.getElementById('oc-p').value||0;
+    var k=+document.getElementById('oc-k').value||0;
+    var cost=c*p*100,bp=k+p;
+    document.getElementById('oc-cost').textContent='$'+cost.toFixed(2);
+    document.getElementById('oc-bp').textContent='$'+bp.toFixed(2);
+    document.getElementById('oc-ml').textContent='$'+cost.toFixed(2);
+  }
+  ['oc-c','oc-p','oc-k'].forEach(function(id){document.getElementById(id).addEventListener('input',calc);});
+})();
+</script>
+</body></html>

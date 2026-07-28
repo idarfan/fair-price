@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>期權小學堂第0課 · 四種基本部位</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#FAF3E8; --page-bg:#FFF9F2; --panel-bg:#FFFCF7;
+  --ink:#2A1A0E; --muted:#7A6555; --border:#E2D4C2;
+  --gold:#D4900A; --gold-bg:#FEF4D8; --gold-bdr:#E8B840;
+  --green:#2E9E52; --green-bg:#E8F8EE; --green-bdr:#8ED4A8;
+  --red:#D04040; --red-bg:#FDEAEA; --red-bdr:#F5AAAA;
+  --blue:#3A70C0; --blue-bg:#EBF2FF; --blue-bdr:#9ABCE8;
+  --amber:#C07830; --amber-bg:#FFF3DC; --amber-bdr:#F0C060;
+  --r-lg:16px; --r-md:10px; --r-sm:6px;
+}
+body { background:var(--bg); font-family:"PingFang TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif; padding:0; margin:0; }
+
+/* ── Page ── */
+.page { background:var(--page-bg); max-width:100%; width:100%; padding:32px 40px 80px; position:relative; min-height:3000px; }
+.course-tag { display:inline-flex; align-items:center; gap:6px; background:var(--ink); color:#FFF9F0; font-size:12px; font-weight:700; padding:5px 14px; border-radius:100px; letter-spacing:1px; margin-bottom:18px; }
+.page-header { display:grid; grid-template-columns:1fr auto; gap:20px; align-items:start; margin-bottom:28px; }
+.page-title { font-size:32px; font-weight:900; color:var(--ink); line-height:1.2; }
+.page-subtitle { font-size:14px; color:var(--muted); margin-top:4px; font-weight:500; }
+.page-desc { font-size:13px; color:var(--muted); margin-top:6px; line-height:1.7; }
+.concept-box { background:var(--gold-bg); border:2px solid var(--gold-bdr); border-radius:var(--r-lg); padding:14px 18px; min-width:230px; }
+.cb-title { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--gold); margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+.cb-row { display:flex; align-items:flex-start; gap:10px; margin-bottom:7px; }
+.cb-badge { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; flex-shrink:0; margin-top:1px; }
+.cb-row p { font-size:12px; color:var(--ink); line-height:1.5; font-weight:500; }
+.section-divider { display:flex; align-items:center; gap:12px; margin:40px 0 80px; }
+.section-divider-line { flex:1; height:2px; background:var(--border); }
+.section-divider-label { font-size:11px; font-weight:800; letter-spacing:2px; color:var(--muted); text-transform:uppercase; white-space:nowrap; }
+.payoff-grid { display:grid; grid-template-columns:1fr; gap:20px; margin-bottom:28px; }
+.payoff-card { background:var(--panel-bg); border:2px solid var(--border); border-radius:var(--r-lg); overflow:hidden; display:flex; flex-direction:column; margin-bottom:24px; }
+.payoff-card-header { padding:14px 18px 10px; display:flex; align-items:center; justify-content:space-between; }
+.payoff-card-name { font-size:18px; font-weight:900; }
+.payoff-card-en { font-size:11px; color:var(--muted); font-weight:600; margin-top:2px; letter-spacing:0.5px; }
+.payoff-svg-wrap { width:100%; aspect-ratio:4/3; overflow:hidden; border-top:1px solid var(--border); border-bottom:1px solid var(--border); background:white; }
+.payoff-details { padding:12px 16px 14px; display:flex; flex-direction:column; gap:7px; }
+.detail-row { display:flex; align-items:baseline; gap:8px; font-size:12px; }
+.detail-label { color:var(--muted); font-weight:600; min-width:62px; flex-shrink:0; }
+.detail-value { color:var(--ink); font-weight:700; line-height:1.4; }
+.pill { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:3px 10px; border-radius:100px; }
+.pill-green { background:var(--green-bg); color:var(--green); border:1.5px solid var(--green-bdr); }
+.pill-red   { background:var(--red-bg);   color:var(--red);   border:1.5px solid var(--red-bdr);   }
+.pill-blue  { background:var(--blue-bg);  color:var(--blue);  border:1.5px solid var(--blue-bdr);  }
+.pill-amber { background:var(--amber-bg); color:var(--amber); border:1.5px solid var(--amber-bdr); }
+.summary-table-wrap { margin-bottom:28px; overflow-x:auto; }
+.summary-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+.summary-table th, .summary-table td { padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); vertical-align:top; }
+.summary-table th { background:var(--ink); color:#FFF9F0; font-size:11px; font-weight:700; letter-spacing:0.5px; }
+.summary-table th:first-child { border-radius:10px 0 0 0; }
+.summary-table th:last-child  { border-radius:0 10px 0 0; }
+.summary-table tr:last-child td { border-bottom:none; }
+.summary-table tr:nth-child(even) td { background:#FDFAF5; }
+.summary-table td:first-child { font-weight:700; color:var(--ink); }
+.tag-lc { background:var(--green-bg); color:var(--green); border-radius:4px; padding:2px 6px; font-size:11px; font-weight:700; }
+.tag-sc { background:var(--red-bg);   color:var(--red);   border-radius:4px; padding:2px 6px; font-size:11px; font-weight:700; }
+.tag-lp { background:var(--blue-bg);  color:var(--blue);  border-radius:4px; padding:2px 6px; font-size:11px; font-weight:700; }
+.tag-sp { background:var(--amber-bg); color:var(--amber); border-radius:4px; padding:2px 6px; font-size:11px; font-weight:700; }
+.insight-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.insight-box { border-radius:var(--r-md); padding:14px 16px; border:2px solid; }
+.insight-box h4 { font-size:13px; font-weight:800; margin-bottom:6px; letter-spacing:0.3px; }
+.insight-box p { font-size:12px; line-height:1.65; color:var(--ink); }
+.insight-box strong { font-weight:700; }
+.insight-call { background:var(--green-bg); border-color:var(--green-bdr); }
+.insight-call h4 { color:var(--green); }
+.insight-put  { background:var(--blue-bg);  border-color:var(--blue-bdr);  }
+.insight-put  h4 { color:var(--blue);  }
+.insight-long { background:var(--gold-bg);  border-color:var(--gold-bdr);  }
+.insight-long h4 { color:var(--gold);  }
+.insight-risk { background:var(--red-bg);   border-color:var(--red-bdr);   }
+.insight-risk h4 { color:var(--red);   }
+
+/* ══ EDIT MODE ══ */
+#edit-btn {
+  position:fixed; bottom:28px; right:28px; z-index:2000;
+  background:var(--ink); color:#FFF9F0; border:none;
+  border-radius:100px; padding:10px 20px;
+  font-size:14px; font-weight:700; cursor:pointer;
+  display:flex; align-items:center; gap:8px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.25);
+  font-family:inherit; transition:background 0.15s, transform 0.1s;
+}
+#edit-btn:hover { background:#4A3020; transform:scale(1.03); }
+#edit-btn.active { background:#2E7040; }
+#edit-toolbar {
+  position:fixed; bottom:0; left:0; right:0;
+  background:#FFFCF7; border-top:2px solid #E2D4C2;
+  padding:10px 24px 12px; z-index:1999;
+  display:flex; align-items:center; gap:0;
+  box-shadow:0 -4px 24px rgba(80,40,0,0.10);
+  transform:translateY(100%);
+  transition:transform 0.22s cubic-bezier(.4,0,.2,1);
+  font-family:inherit; flex-wrap:wrap; min-height:56px;
+}
+#edit-toolbar.visible { transform:translateY(0); }
+.et-hint { font-size:13px; color:#A08878; padding:6px 0; font-style:italic; }
+.et-group { display:flex; align-items:center; gap:0; flex-wrap:wrap; width:100%; }
+.et-item { display:flex; flex-direction:column; gap:3px; padding:0 14px; }
+.et-label { font-size:10px; font-weight:600; color:#9A8878; letter-spacing:0.5px; text-transform:uppercase; }
+.et-divider { width:1px; height:36px; background:#E2D4C2; flex-shrink:0; }
+#et-font { font-size:13px; border:1.5px solid #E2D4C2; border-radius:6px; padding:4px 8px; background:white; color:var(--ink); cursor:pointer; font-family:inherit; }
+.et-size-ctrl { display:flex; align-items:center; gap:6px; }
+.et-btn-sm { width:24px; height:24px; border:1.5px solid #E2D4C2; border-radius:6px; background:white; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--ink); line-height:1; }
+.et-btn-sm:hover { background:#F5EFE6; }
+#et-size-val { font-size:14px; font-weight:700; min-width:28px; text-align:center; color:var(--ink); }
+.et-fmt-btn { width:30px; height:30px; border:1.5px solid #E2D4C2; border-radius:6px; background:white; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--ink); }
+.et-fmt-btn:hover { background:#F5EFE6; }
+.et-fmt-btn.on { background:var(--ink); color:white; border-color:var(--ink); }
+#et-color { width:36px; height:28px; border:1.5px solid #E2D4C2; border-radius:6px; padding:2px; cursor:pointer; background:white; }
+#et-lh { width:80px; accent-color:var(--gold); }
+.et-action-btn { font-size:12px; font-weight:600; padding:5px 12px; border:1.5px solid #E2D4C2; border-radius:6px; background:white; cursor:pointer; color:var(--ink); font-family:inherit; }
+.et-action-btn:hover { background:#F5EFE6; }
+.edit-mode .page *:hover { outline:1.5px dashed #E8B840; outline-offset:2px; border-radius:3px; }
+.edit-mode .page input[type="number"]:hover,
+.edit-mode .page input[type="number"]:focus { outline:none !important; pointer-events:auto !important; }
+.el-focus { outline:2px solid var(--blue) !important; outline-offset:3px; border-radius:3px; }
+.edit-mode .page .el-focus * { outline:none !important; }
+
+/* ══ DRAG & RESIZE ══ */
+#drag-canvas { position:relative !important; min-height:3000px; overflow:visible; }
+[data-drag-id] { box-sizing:border-box; }
+[data-drag-id].positioned { position:absolute; }
+.edit-mode [data-drag-id]:hover > .drag-handle,
+[data-drag-id].is-dragging > .drag-handle,
+[data-drag-id].is-resizing > .drag-handle { opacity:1; }
+.drag-handle {
+  position:absolute; top:-15px; left:0; right:0; height:13px;
+  background:linear-gradient(90deg,#3A70C0,#2255A0);
+  border-radius:5px 5px 0 0; cursor:grab; opacity:0;
+  transition:opacity 0.15s; display:flex; align-items:center; justify-content:center;
+  z-index:200; user-select:none; -webkit-user-select:none;
+}
+.drag-handle:active { cursor:grabbing; }
+.drag-handle::before { content:":::"; font-size:9px; font-weight:900; color:rgba(255,255,255,0.85); letter-spacing:4px; }
+.edit-mode [data-drag-id]:hover,
+[data-drag-id].is-dragging,
+[data-drag-id].is-resizing { outline:2px dashed rgba(58,112,192,0.45); outline-offset:3px; }
+.rh { position:absolute; width:10px; height:10px; background:#3A70C0; border:2px solid #fff; border-radius:2px; opacity:0; transition:opacity 0.15s; z-index:201; }
+.edit-mode [data-drag-id]:hover .rh,
+[data-drag-id].is-resizing .rh { opacity:1; }
+.rh-nw { top:-5px; left:-5px; cursor:nw-resize; }
+.rh-n  { top:-5px; left:50%; transform:translateX(-50%); cursor:n-resize; }
+.rh-ne { top:-5px; right:-5px; cursor:ne-resize; }
+.rh-e  { top:50%; right:-5px; transform:translateY(-50%); cursor:e-resize; }
+.rh-se { bottom:-5px; right:-5px; cursor:se-resize; }
+.rh-s  { bottom:-5px; left:50%; transform:translateX(-50%); cursor:s-resize; }
+.rh-sw { bottom:-5px; left:-5px; cursor:sw-resize; }
+.rh-w  { top:50%; left:-5px; transform:translateY(-50%); cursor:w-resize; }
+#layout-reset-btn {
+  position:fixed; bottom:70px; right:20px;
+  background:#FAF3E8; border:1.5px solid #E2D4C2; border-radius:8px;
+  padding:7px 16px; font-size:12px; cursor:pointer; z-index:10001;
+  color:#7A6555; font-family:inherit; transition:background 0.15s;
+  box-shadow:0 2px 8px rgba(0,0,0,0.12);
+}
+#layout-reset-btn:hover { background:#F0E4D0; }
+
+
+.full-section-card { background:var(--panel-bg); border-radius:var(--r-lg); padding:16px 20px; margin-bottom:24px; }
+.fsc-title { font-size:15px; font-weight:700; margin-bottom:10px; }
+
+/* ── Order form ── */
+.order-wrap{margin-top:12px;border:1px solid #c8ccd0;border-radius:4px;overflow:hidden;font-size:12px;}
+.order-row1{background:#f4f6f9;padding:6px 8px;display:flex;flex-wrap:wrap;gap:5px;align-items:flex-end;border-bottom:1px solid #e0e3e7;}
+.order-row2{background:#fff;padding:6px 8px;display:flex;flex-wrap:wrap;gap:5px;align-items:flex-end;}
+.ofield{display:flex;flex-direction:column;gap:2px;}
+.olabel{font-size:10px;color:#555;white-space:nowrap;}
+.oinput,.oselect-fake{
+  background:#fff;border:1px solid #bfc3c8;border-radius:3px;
+  padding:3px 5px;font-size:12px;color:#222;font-family:inherit;
+  height:26px;box-sizing:border-box;
+}
+.oinput:focus{outline:none;border-color:#2771c9;box-shadow:0 0 0 2px rgba(39,113,201,0.15);}
+.oselect-fake{display:flex;align-items:center;white-space:nowrap;cursor:default;user-select:none;}
+.oinput[type=number]{width:68px;}
+.oinput.ticker-input{width:60px;text-transform:uppercase;}
+.oinput.date-input{width:90px;}
+.oinput.strike-input{width:72px;}
+.oinput.premium-input{width:60px;}
+.oinput.stoploss-input{width:60px;color:#aaa;}
+.obtn{
+  border:1px solid #bfc3c8;border-radius:3px;padding:3px 9px;
+  font-size:11.5px;font-family:inherit;cursor:default;font-weight:600;height:26px;
+  box-sizing:border-box;white-space:nowrap;
+}
+.obtn-quote{background:#2771c9;color:#fff;border-color:#2771c9;}
+.obtn-clear{background:#fff;color:#444;border-color:#bfc3c8;}
+.obtn-review{background:#fff;color:#444;border-color:#bfc3c8;}
+.obtn-submit{background:#f08c00;color:#fff;border-color:#d97d00;}
+/* Calculation result bar */
+.order-calc{
+  background:#f9fafb;border-top:1px solid #e0e3e7;
+  padding:6px 10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+}
+.calc-item{display:flex;flex-direction:column;gap:1px;min-width:80px;}
+.calc-label{font-size:9.5px;color:#666;}
+.calc-value{font-size:13px;font-weight:700;color:#222;}
+.calc-value.win{color:#16a34a;}
+.calc-value.loss{color:#dc2626;}
+.calc-value.neutral{color:#d97706;}
+/* Explanation */
+.order-explain{
+  margin-top:10px;border-left:3px solid var(--green);
+  border-radius:0 6px 6px 0;background:rgba(34,197,94,0.04);
+  padding:9px 12px;font-size:12.5px;
+}
+.order-explain-title{font-size:11px;font-weight:700;color:var(--green);margin-bottom:7px;letter-spacing:0.03em;}
+.order-explain p{margin:0 0 6px;line-height:1.55;color:var(--ink);}
+.order-explain p:last-child{margin-bottom:0;}
+.oe-table{width:100%;border-collapse:collapse;font-size:11.5px;margin:6px 0;}
+.oe-table th{background:rgba(34,197,94,0.12);padding:4px 6px;font-weight:700;text-align:left;color:var(--ink);}
+.oe-table td{padding:4px 6px;border-top:1px solid rgba(0,0,0,0.07);color:var(--ink);}
+.oe-table tr:hover td{background:rgba(34,197,94,0.05);}
+.explain-win{color:#16a34a;font-weight:700;}
+.explain-lose{color:#dc2626;}
+.explain-break{color:#d97706;}
+.order-key-box{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.order-key-item{background:rgba(34,197,94,0.1);border-radius:6px;padding:5px 8px;font-size:11px;color:var(--ink);flex:1;min-width:120px;}
+.order-key-item b{display:block;color:var(--green);margin-bottom:2px;font-size:10.5px;}
+.order-sqqq-note{margin-top:8px;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.3);border-radius:6px;padding:7px 10px;font-size:11.5px;line-height:1.5;color:var(--ink);}
+.order-sqqq-note b{color:#b45309;}
+
+/* ── TTS Bar ── */
+#tts-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 3000;
+  background: rgba(42,26,14,0.97); backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 8px 20px; display: flex; align-items: center; gap: 12px;
+  font-family: "PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+.tts-btn {
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+  color: #FFF9F0; border-radius: 100px; padding: 5px 14px; font-size: 12px;
+  cursor: pointer; font-family: inherit; font-weight: 700;
+  transition: background 0.15s; display: flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.tts-btn:hover { background: rgba(255,255,255,0.22); }
+.tts-btn.playing { background: #1E7A3A; border-color: #2E9E52; color: #fff; }
+.tts-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.15); flex-shrink: 0; }
+.tts-dots { display: flex; gap: 5px; align-items: center; }
+.tts-dot {
+  width: 7px; height: 7px; border-radius: 100px;
+  background: rgba(255,255,255,0.2); cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.tts-dot.done    { background: rgba(255,255,255,0.45); }
+.tts-dot.current { background: var(--gold); transform: scale(1.5); }
+.tts-section { font-size: 12px; color: #E8C060; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tts-speed {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #FFF9F0; border-radius: 6px; padding: 3px 7px; font-size: 12px;
+  cursor: pointer; font-family: inherit;
+}
+#tts-subtitle {
+  position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%);
+  max-width: 700px; width: calc(100% - 40px);
+  background: rgba(8,4,1,0.85); backdrop-filter: blur(8px);
+  color: #FFF9F0; border-radius: 10px; padding: 10px 18px;
+  font-size: 14px; line-height: 1.9; z-index: 2500;
+  display: none; pointer-events: none;
+  max-height: 110px; overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+#tts-subtitle.active { display: block; }
+.sub-c       { color: rgba(255,249,240,0.28); }
+.sub-c.done  { color: rgba(255,249,240,0.75); }
+.sub-c.now   { color: #F5C540; background: rgba(245,197,64,0.18); border-radius: 2px; }
+.panel.tts-active, .bonus-panel.tts-active,
+.payoff-card.tts-active, .full-section-card.tts-active { outline: 2px solid var(--gold); outline-offset: 4px; }
+.pron-btn {
+  background: none; border: none; cursor: pointer; padding: 2px 3px;
+  line-height: 1; vertical-align: middle; display: inline-flex;
+  align-items: center; justify-content: center; flex-shrink: 0;
+  transition: transform .1s;
+}
+.pron-btn:hover  { transform: scale(1.25); }
+.pron-btn:active { transform: scale(0.95); }
+.pron-btn.male   { color: #3b82f6; }
+.pron-btn.female { color: #ef4444; }
+body { padding-top: 52px; }
+</style>
+</head>
+<body>
+<!-- ── TTS Bar ── -->
+<div id="tts-bar">
+  <button id="tts-play-btn" class="tts-btn" onclick="ttsToggle()">&#9658; 朗讀全文</button>
+  <button class="tts-btn" onclick="ttsStop()" title="停止並重設">&#9632;</button>
+  <div class="tts-sep"></div>
+  <div class="tts-dots" id="tts-dots"></div>
+  <div class="tts-sep"></div>
+  <span class="tts-section" id="tts-section-name">點擊「朗讀全文」開始</span>
+  <select id="tts-speed" title="語速" onchange="ttsSetRate(this.value)">
+    <option value="0.8">0.8x</option>
+    <option value="0.9" selected>0.9x</option>
+    <option value="1.0">1.0x</option>
+    <option value="1.1">1.1x</option>
+    <option value="1.2">1.2x</option>
+  </select>
+  <div class="tts-sep"></div>
+  <span style="font-size:11px;color:#8A7A5A;">&#128266;</span>
+  <input type="range" id="tts-vol" min="0" max="1" step="0.05" value="1"
+         style="width:60px;accent-color:var(--gold);cursor:pointer;" title="音量">
+  <div class="tts-sep"></div>
+  <button class="tts-btn" onclick="adjustPageFont(-1)" style="padding:4px 9px;font-size:11px;font-weight:900;" title="縮小字體">A-</button>
+  <button class="tts-btn" onclick="adjustPageFont(1)"  style="padding:4px 9px;font-size:11px;font-weight:900;" title="放大字體">A+</button>
+</div>
+<div id="tts-subtitle"></div>
+<div class="page" id="drag-canvas">
+
+  <div data-drag-id="course-tag" class="course-tag">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="#FFF9F0" stroke-width="1.5"/><path d="M6 3v3l2 1.5" stroke="#FFF9F0" stroke-width="1.5" stroke-linecap="round"/></svg>
+    期權小學堂 &middot; 第 0 課
+  </div>
+
+  <div class="page-header">
+    <div data-drag-id="header-text">
+      <div class="page-title">美股選擇權：四種基本部位</div>
+      <div class="page-subtitle">Options Basics<button class="pron-btn male" onclick="pronounce('Options','male')" title="男聲 Options"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('Options','female')" title="女聲 Options"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button> — The 4 Fundamental Positions</div>
+      <div class="page-desc">
+        選擇權分為 <strong>Call（買權）</strong> 與 <strong>Put（賣權）</strong>，每種又有 <strong>Long（買入）</strong> 和 <strong>Short（賣出）</strong> 兩個方向，<br>
+        共四種基本部位。所有進階策略皆由此四種部位組合而成。
+      </div>
+    </div>
+    <div data-drag-id="concept-box" class="concept-box">
+      <div class="cb-title">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" fill="#D4900A"/></svg>
+        核心概念
+      </div>
+      <div class="cb-row">
+        <div class="cb-badge" style="background:#E8F8EE;color:#2E9E52;">C</div>
+        <p><strong>Call 買權</strong>：賦予「以行使價 K<br>買入股票」的權利</p>
+      </div>
+      <div class="cb-row">
+        <div class="cb-badge" style="background:#EBF2FF;color:#3A70C0;">P</div>
+        <p><strong>Put 賣權</strong>：賦予「以行使價 K<br>賣出股票」的權利</p>
+      </div>
+      <div class="cb-row">
+        <div class="cb-badge" style="background:#FEF4D8;color:#D4900A;">K</div>
+        <p><strong>行使價（Strike）</strong>：<br>合約約定的買/賣價格</p>
+      </div>
+    </div>
+  </div>
+
+  <div data-drag-id="call-divider" class="section-divider">
+    <div class="section-divider-line"></div>
+    <div class="section-divider-label" style="color:var(--green);">&#9650; CALL &mdash; 買權（買入股票的權利）</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+
+    <div data-drag-id="long-call-card" id="l0-long-call" class="payoff-card" style="border-color:var(--green-bdr);">
+      <div class="payoff-card-header">
+        <div>
+          <div class="payoff-card-name" style="color:var(--green);">Long Call<button class="pron-btn male" onclick="pronounce('Long Call','male')" title="男聲 Long Call"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('Long Call','female')" title="女聲 Long Call"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button></div>
+          <div class="payoff-card-en">買入買權</div>
+        </div>
+        <span class="pill pill-green">付出權利金</span>
+      </div>
+      <div class="payoff-svg-wrap"><svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="20 20 800 560" width="100%" height="100%" style="width:100%;height:100%;display:block;"><!-- svg-source:excalidraw --><metadata/><defs><style class="style-fonts">
+      </style></defs><rect x="0" y="0" width="840" height="600" fill="#ffffff"/><g stroke-opacity="0.2" fill-opacity="0.2" stroke-linecap="round" transform="translate(20 20) rotate(0 400 280)"><path d="M0 0 L800 0 L800 560 L0 560" stroke="none" stroke-width="0" fill="#d3f9d8"/><path d="M0 0 C278.2 0, 556.41 0, 800 0 M0 0 C195.54 0, 391.07 0, 800 0 M800 0 C800 165.18, 800 330.37, 800 560 M800 0 C800 210.64, 800 421.27, 800 560 M800 560 C609.41 560, 418.82 560, 0 560 M800 560 C567.23 560, 334.47 560, 0 560 M0 560 C0 358.56, 0 157.11, 0 0 M0 560 C0 355.25, 0 150.51, 0 0" stroke="transparent" stroke-width="2" fill="none"/></g><g stroke-linecap="round"><g transform="translate(140 499.5) rotate(0 0 -209.5)"><path d="M0 0 C0 -91.94, 0 -183.88, 0 -419 M0 0 C0 -107.33, 0 -214.66, 0 -419" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(140 499.5) rotate(0 0 -209.5)"><path d="M8.55 -395.51 C6.67 -400.66, 4.8 -405.82, 0 -419 M8.55 -395.51 C6.36 -401.53, 4.17 -407.54, 0 -419" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(140 499.5) rotate(0 0 -209.5)"><path d="M-8.55 -395.51 C-6.67 -400.66, -4.8 -405.82, 0 -419 M-8.55 -395.51 C-6.36 -401.53, -4.17 -407.54, 0 -419" stroke="#888" stroke-width="1" fill="none"/></g></g><mask/><g stroke-linecap="round"><g transform="translate(120.5 280) rotate(0 329.5 0)"><path d="M0 0 C226.76 0, 453.51 0, 659 0 M0 0 C261.96 0, 523.93 0, 659 0" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(120.5 280) rotate(0 329.5 0)"><path d="M635.51 8.55 C643.59 5.61, 651.67 2.67, 659 0 M635.51 8.55 C644.85 5.15, 654.18 1.75, 659 0" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(120.5 280) rotate(0 329.5 0)"><path d="M635.51 -8.55 C643.59 -5.61, 651.67 -2.67, 659 0 M635.51 -8.55 C644.85 -5.15, 654.18 -1.75, 659 0" stroke="#888" stroke-width="1" fill="none"/></g></g><mask/><g transform="translate(108 272) rotate(0 4 10)"><text x="0" y="14.096" font-family="Virgil, Segoe UI Emoji" font-size="16px" fill="#888" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">0</text></g><g transform="translate(782 284) rotate(0 16 10)"><text x="0" y="14.096" font-family="Virgil, Segoe UI Emoji" font-size="16px" fill="#666" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">股價</text></g><g transform="translate(88 68) rotate(0 16 10)"><text x="0" y="14.096" font-family="Virgil, Segoe UI Emoji" font-size="16px" fill="#666" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">損益</text></g><g stroke-linecap="round"><g transform="translate(450 509.5) rotate(0 0 -224.5)"><path d="M0 0 C0 -95.95, 0 -191.91, 0 -449" stroke="#f59e0b" stroke-width="1.5" fill="none" stroke-dasharray="8 9"/></g></g><mask/><g transform="translate(438 514) rotate(0 7.2216796875 12.5)"><text x="0" y="17.619999999999997" font-family="Virgil, Segoe UI Emoji" font-size="20px" fill="#f59e0b" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">K</text></g><g stroke-linecap="round"><g transform="translate(140 350) rotate(0 155 0)"><path d="M0 0 C79.41 0, 158.82 0, 310 0 M0 0 C120.07 0, 240.14 0, 310 0" stroke="#22c55e" stroke-width="3" fill="none"/></g></g><mask/><g stroke-linecap="round"><g transform="translate(450.5 349.5) rotate(0 144.5 -134.5)"><path d="M0 0 C114.88 -106.93, 229.76 -213.86, 289 -269 M0 0 C94.64 -88.09, 189.29 -176.19, 289 -269" stroke="#22c55e" stroke-width="3" fill="none"/></g><g transform="translate(450.5 349.5) rotate(0 144.5 -134.5)"><path d="M277.63 -246.74 C282.15 -255.59, 286.67 -264.44, 289 -269 M277.63 -246.74 C281.35 -254.03, 285.08 -261.32, 289 -269" stroke="#22c55e" stroke-width="3" fill="none"/></g><g transform="translate(450.5 349.5) rotate(0 144.5 -134.5)"><path d="M265.98 -259.25 C275.13 -263.13, 284.28 -267, 289 -269 M265.98 -259.25 C273.52 -262.44, 281.06 -265.64, 289 -269" stroke="#22c55e" stroke-width="3" fill="none"/></g></g><mask/><g stroke-linecap="round" transform="translate(513 273) rotate(0 7 7)"><path d="M14 7 C14 7.41, 13.96 7.82, 13.89 8.22 C13.82 8.61, 13.72 9.01, 13.58 9.39 C13.44 9.77, 13.26 10.15, 13.06 10.5 C12.86 10.85, 12.62 11.19, 12.36 11.5 C12.1 11.81, 11.81 12.1, 11.5 12.36 C11.19 12.62, 10.85 12.86, 10.5 13.06 C10.15 13.26, 9.77 13.44, 9.39 13.58 C9.01 13.72, 8.61 13.82, 8.22 13.89 C7.82 13.96, 7.41 14, 7 14 C6.59 14, 6.18 13.96, 5.78 13.89 C5.39 13.82, 4.99 13.72, 4.61 13.58 C4.23 13.44, 3.85 13.26, 3.5 13.06 C3.15 12.86, 2.81 12.62, 2.5 12.36 C2.19 12.1, 1.9 11.81, 1.64 11.5 C1.38 11.19, 1.14 10.85, 0.94 10.5 C0.74 10.15, 0.56 9.77, 0.42 9.39 C0.28 9.01, 0.18 8.61, 0.11 8.22 C0.04 7.82, 0 7.41, 0 7 C0 6.59, 0.04 6.18, 0.11 5.78 C0.18 5.39, 0.28 4.99, 0.42 4.61 C0.56 4.23, 0.74 3.85, 0.94 3.5 C1.14 3.15, 1.38 2.81, 1.64 2.5 C1.9 2.19, 2.19 1.9, 2.5 1.64 C2.81 1.38, 3.15 1.14, 3.5 0.94 C3.85 0.74, 4.23 0.56, 4.61 0.42 C4.99 0.28, 5.39 0.18, 5.78 0.11 C6.18 0.04, 6.59 0, 7 0 C7.41 0, 7.82 0.04, 8.22 0.11 C8.61 0.18, 9.01 0.28, 9.39 0.42 C9.77 0.56, 10.15 0.74, 10.5 0.94 C10.85 1.14, 11.19 1.38, 11.5 1.64 C11.81 1.9, 12.1 2.19, 12.36 2.5 C12.62 2.81, 12.86 3.15, 13.06 3.5 C13.26 3.85, 13.44 4.23, 13.58 4.61 C13.72 4.99, 13.82 5.39, 13.89 5.78 C13.96 6.18, 13.98 6.8, 14 7 C14.02 7.2, 14.02 6.8, 14 7" stroke="none" stroke-width="0" fill="#22c55e"/><path d="M14 7 C14 7.41, 13.96 7.82, 13.89 8.22 C13.82 8.61, 13.72 9.01, 13.58 9.39 C13.44 9.77, 13.26 10.15, 13.06 10.5 C12.86 10.85, 12.62 11.19, 12.36 11.5 C12.1 11.81, 11.81 12.1, 11.5 12.36 C11.19 12.62, 10.85 12.86, 10.5 13.06 C10.15 13.26, 9.77 13.44, 9.39 13.58 C9.01 13.72, 8.61 13.82, 8.22 13.89 C7.82 13.96, 7.41 14, 7 14 C6.59 14, 6.18 13.96, 5.78 13.89 C5.39 13.82, 4.99 13.72, 4.61 13.58 C4.23 13.44, 3.85 13.26, 3.5 13.06 C3.15 12.86, 2.81 12.62, 2.5 12.36 C2.19 12.1, 1.9 11.81, 1.64 11.5 C1.38 11.19, 1.14 10.85, 0.94 10.5 C0.74 10.15, 0.56 9.77, 0.42 9.39 C0.28 9.01, 0.18 8.61, 0.11 8.22 C0.04 7.82, 0 7.41, 0 7 C0 6.59, 0.04 6.18, 0.11 5.78 C0.18 5.39, 0.28 4.99, 0.42 4.61 C0.56 4.23, 0.74 3.85, 0.94 3.5 C1.14 3.15, 1.38 2.81, 1.64 2.5 C1.9 2.19, 2.19 1.9, 2.5 1.64 C2.81 1.38, 3.15 1.14, 3.5 0.94 C3.85 0.74, 4.23 0.56, 4.61 0.42 C4.99 0.28, 5.39 0.18, 5.78 0.11 C6.18 0.04, 6.59 0, 7 0 C7.41 0, 7.82 0.04, 8.22 0.11 C8.61 0.18, 9.01 0.28, 9.39 0.42 C9.77 0.56, 10.15 0.74, 10.5 0.94 C10.85 1.14, 11.19 1.38, 11.5 1.64 C11.81 1.9, 12.1 2.19, 12.36 2.5 C12.62 2.81, 12.86 3.15, 13.06 3.5 C13.26 3.85, 13.44 4.23, 13.58 4.61 C13.72 4.99, 13.82 5.39, 13.89 5.78 C13.96 6.18, 13.98 6.8, 14 7 C14.02 7.2, 14.02 6.8, 14 7" stroke="#22c55e" stroke-width="2" fill="none"/></g><g transform="translate(482 248) rotate(0 28 8.75)"><text x="0" y="12.334" font-family="Virgil, Segoe UI Emoji" font-size="14px" fill="#22c55e" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">損益兩平</text></g><g transform="translate(155 368) rotate(0 56.44775390625 8.75)"><text x="0" y="12.334" font-family="Virgil, Segoe UI Emoji" font-size="14px" fill="#ef4444" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">最大虧損 = 權利金</text></g><g transform="translate(528 78) rotate(0 42 8.75)"><text x="0" y="12.334" font-family="Virgil, Segoe UI Emoji" font-size="14px" fill="#22c55e" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">獲利潛力無限</text></g><g transform="translate(180 220) rotate(0 58.333740234375 9.375)"><text x="0" y="13.215" font-family="Virgil, Segoe UI Emoji" font-size="15px" fill="#22c55e" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">看多 / 付出權利金</text></g></svg></div>
+      <div class="payoff-details">
+        <div class="detail-row"><span class="detail-label">獲利條件</span><span class="detail-value">股價大漲（越高越好，無上限）</span></div>
+        <div class="detail-row"><span class="detail-label">最大獲利</span><span class="detail-value" style="color:var(--green)">無限（股價可無限上漲）</span></div>
+        <div class="detail-row"><span class="detail-label">最大虧損</span><span class="detail-value" style="color:var(--red)">有限（僅限付出的權利金）</span></div>
+        <div class="detail-row"><span class="detail-label">損益兩平</span><span class="detail-value">股價 = K + 權利金</span></div>
+        <div class="detail-row"><span class="detail-label">心態</span><span class="detail-value">看多、預期股價大漲</span></div>
+        <div class="detail-row"><span class="detail-label">常見策略</span><span class="detail-value">槓桿做多、代替買股</span></div>
+      </div>
+    </div>
+
+    <div data-drag-id="longcall-order" class="full-section-card" style="border-left:4px solid #22c55e;">
+    <div class="drag-handle"></div>
+    <div class="fsc-title" style="color:#22c55e;">Long Call 下單範例 — SQQQ</div>
+
+    <!-- Interactive order form -->
+    <div class="order-wrap" id="order-wrap">
+      <div class="order-row1">
+        <div class="ofield"><span class="olabel">訂單類別</span><div class="oselect-fake">Buy Open &#9660;</div></div>
+        <div class="ofield"><span class="olabel">合約數</span><input class="oinput" id="oc-contracts" type="number" value="1" min="1" step="1"></div>
+        <div class="ofield"><span class="olabel">股票代號</span><input class="oinput oinput-t" id="oc-ticker" type="text" value="SQQQ"></div>
+        <div class="ofield"><span class="olabel">到期日</span><input class="oinput oinput-d" id="oc-expiry" type="text" value="05/01/2026"></div>
+        <div class="ofield"><span class="olabel">履約價</span><input class="oinput oinput-s" id="oc-strike" type="number" value="50.00" step="0.5" min="0"></div>
+        <div class="ofield"><span class="olabel">合約類型</span><div class="oselect-fake">買權 Call &#9660;</div></div>
+        <button class="obtn obtn-quote" style="align-self:flex-end;">取得報價</button>
+      </div>
+      <div class="order-row2">
+        <div class="ofield"><span class="olabel">價格</span><div class="oselect-fake" style="width:52px;">限價 &#9660;</div></div>
+        <div class="ofield"><span class="olabel">限價</span><input class="oinput oinput-p" id="oc-premium" type="number" value="1.68" step="0.01" min="0"></div>
+        <div class="ofield"><span class="olabel">停損價</span><input class="oinput oinput-p" type="number" placeholder="—" style="color:#aaa;"></div>
+        <div class="ofield"><span class="olabel">有效期</span><div class="oselect-fake">90 天有效 &#9660;</div></div>
+        <div class="ofield"><span class="olabel">其他條件</span><div class="oselect-fake">無 &#9660;</div></div>
+        <div style="display:flex;gap:4px;align-self:flex-end;">
+          <button class="obtn obtn-clear">清除</button>
+          <button class="obtn obtn-review">檢視</button>
+          <button class="obtn obtn-submit">下單</button>
+        </div>
+      </div>
+      <div class="order-calc">
+        <div class="calc-item"><span class="calc-label">權利金總成本</span><span class="calc-value loss" id="oc-cost">$168.00</span></div>
+        <div class="calc-item"><span class="calc-label">損益兩平</span><span class="calc-value neutral" id="oc-break">$51.68</span></div>
+        <div class="calc-item"><span class="calc-label">最大虧損</span><span class="calc-value loss" id="oc-maxloss">$168.00</span></div>
+        <div class="calc-item"><span class="calc-label">最大獲利</span><span class="calc-value win">無限 ↑</span></div>
+      </div>
+    </div>
+
+    <!-- Explanation -->
+    <div style="margin-top:12px;font-size:12.5px;line-height:1.6;color:var(--ink);">
+      <p style="margin:0 0 8px;">你付出 <strong id="oe-cost">$168.00</strong> 的權利金（<span id="oe-contracts">1</span> 張 × $<span id="oe-premium">1.68</span> × 100），取得在 <span id="oe-expiry">2026/05/01</span> 前以 <strong>$<span id="oe-strike">50.00</span></strong> 買入 <strong><span id="oe-shares">100</span> 股 <span class="oe-ticker">SQQQ</span></strong> 的<strong>權利</strong>（非義務）。</p>
+      <table class="oe-table">
+        <tr><th>情境</th><th><span class="oe-ticker">SQQQ</span> 到期股價</th><th>你的結果</th></tr>
+        <tr><td>大漲</td><td id="oe-big-price">$60.00</td><td class="explain-win" id="oe-big-result">可用 $50 買，每股賺 $10.00，淨賺 $831.00</td></tr>
+        <tr><td>損益兩平</td><td class="explain-break" id="oe-bp">$51.68</td><td>剛好回本</td></tr>
+        <tr><td>橫盤</td><td id="oe-strike2">$50.00</td><td class="explain-lose" id="oe-flat">Call 歸零，虧 $168.00</td></tr>
+        <tr><td>下跌</td><td>$40.00</td><td class="explain-lose" id="oe-drop">不行使，虧 $168.00（最大損失）</td></tr>
+      </table>
+      <div class="order-key-box" style="margin-top:8px;">
+        <div class="order-key-item"><b>最大虧損</b><span id="ok-loss">$168.00（全部權利金）</span></div>
+        <div class="order-key-item"><b>最大獲利</b>理論上無限（股價漲越高賺越多）</div>
+        <div class="order-key-item"><b>你的判斷</b><span class="oe-ticker">SQQQ</span> 到期前漲超過 $<span id="ok-break">51.68</span></div>
+      </div>
+      <div class="order-sqqq-note" style="margin-top:8px;">
+        <b>SQQQ 的特殊性：</b>SQQQ 是 <b>3 倍做空納指</b>的 ETF，股價上漲 = 納指大跌。這筆 Long Call = 用 $<span id="ok-cost2">168.00</span> 賭納斯達克大幅下跌，槓桿放大獲利，虧損有限。
+      </div>
+    </div>
+  </div>
+
+
+    <div data-drag-id="short-call-card" id="l0-short-call" class="payoff-card" style="border-color:var(--red-bdr);">
+      <div class="payoff-card-header">
+        <div>
+          <div class="payoff-card-name" style="color:var(--red);">Short Call<button class="pron-btn male" onclick="pronounce('Short Call','male')" title="男聲 Short Call"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('Short Call','female')" title="女聲 Short Call"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button></div>
+          <div class="payoff-card-en">賣出買權</div>
+        </div>
+        <span class="pill pill-red">收取權利金</span>
+      </div>
+      <div class="payoff-svg-wrap"><svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="20 20 800 560" width="100%" height="100%" style="width:100%;height:100%;display:block;"><!-- svg-source:excalidraw --><metadata/><defs><style class="style-fonts">
+      </style></defs><rect x="0" y="0" width="840" height="600" fill="#ffffff"/><g stroke-opacity="0.2" fill-opacity="0.2" stroke-linecap="round" transform="translate(20 20) rotate(0 400 280)"><path d="M0 0 L800 0 L800 560 L0 560" stroke="none" stroke-width="0" fill="#ffc9c9"/><path d="M0 0 C306.34 0, 612.68 0, 800 0 M0 0 C191.59 0, 383.18 0, 800 0 M800 0 C800 196.54, 800 393.08, 800 560 M800 0 C800 176.3, 800 352.59, 800 560 M800 560 C515.24 560, 230.47 560, 0 560 M800 560 C588.88 560, 377.76 560, 0 560 M0 560 C0 427.12, 0 294.24, 0 0 M0 560 C0 425.26, 0 290.52, 0 0" stroke="transparent" stroke-width="2" fill="none"/></g><g stroke-linecap="round"><g transform="translate(140 499.5) rotate(0 0 -209.5)"><path d="M0 0 C0 -98.53, 0 -197.06, 0 -419 M0 0 C0 -143.28, 0 -286.55, 0 -419" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(140 499.5) rotate(0 0 -209.5)"><path d="M8.55 -395.51 C6.54 -401.03, 4.53 -406.56, 0 -419 M8.55 -395.51 C5.63 -403.54, 2.7 -411.57, 0 -419" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(140 499.5) rotate(0 0 -209.5)"><path d="M-8.55 -395.51 C-6.54 -401.03, -4.53 -406.56, 0 -419 M-8.55 -395.51 C-5.63 -403.54, -2.7 -411.57, 0 -419" stroke="#888" stroke-width="1" fill="none"/></g></g><mask/><g stroke-linecap="round"><g transform="translate(120.5 280) rotate(0 329.5 0)"><path d="M0 0 C173.73 0, 347.46 0, 659 0 M0 0 C214.34 0, 428.68 0, 659 0" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(120.5 280) rotate(0 329.5 0)"><path d="M635.51 8.55 C641.7 6.3, 647.89 4.04, 659 0 M635.51 8.55 C643.15 5.77, 650.79 2.99, 659 0" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(120.5 280) rotate(0 329.5 0)"><path d="M635.51 -8.55 C641.7 -6.3, 647.89 -4.04, 659 0 M635.51 -8.55 C643.15 -5.77, 650.79 -2.99, 659 0" stroke="#888" stroke-width="1" fill="none"/></g></g><mask/><g transform="translate(108 272) rotate(0 4 10)"><text x="0" y="14.096" font-family="Virgil, Segoe UI Emoji" font-size="16px" fill="#888" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">0</text></g><g transform="translate(782 284) rotate(0 16 10)"><text x="0" y="14.096" font-family="Virgil, Segoe UI Emoji" font-size="16px" fill="#666" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">股價</text></g><g transform="translate(88 68) rotate(0 16 10)"><text x="0" y="14.096" font-family="Virgil, Segoe UI Emoji" font-size="16px" fill="#666" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">損益</text></g><g stroke-linecap="round"><g transform="translate(450 509.5) rotate(0 0 -224.5)"><path d="M0 0 C0 -91.97, 0 -183.94, 0 -449" stroke="#f59e0b" stroke-width="1.5" fill="none" stroke-dasharray="8 9"/></g></g><mask/><g transform="translate(438 514) rotate(0 7.2216796875 12.5)"><text x="0" y="17.619999999999997" font-family="Virgil, Segoe UI Emoji" font-size="20px" fill="#f59e0b" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">K</text></g><g stroke-linecap="round"><g transform="translate(140 210) rotate(0 155 0)"><path d="M0 0 C106 0, 212.01 0, 310 0 M0 0 C109.98 0, 219.96 0, 310 0" stroke="#ef4444" stroke-width="3" fill="none"/></g></g><mask/><g stroke-linecap="round"><g transform="translate(450.5 210.5) rotate(0 144.5 134.5)"><path d="M0 0 C94 87.49, 188 174.99, 289 269 M0 0 C66.25 61.66, 132.5 123.33, 289 269" stroke="#ef4444" stroke-width="3" fill="none"/></g><g transform="translate(450.5 210.5) rotate(0 144.5 134.5)"><path d="M265.98 259.25 C273.47 262.42, 280.95 265.59, 289 269 M265.98 259.25 C271.26 261.49, 276.53 263.72, 289 269" stroke="#ef4444" stroke-width="3" fill="none"/></g><g transform="translate(450.5 210.5) rotate(0 144.5 134.5)"><path d="M277.63 246.74 C281.33 253.98, 285.03 261.22, 289 269 M277.63 246.74 C280.24 251.84, 282.84 256.94, 289 269" stroke="#ef4444" stroke-width="3" fill="none"/></g></g><mask/><g stroke-linecap="round" transform="translate(513 273) rotate(0 7 7)"><path d="M14 7 C14 7.41, 13.96 7.82, 13.89 8.22 C13.82 8.61, 13.72 9.01, 13.58 9.39 C13.44 9.77, 13.26 10.15, 13.06 10.5 C12.86 10.85, 12.62 11.19, 12.36 11.5 C12.1 11.81, 11.81 12.1, 11.5 12.36 C11.19 12.62, 10.85 12.86, 10.5 13.06 C10.15 13.26, 9.77 13.44, 9.39 13.58 C9.01 13.72, 8.61 13.82, 8.22 13.89 C7.82 13.96, 7.41 14, 7 14 C6.59 14, 6.18 13.96, 5.78 13.89 C5.39 13.82, 4.99 13.72, 4.61 13.58 C4.23 13.44, 3.85 13.26, 3.5 13.06 C3.15 12.86, 2.81 12.62, 2.5 12.36 C2.19 12.1, 1.9 11.81, 1.64 11.5 C1.38 11.19, 1.14 10.85, 0.94 10.5 C0.74 10.15, 0.56 9.77, 0.42 9.39 C0.28 9.01, 0.18 8.61, 0.11 8.22 C0.04 7.82, 0 7.41, 0 7 C0 6.59, 0.04 6.18, 0.11 5.78 C0.18 5.39, 0.28 4.99, 0.42 4.61 C0.56 4.23, 0.74 3.85, 0.94 3.5 C1.14 3.15, 1.38 2.81, 1.64 2.5 C1.9 2.19, 2.19 1.9, 2.5 1.64 C2.81 1.38, 3.15 1.14, 3.5 0.94 C3.85 0.74, 4.23 0.56, 4.61 0.42 C4.99 0.28, 5.39 0.18, 5.78 0.11 C6.18 0.04, 6.59 0, 7 0 C7.41 0, 7.82 0.04, 8.22 0.11 C8.61 0.18, 9.01 0.28, 9.39 0.42 C9.77 0.56, 10.15 0.74, 10.5 0.94 C10.85 1.14, 11.19 1.38, 11.5 1.64 C11.81 1.9, 12.1 2.19, 12.36 2.5 C12.62 2.81, 12.86 3.15, 13.06 3.5 C13.26 3.85, 13.44 4.23, 13.58 4.61 C13.72 4.99, 13.82 5.39, 13.89 5.78 C13.96 6.18, 13.98 6.8, 14 7 C14.02 7.2, 14.02 6.8, 14 7" stroke="none" stroke-width="0" fill="#ef4444"/><path d="M14 7 C14 7.41, 13.96 7.82, 13.89 8.22 C13.82 8.61, 13.72 9.01, 13.58 9.39 C13.44 9.77, 13.26 10.15, 13.06 10.5 C12.86 10.85, 12.62 11.19, 12.36 11.5 C12.1 11.81, 11.81 12.1, 11.5 12.36 C11.19 12.62, 10.85 12.86, 10.5 13.06 C10.15 13.26, 9.77 13.44, 9.39 13.58 C9.01 13.72, 8.61 13.82, 8.22 13.89 C7.82 13.96, 7.41 14, 7 14 C6.59 14, 6.18 13.96, 5.78 13.89 C5.39 13.82, 4.99 13.72, 4.61 13.58 C4.23 13.44, 3.85 13.26, 3.5 13.06 C3.15 12.86, 2.81 12.62, 2.5 12.36 C2.19 12.1, 1.9 11.81, 1.64 11.5 C1.38 11.19, 1.14 10.85, 0.94 10.5 C0.74 10.15, 0.56 9.77, 0.42 9.39 C0.28 9.01, 0.18 8.61, 0.11 8.22 C0.04 7.82, 0 7.41, 0 7 C0 6.59, 0.04 6.18, 0.11 5.78 C0.18 5.39, 0.28 4.99, 0.42 4.61 C0.56 4.23, 0.74 3.85, 0.94 3.5 C1.14 3.15, 1.38 2.81, 1.64 2.5 C1.9 2.19, 2.19 1.9, 2.5 1.64 C2.81 1.38, 3.15 1.14, 3.5 0.94 C3.85 0.74, 4.23 0.56, 4.61 0.42 C4.99 0.28, 5.39 0.18, 5.78 0.11 C6.18 0.04, 6.59 0, 7 0 C7.41 0, 7.82 0.04, 8.22 0.11 C8.61 0.18, 9.01 0.28, 9.39 0.42 C9.77 0.56, 10.15 0.74, 10.5 0.94 C10.85 1.14, 11.19 1.38, 11.5 1.64 C11.81 1.9, 12.1 2.19, 12.36 2.5 C12.62 2.81, 12.86 3.15, 13.06 3.5 C13.26 3.85, 13.44 4.23, 13.58 4.61 C13.72 4.99, 13.82 5.39, 13.89 5.78 C13.96 6.18, 13.98 6.8, 14 7 C14.02 7.2, 14.02 6.8, 14 7" stroke="#ef4444" stroke-width="2" fill="none"/></g><g transform="translate(482 295) rotate(0 28 8.75)"><text x="0" y="12.334" font-family="Virgil, Segoe UI Emoji" font-size="14px" fill="#ef4444" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">損益兩平</text></g><g transform="translate(155 150) rotate(0 56.44775390625 8.75)"><text x="0" y="12.334" font-family="Virgil, Segoe UI Emoji" font-size="14px" fill="#22c55e" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">最大獲利 = 權利金</text></g><g transform="translate(560 410) rotate(0 42 8.75)"><text x="0" y="12.334" font-family="Virgil, Segoe UI Emoji" font-size="14px" fill="#ef4444" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">虧損理論無限</text></g><g transform="translate(175 232) rotate(0 73.333740234375 9.375)"><text x="0" y="13.215" font-family="Virgil, Segoe UI Emoji" font-size="15px" fill="#ef4444" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">看平偏空 / 收取權利金</text></g></svg></div>
+      <div class="payoff-details">
+        <div class="detail-row"><span class="detail-label">獲利條件</span><span class="detail-value">股價不漲、橫盤、或下跌</span></div>
+        <div class="detail-row"><span class="detail-label">最大獲利</span><span class="detail-value" style="color:var(--green)">有限（僅限收到的權利金）</span></div>
+        <div class="detail-row"><span class="detail-label">最大虧損</span><span class="detail-value" style="color:var(--red)">理論上無限（Naked Call 風險）</span></div>
+        <div class="detail-row"><span class="detail-label">損益兩平</span><span class="detail-value">股價 = K + 權利金</span></div>
+        <div class="detail-row"><span class="detail-label">心態</span><span class="detail-value">看平偏空、靠時間價值獲利</span></div>
+        <div class="detail-row"><span class="detail-label">常見策略</span><span class="detail-value">Covered Call（持股掩護性賣出）</span></div>
+      </div>
+    </div>
+
+  <div data-drag-id="shortcall-order" class="full-section-card" style="border-left:4px solid var(--red);">
+    <div class="drag-handle"></div>
+    <div class="fsc-title" style="color:var(--red);">Short Call 下單範例 — SQQQ</div>
+
+    <div class="order-wrap" id="sc-order-wrap">
+      <div class="order-row1">
+        <div class="ofield"><span class="olabel">訂單類別</span><div class="oselect-fake">Sell Open &#9660;</div></div>
+        <div class="ofield"><span class="olabel">合約數</span><input class="oinput" id="sc-contracts" type="number" value="1" min="1" step="1"></div>
+        <div class="ofield"><span class="olabel">股票代號</span><input class="oinput oinput-t" id="sc-ticker" type="text" value="SQQQ"></div>
+        <div class="ofield"><span class="olabel">到期日</span><input class="oinput oinput-d" id="sc-expiry" type="text" value="05/01/2026"></div>
+        <div class="ofield"><span class="olabel">履約價</span><input class="oinput oinput-s" id="sc-strike" type="number" value="50.00" step="0.5" min="0"></div>
+        <div class="ofield"><span class="olabel">合約類型</span><div class="oselect-fake">買權 Call &#9660;</div></div>
+        <button class="obtn obtn-quote" style="align-self:flex-end;">取得報價</button>
+      </div>
+      <div class="order-row2">
+        <div class="ofield"><span class="olabel">價格</span><div class="oselect-fake" style="width:52px;">限價 &#9660;</div></div>
+        <div class="ofield"><span class="olabel">限價</span><input class="oinput oinput-p" id="sc-premium" type="number" value="1.68" step="0.01" min="0"></div>
+        <div class="ofield"><span class="olabel">停損價</span><input class="oinput oinput-p" type="number" placeholder="—" style="color:#aaa;"></div>
+        <div class="ofield"><span class="olabel">有效期</span><div class="oselect-fake">90 天有效 &#9660;</div></div>
+        <div class="ofield"><span class="olabel">其他條件</span><div class="oselect-fake">無 &#9660;</div></div>
+        <div style="display:flex;gap:4px;align-self:flex-end;">
+          <button class="obtn obtn-clear">清除</button>
+          <button class="obtn obtn-review">檢視</button>
+          <button class="obtn obtn-submit">下單</button>
+        </div>
+      </div>
+      <div class="order-calc">
+        <div class="calc-item"><span class="calc-label">權利金總收入</span><span class="calc-value win" id="sc-income">$168.00</span></div>
+        <div class="calc-item"><span class="calc-label">損益兩平</span><span class="calc-value neutral" id="sc-break">$51.68</span></div>
+        <div class="calc-item"><span class="calc-label">最大獲利</span><span class="calc-value win" id="sc-maxprofit">$168.00</span></div>
+        <div class="calc-item"><span class="calc-label">最大虧損</span><span class="calc-value loss">無限 ↑</span></div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;font-size:12.5px;line-height:1.6;color:var(--ink);">
+      <p style="margin:0 0 8px;">你收取 <strong id="se-cost">$168.00</strong> 的權利金（<span id="se-contracts">1</span> 張 × $<span id="se-premium">1.68</span> × 100），承擔在 <span id="se-expiry">2026/05/01</span> 前 <strong><span class="se-ticker">SQQQ</span></strong> 股價超過 <strong>$<span id="se-strike">50.00</span></strong> 時，需以 $<span id="se-strike-x">50.00</span> 賣出 <strong><span id="se-shares">100</span> 股</strong> 的<strong>義務</strong>。</p>
+      <table class="oe-table">
+        <tr><th>情境</th><th><span class="se-ticker">SQQQ</span> 到期股價</th><th>你的結果</th></tr>
+        <tr><td>大漲</td><td id="se-big-price">$60.00</td><td class="explain-lose" id="se-big-result">被行使，以 $50 賣出，每股虧 $10.00，總虧 $832.00</td></tr>
+        <tr><td>損益兩平</td><td class="explain-break" id="se-bp">$51.68</td><td>剛好回本</td></tr>
+        <tr><td>橫盤</td><td id="se-strike2">$50.00</td><td class="explain-win" id="se-flat">Call 歸零，保留全部 $168.00</td></tr>
+        <tr><td>下跌</td><td>$40.00</td><td class="explain-win" id="se-drop">Call 歸零，保留全部 $168.00（最大獲利）</td></tr>
+      </table>
+      <div class="order-key-box" style="margin-top:8px;">
+        <div class="order-key-item"><b>最大獲利</b><span id="sk-profit">$168.00（全部權利金）</span></div>
+        <div class="order-key-item"><b>最大虧損</b>理論上無限（股價漲越高虧越多）</div>
+        <div class="order-key-item"><b>你的判斷</b><span class="se-ticker">SQQQ</span> 到期前不漲超過 $<span id="sk-break">51.68</span></div>
+      </div>
+      <div class="order-sqqq-note" style="margin-top:8px;">
+        <b>Short Call 風險：</b>Sell Call on SQQQ = 賭納指不大跌。若納指大崩，SQQQ 大漲，你被行使而承受巨額虧損。收取 $<span id="sk-income">168.00</span> 的權利金，卻面對理論上無上限的損失——屬高風險策略，需充足保證金。
+      </div>
+    </div>
+  </div>
+
+
+  <div data-drag-id="put-divider" class="section-divider">
+    <div class="section-divider-line"></div>
+    <div class="section-divider-label" style="color:var(--blue);">&#9660; PUT &mdash; 賣權（賣出股票的權利）</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+
+    <div data-drag-id="long-put-card" id="l0-long-put" class="payoff-card" style="border-color:var(--blue-bdr);">
+      <div class="payoff-card-header">
+        <div>
+          <div class="payoff-card-name" style="color:var(--blue);">Long Put<button class="pron-btn male" onclick="pronounce('Long Put','male')" title="男聲 Long Put"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('Long Put','female')" title="女聲 Long Put"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button></div>
+          <div class="payoff-card-en">買入賣權</div>
+        </div>
+        <span class="pill pill-blue">付出權利金</span>
+      </div>
+      <div class="payoff-svg-wrap"><svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="20 20 800 560" width="100%" height="100%" style="width:100%;height:100%;display:block;"><!-- svg-source:excalidraw --><metadata/><defs><style class="style-fonts">
+      </style></defs><rect x="0" y="0" width="840" height="600" fill="#ffffff"/><g stroke-opacity="0.2" fill-opacity="0.2" stroke-linecap="round" transform="translate(20 20) rotate(0 400 280)"><path d="M0 0 L800 0 L800 560 L0 560" stroke="none" stroke-width="0" fill="#a5d8ff"/><path d="M0 0 C309.2 0, 618.4 0, 800 0 M0 0 C258.16 0, 516.32 0, 800 0 M800 0 C800 113.1, 800 226.19, 800 560 M800 0 C800 161.28, 800 322.56, 800 560 M800 560 C634.26 560, 468.51 560, 0 560 M800 560 C587.88 560, 375.76 560, 0 560 M0 560 C0 431.18, 0 302.37, 0 0 M0 560 C0 361.79, 0 163.59, 0 0" stroke="transparent" stroke-width="2" fill="none"/></g><g stroke-linecap="round"><g transform="translate(140 499.5) rotate(0 0 -209.5)"><path d="M0 0 C0 -85.03, 0 -170.07, 0 -419 M0 0 C0 -127.06, 0 -254.13, 0 -419" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(140 499.5) rotate(0 0 -209.5)"><path d="M8.55 -395.51 C6.82 -400.28, 5.08 -405.04, 0 -419 M8.55 -395.51 C5.96 -402.63, 3.36 -409.76, 0 -419" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(140 499.5) rotate(0 0 -209.5)"><path d="M-8.55 -395.51 C-6.82 -400.28, -5.08 -405.04, 0 -419 M-8.55 -395.51 C-5.96 -402.63, -3.36 -409.76, 0 -419" stroke="#888" stroke-width="1" fill="none"/></g></g><mask/><g stroke-linecap="round"><g transform="translate(120.5 280) rotate(0 329.5 0)"><path d="M0 0 C160.32 0, 320.65 0, 659 0 M0 0 C162.11 0, 324.22 0, 659 0" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(120.5 280) rotate(0 329.5 0)"><path d="M635.51 8.55 C641.22 6.47, 646.94 4.39, 659 0 M635.51 8.55 C641.29 6.45, 647.07 4.34, 659 0" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(120.5 280) rotate(0 329.5 0)"><path d="M635.51 -8.55 C641.22 -6.47, 646.94 -4.39, 659 0 M635.51 -8.55 C641.29 -6.45, 647.07 -4.34, 659 0" stroke="#888" stroke-width="1" fill="none"/></g></g><mask/><g transform="translate(108 272) rotate(0 4 10)"><text x="0" y="14.096" font-family="Virgil, Segoe UI Emoji" font-size="16px" fill="#888" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">0</text></g><g transform="translate(782 284) rotate(0 16 10)"><text x="0" y="14.096" font-family="Virgil, Segoe UI Emoji" font-size="16px" fill="#666" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">股價</text></g><g transform="translate(88 68) rotate(0 16 10)"><text x="0" y="14.096" font-family="Virgil, Segoe UI Emoji" font-size="16px" fill="#666" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">損益</text></g><g stroke-linecap="round"><g transform="translate(450 509.5) rotate(0 0 -224.5)"><path d="M0 0 C0 -175.51, 0 -351.03, 0 -449" stroke="#f59e0b" stroke-width="1.5" fill="none" stroke-dasharray="8 9"/></g></g><mask/><g transform="translate(438 514) rotate(0 7.2216796875 12.5)"><text x="0" y="17.619999999999997" font-family="Virgil, Segoe UI Emoji" font-size="20px" fill="#f59e0b" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">K</text></g><g stroke-linecap="round"><g transform="translate(140 80) rotate(0 155 135)"><path d="M0 0 C94.01 81.88, 188.02 163.76, 310 270 M0 0 C107.21 93.38, 214.42 186.75, 310 270" stroke="#4a9eed" stroke-width="3" fill="none"/></g></g><mask/><g stroke-linecap="round"><g transform="translate(450.5 350) rotate(0 144.5 0)"><path d="M0 0 C71.09 0, 142.18 0, 289 0 M0 0 C73.47 0, 146.94 0, 289 0" stroke="#4a9eed" stroke-width="3" fill="none"/></g><g transform="translate(450.5 350) rotate(0 144.5 0)"><path d="M265.51 8.55 C271.29 6.45, 277.07 4.34, 289 0 M265.51 8.55 C271.48 6.38, 277.45 4.2, 289 0" stroke="#4a9eed" stroke-width="3" fill="none"/></g><g transform="translate(450.5 350) rotate(0 144.5 0)"><path d="M265.51 -8.55 C271.29 -6.45, 277.07 -4.34, 289 0 M265.51 -8.55 C271.48 -6.38, 277.45 -4.2, 289 0" stroke="#4a9eed" stroke-width="3" fill="none"/></g></g><mask/><g stroke-linecap="round" transform="translate(373 273) rotate(0 7 7)"><path d="M14 7 C14 7.41, 13.96 7.82, 13.89 8.22 C13.82 8.61, 13.72 9.01, 13.58 9.39 C13.44 9.77, 13.26 10.15, 13.06 10.5 C12.86 10.85, 12.62 11.19, 12.36 11.5 C12.1 11.81, 11.81 12.1, 11.5 12.36 C11.19 12.62, 10.85 12.86, 10.5 13.06 C10.15 13.26, 9.77 13.44, 9.39 13.58 C9.01 13.72, 8.61 13.82, 8.22 13.89 C7.82 13.96, 7.41 14, 7 14 C6.59 14, 6.18 13.96, 5.78 13.89 C5.39 13.82, 4.99 13.72, 4.61 13.58 C4.23 13.44, 3.85 13.26, 3.5 13.06 C3.15 12.86, 2.81 12.62, 2.5 12.36 C2.19 12.1, 1.9 11.81, 1.64 11.5 C1.38 11.19, 1.14 10.85, 0.94 10.5 C0.74 10.15, 0.56 9.77, 0.42 9.39 C0.28 9.01, 0.18 8.61, 0.11 8.22 C0.04 7.82, 0 7.41, 0 7 C0 6.59, 0.04 6.18, 0.11 5.78 C0.18 5.39, 0.28 4.99, 0.42 4.61 C0.56 4.23, 0.74 3.85, 0.94 3.5 C1.14 3.15, 1.38 2.81, 1.64 2.5 C1.9 2.19, 2.19 1.9, 2.5 1.64 C2.81 1.38, 3.15 1.14, 3.5 0.94 C3.85 0.74, 4.23 0.56, 4.61 0.42 C4.99 0.28, 5.39 0.18, 5.78 0.11 C6.18 0.04, 6.59 0, 7 0 C7.41 0, 7.82 0.04, 8.22 0.11 C8.61 0.18, 9.01 0.28, 9.39 0.42 C9.77 0.56, 10.15 0.74, 10.5 0.94 C10.85 1.14, 11.19 1.38, 11.5 1.64 C11.81 1.9, 12.1 2.19, 12.36 2.5 C12.62 2.81, 12.86 3.15, 13.06 3.5 C13.26 3.85, 13.44 4.23, 13.58 4.61 C13.72 4.99, 13.82 5.39, 13.89 5.78 C13.96 6.18, 13.98 6.8, 14 7 C14.02 7.2, 14.02 6.8, 14 7" stroke="none" stroke-width="0" fill="#4a9eed"/><path d="M14 7 C14 7.41, 13.96 7.82, 13.89 8.22 C13.82 8.61, 13.72 9.01, 13.58 9.39 C13.44 9.77, 13.26 10.15, 13.06 10.5 C12.86 10.85, 12.62 11.19, 12.36 11.5 C12.1 11.81, 11.81 12.1, 11.5 12.36 C11.19 12.62, 10.85 12.86, 10.5 13.06 C10.15 13.26, 9.77 13.44, 9.39 13.58 C9.01 13.72, 8.61 13.82, 8.22 13.89 C7.82 13.96, 7.41 14, 7 14 C6.59 14, 6.18 13.96, 5.78 13.89 C5.39 13.82, 4.99 13.72, 4.61 13.58 C4.23 13.44, 3.85 13.26, 3.5 13.06 C3.15 12.86, 2.81 12.62, 2.5 12.36 C2.19 12.1, 1.9 11.81, 1.64 11.5 C1.38 11.19, 1.14 10.85, 0.94 10.5 C0.74 10.15, 0.56 9.77, 0.42 9.39 C0.28 9.01, 0.18 8.61, 0.11 8.22 C0.04 7.82, 0 7.41, 0 7 C0 6.59, 0.04 6.18, 0.11 5.78 C0.18 5.39, 0.28 4.99, 0.42 4.61 C0.56 4.23, 0.74 3.85, 0.94 3.5 C1.14 3.15, 1.38 2.81, 1.64 2.5 C1.9 2.19, 2.19 1.9, 2.5 1.64 C2.81 1.38, 3.15 1.14, 3.5 0.94 C3.85 0.74, 4.23 0.56, 4.61 0.42 C4.99 0.28, 5.39 0.18, 5.78 0.11 C6.18 0.04, 6.59 0, 7 0 C7.41 0, 7.82 0.04, 8.22 0.11 C8.61 0.18, 9.01 0.28, 9.39 0.42 C9.77 0.56, 10.15 0.74, 10.5 0.94 C10.85 1.14, 11.19 1.38, 11.5 1.64 C11.81 1.9, 12.1 2.19, 12.36 2.5 C12.62 2.81, 12.86 3.15, 13.06 3.5 C13.26 3.85, 13.44 4.23, 13.58 4.61 C13.72 4.99, 13.82 5.39, 13.89 5.78 C13.96 6.18, 13.98 6.8, 14 7 C14.02 7.2, 14.02 6.8, 14 7" stroke="#4a9eed" stroke-width="2" fill="none"/></g><g transform="translate(342 248) rotate(0 28 8.75)"><text x="0" y="12.334" font-family="Virgil, Segoe UI Emoji" font-size="14px" fill="#4a9eed" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">損益兩平</text></g><g transform="translate(510 72) rotate(0 64.162109375 8.75)"><text x="0" y="12.334" font-family="Virgil, Segoe UI Emoji" font-size="14px" fill="#22c55e" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">最大獲利有限(股到0)</text></g><g transform="translate(475 368) rotate(0 56.44775390625 8.75)"><text x="0" y="12.334" font-family="Virgil, Segoe UI Emoji" font-size="14px" fill="#ef4444" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">最大虧損 = 權利金</text></g><g transform="translate(220 205) rotate(0 58.333740234375 9.375)"><text x="0" y="13.215" font-family="Virgil, Segoe UI Emoji" font-size="15px" fill="#4a9eed" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">看空 / 付出權利金</text></g></svg></div>
+      <div class="payoff-details">
+        <div class="detail-row"><span class="detail-label">獲利條件</span><span class="detail-value">股價大跌（越低越好）</span></div>
+        <div class="detail-row"><span class="detail-label">最大獲利</span><span class="detail-value" style="color:var(--green)">有限（股價最低跌到 0）</span></div>
+        <div class="detail-row"><span class="detail-label">最大虧損</span><span class="detail-value" style="color:var(--red)">有限（僅限付出的權利金）</span></div>
+        <div class="detail-row"><span class="detail-label">損益兩平</span><span class="detail-value">股價 = K &minus; 權利金</span></div>
+        <div class="detail-row"><span class="detail-label">心態</span><span class="detail-value">看空、預期股價大跌</span></div>
+        <div class="detail-row"><span class="detail-label">常見策略</span><span class="detail-value">做空槓桿 / Protective Put 對沖</span></div>
+      </div>
+    </div>
+
+  <div data-drag-id="longput-order" class="full-section-card" style="border-left:4px solid var(--blue);">
+    <div class="drag-handle"></div>
+    <div class="fsc-title" style="color:var(--blue);">Long Put 下單範例 — SQQQ</div>
+
+    <div class="order-wrap" id="lp-order-wrap">
+      <div class="order-row1">
+        <div class="ofield"><span class="olabel">訂單類別</span><div class="oselect-fake">Buy Open &#9660;</div></div>
+        <div class="ofield"><span class="olabel">合約數</span><input class="oinput" id="lp-contracts" type="number" value="1" min="1" step="1"></div>
+        <div class="ofield"><span class="olabel">股票代號</span><input class="oinput oinput-t" id="lp-ticker" type="text" value="SQQQ"></div>
+        <div class="ofield"><span class="olabel">到期日</span><input class="oinput oinput-d" id="lp-expiry" type="text" value="05/01/2026"></div>
+        <div class="ofield"><span class="olabel">履約價</span><input class="oinput oinput-s" id="lp-strike" type="number" value="50.00" step="0.5" min="0"></div>
+        <div class="ofield"><span class="olabel">合約類型</span><div class="oselect-fake">賣權 Put &#9660;</div></div>
+        <button class="obtn obtn-quote" style="align-self:flex-end;">取得報價</button>
+      </div>
+      <div class="order-row2">
+        <div class="ofield"><span class="olabel">價格</span><div class="oselect-fake" style="width:52px;">限價 &#9660;</div></div>
+        <div class="ofield"><span class="olabel">限價</span><input class="oinput oinput-p" id="lp-premium" type="number" value="1.68" step="0.01" min="0"></div>
+        <div class="ofield"><span class="olabel">停損價</span><input class="oinput oinput-p" type="number" placeholder="—" style="color:#aaa;"></div>
+        <div class="ofield"><span class="olabel">有效期</span><div class="oselect-fake">90 天有效 &#9660;</div></div>
+        <div class="ofield"><span class="olabel">其他條件</span><div class="oselect-fake">無 &#9660;</div></div>
+        <div style="display:flex;gap:4px;align-self:flex-end;">
+          <button class="obtn obtn-clear">清除</button>
+          <button class="obtn obtn-review">檢視</button>
+          <button class="obtn obtn-submit">下單</button>
+        </div>
+      </div>
+      <div class="order-calc">
+        <div class="calc-item"><span class="calc-label">權利金總成本</span><span class="calc-value loss" id="lp-cost">$168.00</span></div>
+        <div class="calc-item"><span class="calc-label">損益兩平</span><span class="calc-value neutral" id="lp-break">$48.32</span></div>
+        <div class="calc-item"><span class="calc-label">最大虧損</span><span class="calc-value loss" id="lp-maxloss">$168.00</span></div>
+        <div class="calc-item"><span class="calc-label">最大獲利</span><span class="calc-value win" id="lp-maxprofit">$4,832.00</span></div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;font-size:12.5px;line-height:1.6;color:var(--ink);">
+      <p style="margin:0 0 8px;">你付出 <strong id="lpe-cost">$168.00</strong> 的權利金（<span id="lpe-contracts">1</span> 張 × $<span id="lpe-premium">1.68</span> × 100），取得在 <span id="lpe-expiry">2026/05/01</span> 前以 <strong>$<span id="lpe-strike">50.00</span></strong> 賣出 <strong><span id="lpe-shares">100</span> 股 <span class="lpe-ticker">SQQQ</span></strong> 的<strong>權利</strong>（非義務）。</p>
+      <table class="oe-table">
+        <tr><th>情境</th><th><span class="lpe-ticker">SQQQ</span> 到期股價</th><th>你的結果</th></tr>
+        <tr><td>大跌</td><td id="lpe-drop-price">$40.00</td><td class="explain-win" id="lpe-drop-result">可用 $50 賣，每股賺 $10.00，淨賺 $832.00</td></tr>
+        <tr><td>損益兩平</td><td class="explain-break" id="lpe-bp">$48.32</td><td>剛好回本</td></tr>
+        <tr><td>橫盤</td><td id="lpe-strike2">$50.00</td><td class="explain-lose" id="lpe-flat">Put 歸零，虧 $168.00</td></tr>
+        <tr><td>上漲</td><td>$60.00</td><td class="explain-lose" id="lpe-rise">不行使，虧 $168.00（最大損失）</td></tr>
+      </table>
+      <div class="order-key-box" style="margin-top:8px;">
+        <div class="order-key-item"><b>最大虧損</b><span id="lpk-loss">$168.00（全部權利金）</span></div>
+        <div class="order-key-item"><b>最大獲利</b><span id="lpk-maxprofit">$4,832.00（股價跌至 0 時）</span></div>
+        <div class="order-key-item"><b>你的判斷</b><span class="lpe-ticker">SQQQ</span> 到期前跌破 $<span id="lpk-break">48.32</span></div>
+      </div>
+      <div class="order-sqqq-note" style="margin-top:8px;">
+        <b>SQQQ 的特殊性：</b>SQQQ 是 <b>3 倍做空納指</b>的 ETF，股價下跌 = 納指上漲。這筆 Long Put = 用 $<span id="lpk-cost2">168.00</span> 賭 SQQQ 股價下跌（即納指上漲），最大獲利 $<span id="lpk-maxprofit2">4,832.00</span>（股價跌至 0 時），虧損上限僅 $<span id="lpk-loss2">168.00</span>。
+      </div>
+    </div>
+  </div>
+
+
+    <div data-drag-id="short-put-card" id="l0-short-put" class="payoff-card" style="border-color:var(--amber-bdr);">
+      <div class="payoff-card-header">
+        <div>
+          <div class="payoff-card-name" style="color:var(--amber);">Short Put<button class="pron-btn male" onclick="pronounce('Short Put','male')" title="男聲 Short Put"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button><button class="pron-btn female" onclick="pronounce('Short Put','female')" title="女聲 Short Put"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg></button></div>
+          <div class="payoff-card-en">賣出賣權</div>
+        </div>
+        <span class="pill pill-amber">收取權利金</span>
+      </div>
+      <div class="payoff-svg-wrap"><svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="20 20 800 560" width="100%" height="100%" style="width:100%;height:100%;display:block;"><!-- svg-source:excalidraw --><metadata/><defs><style class="style-fonts">
+      </style></defs><rect x="0" y="0" width="840" height="600" fill="#ffffff"/><g stroke-opacity="0.2" fill-opacity="0.2" stroke-linecap="round" transform="translate(20 20) rotate(0 400 280)"><path d="M0 0 L800 0 L800 560 L0 560" stroke="none" stroke-width="0" fill="#ffd8a8"/><path d="M0 0 C245.68 0, 491.37 0, 800 0 M0 0 C222.83 0, 445.66 0, 800 0 M800 0 C800 126.38, 800 252.75, 800 560 M800 0 C800 187.85, 800 375.69, 800 560 M800 560 C576.01 560, 352.03 560, 0 560 M800 560 C633.19 560, 466.38 560, 0 560 M0 560 C0 438.13, 0 316.26, 0 0 M0 560 C0 385.18, 0 210.36, 0 0" stroke="transparent" stroke-width="2" fill="none"/></g><g stroke-linecap="round"><g transform="translate(140 499.5) rotate(0 0 -209.5)"><path d="M0 0 C0 -122.94, 0 -245.89, 0 -419 M0 0 C0 -127.18, 0 -254.36, 0 -419" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(140 499.5) rotate(0 0 -209.5)"><path d="M8.55 -395.51 C6.04 -402.4, 3.53 -409.29, 0 -419 M8.55 -395.51 C5.96 -402.64, 3.36 -409.77, 0 -419" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(140 499.5) rotate(0 0 -209.5)"><path d="M-8.55 -395.51 C-6.04 -402.4, -3.53 -409.29, 0 -419 M-8.55 -395.51 C-5.96 -402.64, -3.36 -409.77, 0 -419" stroke="#888" stroke-width="1" fill="none"/></g></g><mask/><g stroke-linecap="round"><g transform="translate(120.5 280) rotate(0 329.5 0)"><path d="M0 0 C173.66 0, 347.32 0, 659 0 M0 0 C166.74 0, 333.48 0, 659 0" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(120.5 280) rotate(0 329.5 0)"><path d="M635.51 8.55 C641.7 6.3, 647.89 4.04, 659 0 M635.51 8.55 C641.45 6.39, 647.4 4.22, 659 0" stroke="#888" stroke-width="1" fill="none"/></g><g transform="translate(120.5 280) rotate(0 329.5 0)"><path d="M635.51 -8.55 C641.7 -6.3, 647.89 -4.04, 659 0 M635.51 -8.55 C641.45 -6.39, 647.4 -4.22, 659 0" stroke="#888" stroke-width="1" fill="none"/></g></g><mask/><g transform="translate(108 272) rotate(0 4 10)"><text x="0" y="14.096" font-family="Virgil, Segoe UI Emoji" font-size="16px" fill="#888" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">0</text></g><g transform="translate(782 284) rotate(0 16 10)"><text x="0" y="14.096" font-family="Virgil, Segoe UI Emoji" font-size="16px" fill="#666" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">股價</text></g><g transform="translate(88 68) rotate(0 16 10)"><text x="0" y="14.096" font-family="Virgil, Segoe UI Emoji" font-size="16px" fill="#666" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">損益</text></g><g stroke-linecap="round"><g transform="translate(450 509.5) rotate(0 0 -224.5)"><path d="M0 0 C0 -161.54, 0 -323.07, 0 -449" stroke="#f59e0b" stroke-width="1.5" fill="none" stroke-dasharray="8 9"/></g></g><mask/><g transform="translate(438 514) rotate(0 7.2216796875 12.5)"><text x="0" y="17.619999999999997" font-family="Virgil, Segoe UI Emoji" font-size="20px" fill="#f59e0b" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">K</text></g><g stroke-linecap="round"><g transform="translate(140 500) rotate(0 155 -145)"><path d="M0 0 C94.1 -88.03, 188.19 -176.05, 310 -290 M0 0 C90.73 -84.87, 181.46 -169.75, 310 -290" stroke="#f59e0b" stroke-width="3" fill="none"/></g></g><mask/><g stroke-linecap="round"><g transform="translate(450.5 210) rotate(0 144.5 0)"><path d="M0 0 C73.12 0, 146.25 0, 289 0 M0 0 C81.14 0, 162.29 0, 289 0" stroke="#f59e0b" stroke-width="3" fill="none"/></g><g transform="translate(450.5 210) rotate(0 144.5 0)"><path d="M265.51 8.55 C271.45 6.39, 277.4 4.22, 289 0 M265.51 8.55 C272.1 6.15, 278.7 3.75, 289 0" stroke="#f59e0b" stroke-width="3" fill="none"/></g><g transform="translate(450.5 210) rotate(0 144.5 0)"><path d="M265.51 -8.55 C271.45 -6.39, 277.4 -4.22, 289 0 M265.51 -8.55 C272.1 -6.15, 278.7 -3.75, 289 0" stroke="#f59e0b" stroke-width="3" fill="none"/></g></g><mask/><g stroke-linecap="round" transform="translate(373 273) rotate(0 7 7)"><path d="M14 7 C14 7.41, 13.96 7.82, 13.89 8.22 C13.82 8.61, 13.72 9.01, 13.58 9.39 C13.44 9.77, 13.26 10.15, 13.06 10.5 C12.86 10.85, 12.62 11.19, 12.36 11.5 C12.1 11.81, 11.81 12.1, 11.5 12.36 C11.19 12.62, 10.85 12.86, 10.5 13.06 C10.15 13.26, 9.77 13.44, 9.39 13.58 C9.01 13.72, 8.61 13.82, 8.22 13.89 C7.82 13.96, 7.41 14, 7 14 C6.59 14, 6.18 13.96, 5.78 13.89 C5.39 13.82, 4.99 13.72, 4.61 13.58 C4.23 13.44, 3.85 13.26, 3.5 13.06 C3.15 12.86, 2.81 12.62, 2.5 12.36 C2.19 12.1, 1.9 11.81, 1.64 11.5 C1.38 11.19, 1.14 10.85, 0.94 10.5 C0.74 10.15, 0.56 9.77, 0.42 9.39 C0.28 9.01, 0.18 8.61, 0.11 8.22 C0.04 7.82, 0 7.41, 0 7 C0 6.59, 0.04 6.18, 0.11 5.78 C0.18 5.39, 0.28 4.99, 0.42 4.61 C0.56 4.23, 0.74 3.85, 0.94 3.5 C1.14 3.15, 1.38 2.81, 1.64 2.5 C1.9 2.19, 2.19 1.9, 2.5 1.64 C2.81 1.38, 3.15 1.14, 3.5 0.94 C3.85 0.74, 4.23 0.56, 4.61 0.42 C4.99 0.28, 5.39 0.18, 5.78 0.11 C6.18 0.04, 6.59 0, 7 0 C7.41 0, 7.82 0.04, 8.22 0.11 C8.61 0.18, 9.01 0.28, 9.39 0.42 C9.77 0.56, 10.15 0.74, 10.5 0.94 C10.85 1.14, 11.19 1.38, 11.5 1.64 C11.81 1.9, 12.1 2.19, 12.36 2.5 C12.62 2.81, 12.86 3.15, 13.06 3.5 C13.26 3.85, 13.44 4.23, 13.58 4.61 C13.72 4.99, 13.82 5.39, 13.89 5.78 C13.96 6.18, 13.98 6.8, 14 7 C14.02 7.2, 14.02 6.8, 14 7" stroke="none" stroke-width="0" fill="#f59e0b"/><path d="M14 7 C14 7.41, 13.96 7.82, 13.89 8.22 C13.82 8.61, 13.72 9.01, 13.58 9.39 C13.44 9.77, 13.26 10.15, 13.06 10.5 C12.86 10.85, 12.62 11.19, 12.36 11.5 C12.1 11.81, 11.81 12.1, 11.5 12.36 C11.19 12.62, 10.85 12.86, 10.5 13.06 C10.15 13.26, 9.77 13.44, 9.39 13.58 C9.01 13.72, 8.61 13.82, 8.22 13.89 C7.82 13.96, 7.41 14, 7 14 C6.59 14, 6.18 13.96, 5.78 13.89 C5.39 13.82, 4.99 13.72, 4.61 13.58 C4.23 13.44, 3.85 13.26, 3.5 13.06 C3.15 12.86, 2.81 12.62, 2.5 12.36 C2.19 12.1, 1.9 11.81, 1.64 11.5 C1.38 11.19, 1.14 10.85, 0.94 10.5 C0.74 10.15, 0.56 9.77, 0.42 9.39 C0.28 9.01, 0.18 8.61, 0.11 8.22 C0.04 7.82, 0 7.41, 0 7 C0 6.59, 0.04 6.18, 0.11 5.78 C0.18 5.39, 0.28 4.99, 0.42 4.61 C0.56 4.23, 0.74 3.85, 0.94 3.5 C1.14 3.15, 1.38 2.81, 1.64 2.5 C1.9 2.19, 2.19 1.9, 2.5 1.64 C2.81 1.38, 3.15 1.14, 3.5 0.94 C3.85 0.74, 4.23 0.56, 4.61 0.42 C4.99 0.28, 5.39 0.18, 5.78 0.11 C6.18 0.04, 6.59 0, 7 0 C7.41 0, 7.82 0.04, 8.22 0.11 C8.61 0.18, 9.01 0.28, 9.39 0.42 C9.77 0.56, 10.15 0.74, 10.5 0.94 C10.85 1.14, 11.19 1.38, 11.5 1.64 C11.81 1.9, 12.1 2.19, 12.36 2.5 C12.62 2.81, 12.86 3.15, 13.06 3.5 C13.26 3.85, 13.44 4.23, 13.58 4.61 C13.72 4.99, 13.82 5.39, 13.89 5.78 C13.96 6.18, 13.98 6.8, 14 7 C14.02 7.2, 14.02 6.8, 14 7" stroke="#f59e0b" stroke-width="2" fill="none"/></g><g transform="translate(342 295) rotate(0 28 8.75)"><text x="0" y="12.334" font-family="Virgil, Segoe UI Emoji" font-size="14px" fill="#f59e0b" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">損益兩平</text></g><g transform="translate(475 148) rotate(0 56.44775390625 8.75)"><text x="0" y="12.334" font-family="Virgil, Segoe UI Emoji" font-size="14px" fill="#22c55e" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">最大獲利 = 權利金</text></g><g transform="translate(155 435) rotate(0 49 8.75)"><text x="0" y="12.334" font-family="Virgil, Segoe UI Emoji" font-size="14px" fill="#ef4444" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">虧損有限但可大</text></g><g transform="translate(265 228) rotate(0 73.333740234375 9.375)"><text x="0" y="13.215" font-family="Virgil, Segoe UI Emoji" font-size="15px" fill="#f59e0b" text-anchor="start" style="white-space: pre;" direction="ltr" dominant-baseline="alphabetic">看平偏多 / 收取權利金</text></g></svg></div>
+      <div class="payoff-details">
+        <div class="detail-row"><span class="detail-label">獲利條件</span><span class="detail-value">股價不跌、橫盤、或上漲</span></div>
+        <div class="detail-row"><span class="detail-label">最大獲利</span><span class="detail-value" style="color:var(--green)">有限（僅限收到的權利金）</span></div>
+        <div class="detail-row"><span class="detail-label">最大虧損</span><span class="detail-value" style="color:var(--red)">有限但很大（股跌到 0 時）</span></div>
+        <div class="detail-row"><span class="detail-label">損益兩平</span><span class="detail-value">股價 = K &minus; 權利金</span></div>
+        <div class="detail-row"><span class="detail-label">心態</span><span class="detail-value">看平偏多、願意低接股票</span></div>
+        <div class="detail-row"><span class="detail-label">常見策略</span><span class="detail-value">Cash-Secured Put / Wheel 策略</span></div>
+      </div>
+    </div>
+
+  <div data-drag-id="shortput-order" class="full-section-card" style="border-left:4px solid var(--amber);">
+    <div class="drag-handle"></div>
+    <div class="fsc-title" style="color:var(--amber);">Short Put 下單範例 — SQQQ</div>
+
+    <div class="order-wrap" id="sp-order-wrap">
+      <div class="order-row1">
+        <div class="ofield"><span class="olabel">訂單類別</span><div class="oselect-fake">Sell Open &#9660;</div></div>
+        <div class="ofield"><span class="olabel">合約數</span><input class="oinput" id="sp-contracts" type="number" value="1" min="1" step="1"></div>
+        <div class="ofield"><span class="olabel">股票代號</span><input class="oinput oinput-t" id="sp-ticker" type="text" value="SQQQ"></div>
+        <div class="ofield"><span class="olabel">到期日</span><input class="oinput oinput-d" id="sp-expiry" type="text" value="05/01/2026"></div>
+        <div class="ofield"><span class="olabel">履約價</span><input class="oinput oinput-s" id="sp-strike" type="number" value="50.00" step="0.5" min="0"></div>
+        <div class="ofield"><span class="olabel">合約類型</span><div class="oselect-fake">賣權 Put &#9660;</div></div>
+        <button class="obtn obtn-quote" style="align-self:flex-end;">取得報價</button>
+      </div>
+      <div class="order-row2">
+        <div class="ofield"><span class="olabel">價格</span><div class="oselect-fake" style="width:52px;">限價 &#9660;</div></div>
+        <div class="ofield"><span class="olabel">限價</span><input class="oinput oinput-p" id="sp-premium" type="number" value="1.68" step="0.01" min="0"></div>
+        <div class="ofield"><span class="olabel">停損價</span><input class="oinput oinput-p" type="number" placeholder="—" style="color:#aaa;"></div>
+        <div class="ofield"><span class="olabel">有效期</span><div class="oselect-fake">90 天有效 &#9660;</div></div>
+        <div class="ofield"><span class="olabel">其他條件</span><div class="oselect-fake">無 &#9660;</div></div>
+        <div style="display:flex;gap:4px;align-self:flex-end;">
+          <button class="obtn obtn-clear">清除</button>
+          <button class="obtn obtn-review">檢視</button>
+          <button class="obtn obtn-submit">下單</button>
+        </div>
+      </div>
+      <div class="order-calc">
+        <div class="calc-item"><span class="calc-label">權利金總收入</span><span class="calc-value win" id="sp-income">$168.00</span></div>
+        <div class="calc-item"><span class="calc-label">損益兩平</span><span class="calc-value neutral" id="sp-break">$48.32</span></div>
+        <div class="calc-item"><span class="calc-label">最大獲利</span><span class="calc-value win" id="sp-maxprofit">$168.00</span></div>
+        <div class="calc-item"><span class="calc-label">最大虧損</span><span class="calc-value loss" id="sp-maxloss">$4,832.00</span></div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;font-size:12.5px;line-height:1.6;color:var(--ink);">
+      <p style="margin:0 0 8px;">你收取 <strong id="spe-cost">$168.00</strong> 的權利金（<span id="spe-contracts">1</span> 張 × $<span id="spe-premium">1.68</span> × 100），承擔在 <span id="spe-expiry">2026/05/01</span> 前 <strong><span class="spe-ticker">SQQQ</span></strong> 股價跌破 <strong>$<span id="spe-strike">50.00</span></strong> 時，需以 $<span id="spe-strike-x">50.00</span> 買入 <strong><span id="spe-shares">100</span> 股</strong> 的<strong>義務</strong>。</p>
+      <table class="oe-table">
+        <tr><th>情境</th><th><span class="spe-ticker">SQQQ</span> 到期股價</th><th>你的結果</th></tr>
+        <tr><td>大跌</td><td id="spe-drop-price">$40.00</td><td class="explain-lose" id="spe-drop-result">被行使，以 $50 買入，每股虧 $10.00，總虧 $832.00</td></tr>
+        <tr><td>損益兩平</td><td class="explain-break" id="spe-bp">$48.32</td><td>剛好回本</td></tr>
+        <tr><td>橫盤</td><td id="spe-strike2">$50.00</td><td class="explain-win" id="spe-flat">Put 歸零，保留全部 $168.00</td></tr>
+        <tr><td>上漲</td><td>$60.00</td><td class="explain-win" id="spe-rise">Put 歸零，保留全部 $168.00（最大獲利）</td></tr>
+      </table>
+      <div class="order-key-box" style="margin-top:8px;">
+        <div class="order-key-item"><b>最大獲利</b><span id="spk-profit">$168.00（全部權利金）</span></div>
+        <div class="order-key-item"><b>最大虧損</b><span id="spk-maxloss">$4,832.00（股價跌至 0 時）</span></div>
+        <div class="order-key-item"><b>你的判斷</b><span class="spe-ticker">SQQQ</span> 到期前不跌破 $<span id="spk-break">48.32</span></div>
+      </div>
+      <div class="order-sqqq-note" style="margin-top:8px;">
+        <b>Short Put 風險：</b>Sell Put on SQQQ = 賭 SQQQ 不大跌（即納指不大漲）。若 SQQQ 大崩，你被迫以 $<span id="spk-strike">50.00</span> 買入 SQQQ，最大虧損 $<span id="spk-maxloss2">4,832.00</span>（股價跌至 0 時）。收取 $<span id="spk-income">168.00</span> 的權利金，需充足保證金承擔下行風險。
+      </div>
+    </div>
+  </div>
+
+  <div data-drag-id="table-divider" class="section-divider">
+    <div class="section-divider-line"></div>
+    <div class="section-divider-label">四大部位比較表</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div data-drag-id="summary-table" class="summary-table-wrap">
+    <table class="summary-table">
+      <thead>
+        <tr>
+          <th>部位</th><th>操作</th><th>最大獲利</th><th>最大虧損</th><th>損益兩平</th><th>心態</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tag-lc">Long Call</span> 買入買權</td>
+          <td>付出權利金，取得買入股票的權利</td>
+          <td style="color:var(--green);font-weight:800;">無限</td>
+          <td style="color:var(--red);">有限（權利金）</td>
+          <td>K + 權利金</td><td>看多</td>
+        </tr>
+        <tr>
+          <td><span class="tag-sc">Short Call</span> 賣出買權</td>
+          <td>收取權利金，承擔賣出股票的義務</td>
+          <td style="color:var(--green);">有限（權利金）</td>
+          <td style="color:var(--red);font-weight:800;">理論無限</td>
+          <td>K + 權利金</td><td>看平偏空</td>
+        </tr>
+        <tr>
+          <td><span class="tag-lp">Long Put</span> 買入賣權</td>
+          <td>付出權利金，取得賣出股票的權利</td>
+          <td style="color:var(--green);">有限（股跌到 0）</td>
+          <td style="color:var(--red);">有限（權利金）</td>
+          <td>K &minus; 權利金</td><td>看空</td>
+        </tr>
+        <tr>
+          <td><span class="tag-sp">Short Put</span> 賣出賣權</td>
+          <td>收取權利金，承擔買入股票的義務</td>
+          <td style="color:var(--green);">有限（權利金）</td>
+          <td style="color:var(--red);">有限但很大</td>
+          <td>K &minus; 權利金</td><td>看平偏多</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div data-drag-id="insights-divider" class="section-divider">
+    <div class="section-divider-line"></div>
+    <div class="section-divider-label">關鍵觀念</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div data-drag-id="insight-grid" class="insight-grid">
+    <div class="insight-box insight-call">
+      <h4>Call vs Put</h4>
+      <p><strong>Call</strong>（買權）方向與股價<strong>正相關</strong>：股漲，Call 升值；股跌，Call 貶值。<br>
+      <strong>Put</strong>（賣權）方向與股價<strong>負相關</strong>：股跌，Put 升值；股漲，Put 貶值。</p>
+    </div>
+    <div class="insight-box insight-put">
+      <h4>Long vs Short</h4>
+      <p><strong>Long（買入）</strong>代表你持有<strong>權利</strong>，付出權利金，可選擇是否行使。<br>
+      <strong>Short（賣出）</strong>代表你承擔<strong>義務</strong>，收取權利金，對方行使時你必須履約。</p>
+    </div>
+    <div class="insight-box insight-long">
+      <h4>時間價值的方向</h4>
+      <p>時間對 <strong>Long 方不利</strong>（Theta 為負）：合約越近到期，時間價值流失越快。<br>
+      時間對 <strong>Short 方有利</strong>（Theta 為正）：賣方靠時間流逝收割權利金。</p>
+    </div>
+    <div class="insight-box insight-risk">
+      <h4>風險非對稱性</h4>
+      <p><strong>Long 部位</strong>：風險有限（最多賠光權利金），獲利空間大。<br>
+      <strong>Short Call（裸賣）</strong>：風險理論無限，需格外謹慎。<br>
+      <strong>Short Put</strong>：風險有限但可能很大（股票歸零情境）。</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- EDIT MODE UI -->
+<button id="edit-btn" onclick="toggleEditMode()" title="Ctrl+E">
+  <span id="edit-icon">&#9998;</span>
+  <span id="edit-label">編輯模式</span>
+</button>
+
+<div id="edit-toolbar">
+  <div class="et-hint" id="et-hint">&#8592; 點擊頁面任意文字開始編輯</div>
+  <div class="et-group" id="et-controls" style="display:none;">
+    <div class="et-item">
+      <div class="et-label">字體</div>
+      <select id="et-font" onchange="applyStyle('fontFamily', this.value)">
+        <option value='"PingFang TC","Microsoft JhengHei",sans-serif'>PingFang TC</option>
+        <option value='Georgia,"Times New Roman",serif'>Georgia</option>
+        <option value='system-ui,sans-serif'>System UI</option>
+        <option value='"Courier New",monospace'>等寬</option>
+      </select>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">大小</div>
+      <div class="et-size-ctrl">
+        <button class="et-btn-sm" onclick="adjustSize(-1)">&#8722;</button>
+        <span id="et-size-val">16</span>
+        <button class="et-btn-sm" onclick="adjustSize(1)">+</button>
+      </div>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button id="et-bold"   class="et-fmt-btn" onclick="toggleBold()"><b>B</b></button>
+      <button id="et-italic" class="et-fmt-btn" onclick="toggleItalic()"><i>I</i></button>
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">顏色</div>
+      <input type="color" id="et-color" oninput="applyStyle('color', this.value)" title="文字顏色">
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item">
+      <div class="et-label">行距 <span id="et-lh-val">1.4</span></div>
+      <input type="range" id="et-lh" min="1" max="3" step="0.05" value="1.4"
+             oninput="applyStyle('lineHeight',this.value);document.getElementById('et-lh-val').textContent=parseFloat(this.value).toFixed(1);">
+    </div>
+    <div class="et-divider"></div>
+    <div class="et-item" style="flex-direction:row;gap:6px;align-items:center;">
+      <button class="et-action-btn" onclick="resetElement()">重設</button>
+      <button class="et-action-btn" id="et-copy-btn" onclick="copyHtml()">複製 HTML</button>
+      <button class="et-action-btn" onclick="clearSavedState()" style="color:#D04040;">&#128465; 清除</button>
+    </div>
+  </div>
+</div>
+
+<button id="layout-reset-btn" onclick="resetLayout()" title="重設版面">&#8635; 重設版面</button>
+
+<script>
+/* ══ PERSISTENCE KEY ══ */
+var L0_KEY    = 'l0-state-v1';
+var L0_LAY    = 'l0-layout-v9';
+
+function getSaved(key) {
+  try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch(e) { return null; }
+}
+function putSaved(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+}
+
+function saveTextEdit(el) {
+  if (!el || !el.id) return;
+  var s = getSaved(L0_KEY) || {};
+  s['t:' + el.id] = { html: el.innerHTML, style: el.getAttribute('style') || '' };
+  putSaved(L0_KEY, s);
+}
+
+function restoreTextEdits() {
+  var s = getSaved(L0_KEY);
+  if (!s) return;
+  Object.keys(s).forEach(function(k) {
+    if (k.indexOf('t:') !== 0) return;
+    var el = document.getElementById(k.slice(2));
+    if (!el) return;
+    if (s[k].html !== undefined) el.innerHTML = s[k].html;
+    if (s[k].style) el.setAttribute('style', s[k].style);
+  });
+}
+
+window.clearSavedState = function() {
+  localStorage.removeItem(L0_KEY);
+  localStorage.removeItem(L0_LAY);
+  location.reload();
+};
+
+window.addEventListener('load', restoreTextEdits);
+
+/* ══ EDIT MODE ══ */
+(function() {
+  var editMode = false;
+  var focused = null;
+  var originalStyles = new WeakMap();
+
+  window.toggleEditMode = function() {
+    editMode = !editMode;
+    document.body.classList.toggle('edit-mode', editMode);
+    document.getElementById('edit-btn').classList.toggle('active', editMode);
+    document.getElementById('edit-label').textContent = editMode ? '退出編輯' : '編輯模式';
+    document.getElementById('edit-icon').innerHTML = editMode ? '&#10005;' : '&#9998;';
+    document.getElementById('edit-toolbar').classList.toggle('visible', editMode);
+    if (!editMode) blurCurrent();
+  };
+
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); window.toggleEditMode(); }
+    if (e.key === 'Escape' && editMode) blurCurrent();
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!editMode) return;
+    var btn = document.getElementById('edit-btn');
+    var tb  = document.getElementById('edit-toolbar');
+    if (btn.contains(e.target) || tb.contains(e.target)) return;
+    if (e.target.tagName === 'INPUT') return;
+    blurCurrent();
+    var el = e.target;
+    var allowed = ['div','p','span','h1','h2','h3','h4','td','th','strong','b'];
+    while (el && el !== document.body) {
+      if (allowed.indexOf(el.tagName.toLowerCase()) !== -1) break;
+      el = el.parentElement;
+    }
+    if (!el || el === document.body) return;
+    if (el.querySelector && el.querySelector('input')) return;
+    focused = el;
+    if (!el.id) el.id = 'el-' + Date.now();
+    if (!originalStyles.has(el)) originalStyles.set(el, el.getAttribute('style') || '');
+    el.contentEditable = 'true';
+    el.classList.add('el-focus');
+    el.focus();
+    updateToolbar(el);
+    document.getElementById('et-hint').style.display = 'none';
+    document.getElementById('et-controls').style.display = 'flex';
+  });
+
+  function blurCurrent() {
+    if (focused) {
+      saveTextEdit(focused);
+      focused.contentEditable = 'false';
+      focused.classList.remove('el-focus');
+      focused = null;
+      document.getElementById('et-hint').style.display = '';
+      document.getElementById('et-controls').style.display = 'none';
+    }
+  }
+
+  function updateToolbar(el) {
+    var cs = window.getComputedStyle(el);
+    var ff = (el.style.fontFamily || cs.fontFamily || '').replace(/"/g, '');
+    var sel = document.getElementById('et-font');
+    var matched = false;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value.replace(/"/g,'').split(',')[0].trim() === ff.split(',')[0].trim()) {
+        sel.selectedIndex = i; matched = true; break;
+      }
+    }
+    if (!matched) sel.selectedIndex = 0;
+    var fs = parseFloat(cs.fontSize) || 14;
+    document.getElementById('et-size-val').textContent = Math.round(fs);
+    document.getElementById('et-bold').classList.toggle('on', parseInt(cs.fontWeight) >= 600);
+    document.getElementById('et-italic').classList.toggle('on', cs.fontStyle === 'italic');
+    document.getElementById('et-color').value = rgbToHex(cs.color);
+    var lhRaw = cs.lineHeight;
+    var lhNum = lhRaw === 'normal' ? 1.4 : parseFloat(lhRaw) / fs;
+    var lhSlider = document.getElementById('et-lh');
+    lhSlider.value = isNaN(lhNum) ? 1.4 : Math.min(3, Math.max(1, lhNum));
+    document.getElementById('et-lh-val').textContent = parseFloat(lhSlider.value).toFixed(1);
+  }
+
+  window.applyStyle  = function(p, v) { if (focused) focused.style[p] = v; };
+  window.adjustSize  = function(d) {
+    if (!focused) return;
+    var cur = Math.round(parseFloat(window.getComputedStyle(focused).fontSize) || 14);
+    var next = Math.max(8, Math.min(72, cur + d));
+    focused.style.fontSize = next + 'px';
+    document.getElementById('et-size-val').textContent = next;
+  };
+  window.toggleBold = function() {
+    if (!focused) return;
+    var b = parseInt(window.getComputedStyle(focused).fontWeight) >= 600;
+    focused.style.fontWeight = b ? '400' : '800';
+    document.getElementById('et-bold').classList.toggle('on', !b);
+  };
+  window.toggleItalic = function() {
+    if (!focused) return;
+    var it = window.getComputedStyle(focused).fontStyle === 'italic';
+    focused.style.fontStyle = it ? 'normal' : 'italic';
+    document.getElementById('et-italic').classList.toggle('on', !it);
+  };
+  window.resetElement = function() {
+    if (!focused) return;
+    focused.style.cssText = originalStyles.get(focused) || '';
+    updateToolbar(focused);
+  };
+  window.copyHtml = function() {
+    var html = document.querySelector('.page').outerHTML;
+    navigator.clipboard.writeText(html).then(function() {
+      var btn = document.getElementById('et-copy-btn');
+      btn.textContent = '已複製 ✓';
+      setTimeout(function() { btn.textContent = '複製 HTML'; }, 2000);
+    });
+  };
+
+  function rgbToHex(rgb) {
+    var m = rgb.match(/\d+/g);
+    if (!m || m.length < 3) return '#000000';
+    return '#' + [m[0],m[1],m[2]].map(function(x) {
+      return ('0' + parseInt(x).toString(16)).slice(-2);
+    }).join('');
+  }
+})();
+
+/* ══ DRAG & RESIZE ══ */
+(function() {
+  var canvas = null;
+  var dragging = null, resizing = null;
+  var dragOX = 0, dragOY = 0;
+  var rzS = {};
+
+  function getSavedLayout() { return getSaved(L0_LAY); }
+  function putSavedLayout(s) { putSaved(L0_LAY, s); }
+
+  function saveItem(id, x, y, w, h) {
+    var s = getSavedLayout() || {};
+    s[id] = { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: h ? Math.round(h) : null };
+    putSavedLayout(s);
+  }
+  function applyPos(el, x, y, w, h) {
+    el.style.position = 'absolute';
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+    el.style.width = w + 'px';
+    if (h) el.style.minHeight = h + 'px';
+  }
+
+  function addHandles(el) {
+    var dh = document.createElement('div');
+    dh.className = 'drag-handle';
+    el.insertBefore(dh, el.firstChild);
+    dh.addEventListener('mousedown', function(e) {
+      if (!document.body.classList.contains('edit-mode')) return;
+      e.preventDefault(); e.stopPropagation();
+      dragging = el;
+      var r = el.getBoundingClientRect();
+      dragOX = e.clientX - r.left;
+      dragOY = e.clientY - r.top;
+      el.classList.add('is-dragging');
+      el.style.zIndex = '1000';
+    });
+    ['nw','n','ne','e','se','s','sw','w'].forEach(function(dir) {
+      var rh = document.createElement('div');
+      rh.className = 'rh rh-' + dir;
+      el.appendChild(rh);
+      rh.addEventListener('mousedown', function(e) {
+        if (!document.body.classList.contains('edit-mode')) return;
+        e.preventDefault(); e.stopPropagation();
+        resizing = { el: el, dir: dir };
+        rzS = { mx: e.clientX, my: e.clientY, w: el.offsetWidth, h: el.offsetHeight,
+                l: parseFloat(el.style.left)||0, t: parseFloat(el.style.top)||0 };
+        el.classList.add('is-resizing');
+        el.style.zIndex = '1000';
+      });
+    });
+  }
+
+  document.addEventListener('mousemove', function(e) {
+    if (dragging) {
+      var cr = canvas.getBoundingClientRect();
+      var x = Math.max(0, e.clientX - cr.left - dragOX);
+      var y = Math.max(0, e.clientY - cr.top  - dragOY);
+      dragging.style.left = x + 'px';
+      dragging.style.top  = y + 'px';
+      var bottom = y + dragging.offsetHeight;
+      var curMin = parseInt(canvas.style.minHeight) || 3000;
+      if (bottom + 100 > curMin) canvas.style.minHeight = (bottom + 300) + 'px';
+    }
+    if (resizing) {
+      var el = resizing.el, dir = resizing.dir;
+      var dx = e.clientX - rzS.mx, dy = e.clientY - rzS.my;
+      var w = rzS.w, h = rzS.h, l = rzS.l, t = rzS.t;
+      if (dir.indexOf('e') >= 0) w = Math.max(180, rzS.w + dx);
+      if (dir.indexOf('w') >= 0) { w = Math.max(180, rzS.w - dx); l = rzS.l + (rzS.w - w); }
+      if (dir.indexOf('s') >= 0) h = Math.max(80,  rzS.h + dy);
+      if (dir.indexOf('n') >= 0) { h = Math.max(80,  rzS.h - dy); t = rzS.t + (rzS.h - h); }
+      el.style.width = w + 'px';
+      el.style.minHeight = h + 'px';
+      el.style.left = l + 'px';
+      el.style.top  = t + 'px';
+    }
+  });
+
+  document.addEventListener('mouseup', function() {
+    if (dragging) {
+      dragging.classList.remove('is-dragging');
+      dragging.style.zIndex = '';
+      saveItem(dragging.dataset.dragId,
+        parseFloat(dragging.style.left)||0,
+        parseFloat(dragging.style.top) ||0,
+        dragging.offsetWidth, null);
+      dragging = null;
+    }
+    if (resizing) {
+      var el = resizing.el;
+      el.classList.remove('is-resizing');
+      el.style.zIndex = '';
+      saveItem(el.dataset.dragId,
+        parseFloat(el.style.left)||0,
+        parseFloat(el.style.top) ||0,
+        el.offsetWidth, el.offsetHeight);
+      resizing = null;
+    }
+  });
+
+  window.resetLayout = function() {
+    localStorage.removeItem(L0_LAY);
+    location.reload();
+  };
+
+  function initLayout() {
+    canvas = document.getElementById('drag-canvas');
+    if (!canvas) return;
+    var saved = getSavedLayout();
+    var items = Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    items.forEach(function(el) { addHandles(el); });
+
+    // Invalidate stale layout if new required elements are missing
+    if (saved && (!saved['longcall-order'] || !saved['shortcall-order'] || !saved['longput-order'] || !saved['shortput-order'])) { saved = null; localStorage.removeItem(L0_LAY); }
+
+    if (saved) {
+      items.forEach(function(el) {
+        var s = saved[el.dataset.dragId];
+        if (el.parentElement !== canvas) canvas.appendChild(el);
+        if (s) applyPos(el, s.x, s.y, s.w, s.h);
+      });
+      var maxB = 0;
+      items.forEach(function(el) {
+        var b = (parseFloat(el.style.top)||0) + el.offsetHeight;
+        if (b > maxB) maxB = b;
+      });
+      canvas.style.minHeight = Math.max(3000, maxB + 200) + 'px';
+    } else {
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          var cr = canvas.getBoundingClientRect();
+          var captures = [];
+          items.forEach(function(el) {
+            var r = el.getBoundingClientRect();
+            captures.push({ el: el, x: r.left - cr.left, y: r.top - cr.top, w: r.width, h: r.height });
+          });
+          var newSaved = {}, maxB = 0;
+          captures.forEach(function(p) {
+            if (p.el.parentElement !== canvas) canvas.appendChild(p.el);
+            applyPos(p.el, p.x, p.y, p.w, null);
+            newSaved[p.el.dataset.dragId] = { x: Math.round(p.x), y: Math.round(p.y), w: Math.round(p.w), h: null };
+            if (p.y + p.h > maxB) maxB = p.y + p.h;
+          });
+          canvas.style.minHeight = Math.max(3000, maxB + 200) + 'px';
+          putSavedLayout(newSaved);
+        });
+      });
+    }
+  }
+
+  window.addEventListener('load', initLayout);
+})();
+</script>
+
+<script>
+(function(){
+  function calcOrder(){
+    var c = parseFloat(document.getElementById('oc-contracts').value)||1;
+    var prem = parseFloat(document.getElementById('oc-premium').value)||0;
+    var k = parseFloat(document.getElementById('oc-strike').value)||0;
+    var ticker = (document.getElementById('oc-ticker').value||'SQQQ').toUpperCase();
+    var expiry = document.getElementById('oc-expiry').value||'';
+    var cost = c*prem*100, bp = k+prem, shares = c*100;
+    var fmt = function(n){ return '$'+n.toFixed(2); };
+    function set(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
+    // bar
+    set('oc-cost', fmt(cost)); set('oc-break', fmt(bp)); set('oc-maxloss', fmt(cost));
+    // explain paragraph
+    set('oe-cost', fmt(cost)); set('oe-contracts', c); set('oe-premium', prem.toFixed(2));
+    set('oe-expiry', expiry); set('oe-strike', k.toFixed(2)); set('oe-shares', shares);
+    document.querySelectorAll('.oe-ticker').forEach(function(e){ e.textContent=ticker; });
+    // table
+    var big = k+10;
+    set('oe-big-price', fmt(big));
+    set('oe-big-result', '可用 '+fmt(k)+' 買，每股賺 $'+(big-k).toFixed(2)+'，淨賺 $'+((big-k-prem)*shares).toFixed(2));
+    set('oe-bp', fmt(bp)); set('oe-strike2', fmt(k));
+    set('oe-flat', 'Call 歸零，虧 '+fmt(cost));
+    set('oe-drop', '不行使，虧 '+fmt(cost)+'（最大損失）');
+    // key box
+    set('ok-loss', fmt(cost)+'（全部權利金）');
+    set('ok-break', bp.toFixed(2));
+    set('ok-cost2', cost.toFixed(2));
+  }
+  ['oc-contracts','oc-premium','oc-strike','oc-ticker','oc-expiry'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.addEventListener('input', calcOrder);
+  });
+  calcOrder();
+})();
+</script>
+
+<script>
+(function(){
+  function calcSCOrder(){
+    var c = parseFloat(document.getElementById('sc-contracts').value)||1;
+    var prem = parseFloat(document.getElementById('sc-premium').value)||0;
+    var k = parseFloat(document.getElementById('sc-strike').value)||0;
+    var ticker = (document.getElementById('sc-ticker').value||'SQQQ').toUpperCase();
+    var expiry = document.getElementById('sc-expiry').value||'';
+    var income = c*prem*100, bp = k+prem, shares = c*100;
+    var fmt = function(n){ return '$'+n.toFixed(2); };
+    function set(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
+    set('sc-income', fmt(income)); set('sc-break', fmt(bp)); set('sc-maxprofit', fmt(income));
+    set('se-cost', fmt(income)); set('se-contracts', c); set('se-premium', prem.toFixed(2));
+    set('se-expiry', expiry); set('se-strike', k.toFixed(2)); set('se-strike-x', k.toFixed(2)); set('se-shares', shares);
+    document.querySelectorAll('.se-ticker').forEach(function(e){ e.textContent=ticker; });
+    var big = k+10;
+    set('se-big-price', fmt(big));
+    set('se-big-result', '被行使，以 '+fmt(k)+' 賣出，每股虧 $'+(big-k).toFixed(2)+'，總虧 $'+((big-k-prem)*shares).toFixed(2));
+    set('se-bp', fmt(bp)); set('se-strike2', fmt(k));
+    set('se-flat', 'Call 歸零，保留全部 '+fmt(income));
+    set('se-drop', 'Call 歸零，保留全部 '+fmt(income)+'（最大獲利）');
+    set('sk-profit', fmt(income)+'（全部權利金）');
+    set('sk-break', bp.toFixed(2));
+    set('sk-income', income.toFixed(2));
+  }
+  ['sc-contracts','sc-premium','sc-strike','sc-ticker','sc-expiry'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.addEventListener('input', calcSCOrder);
+  });
+  calcSCOrder();
+})();
+</script>
+
+<script>
+(function(){
+  function calcLPOrder(){
+    var c = parseFloat(document.getElementById('lp-contracts').value)||1;
+    var prem = parseFloat(document.getElementById('lp-premium').value)||0;
+    var k = parseFloat(document.getElementById('lp-strike').value)||0;
+    var ticker = (document.getElementById('lp-ticker').value||'SQQQ').toUpperCase();
+    var expiry = document.getElementById('lp-expiry').value||'';
+    var cost = c*prem*100, bp = k-prem, shares = c*100;
+    var maxProfit = (k-prem)*shares;
+    var fmt = function(n){ return '$'+n.toFixed(2); };
+    function set(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
+    set('lp-cost', fmt(cost)); set('lp-break', fmt(bp)); set('lp-maxloss', fmt(cost));
+    set('lp-maxprofit', '$'+maxProfit.toFixed(2));
+    set('lpe-cost', fmt(cost)); set('lpe-contracts', c); set('lpe-premium', prem.toFixed(2));
+    set('lpe-expiry', expiry); set('lpe-strike', k.toFixed(2)); set('lpe-shares', shares);
+    document.querySelectorAll('.lpe-ticker').forEach(function(e){ e.textContent=ticker; });
+    var dropPrice = Math.max(0, k-10);
+    var dropGain = (k - dropPrice - prem)*shares;
+    set('lpe-drop-price', fmt(dropPrice));
+    set('lpe-drop-result', '可用 '+fmt(k)+' 賣，每股賺 $'+(k-dropPrice).toFixed(2)+'，淨賺 $'+dropGain.toFixed(2));
+    set('lpe-bp', fmt(bp)); set('lpe-strike2', fmt(k));
+    set('lpe-flat', 'Put 歸零，虧 '+fmt(cost));
+    set('lpe-rise', '不行使，虧 '+fmt(cost)+'（最大損失）');
+    set('lpk-loss', fmt(cost)+'（全部權利金）');
+    set('lpk-maxprofit', '$'+maxProfit.toFixed(2)+'（股價跌至 0 時）');
+    set('lpk-break', bp.toFixed(2));
+    set('lpk-cost2', cost.toFixed(2));
+    set('lpk-maxprofit2', maxProfit.toFixed(2));
+    set('lpk-loss2', cost.toFixed(2));
+  }
+  ['lp-contracts','lp-premium','lp-strike','lp-ticker','lp-expiry'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.addEventListener('input', calcLPOrder);
+  });
+  calcLPOrder();
+})();
+</script>
+
+<script>
+(function(){
+  function calcSPOrder(){
+    var c = parseFloat(document.getElementById('sp-contracts').value)||1;
+    var prem = parseFloat(document.getElementById('sp-premium').value)||0;
+    var k = parseFloat(document.getElementById('sp-strike').value)||0;
+    var ticker = (document.getElementById('sp-ticker').value||'SQQQ').toUpperCase();
+    var expiry = document.getElementById('sp-expiry').value||'';
+    var income = c*prem*100, bp = k-prem, shares = c*100;
+    var maxLoss = (k-prem)*shares;
+    var fmt = function(n){ return '$'+n.toFixed(2); };
+    function set(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
+    set('sp-income', fmt(income)); set('sp-break', fmt(bp));
+    set('sp-maxprofit', fmt(income)); set('sp-maxloss', '$'+maxLoss.toFixed(2));
+    set('spe-cost', fmt(income)); set('spe-contracts', c); set('spe-premium', prem.toFixed(2));
+    set('spe-expiry', expiry); set('spe-strike', k.toFixed(2)); set('spe-strike-x', k.toFixed(2)); set('spe-shares', shares);
+    document.querySelectorAll('.spe-ticker').forEach(function(e){ e.textContent=ticker; });
+    var dropPrice = Math.max(0, k-10);
+    var dropLoss = (k-dropPrice-prem)*shares;
+    set('spe-drop-price', fmt(dropPrice));
+    set('spe-drop-result', '被行使，以 '+fmt(k)+' 買入，每股虧 $'+(k-dropPrice).toFixed(2)+'，總虧 $'+dropLoss.toFixed(2));
+    set('spe-bp', fmt(bp)); set('spe-strike2', fmt(k));
+    set('spe-flat', 'Put 歸零，保留全部 '+fmt(income));
+    set('spe-rise', 'Put 歸零，保留全部 '+fmt(income)+'（最大獲利）');
+    set('spk-profit', fmt(income)+'（全部權利金）');
+    set('spk-maxloss', '$'+maxLoss.toFixed(2)+'（股價跌至 0 時）');
+    set('spk-break', bp.toFixed(2));
+    set('spk-strike', k.toFixed(2));
+    set('spk-maxloss2', maxLoss.toFixed(2));
+    set('spk-income', income.toFixed(2));
+  }
+  ['sp-contracts','sp-premium','sp-strike','sp-ticker','sp-expiry'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.addEventListener('input', calcSPOrder);
+  });
+  calcSPOrder();
+})();
+</script>
+<script>
+(function () {
+  var _fontZoom = parseFloat(localStorage.getItem('l0-font-zoom') || '1');
+  var _fontBaseMap = new WeakMap();
+  function applyFontZoom() {
+    document.querySelectorAll('#drag-canvas *').forEach(function(el) {
+      if (!_fontBaseMap.has(el)) _fontBaseMap.set(el, parseFloat(window.getComputedStyle(el).fontSize) || 14);
+      el.style.fontSize = (_fontBaseMap.get(el) * _fontZoom) + 'px';
+    });
+  }
+
+  function relayoutAfterZoom() {
+    var canvas = document.getElementById('drag-canvas');
+    if (!canvas) return;
+    var panels = Array.from(canvas.querySelectorAll('[data-drag-id]'));
+    if (!panels.length) return;
+    panels.sort(function(a,b){ return (parseFloat(a.style.top)||0)-(parseFloat(b.style.top)||0); });
+    var GAP=16, y=GAP;
+    panels.forEach(function(el){ el.style.top=y+'px'; y+=el.getBoundingClientRect().height+GAP; });
+    try { localStorage.removeItem('l0-layout-v9'); } catch(e) {}
+    canvas.style.minHeight = (y + 40) + 'px';
+  }
+  window.adjustPageFont = function(delta) {
+    _fontZoom = Math.max(0.7, Math.min(2.0, parseFloat((_fontZoom+delta*0.1).toFixed(2))));
+    applyFontZoom();
+    localStorage.setItem('l0-font-zoom', _fontZoom);
+    requestAnimationFrame(function(){ requestAnimationFrame(relayoutAfterZoom); });
+  };
+  window.addEventListener('load', function() {
+    if (_fontZoom !== 1) { applyFontZoom(); requestAnimationFrame(function(){ requestAnimationFrame(relayoutAfterZoom); }); }
+  });
+
+  function pronounce(text, gender) {
+    var voice = gender === 'female' ? 'af_sarah' : 'am_michael';
+    var vol = parseFloat((document.getElementById('tts-vol') || {value:'1'}).value);
+    var audio = new Audio('http://127.0.0.1:5051/tts?text=' + encodeURIComponent(text) + '&voice=' + encodeURIComponent(voice));
+    audio.volume = vol;
+    audio.play().catch(function(e){ console.warn('Kokoro TTS:', e.message); });
+  }
+  window.pronounce = pronounce;
+
+  var SCRIPT = [
+    { id: null, label: '課程介紹',
+      text: '歡迎來到期權小學堂第零課。今天學習美股選擇權的四種基本部位：Long Call、Short Call、Long Put、Short Put。所有進階策略都由這四種部位組合而成。理解這四種損益圖，就掌握了後續所有策略的語言基礎。' },
+    { id: 'l0-long-call', label: 'Long Call',
+      text: 'Long Call，買入買權。你付出一筆 Premium 購買 Call 選擇權，獲得在未來以 Strike 價格買入股票的權利。損益特徵：看漲，最大虧損等於你付出的 Premium，獲利理論無限，因為股票可以無限上漲。損益兩平點是 Strike 加上 Premium。適合看好股票大漲時，以小博大的槓桿工具。' },
+    { id: 'l0-short-call', label: 'Short Call',
+      text: 'Short Call，賣出買權。你收取一筆 Premium，承諾如果買家行使權利，你要以 Strike 價賣出股票。最大獲利是收到的 Premium，虧損理論無限，股票漲得越高虧得越多。風險最大，適合搭配持股使用，也就是 Covered Call。' },
+    { id: 'l0-long-put', label: 'Long Put',
+      text: 'Long Put，買入賣權。你付出 Premium 購買 Put 選擇權，獲得在未來以 Strike 價格賣出股票的權利。看跌，最大虧損是付出的 Premium，最大獲利是 Strike 減去 Premium。損益兩平是 Strike 減去 Premium。適合看空股票或作為持股的保護傘。' },
+    { id: 'l0-short-put', label: 'Short Put',
+      text: 'Short Put，賣出賣權。你收取 Premium，承諾以 Strike 價買入股票，也就是現金抵押賣出權 CSP。最大獲利是 Premium，最大虧損是 Strike 減去 Premium。這是最常用的保守收租策略，被行使時以優惠價格入股，繼續 Wheel 輪轉。' }
+  ];
+  var ttsIdx=0, ttsPlaying=false, ttsPaused=false, ttsRate=0.9, activePanelId=null;
+
+  function initDots() {
+    var c = document.getElementById('tts-dots'); c.innerHTML = '';
+    SCRIPT.forEach(function(s,i) {
+      var d = document.createElement('div');
+      d.className='tts-dot'; d.id='tts-dot-'+i; d.title=s.label;
+      d.onclick = function(){ ttsJumpTo(i); }; c.appendChild(d);
+    });
+  }
+  function updateDots() {
+    SCRIPT.forEach(function(_,i) {
+      var d=document.getElementById('tts-dot-'+i); if(!d) return;
+      d.className='tts-dot'+(i<ttsIdx?' done':i===ttsIdx?' current':'');
+    });
+  }
+  function setActivePanel(id) {
+    if (activePanelId) { var p=document.getElementById(activePanelId); if(p) p.classList.remove('tts-active'); }
+    activePanelId=id;
+    if (id) { var el=document.getElementById(id); if(el){ el.classList.add('tts-active'); el.scrollIntoView({behavior:'smooth',block:'nearest'}); } }
+  }
+  function updateUI() {
+    var btn=document.getElementById('tts-play-btn'), sec=document.getElementById('tts-section-name');
+    if (ttsPlaying&&!ttsPaused){ btn.textContent='| | 暫停'; btn.className='tts-btn playing'; }
+    else if (ttsPaused){ btn.textContent='&#9658; 繼續'; btn.className='tts-btn'; }
+    else if (ttsIdx>=SCRIPT.length){ btn.textContent='&#8635; 重新朗讀'; btn.className='tts-btn'; }
+    else { btn.textContent=ttsIdx===0?'&#9658; 朗讀全文':'&#9658; 繼續朗讀'; btn.className='tts-btn'; }
+    sec.textContent=ttsIdx<SCRIPT.length?'&#9658; '+SCRIPT[ttsIdx].label:'&#10003; 朗讀完畢';
+    setActivePanel(ttsIdx<SCRIPT.length?SCRIPT[ttsIdx].id:null); updateDots();
+  }
+  function showSubtitle(text) {
+    var el=document.getElementById('tts-subtitle'); if(!el) return;
+    el.innerHTML=text.split('').map(function(ch,i){
+      var s=ch==='<'?'&lt;':ch==='>'?'&gt;':ch==='&'?'&amp;':ch;
+      return '<span class="sub-c" id="sc-'+i+'">'+s+'</span>';
+    }).join(''); el.scrollTop=0; el.classList.add('active');
+  }
+  function clearSubtitle() { var el=document.getElementById('tts-subtitle'); if(el){ el.innerHTML=''; el.classList.remove('active'); } }
+  function speakSection() {
+    if (!ttsPlaying) return;
+    if (ttsIdx>=SCRIPT.length){ ttsPlaying=false; ttsIdx=0; updateUI(); return; }
+    updateUI();
+    var item=SCRIPT[ttsIdx];
+    var utt=new SpeechSynthesisUtterance(item.text);
+    utt.lang='zh-TW'; utt.rate=ttsRate; utt.pitch=1.0; showSubtitle(item.text);
+    utt.onboundary=function(e){
+      var chars=document.querySelectorAll('#tts-subtitle .sub-c'), len=e.charLength||1;
+      chars.forEach(function(ch,i){ ch.className='sub-c'+(i<e.charIndex?' done':i<e.charIndex+len?' now':''); });
+      var cur=document.getElementById('sc-'+e.charIndex); if(cur) cur.scrollIntoView({block:'nearest'});
+    };
+    utt.onend=function(){ if(!ttsPlaying) return; ttsIdx++; setTimeout(speakSection,350); };
+    utt.onerror=function(e){ if(e.error==='interrupted') return; if(!ttsPlaying) return; ttsIdx++; speakSection(); };
+    setTimeout(function(){ speechSynthesis.speak(utt); },50);
+  }
+  window.ttsToggle=function(){
+    if(speechSynthesis.speaking&&!speechSynthesis.paused){ speechSynthesis.pause(); ttsPlaying=false; ttsPaused=true; updateUI(); }
+    else if(speechSynthesis.paused){ speechSynthesis.resume(); ttsPlaying=true; ttsPaused=false; updateUI(); }
+    else{ if(ttsIdx>=SCRIPT.length) ttsIdx=0; ttsPlaying=true; ttsPaused=false; speakSection(); }
+  };
+  window.ttsStop=function(){
+    speechSynthesis.cancel(); clearSubtitle();
+    ttsPlaying=false; ttsPaused=false; ttsIdx=0; setActivePanel(null);
+    document.getElementById('tts-section-name').textContent='點擊「朗讀全文」開始'; updateDots();
+    document.getElementById('tts-play-btn').textContent='&#9658; 朗讀全文';
+    document.getElementById('tts-play-btn').className='tts-btn';
+  };
+  window.ttsJumpTo=function(i){ speechSynthesis.cancel(); ttsIdx=i; ttsPlaying=true; ttsPaused=false; setTimeout(speakSection,80); };
+  window.ttsSetRate=function(v){ ttsRate=parseFloat(v); };
+  var volEl=document.getElementById('tts-vol');
+  if(volEl) volEl.addEventListener('input',function(){ window._ttsVol=parseFloat(this.value); });
+  initDots();
+}());
+</script>
+
+</body>
+</html>
