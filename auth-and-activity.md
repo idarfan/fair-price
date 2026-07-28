@@ -85,6 +85,8 @@ add_index :user_activities, [:user_id, :kind, :started_at]
 
 ## 階段 2:Google 開放註冊
 
+> **與階段 3 的依賴**:本階段只建立登入路由(`/login`、`/auth/google_oauth2/callback`、`/logout`),**不加全域強制登入的 before_action**。現有頁面(root/momentum/options/leaps 等)維持可直接訪問。全站「未登入/未過 TOTP 一律導回」的守門邏輯要等 `/two_factor/setup`、`/two_factor/challenge` 頁面都寫完(階段 3、4 做完)才能一起加上,否則會把使用者導向一個還不存在的頁面,整個 app 鎖死。階段 2、3、4 建議同一輪做完,不要在只完成階段 2 的狀態下收工。
+
 `SessionsController#google_callback`:
 1. 取 omniauth email
 2. `find_or_create_by(google_uid:)`;新建時 email ∈ `ADMIN_EMAILS` → `enabled+admin+approved_at`,否則 `pending`
@@ -96,6 +98,8 @@ add_index :user_activities, [:user_id, :kind, :started_at]
 ---
 
 ## 階段 3:TOTP 強制設定
+
+> **全域強制登入的 before_action 在此階段(與階段 4 一起)才加上**,見階段 2 說明。
 
 - 全域 `before_action`:`totp_enabled==false` 時,非 `/two_factor/*`、非 `/logout` 一律導回 setup
 - `/two_factor/setup` GET:產生 secret 暫存 session,用 `ROTP::TOTP.new(secret, issuer: "FairPrice-Ohmy").provisioning_uri("FairPrice-Ohmy")` 產生 QR code(label 不帶 email,手機上單純顯示 FairPrice-Ohmy)+ 顯示手動輸入用金鑰

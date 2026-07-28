@@ -56,6 +56,13 @@ Rails.application.routes.draw do
   # Health check
   get "up" => "rails/health#show", as: :rails_health_check
 
+  # Auth
+  get    "login",                       to: "sessions#new"
+  get    "auth/google_oauth2/callback", to: "sessions#google_callback"
+  get    "auth/failure",                to: "sessions#failure"
+  delete "logout",                      to: "sessions#destroy"
+  get    "account_disabled",            to: "sessions#account_disabled"
+
   # HTML app
   get "valuations/:ticker", to: "valuations#show", as: :valuation,
       constraints: { ticker: TICKER_CONSTRAINT }
