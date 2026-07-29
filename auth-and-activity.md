@@ -34,6 +34,29 @@
 
 ---
 
+## 待辦事項(阻塞性,須先解決才能繼續驗證任何階段)
+
+### 1. `redirect_uri_mismatch`(Google 登入直接被擋)
+- 現象:`https://fairprice-ohmy.com/login` 點「使用 Google 登入」後,Google 回報 `錯誤 400:redirect_uri_mismatch`
+- 疑似原因:Cloudflare Tunnel 把外部 https 請求轉成內部 http 送進 Rails,OmniAuth 沒有正確判斷原始請求是 https,組出來的 callback URL 變成 `http://fairprice-ohmy.com/auth/google_oauth2/callback`,跟 GCP Console 登記的 `https://fairprice-ohmy.com/auth/google_oauth2/callback` 對不上
+- 修法:
+  1. `config/initializers/omniauth.rb` 明確指定 `OmniAuth.config.full_host = "https://fairprice-ohmy.com"`,不要依賴 proxy 標頭判斷
+  2. 確認 Rails 有正確信任 `X-Forwarded-Proto` 標頭(若走 `config.force_ssl` 或反向 proxy middleware 相關設定)
+- **驗證**:先看 Google 錯誤頁「錯誤詳細資料」裡實際收到的 redirect_uri 是什麼,確認是 http 而非 https 這個假設成立,再修;修完後實際跑一次 `https://fairprice-ohmy.com/login` 完整 Google 登入,不噴 400
+
+### 2. 正式環境洩漏 Rails 除錯頁(資訊安全問題,優先度高)
+- 現象:打錯路徑(如 `/admin`)會看到完整 `Routing Error` 頁,含 `Rails.root` 路徑、`config/routes.rb:9` 原始碼位置、Application/Framework/Full Trace 連結
+- 這代表正式環境目前在用 development 模式的詳細錯誤頁,對外公開網域上任何人打錯路徑都能看到伺服器檔案結構
+- 修法:確認 `config/environments/production.rb` 內 `config.consider_all_requests_local = false`;確認 pm2 啟動該 process 時,環境變數 `RAILS_ENV=production` 真的有生效(不是預設落到 development)
+- **驗證**:故意打一個不存在的路徑(如 `/this-route-does-not-exist`),應顯示一般 404 頁面,不含任何路徑/程式碼細節或 trace 連結
+
+### 3. Admin 路徑打錯
+- 正確路徑是 `/admin/users`,不是 `/admin`(單純備註,非程式問題)
+
+以上三項修完後,才能真正跑階段 2-7 的完整登入 → 核准流程驗證。
+
+---
+
 ## 階段 0:環境準備(先做,做完才可繼續)
 
 - Gemfile:`omniauth-google-oauth2`、`omniauth-rails_csrf_protection`、`rotp`、`rqrcode`

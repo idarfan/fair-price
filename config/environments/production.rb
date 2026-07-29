@@ -51,10 +51,11 @@ Rails.application.configure do
   config.i18n.fallbacks = true
 
   # Enable DNS rebinding protection and other `Host` header attacks.
-  # config.hosts = [
-  #   "example.com",     # Allow requests from example.com
-  #   /.*\.example\.com/ # Allow requests from subdomains like `www.example.com`
-  # ]
+  # 注意:production 環境沒有 development 那組 0.0.0.0/0 預設允許清單,
+  # 不設定 config.hosts 會導致所有請求被 Host Authorization 擋下(全站
+  # 403)。localhost 是給本機直接存取(如健康檢查)用。
+  config.hosts << "fairprice-ohmy.com"
+  config.hosts << "localhost"
   #
   # Skip DNS rebinding protection for the default health check endpoint.
   # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
