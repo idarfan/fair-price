@@ -1,0 +1,9 @@
+<% content_for :title, "帳戶管理 | FairPrice" %>
+
+<% if flash[:notice] %>
+  <div class="mb-4">
+    <%= render FairValue::AlertComponent.new(message: flash[:notice], type: :success) %>
+  </div>
+<% end %>
+
+<%= render Admin::Users::PageComponent.new(users: @users, current_admin: current_user) %>

@@ -74,6 +74,13 @@ Rails.application.routes.draw do
   post "settings/security/backup_codes", to: "account_security#regenerate_backup_codes"
   post "settings/security/logout_all",   to: "account_security#logout_all_devices"
 
+  namespace :admin do
+    get   "users",               to: "users#index"
+    patch "users/:id/approve",    to: "users#approve"
+    patch "users/:id/disable",    to: "users#disable"
+    patch "users/:id/reactivate", to: "users#reactivate"
+  end
+
   # HTML app
   get "valuations/:ticker", to: "valuations#show", as: :valuation,
       constraints: { ticker: TICKER_CONSTRAINT }

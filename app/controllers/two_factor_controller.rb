@@ -46,6 +46,7 @@ class TwoFactorController < ApplicationController
     if verified
       session[:totp_verified]   = true
       session[:totp_fail_count] = 0
+      current_user.update!(last_login_at: Time.current)
       redirect_to root_path
     else
       session[:totp_fail_count] = session[:totp_fail_count].to_i + 1

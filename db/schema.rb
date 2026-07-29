@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_28_104937) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_29_060043) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -566,6 +566,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_104937) do
     t.datetime "created_at", null: false
     t.string "email", null: false
     t.string "google_uid", null: false
+    t.datetime "last_login_at"
     t.integer "session_version", default: 0, null: false
     t.integer "status", default: 0, null: false
     t.boolean "totp_enabled", default: false, null: false
