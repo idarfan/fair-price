@@ -1,0 +1,3 @@
+<% content_for :title, "備用碼 | FairPrice" %>
+
+<%= render TwoFactor::BackupCodesComponent.new(codes: @codes) %>

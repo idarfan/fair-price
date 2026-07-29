@@ -1,0 +1,9 @@
+<% content_for :title, "設定兩步驟驗證 | FairPrice" %>
+
+<% if flash[:alert] %>
+  <div class="max-w-md mx-auto mt-4">
+    <%= render FairValue::AlertComponent.new(message: flash[:alert], type: :error) %>
+  </div>
+<% end %>
+
+<%= render TwoFactor::SetupComponent.new(secret: @secret, qr_svg: @qr_svg) %>

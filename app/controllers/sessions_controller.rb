@@ -25,7 +25,6 @@ class SessionsController < ApplicationController
       redirect_to account_disabled_path and return
     end
 
-    # 階段 3/4 會補上這兩個路由；目前所有新 user 的 totp_enabled 都是 false
     if user.totp_enabled?
       redirect_to "/two_factor/challenge"
     else
@@ -43,5 +42,8 @@ class SessionsController < ApplicationController
   end
 
   def account_disabled
+  end
+
+  def pending_approval
   end
 end

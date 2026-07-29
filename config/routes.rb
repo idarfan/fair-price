@@ -62,6 +62,13 @@ Rails.application.routes.draw do
   get    "auth/failure",                to: "sessions#failure"
   delete "logout",                      to: "sessions#destroy"
   get    "account_disabled",            to: "sessions#account_disabled"
+  get    "pending_approval",            to: "sessions#pending_approval"
+
+  get  "two_factor/setup",        to: "two_factor#setup"
+  post "two_factor/setup",        to: "two_factor#create_setup"
+  get  "two_factor/challenge",    to: "two_factor#challenge"
+  post "two_factor/challenge",    to: "two_factor#create_challenge"
+  get  "two_factor/backup_codes", to: "two_factor#backup_codes"
 
   # HTML app
   get "valuations/:ticker", to: "valuations#show", as: :valuation,

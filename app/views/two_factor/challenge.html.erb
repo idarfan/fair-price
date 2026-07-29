@@ -1,0 +1,9 @@
+<% content_for :title, "兩步驟驗證 | FairPrice" %>
+
+<% if flash[:alert] && !@locked_until %>
+  <div class="max-w-sm mx-auto mt-4">
+    <%= render FairValue::AlertComponent.new(message: flash[:alert], type: :error) %>
+  </div>
+<% end %>
+
+<%= render TwoFactor::ChallengeComponent.new(locked_until: @locked_until) %>

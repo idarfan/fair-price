@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe "Sessions", type: :request do
+RSpec.describe "Sessions", type: :request, skip_auto_auth: true do
   def mock_google_auth(email:, uid: "google-uid-1")
     OmniAuth.config.mock_auth[:google_oauth2] = OmniAuth::AuthHash.new(
       provider: "google_oauth2",
