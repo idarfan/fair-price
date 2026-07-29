@@ -14,14 +14,22 @@ class Admin::Users::RowComponent < ApplicationComponent
 
   # @param user [User]
   # @param is_self [Boolean] Whether this row is the currently signed-in admin
-  def initialize(user:, is_self:)
-    @user    = user
-    @is_self = is_self
+  # @param dwell_ms [Integer, nil] Accumulated page_view duration_ms
+  # @param top_commands [Array<Array(String, Integer)>] [[action_name, count], ...] in the last 7 days
+  # @param last_activity_at [Time, nil] Most recent UserActivity#created_at (page_view or command)
+  def initialize(user:, is_self:, dwell_ms: nil, top_commands: [], last_activity_at: nil)
+    @user             = user
+    @is_self          = is_self
+    @dwell_ms         = dwell_ms
+    @top_commands     = top_commands
+    @last_activity_at = last_activity_at
   end
 
   def view_template
     tr(class: "border-t border-gray-100") do
-      td(class: "px-3 py-2.5 text-sm text-gray-700") { plain(@user.email) }
+      td(class: "px-3 py-2.5 text-sm text-blue-600") do
+        a(href: "/admin/users/#{@user.id}", class: "hover:underline") { plain(@user.email) }
+      end
       td(class: "px-3 py-2.5 text-sm text-gray-500") { plain(@user.created_at.strftime("%Y-%m-%d")) }
       td(class: "px-3 py-2.5") do
         span(class: "px-2 py-0.5 rounded-full text-xs font-medium #{STATUS_STYLES.fetch(@user.status)}") do
@@ -34,11 +42,26 @@ class Admin::Users::RowComponent < ApplicationComponent
       td(class: "px-3 py-2.5 text-sm text-gray-500") do
         plain(@user.last_login_at&.strftime("%Y-%m-%d %H:%M") || "—")
       end
+      td(class: "px-3 py-2.5 text-sm text-gray-500") { plain(fmt_duration_ms(@dwell_ms)) }
+      td(class: "px-3 py-2.5 text-sm text-gray-500") { render_top_commands }
+      td(class: "px-3 py-2.5 text-sm text-gray-500") do
+        plain(@last_activity_at&.strftime("%Y-%m-%d %H:%M") || "—")
+      end
       td(class: "px-3 py-2.5") { render_actions }
     end
   end
 
   private
+
+  def render_top_commands
+    return plain("—") if @top_commands.blank?
+
+    div(class: "space-y-0.5") do
+      @top_commands.each do |action_name, count|
+        div(class: "text-xs") { plain("#{action_name} × #{count}") }
+      end
+    end
+  end
 
   def render_actions
     case @user.status

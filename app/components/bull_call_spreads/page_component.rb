@@ -1099,7 +1099,10 @@ class BullCallSpreads::PageComponent < ApplicationComponent
             body: JSON.stringify(payload)
           })
           .then(function (r) { return r.json(); })
-          .then(renderRepairResult)
+          .then(function (d) {
+            renderRepairResult(d);
+            if (window.FairPriceTrack) window.FairPriceTrack.command('bcvs_calculate', payload);
+          })
           .catch(function () {});
         }
 

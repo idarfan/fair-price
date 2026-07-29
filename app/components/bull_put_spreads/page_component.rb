@@ -874,16 +874,21 @@ class BullPutSpreads::PageComponent < ApplicationComponent
         var lastCalcResult = null;
 
         function runCalculate() {
+          var payload = {
+            short_strike: state.csp.strike, short_bid: state.csp.bid,
+            long_strike: state.protection.strike, long_ask: state.protection.ask
+          };
           fetch('#{bull_put_spreads_calculate_path}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf() },
-            body: JSON.stringify({
-              short_strike: state.csp.strike, short_bid: state.csp.bid,
-              long_strike: state.protection.strike, long_ask: state.protection.ask
-            })
+            body: JSON.stringify(payload)
           })
           .then(function (r) { return r.json(); })
-          .then(function (d) { lastCalcResult = d; renderCalcResult(d); })
+          .then(function (d) {
+            lastCalcResult = d;
+            renderCalcResult(d);
+            if (window.FairPriceTrack) window.FairPriceTrack.command('bpus_calculate', payload);
+          })
           .catch(function () {});
         }
 

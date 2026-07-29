@@ -1,0 +1,3 @@
+<% content_for :title, "#{@user.email} | 帳戶管理 | FairPrice" %>
+
+<%= render Admin::Users::ShowComponent.new(user: @user, page_views: @page_views, commands: @commands) %>

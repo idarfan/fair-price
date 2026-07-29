@@ -6,4 +6,10 @@
   </div>
 <% end %>
 
-<%= render Admin::Users::PageComponent.new(users: @users, current_admin: current_user) %>
+<%= render Admin::Users::PageComponent.new(
+      users:         @users,
+      current_admin: current_user,
+      dwell_totals:  @dwell_totals,
+      last_activity: @last_activity,
+      top_commands:  @top_commands
+    ) %>

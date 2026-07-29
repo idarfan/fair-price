@@ -480,6 +480,8 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     button(
       id: "leaps-export-#{kind}", type: "button",
       data_leaps_export: kind, disabled: !exportable,
+      data_track_action: "leaps_export_#{kind}",
+      data_track_metadata: { symbol: @symbol }.to_json,
       class: "#{base} #{style}"
     ) { plain label }
   end
@@ -505,6 +507,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       end
       button(
         id: "leaps-submit-btn", type: "submit",
+        data_track_action: "leaps_filter",
         class: "px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
       ) { plain "查詢" }
       div(id: "leaps-loading", class: "hidden items-center gap-2 text-sm text-gray-500") do

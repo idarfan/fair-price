@@ -36,11 +36,12 @@ class IvWatchlists::IndexView::SymbolRow < ApplicationComponent
 
       div(id: "chart-panel-#{@item.id}", class: "hidden px-5 pb-5 pt-2 bg-gray-950") do
         div(class: "flex gap-2 mb-3") do
-          [7, 30, 60, 90, 180].each do |d|
+          [ 7, 30, 60, 90, 180 ].each do |d|
             button(
               type: "button",
               class: "px-3 py-1 text-xs rounded border transition-colors #{d == 90 ? 'bg-blue-600 border-blue-500 text-white' : 'bg-gray-800 border-gray-600 text-gray-400 hover:text-white'}",
-              data:  { action: "click->iv-chart#changeDays", symbol: @item.symbol, days: d, row_id: @item.id }
+              data:  { action: "click->iv-chart#changeDays", symbol: @item.symbol, days: d, row_id: @item.id,
+                       track_action: "iv_skew_refresh", track_metadata: { symbol: @item.symbol, days: d }.to_json }
             ) { "#{d}天" }
           end
         end

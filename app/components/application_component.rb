@@ -54,4 +54,20 @@ class ApplicationComponent < Phlex::HTML
 
     value >= 0 ? "text-green-600" : "text-red-600"
   end
+
+  def fmt_duration_ms(ms)
+    return "—" if ms.nil? || ms.zero?
+
+    total_seconds = ms / 1000
+    hours, remainder = total_seconds.divmod(3600)
+    minutes, seconds = remainder.divmod(60)
+
+    if hours.positive?
+      "#{hours}時#{minutes}分"
+    elsif minutes.positive?
+      "#{minutes}分#{seconds}秒"
+    else
+      "#{seconds}秒"
+    end
+  end
 end

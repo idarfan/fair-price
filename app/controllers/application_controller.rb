@@ -1,7 +1,7 @@
 class ApplicationController < ActionController::Base
   protect_from_forgery with: :exception
 
-  GATE_EXEMPT_PREFIXES = %w[/login /logout /auth /up /api].freeze
+  GATE_EXEMPT_PREFIXES = %w[/login /logout /auth /up /api /track].freeze
 
   helper_method :current_user, :logged_in?
 

@@ -3,9 +3,15 @@
 class Admin::Users::PageComponent < ApplicationComponent
   # @param users [ActiveRecord::Relation<User>]
   # @param current_admin [User]
-  def initialize(users:, current_admin:)
+  # @param dwell_totals [Hash<Integer, Integer>] user_id => summed page_view duration_ms
+  # @param last_activity [Hash<Integer, Time>] user_id => most recent UserActivity#created_at
+  # @param top_commands [Hash<Integer, Array<Array(String, Integer)>>] user_id => top-3 [action_name, count]
+  def initialize(users:, current_admin:, dwell_totals: {}, last_activity: {}, top_commands: {})
     @users         = users
     @current_admin = current_admin
+    @dwell_totals  = dwell_totals
+    @last_activity = last_activity
+    @top_commands  = top_commands
   end
 
   def view_template
@@ -34,7 +40,13 @@ class Admin::Users::PageComponent < ApplicationComponent
           render_table_header
           tbody do
             @users.each do |user|
-              render Admin::Users::RowComponent.new(user: user, is_self: user.id == @current_admin.id)
+              render Admin::Users::RowComponent.new(
+                user:             user,
+                is_self:          user.id == @current_admin.id,
+                dwell_ms:         @dwell_totals[user.id],
+                top_commands:     @top_commands[user.id] || [],
+                last_activity_at: @last_activity[user.id]
+              )
             end
           end
         end
@@ -50,6 +62,9 @@ class Admin::Users::PageComponent < ApplicationComponent
         th(class: "px-3 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide") { plain("狀態") }
         th(class: "px-3 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide") { plain("TOTP") }
         th(class: "px-3 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide") { plain("最後登入") }
+        th(class: "px-3 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide") { plain("累積停留時間") }
+        th(class: "px-3 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide") { plain("近7天常用指令") }
+        th(class: "px-3 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide") { plain("最後活動時間") }
         th(class: "px-3 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide") { plain("操作") }
       end
     end

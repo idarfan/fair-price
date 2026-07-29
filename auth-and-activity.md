@@ -12,9 +12,9 @@
 | 5 | 備用碼 | 未開始 | 用過即失效;重新產生使舊碼全失效 |
 | 6 | 帳號安全頁 | 未開始 | 可重產備用碼、可登出所有裝置(session_version 機制) |
 | 7 | 帳戶管理頁(Admin) | 未開始 | 非 admin 擋 `/admin/users`;核准/停用即時生效(停用連現有 session 一併踢除) |
-| 8 | 頁面停留時間追蹤 | 未開始 | beacon 觸發寫入 duration_ms;心跳更新同 token 不重複建列 |
-| 9 | 指令使用追蹤 | 未開始 | 觸發指定功能建立 command 紀錄,action_name 正確 |
-| 10 | Admin 頁串接統計 | 未開始 | `/admin/users` 顯示累積停留時間/常用指令/最後活動時間,與 DB 一致 |
+| 8 | 頁面停留時間追蹤(含進出頁面) | 未開始 | beacon 觸發寫入 duration_ms + referrer_path;心跳更新同 token 不重複建列;/admin/users/:id 能依序看出進入→離開的頁面軌跡 |
+| 9 | 指令使用追蹤(完整查詢字串) | 未開始 | 觸發指定功能建立 command 紀錄,metadata 存完整輸入參數(非摘要) |
+| 10 | Admin 頁串接統計(明細頁分兩分頁) | 未開始 | `/admin/users` 顯示累積停留時間/常用指令/最後活動時間,與 DB 一致;點列進 `/admin/users/:id`,「瀏覽軌跡」「指令記錄」為獨立分頁,不同時展開 |
 | 11 | End-to-end 驗證 | 未開始 | Playwright 全流程截圖(見階段 11) |
 
 > 接續 session 只讀本表 + 進行中階段。
@@ -90,6 +90,7 @@ create_table :user_activities do |t|
   t.references :user, null: false, foreign_key: true
   t.integer :kind, null: false # page_view/command
   t.string :path
+  t.string :referrer_path # kind=page_view:從哪個頁面進來,無則記外部/直接進入
   t.string :action_name
   t.string :activity_token
   t.datetime :started_at, null: false
@@ -163,11 +164,12 @@ add_index :user_activities, [:user_id, :kind, :started_at]
 
 ---
 
-## 階段 8:頁面停留時間追蹤
+## 階段 8:頁面停留時間追蹤(含進出頁面)
 
-- 共用 layout JS:載入時記 `started_at` + 產生 `activity_token`;`visibilitychange`/`pagehide` 時算 `duration_ms`,`sendBeacon` 送 `/track/page_view`
+- 共用 layout JS:載入時記 `started_at`、`referrer_path`(讀 `document.referrer` 對應到站內路徑,沒有則記外部/直接進入)+ 產生 `activity_token`;`visibilitychange`/`pagehide` 時算 `duration_ms`,`sendBeacon` 送 `/track/page_view`
 - 長時間停留同頁:每 5 分鐘用同 token 補送心跳,防資料因崩潰遺失
 - 後端:未登入請求忽略;`activity_token` 存在則 upsert,不重複建列
+- **瀏覽路徑呈現**:`UserActivity(kind: page_view)` 依 `user_id + started_at` 排序即為該使用者完整瀏覽軌跡,每筆記錄的 `path` 是「進入的頁面」、`referrer_path` 是「從哪個頁面進來」、下一筆記錄的 `path` 即為「離開後去的頁面」(若下一筆是同 session 最後一筆,離開後即為關閉分頁/瀏覽器);`/admin/users/:id` 明細頁需按時間序列呈現這條軌跡,不是無序清單
 
 ---
 
@@ -175,15 +177,19 @@ add_index :user_activities, [:user_id, :kind, :started_at]
 
 - 涵蓋:LEAPS 篩選、PMCC/bpus/bcvs 試算、PDF/PNG 匯出、IV Skew 重整
 - 按鈕加 `data-track-action`,共用 click handler fire-and-forget POST `/track/command`
-- `metadata` 僅存操作摘要(如 ticker、匯出格式),不存整包表單
+- `metadata` 存**完整查詢字串/表單參數**(如 ticker、篩選條件、輸入值全部欄位),不再只存摘要——這是使用者明確要求要能看到實際輸入了什麼,不是只看有沒有用過這個功能
 - 未登入請求忽略
 
 ---
 
 ## 階段 10:Admin 頁串接統計
 
-- `/admin/users` 每列加:累積停留時間、近 7 天常用指令 Top3、最後活動時間
-- `/admin/users/:id` 明細:頁面瀏覽清單(路徑+時長)、指令紀錄(時間+action_name+metadata)
+- `/admin/users` 每列加:累積停留時間、近 7 天常用指令 Top3、最後活動時間;每列點擊(或加「查看」連結)才進入明細頁,列表本身不展開細節
+- `/admin/users/:id` 明細頁,分兩個分頁(tab):
+  - **分頁 1「瀏覽軌跡」**:依時間排序表格,欄位為進入頁面(path)、從哪來(referrer_path)、停留時長(duration_ms)、下一步去哪(下一筆記錄的 path)
+  - **分頁 2「指令記錄」**:時間、action_name、完整輸入參數(metadata 展開顯示,不省略)
+  - 兩個分頁互相獨立,不同時顯示在同一畫面,**預設開啟「瀏覽軌跡」**
+  - **表格樣式**:兩個分頁的表格皆適用——列 hover 時底色變紫色高亮;奇偶行底色交替,單數行淺綠色、雙數行淺藍色(各自同一色系深淺搭配)
 
 ---
 

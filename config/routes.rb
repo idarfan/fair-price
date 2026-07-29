@@ -76,10 +76,14 @@ Rails.application.routes.draw do
 
   namespace :admin do
     get   "users",               to: "users#index"
+    get   "users/:id",           to: "users#show"
     patch "users/:id/approve",    to: "users#approve"
     patch "users/:id/disable",    to: "users#disable"
     patch "users/:id/reactivate", to: "users#reactivate"
   end
+
+  post "track/page_view", to: "track#page_view"
+  post "track/command",   to: "track#command"
 
   # HTML app
   get "valuations/:ticker", to: "valuations#show", as: :valuation,

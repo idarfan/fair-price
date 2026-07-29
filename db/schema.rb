@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_29_060043) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_29_111324) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -552,6 +552,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_29_060043) do
     t.integer "kind", null: false
     t.jsonb "metadata", default: {}
     t.string "path"
+    t.string "referrer_path"
     t.datetime "started_at", null: false
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
