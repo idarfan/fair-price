@@ -4,6 +4,9 @@
 config/master.key
 config/credentials/*.key
 
+# GCP OAuth Client 下載的憑證 JSON（含 client secret，曾經被自動提交誤傳進歷史）
+client_secret_*.json
+
 # Rails
 /log/*
 /tmp/*
