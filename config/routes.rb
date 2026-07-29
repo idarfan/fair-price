@@ -70,6 +70,10 @@ Rails.application.routes.draw do
   post "two_factor/challenge",    to: "two_factor#create_challenge"
   get  "two_factor/backup_codes", to: "two_factor#backup_codes"
 
+  get  "settings/security",              to: "account_security#show"
+  post "settings/security/backup_codes", to: "account_security#regenerate_backup_codes"
+  post "settings/security/logout_all",   to: "account_security#logout_all_devices"
+
   # HTML app
   get "valuations/:ticker", to: "valuations#show", as: :valuation,
       constraints: { ticker: TICKER_CONSTRAINT }

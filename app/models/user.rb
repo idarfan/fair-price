@@ -28,4 +28,8 @@ class User < ApplicationRecord
     save!
     true
   end
+
+  def bump_session_version!
+    increment!(:session_version)
+  end
 end

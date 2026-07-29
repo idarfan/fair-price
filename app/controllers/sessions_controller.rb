@@ -18,8 +18,9 @@ class SessionsController < ApplicationController
       end
     end
 
-    session[:user_id]       = user.id
-    session[:totp_verified] = false
+    session[:user_id]         = user.id
+    session[:session_version] = user.session_version
+    session[:totp_verified]   = false
 
     if user.disabled?
       redirect_to account_disabled_path and return

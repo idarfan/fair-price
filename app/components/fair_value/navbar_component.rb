@@ -35,6 +35,16 @@ class FairValue::NavbarComponent < ApplicationComponent
             )
           end
         end
+        if helpers.logged_in?
+          div(class: "flex items-center gap-3 flex-shrink-0") do
+            a(href: "/settings/security", class: "text-xs text-gray-400 hover:text-gray-600") { plain("🔒 帳戶安全") }
+            form(action: "/logout", method: "post") do
+              input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
+              input(type: "hidden", name: "_method", value: "delete")
+              button(type: "submit", class: "text-xs text-gray-400 hover:text-gray-600") { plain("登出") }
+            end
+          end
+        end
         if @show_lookbook
           a(href: "/lookbook", class: "text-xs text-gray-400 hover:text-gray-600 flex-shrink-0") { plain("Lookbook") }
         end

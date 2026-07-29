@@ -1,0 +1,9 @@
+<% content_for :title, "帳戶安全 | FairPrice" %>
+
+<% if flash[:notice] %>
+  <div class="max-w-md mx-auto mt-4">
+    <%= render FairValue::AlertComponent.new(message: flash[:notice], type: :success) %>
+  </div>
+<% end %>
+
+<%= render AccountSecurity::PageComponent.new(user: current_user) %>
