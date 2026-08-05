@@ -21,6 +21,7 @@ class SessionsController < ApplicationController
     session[:user_id]         = user.id
     session[:session_version] = user.session_version
     session[:totp_verified]   = false
+    session[:last_seen_at]    = Time.current.to_i
 
     if user.disabled?
       redirect_to account_disabled_path and return

@@ -473,13 +473,18 @@ class BarchartScraperService
         { status: "partial", data: data }
       when "invalid_strike"
         { status: "invalid_strike", data: data }
+      when "error"
+        Rails.logger.error("[#{type}] scraper reported error for #{@symbol}: #{data["error"]}\n#{data["traceback"]}")
+        { status: "error", error: data["error"].to_s.first(500) }
       else
         { status: "success", data: data }
       end
     else
-      { status: "error", error: stderr.strip.first(500) }
+      Rails.logger.error("[#{type}] scraper exited non-zero for #{@symbol}:\n#{stderr}")
+      { status: "error", error: stderr.strip.first(2000) }
     end
   rescue JSON::ParserError => e
+    Rails.logger.error("[#{type}] scraper JSON parse error for #{@symbol}: #{e.message}\nstdout=#{stdout}\nstderr=#{stderr}")
     { status: "error", error: "JSON parse error: #{e.message}" }
   end
 

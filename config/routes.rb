@@ -168,6 +168,10 @@ Rails.application.routes.draw do
   post "bcvs/recommend",         to: "bull_call_spreads#recommend",         as: :bull_call_spreads_recommend
   post "bcvs/calculate",         to: "bull_call_spreads#calculate",         as: :bull_call_spreads_calculate
 
+  # 期權小學堂（原 public/csp/ 靜態檔案，改走 controller 以套用登入驗證與瀏覽記錄）
+  get "csp",       to: redirect("/csp/index.html")
+  get "csp/*path", to: "csp_lessons#show", as: :csp_lesson, format: false, constraints: { path: /.*/ }
+
 # IV Skew Watchlist
 resources :iv_watchlists, only: [ :index, :create, :destroy ] do
   member do

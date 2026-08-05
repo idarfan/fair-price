@@ -4,7 +4,7 @@ class LeapsOptionChainSnapshot < ApplicationRecord
   # 同一 symbol 在此時間窗內視為 fresh，直接讀 DB 不重新抓取。
   # 唯一權威定義（spec「fresh window 5 → 30 分鐘」節）：model fresh scope、
   # ScrapeLeapsJob 的 Rails.cache expires_in、controller 的 job pending 快取全部引用這裡。
-  FRESH_WINDOW = 30.minutes
+  FRESH_WINDOW = 1.hour
 
   validates :symbol, :expiration_date, :strike, :option_type, :scraped_at, presence: true
 

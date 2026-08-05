@@ -562,4 +562,12 @@ async def main(symbol, user_strike=None):
 if __name__ == "__main__":
     sym      = sys.argv[1] if len(sys.argv) > 1 else "NOK"
     u_strike = float(sys.argv[2]) if len(sys.argv) > 2 else None
-    asyncio.run(main(sym, user_strike=u_strike))
+    try:
+        asyncio.run(main(sym, user_strike=u_strike))
+    except Exception as e:
+        import traceback
+        print(json.dumps({
+            "status": "error",
+            "error": f"{type(e).__name__}: {e}",
+            "traceback": traceback.format_exc(),
+        }))

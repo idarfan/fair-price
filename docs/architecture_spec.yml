@@ -44,6 +44,10 @@ layers:
   item_fill: '#86efac'
   item_stroke: '#15803d'
   items:
+  - - AccountSecurityController
+    - ''
+  - - UsersController
+    - ''
   - - BaseController
     - ''
   - - MarginPositionsController
@@ -54,11 +58,7 @@ layers:
     - ''
   - - ValuationsController
     - ''
-  - - IvAnalysisController
-    - ''
-  - - IvWatchlistsController
-    - ''
-  - - LeapsRecommendationsController
+  - - BullCallSpreadsController
     - ''
 - id: services
   type: band
@@ -70,19 +70,19 @@ layers:
   items:
   - - BarchartScraperService
     - ''
+  - - BcvsCacheService
+    - ''
+  - - BullCallSpreadCalculatorService
+    - ''
+  - - BullCallSpreadRecommenderService
+    - ''
+  - - BullCallSpreadRepairCalculatorService
+    - ''
+  - - BullPutSpreadCalculatorService
+    - ''
   - - CompositeSignalService
     - ''
   - - ExchangeRateService
-    - ''
-  - - FinnhubService
-    - ''
-  - - IvRankService
-    - ''
-  - - IvSidecarService
-    - ''
-  - - IvStatsService
-    - ''
-  - - LeapsOptionsFlowPanelService
     - ''
 - id: models
   type: band
@@ -92,6 +92,10 @@ layers:
   item_fill: '#f9a8d4'
   item_stroke: '#9d174d'
   items:
+  - - BcvsChainSnapshot
+    - ''
+  - - BcvsExpirationSnapshot
+    - ''
   - - Charts
     - ''
   - - TechnicalIndicators
@@ -104,10 +108,6 @@ layers:
     - ''
   - - WatchlistRowPresenter
     - ''
-  - - ConsensusPresenter
-    - ''
-  - - FairValue
-    - ''
 - id: scripts
   type: band
   label: 自動化腳本  (Python + Playwright CDP)
@@ -116,17 +116,17 @@ layers:
   item_fill: '#fde047'
   item_stroke: '#a16207'
   items:
+  - - bcvs_call_chain_scraper.py
+    - ''
+  - - bcvs_expirations_scraper.py
+    - ''
+  - - bpus_expirations_scraper.py
+    - ''
+  - - bpus_put_chain_scraper.py
+    - ''
+  - - bpus_volatility_scraper.py
+    - ''
   - - cdp_helper.py
-    - ''
-  - - fundamental_scraper.py
-    - ''
-  - - leaps_scraper.py
-    - ''
-  - - max_pain_scraper.py
-    - ''
-  - - options_flow_scraper.py
-    - ''
-  - - technical_scraper.py
     - ''
 arrows:
 - - browser
