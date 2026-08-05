@@ -300,7 +300,7 @@ class CompositeSignalService
 
       if bto_call > 0 || bto_put > 0
         bto_ratio = bto_put > 0 ? bto_call.to_f / bto_put : 99.9
-        label     = "BuyToOpen C/P #{sprintf("%.2f", [bto_ratio, 99.9].min)}"
+        label     = "BuyToOpen C/P #{sprintf("%.2f", [ bto_ratio, 99.9 ].min)}"
         if bto_ratio >= 2.0
           points += 1
           signals << { text: "#{label} — 開倉方向確認偏多（CSV 驗證）", sentiment: :bullish }
@@ -383,7 +383,7 @@ class CompositeSignalService
       bto_put_ask_prem:    directional.where(option_type: "Put",  side: "ask", open_close: "BuyToOpen").sum(:premium).to_i,
       bto_put_ask_cnt:     directional.where(option_type: "Put",  side: "ask", open_close: "BuyToOpen").count,
       sto_put_bid_prem:    directional.where(option_type: "Put",  side: "bid", open_close: "SellToOpen").sum(:premium).to_i,
-      sto_put_bid_cnt:     directional.where(option_type: "Put",  side: "bid", open_close: "SellToOpen").count,
+      sto_put_bid_cnt:     directional.where(option_type: "Put",  side: "bid", open_close: "SellToOpen").count
     }
   rescue => e
     Rails.logger.error("load_trade_stats error: #{e.message}")

@@ -25,7 +25,7 @@ class LeapsRankingService
 
     candidates
       .map { |row| enrich(row, tiers[row.id], vol_oi_floor) }
-      .sort_by { |e| [-(e[:open_interest] || 0), -(e[:dte] || 0)] }
+      .sort_by { |e| [ -(e[:open_interest] || 0), -(e[:dte] || 0) ] }
   end
 
   private
@@ -57,9 +57,9 @@ class LeapsRankingService
     candidates.each_with_object({}) do |row, hash|
       oi = row.open_interest || 0
       hash[row.id] = if oi >= p67 then TIER_TOP
-                     elsif oi >= p33 then TIER_MID
-                     else TIER_BOTTOM
-                     end
+      elsif oi >= p33 then TIER_MID
+      else TIER_BOTTOM
+      end
     end
   end
 

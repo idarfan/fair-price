@@ -57,7 +57,7 @@ RSpec.describe LeapsOptionsFlowPanelService do
 
       it "returns all trades sorted by premium desc (no flag filter)" do
         orders = described_class.new(symbol, []).call[:large_orders]
-        expect(orders.map { |t| t[:premium] }).to eq([800_000, 500_000, 300_000])
+        expect(orders.map { |t| t[:premium] }).to eq([ 800_000, 500_000, 300_000 ])
       end
 
       it "includes trades regardless of large_premium flag value" do

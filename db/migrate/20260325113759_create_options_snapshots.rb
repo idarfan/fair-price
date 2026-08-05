@@ -14,7 +14,7 @@ class CreateOptionsSnapshots < ActiveRecord::Migration[8.0]
       t.timestamps
     end
 
-    add_index :options_snapshots, [:symbol, :expiration_date],
+    add_index :options_snapshots, [ :symbol, :expiration_date ],
               name: "index_options_snapshots_on_symbol_expiration"
     add_index :options_snapshots, :cached_at
     add_index :options_snapshots, :symbol

@@ -31,7 +31,7 @@ class IvAnalysis::WatchlistComponent < ApplicationComponent
               th(class: "text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide") { plain "累積天數" }
               th(class: "text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide") { plain "資料品質" }
               th(class: "text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide") { plain "最後更新" }
-              th(class: "px-4 py-2.5") {}
+              th(class: "px-4 py-2.5") { }
             end
           end
           tbody(id: "iv-watchlist-body") do

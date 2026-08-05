@@ -66,7 +66,7 @@ namespace :iv do
   end
 
   desc "補抓單一 ticker 當日 IV（用法：rake iv:backfill[AAPL]）"
-  task :backfill, [:ticker] => :environment do |_t, args|
+  task :backfill, [ :ticker ] => :environment do |_t, args|
     ticker = args[:ticker].to_s.upcase.strip
     if ticker.blank?
       warn "請指定 ticker，例如：rake iv:backfill[AAPL]"

@@ -6,7 +6,7 @@ class FairValue::FairValueSummaryComponent < ApplicationComponent
     "🟡 略微高估"        => { bg: "bg-yellow-50", border: "border-yellow-300", text: "text-yellow-800", badge: "bg-yellow-100 text-yellow-800" },
     "🟢 合理"            => { bg: "bg-green-50",  border: "border-green-300",  text: "text-green-800",  badge: "bg-green-100 text-green-800" },
     "🟡 略微低估"        => { bg: "bg-yellow-50", border: "border-yellow-300", text: "text-yellow-800", badge: "bg-yellow-100 text-yellow-800" },
-    "🟢 明顯低估（潛在買點）" => { bg: "bg-green-50",  border: "border-green-300",  text: "text-green-800",  badge: "bg-green-100 text-green-800" },
+    "🟢 明顯低估（潛在買點）" => { bg: "bg-green-50",  border: "border-green-300",  text: "text-green-800",  badge: "bg-green-100 text-green-800" }
   }.freeze
 
   DEFAULT_STYLE = { bg: "bg-gray-50", border: "border-gray-300", text: "text-gray-700", badge: "bg-gray-100 text-gray-700" }.freeze

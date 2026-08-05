@@ -71,7 +71,7 @@ class FairValue::PriceRangeComponent < ApplicationComponent
   private
 
   def position_percent
-    [(@current - @low) / (@high - @low) * 100, 0].max.clamp(0, 100).round(1)
+    [ (@current - @low) / (@high - @low) * 100, 0 ].max.clamp(0, 100).round(1)
   end
 
   def fill_percent

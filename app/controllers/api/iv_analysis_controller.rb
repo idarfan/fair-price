@@ -95,23 +95,23 @@ class Api::IvAnalysisController < ApplicationController
       [
         Thread.new {
           begin
-            [:live, wt.ticker, IvSidecarService.fetch_atm_iv(wt.ticker)]
+            [ :live, wt.ticker, IvSidecarService.fetch_atm_iv(wt.ticker) ]
           rescue StandardError
-            [:live, wt.ticker, nil]
+            [ :live, wt.ticker, nil ]
           end
         },
         Thread.new {
           begin
-            [:hv, wt.ticker, IvRankService.new(wt.ticker).call]
+            [ :hv, wt.ticker, IvRankService.new(wt.ticker).call ]
           rescue StandardError
-            [:hv, wt.ticker, nil]
+            [ :hv, wt.ticker, nil ]
           end
         },
         Thread.new {
           begin
-            [:skew, wt.ticker, IvSidecarService.fetch_skew(wt.ticker)]
+            [ :skew, wt.ticker, IvSidecarService.fetch_skew(wt.ticker) ]
           rescue StandardError
-            [:skew, wt.ticker, nil]
+            [ :skew, wt.ticker, nil ]
           end
         }
       ]
@@ -167,9 +167,9 @@ class Api::IvAnalysisController < ApplicationController
         sigma = live ? live[:atm_iv].to_f        : latest_query.iv.to_f
         k     = latest_query.strike.to_f
         days  = (latest_query.expiry_date.to_date - Date.today).to_i
-        t     = [days.to_f / 365, 0].max
+        t     = [ days.to_f / 365, 0 ].max
 
-        iv_val = latest_query.option_type == "call" ? [s - k, 0].max : [k - s, 0].max
+        iv_val = latest_query.option_type == "call" ? [ s - k, 0 ].max : [ k - s, 0 ].max
         tv_val = t > 0 ? (0.4 * s * sigma * Math.sqrt(t)).round(2) : 0.0
 
         intrinsic_value = iv_val.round(2)
@@ -239,11 +239,11 @@ class Api::IvAnalysisController < ApplicationController
 
   def build_signal(stats)
     if stats.available_days < 30
-      return [false, "資料累積不足 #{stats.available_days} 天，IVR/IVP 尚不可靠"]
+      return [ false, "資料累積不足 #{stats.available_days} 天，IVR/IVP 尚不可靠" ]
     end
 
     low    = (stats.ivr_1y && stats.ivr_1y < 20) || (stats.ivr_2y && stats.ivr_2y < 20)
     notice = stats.data_quality == "limited" ? "資料累積中（#{stats.available_days} 天），建議等待更多歷史資料" : nil
-    [low, notice]
+    [ low, notice ]
   end
 end

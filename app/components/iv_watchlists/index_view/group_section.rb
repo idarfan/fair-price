@@ -20,4 +20,3 @@ class IvWatchlists::IndexView::GroupSection < ApplicationComponent
     end
   end
 end
-

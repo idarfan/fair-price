@@ -40,4 +40,3 @@ class IvWatchlists::IndexView::AddSymbolForm < ApplicationComponent
     end
   end
 end
-

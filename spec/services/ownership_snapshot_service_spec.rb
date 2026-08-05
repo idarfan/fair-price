@@ -66,7 +66,7 @@ RSpec.describe OwnershipSnapshotService do
 
     it "replaces holders on upsert" do
       service.save_snapshot(ticker, data)
-      new_data = data.merge(top_holders: [{ name: "ARK", pct_held: 2.56, value: 152_000_000, report_date: "2025-12-31" }])
+      new_data = data.merge(top_holders: [ { name: "ARK", pct_held: 2.56, value: 152_000_000, report_date: "2025-12-31" } ])
       service.save_snapshot(ticker, new_data)
 
       snapshot = OwnershipSnapshot.for_ticker(ticker).last

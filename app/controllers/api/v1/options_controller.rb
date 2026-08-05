@@ -125,7 +125,7 @@ module Api
         strikes = (price * 0.85).ceil(-1).step(price * 1.15, 5.0).first(12)
         strikes.map do |k|
           iv  = type == :put ? 0.55 + (price - k) / price * 0.2 : 0.50
-          bid = [((type == :call ? [price - k, 0].max : [k - price, 0].max) + iv * price * 0.05).round(2), 0.05].max
+          bid = [ ((type == :call ? [ price - k, 0 ].max : [ k - price, 0 ].max) + iv * price * 0.05).round(2), 0.05 ].max
           {
             contract_symbol: "#{symbol}#{type.to_s.upcase[0]}#{k.to_i}",
             strike:          k.round(2),

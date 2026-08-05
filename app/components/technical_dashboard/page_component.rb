@@ -23,27 +23,27 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
   }.freeze
 
   STRIKES_OPTIONS = [
-    ["show_all",   "Show All"],
-    ["5_strikes",  "5 Strikes +/-"],
-    ["near_money", "Near the Money"],
-    ["20_strikes", "20 Strikes +/-"],
-    ["50_strikes", "50 Strikes +/-"],
+    [ "show_all",   "Show All" ],
+    [ "5_strikes",  "5 Strikes +/-" ],
+    [ "near_money", "Near the Money" ],
+    [ "20_strikes", "20 Strikes +/-" ],
+    [ "50_strikes", "50 Strikes +/-" ]
   ].freeze
 
   TECH_GRADIENT = [
-    [0.00, [239, 68,  68]],
-    [0.25, [248, 113, 113]],
-    [0.50, [156, 163, 175]],
-    [0.75, [129, 140, 248]],
-    [1.00, [59,  130, 246]],
+    [ 0.00, [ 239, 68,  68 ] ],
+    [ 0.25, [ 248, 113, 113 ] ],
+    [ 0.50, [ 156, 163, 175 ] ],
+    [ 0.75, [ 129, 140, 248 ] ],
+    [ 1.00, [ 59,  130, 246 ] ]
   ].freeze
 
   ANALYST_GRADIENT = [
-    [0.00, [239, 68,  68]],
-    [0.25, [249, 115, 22]],
-    [0.50, [234, 179,  8]],
-    [0.75, [132, 204, 22]],
-    [1.00, [34,  197, 94]],
+    [ 0.00, [ 239, 68,  68 ] ],
+    [ 0.25, [ 249, 115, 22 ] ],
+    [ 0.50, [ 234, 179,  8 ] ],
+    [ 0.75, [ 132, 204, 22 ] ],
+    [ 1.00, [ 34,  197, 94 ] ]
   ].freeze
 
   def initialize(symbol: nil, date: Date.today, result: nil, scrape_status: nil, scrape_errors: [], recent_symbols: [], stock_quote: nil)
@@ -160,7 +160,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
     chg_cls  = up ? "text-green-600" : "text-red-600"
     ts_str   = q[:ts] > 0 ? Time.at(q[:ts]).in_time_zone("Eastern Time (US & Canada)").strftime("%m/%d/%y") : ""
     exch     = q[:exchange].present? ? " [#{q[:exchange]}]" : ""
-    name_sym = [q[:name].presence, @symbol.presence].compact.join(" ")
+    name_sym = [ q[:name].presence, @symbol.presence ].compact.join(" ")
     name_sym = "(#{@symbol})" if q[:name].blank? && @symbol.present?
     name_sym = "#{q[:name]} (#{@symbol})" if q[:name].present?
 
@@ -357,7 +357,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
   def gauge_color(t, stops)
     t = t.clamp(0.0, 1.0)
     lo_i = (stops.rindex { |t0, _| t0 <= t } || 0)
-    hi_i = [lo_i + 1, stops.length - 1].min
+    hi_i = [ lo_i + 1, stops.length - 1 ].min
     lo_t, lo_c = stops[lo_i]
     hi_t, hi_c = stops[hi_i]
     f = hi_t > lo_t ? (t - lo_t).to_f / (hi_t - lo_t) : 0.0
@@ -607,27 +607,27 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
                   type_color = is_call ? "text-green-700 font-bold" : "text-red-700 font-bold"
                   side_str   = (ord["side"] || "mid").downcase
                   side_color = case side_str
-                               when "ask" then "text-green-600 font-bold"
-                               when "bid" then "text-red-600 font-bold"
-                               else            "text-amber-600 font-bold"
-                               end
+                  when "ask" then "text-green-600 font-bold"
+                  when "bid" then "text-red-600 font-bold"
+                  else            "text-amber-600 font-bold"
+                  end
                   exp        = format_expiry(ord["expiration"])
                   delta_val  = ord["delta"] ? sprintf("%.2f", ord["delta"].to_f.abs) : "—"
                   prem_m     = ord["premium"] ? "$#{ord['premium'].to_i.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\1,').reverse}" : "—"
                   trade_price = if ord["tradePrice"] && ord["tradePrice"].to_f > 0
                                   sprintf("$%.2f", ord["tradePrice"].to_f)
-                                elsif ord["premium"].to_f > 0 && ord["tradeSize"].to_i > 0
+                  elsif ord["premium"].to_f > 0 && ord["tradeSize"].to_i > 0
                                   sprintf("$%.2f", ord["premium"].to_f / (ord["tradeSize"].to_i * 100))
-                                else
+                  else
                                   "—"
-                                end
+                  end
                   driver       = flow_driver(ord)
                   driver_tip   = flow_driver_tip(ord)
                   price_color  = case side_str
-                                 when "ask" then "text-green-600 font-bold"
-                                 when "bid" then "text-red-600 font-bold"
-                                 else            "text-gray-900 font-bold"
-                                 end
+                  when "ask" then "text-green-600 font-bold"
+                  when "bid" then "text-red-600 font-bold"
+                  else            "text-gray-900 font-bold"
+                  end
                   tr(class: "border-b border-gray-100 hover:bg-purple-50", "data-dte": (ord["dte"] || -1).to_s, "data-rank": (idx + 1).to_s) do
                     td(class: "py-1 pr-2 #{type_color}") { plain is_call ? "Call" : "Put" }
                     td(class: "py-1 pr-2 text-right font-mono text-gray-700") { plain ord["strikePrice"].to_s }
@@ -705,10 +705,10 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
     parts << "DTE #{dte}"          if dte > 0
     parts << "Delta #{sprintf("%.2f", delta)}" if delta > 0
     parts << case side
-             when "ask" then "ASK：主動買入（方向性）"
-             when "bid" then "BID：造市商賣出（非方向性）"
-             else            "MID：方向不明"
-             end
+    when "ask" then "ASK：主動買入（方向性）"
+    when "bid" then "BID：造市商賣出（非方向性）"
+    else            "MID：方向不明"
+    end
     if type == "Call" && side == "ask"
       parts << (delta >= 0.70 ? "高 Delta — 強確信押注" : dte > 180 ? "長線 — 機構佈局" : "看多押注")
     elsif type == "Put" && side == "ask"
@@ -1316,13 +1316,12 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
   def render_max_pain_filter_controls(symbol, mp)
     available = (mp[:available_expirations] || []).reject(&:blank?)
     current_exp     = mp[:expiration].to_s
-    available       = ([current_exp] + available).uniq.reject(&:blank?)
+    available       = ([ current_exp ] + available).uniq.reject(&:blank?)
     current_strikes = mp[:strikes_filter] || "show_all"
     current_vol_oi  = mp[:volume_oi_filter] || "open_interest"
 
     div(id: "mp-filter-#{symbol}",
         class: "flex flex-wrap items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg text-sm") do
-
       div(class: "flex items-center gap-1.5") do
         span(class: "text-xs text-gray-500 whitespace-nowrap") { plain "到期日" }
         select(id: "mp-exp-#{symbol}",
@@ -1355,7 +1354,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
         span(class: "text-xs text-gray-500 whitespace-nowrap") { plain "顯示" }
         select(id: "mp-oi-#{symbol}",
                class: "text-xs border border-gray-300 rounded px-2 py-1 bg-white") do
-          [["open_interest", "Open Interest"], ["volume", "Volume"]].each do |val, label|
+          [ [ "open_interest", "Open Interest" ], [ "volume", "Volume" ] ].each do |val, label|
             if val == current_vol_oi
               option(value: val, selected: true) { plain label }
             else
@@ -1445,6 +1444,4 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
       })();
     JS
   end
-
-
 end

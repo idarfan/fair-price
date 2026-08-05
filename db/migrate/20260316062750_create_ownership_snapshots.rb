@@ -12,7 +12,7 @@ class CreateOwnershipSnapshots < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :ownership_snapshots, [:symbol, :fetched_at]
+    add_index :ownership_snapshots, [ :symbol, :fetched_at ]
     add_index :ownership_snapshots, :symbol
   end
 end

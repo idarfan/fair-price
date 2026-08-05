@@ -12,8 +12,8 @@ class RestoreOwnershipSnapshotsUniqueKeyToQuarter < ActiveRecord::Migration[8.1]
       )
     SQL
 
-    remove_index :ownership_snapshots, [:ticker, :snapshot_date]
-    add_index    :ownership_snapshots, [:ticker, :quarter], unique: true
-    add_index    :ownership_snapshots, [:ticker, :snapshot_date]
+    remove_index :ownership_snapshots, [ :ticker, :snapshot_date ]
+    add_index    :ownership_snapshots, [ :ticker, :quarter ], unique: true
+    add_index    :ownership_snapshots, [ :ticker, :snapshot_date ]
   end
 end

@@ -10,7 +10,7 @@ class FairValue::MetricsGridComponentPreview < Lookbook::Preview
     { label: "ROE",         value: 1.569,  format: :percent,  decimals: 1 },
     { label: "股息/股",     value: 1.00,   format: :currency },
     { label: "盈餘成長",    value: 0.089,  format: :percent,  decimals: 1 },
-    { label: "營收成長",    value: 0.040,  format: :percent,  decimals: 1 },
+    { label: "營收成長",    value: 0.040,  format: :percent,  decimals: 1 }
   ].freeze
 
   # @label 3 columns (default)
@@ -32,7 +32,7 @@ class FairValue::MetricsGridComponentPreview < Lookbook::Preview
 
   # @label With nil values hidden
   def hide_empty
-    metrics = SAMPLE_METRICS + [{ label: "Forward EPS", value: nil, format: :currency }]
+    metrics = SAMPLE_METRICS + [ { label: "Forward EPS", value: nil, format: :currency } ]
     render FairValue::MetricsGridComponent.new(metrics:, show_empty: false, title: "隱藏空值")
   end
 end

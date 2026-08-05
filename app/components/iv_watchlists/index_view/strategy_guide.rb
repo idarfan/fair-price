@@ -6,7 +6,7 @@ class IvWatchlists::IndexView::StrategyGuide < ApplicationComponent
     { icon: "📉", label: "股價持續下跌", desc: "黃虛線（股價右軸）持續往下，市場進入恐慌模式" },
     { icon: "🔵→🩷", label: "柱子從藍色變桃紅色", desc: "Put IV 被拉高，權利金變厚，開始評估 CSP 進場時機" },
     { icon: "⏳", label: "桃紅色持續 2～3 根", desc: "恐慌情緒累積期，繼續觀望，不要急著進場" },
-    { icon: "📏", label: "桃紅柱明顯縮短那根", desc: "確認進場，開 CSP" },
+    { icon: "📏", label: "桃紅柱明顯縮短那根", desc: "確認進場，開 CSP" }
   ].freeze
 
   WHEEL_ROWS = [
@@ -14,7 +14,7 @@ class IvWatchlists::IndexView::StrategyGuide < ApplicationComponent
     { signal: "Skew 持續桃紅 2～3 根",            meaning: "SQQQ 高位震盪，IV 整體拉高",       action: "繼續觀望，等收斂訊號",                              highlight: false, color: "text-orange-400" },
     { signal: "桃紅後首根明顯縮短",               meaning: "SQQQ 頂部臨近，股價即將回落",      action: "✅ 最佳進場點，開高 Strike OTM CSP，權利金最厚",    highlight: true,  color: "text-green-400" },
     { signal: "Skew 回落至藍色、股價開始下跌",    meaning: "SQQQ 從高位回落，IV 仍高",         action: "✅ 可開 CSP，Strike 設在高於現價，緩衝空間大",       highlight: false, color: "text-blue-400" },
-    { signal: "Skew 藍柱穩定、股價已在低位",      meaning: "IV 下降，整體平靜",                action: "⚠️ 權利金變薄，評估是否划算再進場",                  highlight: false, color: "text-yellow-400" },
+    { signal: "Skew 藍柱穩定、股價已在低位",      meaning: "IV 下降，整體平靜",                action: "⚠️ 權利金變薄，評估是否划算再進場",                  highlight: false, color: "text-yellow-400" }
   ].freeze
 
   def view_template

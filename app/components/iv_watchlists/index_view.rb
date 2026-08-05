@@ -5,7 +5,7 @@ class IvWatchlists::IndexView < ApplicationComponent
     "index"     => "bg-blue-500/10 text-blue-300 border-blue-500/30",
     "leveraged" => "bg-orange-500/10 text-orange-300 border-orange-500/30",
     "macro"     => "bg-purple-500/10 text-purple-300 border-purple-500/30",
-    "general"   => "bg-gray-500/10 text-gray-300 border-gray-500/30",
+    "general"   => "bg-gray-500/10 text-gray-300 border-gray-500/30"
   }.freeze
 
   def initialize(grouped:, new_item:)
@@ -260,5 +260,4 @@ class IvWatchlists::IndexView < ApplicationComponent
       JS
     end
   end
-
 end

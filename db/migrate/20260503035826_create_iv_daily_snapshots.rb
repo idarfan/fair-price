@@ -9,6 +9,6 @@ class CreateIvDailySnapshots < ActiveRecord::Migration[8.1]
 
       t.timestamps
     end
-    add_index :iv_daily_snapshots, [:ticker, :snapshot_date], unique: true
+    add_index :iv_daily_snapshots, [ :ticker, :snapshot_date ], unique: true
   end
 end

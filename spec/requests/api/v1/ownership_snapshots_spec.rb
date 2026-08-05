@@ -64,7 +64,7 @@ RSpec.describe "Api::V1::OwnershipSnapshots", type: :request do
 
   describe "POST /api/v1/ownership_snapshots/:ticker" do
     let(:holders_data) do
-      [{ name: "Vanguard", pct_held: 9.82, value: 494_000_000, report_date: "2025-12-31" }]
+      [ { name: "Vanguard", pct_held: 9.82, value: 494_000_000, report_date: "2025-12-31" } ]
     end
     let(:fetch_result) do
       {

@@ -336,7 +336,7 @@ class IvAnalysis::EducationComponent < ApplicationComponent
           end
         end
         div(class: "flex gap-4 text-xs", style: "color:#7d8590") do
-          [["標的價格", "100"], ["剩餘時間", "1.00 年"], ["利率 (R)", "0%"]].each do |k, v|
+          [ [ "標的價格", "100" ], [ "剩餘時間", "1.00 年" ], [ "利率 (R)", "0%" ] ].each do |k, v|
             div(class: "text-center") do
               div(style: "color:#e6edf3; font-weight:600; font-size:0.85rem") { plain v }
               div { plain k }
@@ -345,7 +345,7 @@ class IvAnalysis::EducationComponent < ApplicationComponent
         end
       end
       div(class: "px-5 pb-2 flex gap-4") do
-        [["10%", "#58a6ff"], ["30%", "#3fb950"], ["50%", "#d29922"], ["80%", "#bc8cff"]].each do |label, color|
+        [ [ "10%", "#58a6ff" ], [ "30%", "#3fb950" ], [ "50%", "#d29922" ], [ "80%", "#bc8cff" ] ].each do |label, color|
           div(class: "flex items-center gap-1.5 text-xs", style: "color:#7d8590") do
             div(class: "w-8 rounded-full", style: "height:2px; background:#{color}")
             span { plain label }
@@ -359,10 +359,10 @@ class IvAnalysis::EducationComponent < ApplicationComponent
       div(class: "mx-4 mb-4 rounded-lg p-4", style: "background:#1f2937; border:1px solid #374151;") do
         p(class: "font-semibold text-sm mb-2", style: "color:#fbbf24") { plain "📌 從圖表看出的關鍵事實" }
         ul(class: "space-y-1") do
-          ["IV = 10% 時，履約價 115 的 OTM（價外）Call Delta 幾乎趨近於 0 ——買了幾乎不動",
+          [ "IV = 10% 時，履約價 115 的 OTM（價外）Call Delta 幾乎趨近於 0 ——買了幾乎不動",
            "IV = 80% 時，同樣履約價 115 的 Delta 可達 0.4 以上 ——對股價極度敏感",
            "IV 上升 8 倍（10% → 80%），OTM（價外）Call 的 Δ 可能翻倍甚至高達五倍",
-           "無論是內涵價值（Δ 變大）還是時間價值（σ 直接乘進去），都以倍數放大"].each do |txt|
+           "無論是內涵價值（Δ 變大）還是時間價值（σ 直接乘進去），都以倍數放大" ].each do |txt|
             li(class: "text-xs leading-relaxed", style: "color:#9ca3af") do
               span(style: "color:#6b7280; margin-right:6px") { plain "•" }
               plain txt
@@ -592,11 +592,11 @@ class IvAnalysis::EducationComponent < ApplicationComponent
 
   def ivr_wheel_table
     rows = [
-      ["0 ~ 20%",   "IV 處於一年低點",  "適合買期權，CSP 權利金偏薄",   "bg-green-100 text-green-800",  "text-green-700"],
-      ["20 ~ 40%",  "偏低",             "CSP 尚可，收益普通",            "bg-green-50 text-green-700",   "text-green-600"],
-      ["40 ~ 60%",  "中性",             "Wheel 正常運作",                "bg-gray-50 text-gray-700",     "text-gray-600"],
-      ["60 ~ 80%",  "偏高",             "Wheel 收益豐厚",                "bg-orange-50 text-orange-700", "text-orange-600"],
-      ["80 ~ 100%", "IV 處於一年高點",  "賣方天堂，但注意方向風險",       "bg-red-100 text-red-800",      "text-red-700"],
+      [ "0 ~ 20%",   "IV 處於一年低點",  "適合買期權，CSP 權利金偏薄",   "bg-green-100 text-green-800",  "text-green-700" ],
+      [ "20 ~ 40%",  "偏低",             "CSP 尚可，收益普通",            "bg-green-50 text-green-700",   "text-green-600" ],
+      [ "40 ~ 60%",  "中性",             "Wheel 正常運作",                "bg-gray-50 text-gray-700",     "text-gray-600" ],
+      [ "60 ~ 80%",  "偏高",             "Wheel 收益豐厚",                "bg-orange-50 text-orange-700", "text-orange-600" ],
+      [ "80 ~ 100%", "IV 處於一年高點",  "賣方天堂，但注意方向風險",       "bg-red-100 text-red-800",      "text-red-700" ]
     ]
 
     div(class: "rounded-lg border border-gray-200 overflow-hidden") do
@@ -1345,5 +1345,4 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
       JS
     end
   end
-
 end

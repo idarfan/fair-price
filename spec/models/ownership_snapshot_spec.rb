@@ -45,7 +45,7 @@ RSpec.describe OwnershipSnapshot, type: :model do
       create(:ownership_snapshot, ticker: "AAPL", quarter: "2025-Q4")
 
       result = OwnershipSnapshot.for_ticker("WULF")
-      expect(result).to eq([old, new])
+      expect(result).to eq([ old, new ])
     end
 
     it "is case-insensitive for ticker" do

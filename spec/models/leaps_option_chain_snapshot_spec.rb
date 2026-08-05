@@ -15,8 +15,8 @@ RSpec.describe LeapsOptionChainSnapshot, type: :model do
 
     after { described_class.where(symbol: "FWTEST").delete_all }
 
-    it "FRESH_WINDOW is 30 minutes (single source of truth)" do
-      expect(described_class::FRESH_WINDOW).to eq(30.minutes)
+    it "FRESH_WINDOW is 1 hour (single source of truth)" do
+      expect(described_class::FRESH_WINDOW).to eq(1.hour)
     end
 
     it "includes rows scraped just inside the window" do

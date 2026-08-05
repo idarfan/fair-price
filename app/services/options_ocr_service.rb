@@ -215,7 +215,7 @@ class OptionsOcrService
         type:     type,
         strike:   strike.round(2),
         premium:  premium.round(2),
-        quantity: [l["quantity"].to_i, 1].max,
+        quantity: [ l["quantity"].to_i, 1 ].max,
         dte:      l["dte"]&.to_i,
         iv:       l["iv"]&.to_f&.round(4)
       }

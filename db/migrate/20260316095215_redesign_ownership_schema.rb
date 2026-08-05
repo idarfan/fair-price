@@ -14,8 +14,8 @@ class RedesignOwnershipSchema < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :ownership_snapshots, [:ticker, :quarter], unique: true
-    add_index :ownership_snapshots, [:ticker, :snapshot_date]
+    add_index :ownership_snapshots, [ :ticker, :quarter ], unique: true
+    add_index :ownership_snapshots, [ :ticker, :snapshot_date ]
 
     create_table :ownership_holders do |t|
       t.references :ownership_snapshot, null: false, foreign_key: true
@@ -26,6 +26,6 @@ class RedesignOwnershipSchema < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :ownership_holders, [:ownership_snapshot_id, :name], unique: true
+    add_index :ownership_holders, [ :ownership_snapshot_id, :name ], unique: true
   end
 end
