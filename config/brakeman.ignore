@@ -1,0 +1,121 @@
+{
+  "ignored_warnings": [
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "420e016b37a00c4e04be124ea739821fa3952cf25adc6ba98fc4abceffe90c42",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/controllers/api/v1/tracked_tickers_controller.rb",
+      "line": 46,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "Open3.capture2e(Rails.root.join(\"scripts/venv/bin/python3\").to_s, Rails.root.join(\"scripts/options_collector.py\").to_s, \"--symbols\", TrackedTicker.find(params[:id]).symbol, \"--force\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Api::V1::TrackedTickersController",
+        "method": "collect"
+      },
+      "user_input": "TrackedTicker.find(params[:id]).symbol",
+      "confidence": "High",
+      "cwe_id": [
+        77
+      ],
+      "note": "Open3.capture2e 傳入多個獨立字串參數（argv 陣列形式），非單一 shell 字串，不經過 shell 解析，symbol 內容不可能被當成 shell metacharacter 注入。2026-08-05 review by Claude Code。"
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "7a635f344167d7ece04a3ff111e87fd8a961f2b3da9a65725cffe0b90efac808",
+      "check_name": "SendFile",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/csp_lessons_controller.rb",
+      "line": 21,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "send_file(Rails.root.join(\"private\", \"csp_lessons\").join((params[:path] or \"index.html\")).expand_path, :disposition => \"inline\", :type => content_type_for(Rails.root.join(\"private\", \"csp_lessons\").join((params[:path] or \"index.html\")).expand_path))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "CspLessonsController",
+        "method": "show"
+      },
+      "user_input": "params[:path]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "send_file 前已用 file_path.to_s.start_with?(\"#{ROOT}/\") 搭配 expand_path 做路徑穿越邊界檢查，path traversal 有 spec 覆蓋（spec/requests/csp_lessons_spec.rb）。2026-08-05 review by Claude Code。"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "9a6afdee4f72656f25d3fb97b342653931e7b55fec62cbea48410487bf8c813a",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/controllers/iv_watchlists_controller.rb",
+      "line": 30,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "ActiveRecord::Base.connection.execute(\"SELECT\\n  to_char(\\n    snapshot_time AT TIME ZONE 'UTC' AT TIME ZONE 'America/New_York',\\n    'MM/DD HH24:MI'\\n  )                                     AS date,\\n  ROUND(put_iv_025  * 100, 2)           AS put_iv,\\n  ROUND(call_iv_025 * 100, 2)           AS call_iv,\\n  ROUND(skew_pts::numeric, 2)           AS skew,\\n  current_price                         AS stock_price\\nFROM skew_rank_intradays\\nWHERE ticker = #{ActiveRecord::Base.connection.quote(params[:symbol].to_s.upcase.strip)}\\n  AND snapshot_time >= NOW() - INTERVAL '#{(params[:days] or 90).to_i.clamp(7, 365)} days'\\nORDER BY snapshot_time ASC\\n\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "IvWatchlistsController",
+        "method": "chart_data"
+      },
+      "user_input": "params[:days]",
+      "confidence": "High",
+      "cwe_id": [
+        89
+      ],
+      "note": "字串內容已用 ActiveRecord::Base.connection.quote() 正確轉義，days 參數經 .to_i.clamp(7, 365) 強制轉成邊界內整數，兩者都不可能注入任意 SQL。2026-08-05 review by Claude Code。"
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "a4f953867396dacf9d87ece3eb1e881eed7f497e591fca7881eea18a28f308cc",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/barchart_scraper_service.rb",
+      "line": 461,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "Open3.capture3(\"python3\", SCRIPT_DIR.join(\"#{type}_scraper.py\").to_s, symbol.upcase, *extra_args, :chdir => Rails.root.to_s)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "BarchartScraperService",
+        "method": "run_scraper"
+      },
+      "user_input": "type",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": "Open3.capture3 同樣使用 argv 陣列形式（\"python3\", script, symbol, *extra_args），非 shell 字串拼接，不受 shell injection 影響。2026-08-05 review by Claude Code。"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "eac555bc1366f9cad17cba56f5c1c8ec8c7421c0f3856a183d7c9283620b0fec",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/controllers/iv_watchlists_controller.rb",
+      "line": 45,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "ActiveRecord::Base.connection.execute(\"SELECT\\n  to_char(s.snapshot_date, 'YYYY-MM-DD') AS date,\\n  ROUND(s.put_iv_025  * 100, 2)          AS put_iv,\\n  ROUND(s.call_iv_025 * 100, 2)          AS call_iv,\\n  ROUND(s.skew_pts::numeric,  2)          AS skew,\\n  d.current_price                         AS stock_price\\nFROM skew_rank_daily s\\nLEFT JOIN iv_daily_snapshots d\\n  ON d.ticker = s.ticker AND d.snapshot_date = s.snapshot_date\\nWHERE s.ticker = #{ActiveRecord::Base.connection.quote(params[:symbol].to_s.upcase.strip)}\\n  AND s.snapshot_date >= CURRENT_DATE - INTERVAL '#{(params[:days] or 90).to_i.clamp(7, 365)} days'\\nORDER BY s.snapshot_date ASC\\n\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "IvWatchlistsController",
+        "method": "chart_data"
+      },
+      "user_input": "params[:days]",
+      "confidence": "High",
+      "cwe_id": [
+        89
+      ],
+      "note": "字串內容已用 ActiveRecord::Base.connection.quote() 正確轉義，days 參數經 .to_i.clamp(7, 365) 強制轉成邊界內整數，兩者都不可能注入任意 SQL。2026-08-05 review by Claude Code。"
+    }
+  ],
+  "updated": "2026-08-05 06:34:28 +0000",
+  "brakeman_version": "8.0.5"
+}
