@@ -17,15 +17,15 @@ RSpec.describe LeapsRankingService do
       make(delta: 0.59)   # just below min — excluded
       make(delta: 0.60)   # boundary — included
       make(delta: 0.82)   # mid-range — included
-      make(delta: 0.90)   # boundary — included
-      make(delta: 0.91)   # just above max — excluded
+      make(delta: 0.90)   # no upper bound — included
+      make(delta: 0.99)   # no upper bound — included
     end
 
-    it "includes only rows with delta in [0.60, 0.90]" do
+    it "includes rows with delta >= 0.60, with no upper bound" do
       results = described_class.new("NOK").call
       deltas  = results.map { |e| e[:delta].to_f }
-      expect(deltas).to all(be_between(0.60, 0.90))
-      expect(results.size).to eq(3)
+      expect(deltas).to all(be >= 0.60)
+      expect(results.size).to eq(4)
     end
   end
 

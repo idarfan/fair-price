@@ -45,7 +45,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       back: "Call 買方有權以履約價買入正股；履約價越低於現價越深價內，行為越接近持有正股。",
       ex: "例：現價 $14.46 時，$10 Call 已深入價內 $4.46。" },
     { en: "Delta", ipa: "/ˈdɛltə/", zh: "方向敏感度", hint: "股價動 $1，權利金動多少",
-      back: "股價每動 $1，權利金理論上變動 Delta 元；也近似到期價內機率。本表篩 0.60–0.90 的深價內區間。",
+      back: "股價每動 $1，權利金理論上變動 Delta 元；也近似到期價內機率。本表篩 Delta ≥ 0.60 的深價內區間。",
       ex: "例：Delta 0.85 的 Call，股價 +$1 → 權利金約 +$0.85。" },
     { en: "Open Interest", ipa: "/ˈoʊpən ˈɪntrəst/", zh: "未平倉量", hint: "市場上還活著的合約數",
       back: "尚未平倉的合約總數，只在盤後更新；是本表排序主鍵，OI 越高通常越容易進出。",
@@ -210,7 +210,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       { title: "⚡ Delta（方向敏感度）", paragraphs: [
         "股價每漲 $1，這口合約的權利金理論上會變動多少錢；也常被拿來當「到期價內機率」的粗略估計。",
         "本合約 Delta #{sprintf('%.3f', delta)}，代表股價 +$1 時，權利金理論上約 +$#{sprintf('%.2f', delta)}；越接近 1，行為越像直接持有正股（100 股），但用的資金遠比買正股少，這正是深價內 LEAPS 被拿來取代持股的原因。",
-        "本表只挑 Delta 0.60–0.90 的深價內合約：太低（Delta 太小）槓桿雖高但方向不夠貼近正股、時間價值佔比也高；太高（Delta 逼近 1）則買進成本已經很接近正股，槓桿效益變小。DTE #{dte} 天——天期越長，同一履約價的 Delta 通常越往中間值靠攏（時間價值稀釋方向性），這也是「深價內＋長天期」要挑履約價再往下修正緩衝的原因。"
+        "本表只挑 Delta ≥ 0.60 的深價內合約：太低（Delta 太小）槓桿雖高但方向不夠貼近正股、時間價值佔比也高；Delta 越接近 1 則越像股票替代品，買進成本已經很接近正股，槓桿效益變小，但仍會列出讓你自行判斷。DTE #{dte} 天——天期越長，同一履約價的 Delta 通常越往中間值靠攏（時間價值稀釋方向性），這也是「深價內＋長天期」要挑履約價再往下修正緩衝的原因。"
       ] },
       { title: "📉 Bid-Ask Spread（買賣價差）", paragraphs: [
         "買方掛單的天花板（Ask）與底價（Bid）的距離，是進出場的隱形成本。",
@@ -449,7 +449,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     div(class: "flex items-start justify-between gap-4") do
       div do
         h1(class: "text-xl font-bold text-gray-900") { plain "LEAPS Call 候選排行" }
-        p(class: "text-sm text-gray-500 mt-0.5") { plain "Delta 0.60–0.90 深度價內 Call · 依 OI 由高到低排序" }
+        p(class: "text-sm text-gray-500 mt-0.5") { plain "Delta ≥ 0.60 深度價內 Call · 依 OI 由高到低排序" }
       end
       # 匯出按鈕：data-export-exclude 讓 html-to-image filter 把按鈕排除在輸出畫面外；
       # 無資料時 disabled，避免匯出空頁。
@@ -543,7 +543,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       render_alert("bg-red-50 border border-red-300 text-red-800", "❌ #{msg}")
     when :no_candidates
       msg = @user_strike.present? ?
-        "這個履約價 #{@user_strike}（含緩衝檔）在所有到期日都沒有符合 Delta 0.60–0.90 的候選。請嘗試其他履約價，或留空讓系統自動偵測。" :
+        "這個履約價 #{@user_strike}（含緩衝檔）在所有到期日都沒有符合 Delta ≥ 0.60 的候選。請嘗試其他履約價，或留空讓系統自動偵測。" :
         "目前沒有符合篩選條件的候選，請嘗試調整 Delta 範圍或手動輸入履約價後重試。"
       render_alert("bg-orange-50 border border-orange-300 text-orange-800", "⚠️ #{msg}")
     when :invalid_strike
@@ -647,7 +647,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
         plain "（100 股），但用的資金遠比買正股少，這正是深價內 LEAPS 被拿來取代持股的原因。"
       end
       p do
-        plain "本表只挑 Delta 0.60–0.90 的深價內合約：太低（Delta 太小）槓桿雖高但方向不夠貼近正股、時間價值佔比也高；太高（Delta 逼近 1）則買進成本已經很接近正股，槓桿效益變小。DTE #{dte} 天——天期越長，同一履約價的 Delta 通常越往中間值靠攏（時間價值稀釋方向性），這也是「深價內＋長天期」要挑履約價再往下修正緩衝的原因。"
+        plain "本表只挑 Delta ≥ 0.60 的深價內合約：太低（Delta 太小）槓桿雖高但方向不夠貼近正股、時間價值佔比也高；Delta 越接近 1 則越像股票替代品，買進成本已經很接近正股，槓桿效益變小，但仍會列出讓你自行判斷。DTE #{dte} 天——天期越長，同一履約價的 Delta 通常越往中間值靠攏（時間價值稀釋方向性），這也是「深價內＋長天期」要挑履約價再往下修正緩衝的原因。"
       end
     end
   end
@@ -1853,7 +1853,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             y += 6;
             pdf.setFontSize(9);
             pdf.setTextColor(107, 114, 128);
-            pdf.text('Delta 0.60–0.90 深度價內 Call · 依 OI 由高到低排序', margin, y);
+            pdf.text('Delta ≥ 0.60 深度價內 Call · 依 OI 由高到低排序', margin, y);
             pdf.setTextColor(0, 0, 0);
             y += 8;
 
@@ -1962,7 +1962,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
             expiration:     { el: '#leaps-th-expiration',     title: '📅 Expiration',           desc: '合約到期日。LEAPS 慣例為一年以上，本表只列 364 天以上。', side: 'bottom' },
             dte:            { el: '#leaps-th-dte',            title: '⏱ Days to Expiration',    desc: '距到期天數。364–550 近天期、550+ 遠天期；越長時間緩衝越大，Vega 曝險也越高。', side: 'bottom' },
             strike:         { el: '#leaps-th-strike',         title: '🎯 Strike',               desc: '約定買入股價。深價內的 Call 行為越接近持有正股。', side: 'bottom' },
-            delta:          { el: '#leaps-th-delta',          title: '⚡ Delta',                 desc: '股價每動 $1 權利金的理論變化。本表篩 0.60–0.90；越接近 1 越像股票替代品，槓桿越低但越穩。', side: 'bottom' },
+            delta:          { el: '#leaps-th-delta',          title: '⚡ Delta',                 desc: '股價每動 $1 權利金的理論變化。本表篩 Delta ≥ 0.60；越接近 1 越像股票替代品，槓桿越低但越穩。', side: 'bottom' },
             oi:             { el: '#leaps-th-oi',             title: '🔓 Open Interest',        desc: '未平倉合約數，本表排序主鍵。OI 高流動性通常較好；只在盤後更新。', side: 'bottom' },
             volume:         { el: '#leaps-th-volume',         title: '📊 Volume',               desc: '當日成交量（即時）。OI 高但 Volume 長期為零，進出仍可能困難。', side: 'bottom' },
             liquidity:      { el: '#leaps-th-liquidity',      title: '🚦 流動性判斷',            desc: '依本次查詢候選的 OI 三分位相對排名（充足/普通/偏低），非固定門檻；「⚠ 近期無成交」由 Vol/OI 比率判斷。', side: 'bottom' },

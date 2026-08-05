@@ -2,7 +2,6 @@
 
 class LeapsRankingService
   DEFAULT_DELTA_MIN = 0.60
-  DEFAULT_DELTA_MAX = 0.90
 
   MIN_CANDIDATES_FOR_VOL_OI_TIER = 4
 
@@ -10,10 +9,9 @@ class LeapsRankingService
   TIER_MID    = "普通"
   TIER_BOTTOM = "偏低"
 
-  def initialize(symbol, delta_min: DEFAULT_DELTA_MIN, delta_max: DEFAULT_DELTA_MAX)
+  def initialize(symbol, delta_min: DEFAULT_DELTA_MIN)
     @symbol    = symbol.upcase
     @delta_min = delta_min
-    @delta_max = delta_max
   end
 
   def call
@@ -41,7 +39,7 @@ class LeapsRankingService
       .calls
       .where(scraped_at: latest_at)
       .where("dte >= ?", MIN_DTE)
-      .where(delta: @delta_min..@delta_max)
+      .where("delta >= ?", @delta_min)
       .to_a
   end
 

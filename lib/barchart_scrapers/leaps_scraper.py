@@ -193,7 +193,8 @@ def _pick_candidates(near_money_rows, user_strike=None, underlying_price=None):
 
     Key invariant: 0.60 here is a Stage 1 filter only.  The caller
     (BarchartScraperService / LeapsRankingService) still applies the
-    final 0.60-0.90 filter in Stage 2 / Ruby — this is a SEPARATE rule.
+    final Delta>=0.60 filter in Stage 2 / Ruby — this is a SEPARATE rule
+    (no upper bound as of 2026-08-05).
 
     BUG FIX (reported 2026-07-09, NOK strike 7): the Near the Money view reads
     Greeks from the NEAREST expiration (short DTE). For deep ITM strikes with
