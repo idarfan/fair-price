@@ -20,14 +20,23 @@ class Admin::Users::ShowComponent < ApplicationComponent
       render_commands_panel
     end
     render_script
+    render_export_script
   end
 
   private
 
   def render_header
-    div do
-      a(href: "/admin/users", class: "text-xs text-blue-600 hover:underline") { plain("← 返回帳戶管理") }
-      h1(class: "text-xl font-bold text-gray-900 mt-1") { plain(@user.email) }
+    div(class: "flex items-start justify-between gap-4") do
+      div do
+        a(href: "/admin/users", class: "text-xs text-blue-600 hover:underline") { plain("← 返回帳戶管理") }
+        h1(class: "text-xl font-bold text-gray-900 mt-1") { plain(@user.email) }
+      end
+      button(
+        type: "button", id: "pageviews-export-pdf-btn",
+        disabled: @page_views.empty?,
+        class: "text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors " \
+               "#{@page_views.empty? ? 'border-gray-200 text-gray-300 cursor-not-allowed' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}"
+      ) { plain("匯出 PDF") }
     end
   end
 
@@ -46,29 +55,43 @@ class Admin::Users::ShowComponent < ApplicationComponent
 
   WEEKDAY_LABELS = %w[日 一 二 三 四 五 六].freeze
 
-  # 依日期分組（月份自然含在日期標題裡：例如「2026年08月06日（三）」），
-  # 每組內維持原本的 進入→下一步 時序推導；跨組（換日）不推導下一步，
-  # 避免把「今天最後一頁」誤標成「明天第一頁」。
+  # 依日期分組、最近日期排最前面（月份自然含在日期標題裡：例如
+  # 「2026年08月06日（三）」）；每組內維持原本的 進入→下一步 時序推導
+  # （組內仍是舊→新，不然「下一步去哪」會反過來指向更早的頁面）；
+  # 跨組（換日）不推導下一步，避免把「今天最後一頁」誤標成「明天第一頁」。
+  # 每組用 <details>/<summary> 做成可收摺（Phlex 2.x 禁用 onclick，這是
+  # 唯一允許的原生互動元件），只展開最近一天，避免久了資料一次全展開。
   def render_pageviews_panel
-    div(id: "tab-panel-pageviews", class: "bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-100") do
-      grouped_page_views.each do |date, activities|
-        render_pageviews_day_group(date, activities)
+    div(id: "tab-panel-pageviews", class: "bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden") do
+      div(class: "p-3 space-y-3") do
+        grouped_page_views.each_with_index do |(date, activities), index|
+          render_pageviews_day_group(date, activities, expanded: index.zero?)
+        end
       end
       empty_state("尚無瀏覽紀錄") if @page_views.empty?
     end
   end
 
   def grouped_page_views
-    @page_views.group_by { |activity| activity.started_at.to_date }
+    @page_views.group_by { |activity| activity.started_at.to_date }.sort_by { |date, _| date }.reverse
   end
 
-  def render_pageviews_day_group(date, activities)
-    div do
-      div(class: "px-3 py-2 bg-gray-50 border-b border-gray-100") do
+  def total_dwell_ms(activities)
+    activities.sum { |activity| activity.duration_ms || 0 }
+  end
+
+  def render_pageviews_day_group(date, activities, expanded:)
+    details(open: expanded, class: "border border-orange-300 rounded-lg overflow-hidden group") do
+      summary(
+        class: "px-3 py-2 bg-green-50 border-b border-orange-300 cursor-pointer select-none " \
+               "list-none flex items-center gap-2 hover:bg-green-100 transition-colors"
+      ) do
+        span(class: "text-orange-500 text-xs transition-transform group-open:rotate-90") { plain("▶") }
         span(class: "text-sm font-semibold text-gray-700") do
           plain("#{date.strftime('%Y年%m月%d日')}（#{WEEKDAY_LABELS[date.wday]}）")
         end
-        span(class: "text-xs text-gray-400 ml-2") { plain("#{activities.size} 筆") }
+        span(class: "text-xs text-gray-500") { plain("合計停留 #{fmt_duration_ms(total_dwell_ms(activities))}") }
+        span(class: "text-xs text-gray-400") { plain("#{activities.size} 筆") }
       end
       div(class: "overflow-x-auto") do
         table(class: "w-full text-sm") do
@@ -174,6 +197,78 @@ class Admin::Users::ShowComponent < ApplicationComponent
                 if (panels[key]) panels[key].classList.toggle('hidden', key !== target);
               });
             });
+          });
+        })();
+      JS
+    end
+  end
+
+  # 匯出 PDF：先把所有 <details> 暫時展開（不然收摺的日期組不會被拍進圖），
+  # 用 html-to-image 把整個瀏覽軌跡面板拍成一張長圖，再用 jsPDF 依 A4 高度
+  # 切成多頁嵌進 PDF（長圖直接分頁嵌入，不是逐頁重新排版）。拍完無論成功
+  # 失敗都要還原原本的展開/收摺狀態，不能讓使用者匯出完發現畫面被打亂。
+  def render_export_script
+    email_json = @user.email.to_json
+    script do
+      raw <<~JS.html_safe
+        (function () {
+          var btn = document.getElementById('pageviews-export-pdf-btn');
+          if (!btn) return;
+
+          function timestamp() {
+            var d = new Date();
+            function p(n) { return String(n).padStart(2, '0'); }
+            return '' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes());
+          }
+
+          btn.addEventListener('click', function () {
+            if (btn.disabled) return;
+            var root = document.getElementById('tab-panel-pageviews');
+            if (!root) return;
+
+            var detailsEls = root.querySelectorAll('details');
+            var openStates = Array.prototype.map.call(detailsEls, function (d) { return d.open; });
+            detailsEls.forEach(function (d) { d.open = true; });
+
+            var originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '匯出中…';
+
+            function restore() {
+              detailsEls.forEach(function (d, i) { d.open = openStates[i]; });
+              btn.disabled = false;
+              btn.textContent = originalText;
+            }
+
+            var bg = getComputedStyle(document.body).backgroundColor || '#ffffff';
+            htmlToImage.toPng(root, { pixelRatio: 2, backgroundColor: bg })
+              .then(function (dataUrl) {
+                var img = new Image();
+                img.onload = function () {
+                  var pdf = new jspdf.jsPDF({ orientation: 'p', unit: 'pt', format: 'a4', compress: true });
+                  var pageW = pdf.internal.pageSize.getWidth();
+                  var pageH = pdf.internal.pageSize.getHeight();
+                  var imgW  = pageW;
+                  var imgH  = img.height * (imgW / img.width);
+                  var heightLeft = imgH;
+                  var position   = 0;
+
+                  pdf.addImage(dataUrl, 'PNG', 0, position, imgW, imgH, undefined, 'FAST');
+                  heightLeft -= pageH;
+                  while (heightLeft > 0) {
+                    position = heightLeft - imgH;
+                    pdf.addPage();
+                    pdf.addImage(dataUrl, 'PNG', 0, position, imgW, imgH, undefined, 'FAST');
+                    heightLeft -= pageH;
+                  }
+
+                  pdf.save('瀏覽軌跡_' + #{email_json} + '_' + timestamp() + '.pdf');
+                  restore();
+                };
+                img.onerror = restore;
+                img.src = dataUrl;
+              })
+              .catch(restore);
           });
         })();
       JS

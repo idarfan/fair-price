@@ -104,7 +104,7 @@ RSpec.describe "Admin::Users", type: :request, skip_auto_auth: true do
       expect(body).to include("0.6")
     end
 
-    it "groups the browsing trail into separate date sections with month/day/weekday headers" do
+    it "groups the browsing trail into separate date sections with month/day/weekday headers, newest first" do
       admin  = create(:user, status: :enabled, totp_enabled: true, totp_secret: secret, admin: true)
       target = create(:user, status: :enabled)
       yesterday = Time.zone.local(2026, 8, 5, 10, 0, 0)
@@ -119,11 +119,45 @@ RSpec.describe "Admin::Users", type: :request, skip_auto_auth: true do
       body = response.body
       expect(body).to include("2026年08月05日（三）")
       expect(body).to include("2026年08月06日（四）")
+      # 最近日期排最前面
+      day1_idx = body.index("2026年08月06日")
+      day2_idx = body.index("2026年08月05日")
+      expect(day1_idx).to be < day2_idx
       # 跨日不推導下一步——8/5 那筆的「下一步去哪」不能指向 8/6 的 /leaps，
       # 應該顯示「當日結束瀏覽」
-      day1_idx = body.index("2026年08月05日")
-      day2_idx = body.index("2026年08月06日")
-      expect(body[day1_idx...day2_idx]).to include("當日結束瀏覽")
+      expect(body[day2_idx..]).to include("當日結束瀏覽")
+    end
+
+    it "expands only the most recent date's <details> section by default" do
+      admin  = create(:user, status: :enabled, totp_enabled: true, totp_secret: secret, admin: true)
+      target = create(:user, status: :enabled)
+      create(:user_activity, user: target, kind: :page_view, path: "/momentum",
+                              started_at: Time.zone.local(2026, 8, 5, 10, 0, 0))
+      create(:user_activity, user: target, kind: :page_view, path: "/leaps",
+                              started_at: Time.zone.local(2026, 8, 6, 9, 0, 0))
+
+      sign_in_and_verify_totp!(admin)
+      get "/admin/users/#{target.id}"
+
+      body = response.body
+      day1_idx = body.index("<details")
+      day2_idx = body.index("<details", day1_idx + 1)
+      expect(body[day1_idx...day1_idx + 40]).to include("open")
+      expect(body[day2_idx...day2_idx + 40]).not_to include("open")
+    end
+
+    it "shows each date group's total dwell time next to the count" do
+      admin  = create(:user, status: :enabled, totp_enabled: true, totp_secret: secret, admin: true)
+      target = create(:user, status: :enabled)
+      create(:user_activity, user: target, kind: :page_view, path: "/momentum",
+                              duration_ms: 60_000, started_at: Time.zone.local(2026, 8, 6, 9, 0, 0))
+      create(:user_activity, user: target, kind: :page_view, path: "/leaps",
+                              duration_ms: 30_000, started_at: Time.zone.local(2026, 8, 6, 10, 0, 0))
+
+      sign_in_and_verify_totp!(admin)
+      get "/admin/users/#{target.id}"
+
+      expect(response.body).to include("合計停留 1分30秒")
     end
   end
 
