@@ -75,3 +75,7 @@ storybook-static
 
 # Options Flow CSV downloads
 csv_files/
+
+# Python bytecode cache
+__pycache__/
+*.pyc
