@@ -40,6 +40,10 @@ class LeapsRankingService
       .where(scraped_at: latest_at)
       .where("dte >= ?", MIN_DTE)
       .where("delta >= ?", @delta_min)
+      # 外在價值為負 = 報價本身壞掉（Mid < 內在價值，通常是低成交量下的
+      # 過期/失真報價），不是「不建議」而是根本不該被當成候選列出。
+      # extrinsic_value 為 null（bid/ask/spot 缺值）維持既有「—」顯示，不在此排除。
+      .where("extrinsic_value IS NULL OR extrinsic_value >= 0")
       .to_a
   end
 

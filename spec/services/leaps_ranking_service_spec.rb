@@ -13,12 +13,15 @@ RSpec.describe LeapsRankingService do
   # ── Delta filter ─────────────────────────────────────────────────────────────
 
   describe "delta filter" do
+    # extrinsic_value 明確指定正值，避免 factory 的遞增 strike 序列在深 ITM
+    # 時算出負外在價值，被新加的「負外在價值排除」規則誤傷（見下方
+    # negative extrinsic_value filter 區塊）——這裡要測的是 delta 篩選本身。
     before do
-      make(delta: 0.59)   # just below min — excluded
-      make(delta: 0.60)   # boundary — included
-      make(delta: 0.82)   # mid-range — included
-      make(delta: 0.90)   # no upper bound — included
-      make(delta: 0.99)   # no upper bound — included
+      make(delta: 0.59, extrinsic_value: 0.5)   # just below min — excluded
+      make(delta: 0.60, extrinsic_value: 0.5)   # boundary — included
+      make(delta: 0.82, extrinsic_value: 0.5)   # mid-range — included
+      make(delta: 0.90, extrinsic_value: 0.5)   # no upper bound — included
+      make(delta: 0.99, extrinsic_value: 0.5)   # no upper bound — included
     end
 
     it "includes rows with delta >= 0.60, with no upper bound" do
@@ -216,6 +219,35 @@ RSpec.describe LeapsRankingService do
     it "explicitly excludes DTE=20 (the NOK near-term case)" do
       results = described_class.new("NOK").call
       expect(results.map { |e| e[:dte] }).not_to include(20)
+    end
+  end
+
+  # ── 外在價值為負 → 排除（報價品質問題，跟 Delta 篩選無關）───────────────────
+  #
+  # 外在價值為負代表 Mid < 內在價值，通常是低成交量/寬價差下失真的報價，
+  # 這種候選不該被列出（不是「不建議」，是根本不進排行）。extrinsic_value
+  # 為 null（bid/ask/spot 缺值）維持既有行為，不受此規則排除。
+
+  describe "negative extrinsic_value filter" do
+    before do
+      make(delta: 0.80, open_interest: 266, intrinsic_value: 7.34, extrinsic_value: -0.39)  # bad quote — excluded
+      make(delta: 0.80, open_interest: 4714, intrinsic_value: 3.0, extrinsic_value: 0.5)     # good quote — included
+      make(delta: 0.80, open_interest: 100, bid: nil, ask: nil)                              # extrinsic nil — included
+    end
+
+    it "excludes candidates with negative extrinsic_value" do
+      results = described_class.new("NOK").call
+      expect(results.map { |e| e[:open_interest] }).not_to include(266)
+    end
+
+    it "includes candidates with positive extrinsic_value" do
+      results = described_class.new("NOK").call
+      expect(results.map { |e| e[:open_interest] }).to include(4714)
+    end
+
+    it "includes candidates with nil extrinsic_value (missing bid/ask/spot)" do
+      results = described_class.new("NOK").call
+      expect(results.map { |e| e[:open_interest] }).to include(100)
     end
   end
 
