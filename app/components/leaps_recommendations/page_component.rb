@@ -844,27 +844,63 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     end
   end
 
-  def render_candidate_row(row, i)
-    tier  = row[:liquidity_tier].to_s
-    style = LIQUIDITY_STYLE[tier] || LIQUIDITY_STYLE["普通"]
-    warn  = row[:no_recent_volume_warning]
+  # 使用者在履約價輸入框填的值，是否就是這一列——用來在完整排行表裡標出來，
+  # 讓使用者一眼看到「我查的那檔」，不管它有沒有被選進上面的推薦分析。
+  def user_strike_row?(row)
+    @user_strike.present? && row[:strike].present? &&
+      row[:strike].to_f == @user_strike.to_f
+  end
 
-    tr(class: "border-t border-gray-100 hover:bg-purple-200 #{i.odd? ? 'bg-gray-50/50' : ''}") do
+  # 使用者指定的履約價流動性不足時的原因文字（供「不建議」標籤旁顯示）。
+  # 只在 user_strike_row? 為真時呼叫。
+  def not_recommended_reason(row)
+    return "近期無成交紀錄，進出場可能有困難" if row[:no_recent_volume_warning]
+    return "OI 在本次候選中排名偏低，流動性相對較差" if row[:liquidity_tier].to_s == "偏低"
+
+    nil
+  end
+
+  def render_candidate_row(row, i)
+    tier      = row[:liquidity_tier].to_s
+    style     = LIQUIDITY_STYLE[tier] || LIQUIDITY_STYLE["普通"]
+    warn      = row[:no_recent_volume_warning]
+    mine      = user_strike_row?(row)
+    not_reco  = mine ? not_recommended_reason(row) : nil
+
+    row_class = "border-t border-gray-100 hover:bg-purple-200 #{i.odd? ? 'bg-gray-50/50' : ''}"
+    row_class += " bg-blue-50/70 ring-1 ring-inset ring-blue-300" if mine
+
+    tr(class: row_class) do
       td(class: "px-3 py-2 text-center font-mono whitespace-nowrap") { plain row[:expiration_date].to_s }
       td(class: "px-3 py-2 text-center")                             { plain row[:dte].to_s }
-      td(class: "px-3 py-2 text-center font-semibold")               { plain fmt_price(row[:strike]) }
+      td(class: "px-3 py-2 text-center font-semibold") do
+        div(class: "inline-flex flex-col items-center gap-0.5") do
+          span { plain fmt_price(row[:strike]) }
+          if mine
+            span(class: "text-blue-600 text-[10px] font-normal whitespace-nowrap") { plain "★ 你查詢的履約價" }
+          end
+        end
+      end
       td(class: "px-3 py-2 text-center")                             { plain fmt_decimal(row[:delta], 4) }
       td(class: "px-3 py-2 text-center font-semibold")               { plain fmt_int(row[:open_interest]) }
       td(class: "px-3 py-2 text-center")                             { plain fmt_int(row[:volume]) }
       td(class: "px-3 py-2 text-center") do
-        div(class: "inline-flex flex-row items-center gap-1.5") do
-          span(class: "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs " \
-                       "#{style[:bg]} #{style[:text]} border #{style[:border]}") do
-            div(class: "w-1.5 h-1.5 rounded-full flex-shrink-0 #{style[:dot]}")
-            plain tier
+        div(class: "inline-flex flex-col items-center gap-1") do
+          div(class: "inline-flex flex-row items-center gap-1.5") do
+            span(class: "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs " \
+                         "#{style[:bg]} #{style[:text]} border #{style[:border]}") do
+              div(class: "w-1.5 h-1.5 rounded-full flex-shrink-0 #{style[:dot]}")
+              plain tier
+            end
+            if warn
+              span(class: "text-orange-600 text-xs whitespace-nowrap") { plain "⚠ 近期無成交" }
+            end
           end
-          if warn
-            span(class: "text-orange-600 text-xs whitespace-nowrap") { plain "⚠ 近期無成交" }
+          if not_reco
+            span(class: "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs " \
+                         "bg-red-50 text-red-600 border border-red-200 whitespace-nowrap") do
+              plain "🚫 不建議：#{not_reco}"
+            end
           end
         end
       end

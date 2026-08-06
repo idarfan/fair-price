@@ -477,15 +477,42 @@ async def main(symbol, user_strike=None):
                 }))
                 return
             else:
-                # Still [] after stability check — genuinely no Call rows, skip with log
-                import sys as _sys
-                _sys.stderr.write(
-                    f"[leaps] strike={strike} options_prices: confirmed empty after stability "
-                    f"check, skipping (not a session issue)\n"
-                )
-                skipped_strikes.append({"strike": strike, "layer": "options_prices"})
-                await asyncio.sleep(0.8)
-                continue
+                # Still [] after stability check — one more hard retry (fresh navigation +
+                # full poll) before giving up. BUG (2026-08-06, NOK strike 4.5): confirmed
+                # empty here, but the exact same URL returned real rows seconds later on
+                # manual retry — this is Barchart's Angular grid intermittently failing to
+                # render on first load, not "no listed contract at this strike". Skipping
+                # here means the strike is silently dropped from this run's output, and
+                # since persist_leaps replaces the WHOLE symbol's data every run, a skip
+                # here erases any previously-good data for this strike too — worth the
+                # extra round trip to avoid.
+                await cdp_navigate(ws_url, opts_url, settle_ms=OPTIONS_SETTLE)
+                await activate_target(target_id)
+                retry_rows = await _wait_for_grid(ws_url, STACKED_OPTIONS_JS, max_wait_s=30)
+
+                if retry_rows:
+                    opts_rows = retry_rows
+                else:
+                    import sys as _sys
+                    if retry_rows is None:
+                        is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
+                        print(json.dumps({
+                            "status":            "partial",
+                            "rows":              _finalize(all_opts_rows, underlying_price),
+                            "expired_at_strike": strike,
+                            "expired_layer":     "options_prices",
+                            "reason":            "session_expired" if is_expired else "page_load_timeout",
+                            "skipped_strikes":   skipped_strikes,
+                            "chain_snapshot":    chain_snapshot,
+                        }))
+                        return
+                    _sys.stderr.write(
+                        f"[leaps] strike={strike} options_prices: confirmed empty after stability "
+                        f"check + hard retry, skipping (not a session issue)\n"
+                    )
+                    skipped_strikes.append({"strike": strike, "layer": "options_prices"})
+                    await asyncio.sleep(0.8)
+                    continue
 
         _fill_exp_dates(opts_rows)
         all_opts_rows.extend(opts_rows)

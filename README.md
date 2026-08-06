@@ -71,6 +71,44 @@ bundle exec rubocop -a   # 自動修正
 
 ## 變更記錄
 
+### 2026-08-06 — LEAPS 排行移除 Delta 0.90 上限，改為 Delta>=0.60 全部列出
+
+**動機：** 使用者查 NOK 履約價 4.5，推薦分析卻換成鄰近的 $5.00。查明是 `LeapsRankingService` 的 `DEFAULT_DELTA_MAX = 0.90` 從未被移除過——2026-07-01 那次「放寬 Delta 篩選」只調了下限（0.75→0.60），上限一直卡著。$4.5 在 2028-01-21 到期的 Delta 是 0.9008，只差 0.0008 就超過舊上限，整檔被排除候選名單。
+
+**異動內容：**
+- `app/services/leaps_ranking_service.rb`：拿掉 `DEFAULT_DELTA_MAX`，`fetch_candidates` 只用 `delta >= @delta_min` 篩選，深度價內（Delta 逼近 1）候選不再被排除
+- `app/components/leaps_recommendations/page_component.rb`、`app/components/fair_value/app_switcher_component.rb`：sidebar 與頁面說明文字同步從「Delta 0.60–0.90」改成「Delta ≥ 0.60」
+- `leaps-call-recommendation-spec.md`：更新規格文件所有 0.60–0.90 篩選描述為 Delta>=0.60（無上限），記錄變更日期
+- `lib/barchart_scrapers/leaps_scraper.py`：更新 comment 說明 Stage 2 最終篩選同步移除上限
+- `spec/services/leaps_ranking_service_spec.rb`：更新 delta filter 邊界測試
+
+### 2026-08-05 — 全專案安全性維護：rubocop 修正、Brakeman 升級、22 個 CVE gem 升級
+
+**動機：** CI 的 `lint` 與 `scan_ruby` job 長期處於失敗狀態（在這次修改之前就已經壞了），順手一次清乾淨，讓 CI 恢復綠燈當作日常品質關卡。
+
+**異動內容：**
+- `bundle exec rubocop -A` 修掉 29 個檔案、136 筆違規（主要是 `Layout/SpaceInsideArrayLiteralBrackets`），修正後全專案 0 offenses
+- Brakeman 8.0.4 → 8.0.5；升級後掃出 5 個警告，逐項審查確認皆非真漏洞（Open3 用 argv 陣列非 shell 字串、SQL 已用 `connection.quote()`/`clamp` 防護、`send_file` 已有路徑穿越邊界檢查），寫入 `config/brakeman.ignore`
+- `bundler-audit` 抓到的 22 個有已知 CVE 的 gem 全部升級：Rails 全家桶 8.1.2 → 8.1.3.1（`actionpack`/`actionview`/`activestorage`/`activesupport` 等，修 XSS 相關 CVE）、`action_text-trix`、`view_component`、`websocket-driver`、`yard`、`rack`、`nokogiri`、`puma`、`json` 等
+- `~/.claude/hooks/pre-commit-rubocop.sh`（新增）：commit 前對 staged `.rb` 檔案跑 rubocop 檢查模式，補上 `post-edit-ruby.sh` 只在 Claude Code Edit/Write 時觸發的覆蓋盲區
+- `~/.claude/hooks/post-edit-ruby.sh`：修正 exit code bug（`rubocop -A | head -20` 讓 `$?` 恆為 head 的結束碼，改用 `PIPESTATUS[0]`）
+- `~/.claude/hooks/pre-commit-xss-scan.sh`：加上「單行 >400 字元視為 minified/vendored 略過」的過濾規則，避免誤判內建在課程 html 裡的 driver.js 等第三方套件
+
+### 2026-08-05 — 修復 public/csp 未登入即可存取漏洞，新增全站閒置逾時機制
+
+**動機：** 使用者反應 `https://fairprice-ohmy.com/csp/index.html` 不需登入就能看到、也不會留下瀏覽記錄。查明是 `public/csp/` 整包靜態檔案（381 個檔案，含期權小學堂工具、內部筆記、截圖、開發過程遺留的 `.claude/` 設定殘留）繞過 `enforce_auth_gate`——`ActionDispatch::Static` 直接把 `public/` 下的檔案吐給瀏覽器，根本沒進到 Rails controller，pm2 日誌顯示已有外部 IP（61.230.110.224）實際掃到並存取過。
+
+**異動內容：**
+- 期權小學堂工具本體（12 個課程 html + 5 個圖片/svg）搬到非 public 的 `private/csp_lessons/`，其餘 364 個開發過程遺留檔直接刪除
+- `app/controllers/csp_lessons_controller.rb`（新增）：serve `private/csp_lessons/`，走登入驗證 + 記錄 `page_view` 瀏覽記錄
+- `config/routes.rb`：新增 `get "csp/*path"`（注意 `format: false`，否則 `.html` 副檔名會被當成 format 參數吃掉導致 404）
+- `app/components/fair_value/app_switcher_component.rb`：sidebar 新增「期權小學堂」入口
+- `app/controllers/application_controller.rb`、`app/controllers/sessions_controller.rb`：新增全站閒置 2 小時強制重新登入機制（`enforce_idle_timeout`），`mr.idarfan@gmail.com` 例外不受限
+- `lib/barchart_scrapers/leaps_scraper.py`：`main()` 例外不再印出裸 Python traceback，改為結構化 JSON 錯誤輸出
+- `app/services/barchart_scraper_service.rb`：正確處理 scraper 回傳的 `error` 狀態（原本會誤判成 success），並記錄完整 stderr 到 log
+- `app/models/leaps_option_chain_snapshot.rb`：`FRESH_WINDOW` cache 新鮮窗從 30 分鐘調整為 1 小時
+- `spec/requests/csp_lessons_spec.rb`、`spec/requests/idle_timeout_spec.rb`（新增）：涵蓋登入閘門、路徑穿越防護、閒置逾時三種情境
+
 ### 2026-04-19 — 期權鏈 Tippy+KaTeX tooltip 升級、水平溢出修正、中文欄位標籤
 
 **動機：** 單選 Calls/Puts 模式新增 TradingView 風格欄位後表格水平溢出；tooltip 說明過於簡陋，缺乏數學公式；Bid/Ask 欄位應維持中文。
