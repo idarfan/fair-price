@@ -103,6 +103,28 @@ RSpec.describe "Admin::Users", type: :request, skip_auto_auth: true do
       expect(body).to include("delta_min")
       expect(body).to include("0.6")
     end
+
+    it "groups the browsing trail into separate date sections with month/day/weekday headers" do
+      admin  = create(:user, status: :enabled, totp_enabled: true, totp_secret: secret, admin: true)
+      target = create(:user, status: :enabled)
+      yesterday = Time.zone.local(2026, 8, 5, 10, 0, 0)
+      today     = Time.zone.local(2026, 8, 6, 9, 0, 0)
+      create(:user_activity, user: target, kind: :page_view, path: "/momentum", started_at: yesterday)
+      create(:user_activity, user: target, kind: :page_view, path: "/leaps", started_at: today)
+
+      sign_in_and_verify_totp!(admin)
+      get "/admin/users/#{target.id}"
+
+      expect(response).to have_http_status(:ok)
+      body = response.body
+      expect(body).to include("2026年08月05日（三）")
+      expect(body).to include("2026年08月06日（四）")
+      # 跨日不推導下一步——8/5 那筆的「下一步去哪」不能指向 8/6 的 /leaps，
+      # 應該顯示「當日結束瀏覽」
+      day1_idx = body.index("2026年08月05日")
+      day2_idx = body.index("2026年08月06日")
+      expect(body[day1_idx...day2_idx]).to include("當日結束瀏覽")
+    end
   end
 
   describe "PATCH /admin/users/:id/approve" do

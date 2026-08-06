@@ -44,12 +44,37 @@ class Admin::Users::ShowComponent < ApplicationComponent
     end
   end
 
+  WEEKDAY_LABELS = %w[日 一 二 三 四 五 六].freeze
+
+  # 依日期分組（月份自然含在日期標題裡：例如「2026年08月06日（三）」），
+  # 每組內維持原本的 進入→下一步 時序推導；跨組（換日）不推導下一步，
+  # 避免把「今天最後一頁」誤標成「明天第一頁」。
   def render_pageviews_panel
-    div(id: "tab-panel-pageviews", class: "bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden") do
+    div(id: "tab-panel-pageviews", class: "bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-100") do
+      grouped_page_views.each do |date, activities|
+        render_pageviews_day_group(date, activities)
+      end
+      empty_state("尚無瀏覽紀錄") if @page_views.empty?
+    end
+  end
+
+  def grouped_page_views
+    @page_views.group_by { |activity| activity.started_at.to_date }
+  end
+
+  def render_pageviews_day_group(date, activities)
+    div do
+      div(class: "px-3 py-2 bg-gray-50 border-b border-gray-100") do
+        span(class: "text-sm font-semibold text-gray-700") do
+          plain("#{date.strftime('%Y年%m月%d日')}（#{WEEKDAY_LABELS[date.wday]}）")
+        end
+        span(class: "text-xs text-gray-400 ml-2") { plain("#{activities.size} 筆") }
+      end
       div(class: "overflow-x-auto") do
         table(class: "w-full text-sm") do
           thead(class: "bg-gray-50 border-b border-gray-100") do
             tr do
+              header_cell("時間")
               header_cell("進入頁面")
               header_cell("從哪來")
               header_cell("停留時長")
@@ -57,21 +82,21 @@ class Admin::Users::ShowComponent < ApplicationComponent
             end
           end
           tbody do
-            @page_views.each_with_index do |activity, index|
-              next_activity = @page_views[index + 1]
+            activities.each_with_index do |activity, index|
+              next_activity = activities[index + 1]
               tr(class: STRIPED_ROW_CLASS) do
+                td(class: "px-3 py-2.5 text-sm text-gray-400 whitespace-nowrap") { plain(activity.started_at.strftime("%H:%M:%S")) }
                 td(class: "px-3 py-2.5 text-sm text-gray-700") { plain(activity.path.presence || "—") }
                 td(class: "px-3 py-2.5 text-sm text-gray-500") { plain(referrer_label(activity.referrer_path)) }
                 td(class: "px-3 py-2.5 text-sm text-gray-500") { plain(fmt_duration_ms(activity.duration_ms)) }
                 td(class: "px-3 py-2.5 text-sm text-gray-500") do
-                  plain(next_activity ? next_activity.path.presence || "—" : "（結束瀏覽）")
+                  plain(next_activity ? next_activity.path.presence || "—" : "（當日結束瀏覽）")
                 end
               end
             end
           end
         end
       end
-      empty_state("尚無瀏覽紀錄") if @page_views.empty?
     end
   end
 
