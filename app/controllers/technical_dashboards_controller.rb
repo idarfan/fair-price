@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class TechnicalDashboardsController < ApplicationController
+  include CdpPrecheckable
+
   FRESH_WINDOW = 1.hour
 
   def index
@@ -37,6 +39,8 @@ class TechnicalDashboardsController < ApplicationController
         job_status = params[:job_status]
         if job_status == "session_expired"
           @scrape_status = :session_expired
+        elsif job_status == "cdp_offline"
+          @scrape_status = :cdp_offline
         elsif job_status == "error"
           @scrape_status = :error
           @scrape_errors = [ "抓取過程發生錯誤，部分資料可能不完整" ]
@@ -46,6 +50,8 @@ class TechnicalDashboardsController < ApplicationController
         case params[:job_status]
         when "session_expired"
           @scrape_status = :session_expired
+        when "cdp_offline"
+          @scrape_status = :cdp_offline
         else
           @scrape_status = :error
           @scrape_errors = [ "抓取失敗，請確認 Barchart 連線後重試" ]
@@ -76,6 +82,10 @@ class TechnicalDashboardsController < ApplicationController
       return render json: { status: "ready", symbol: symbol, date: date.to_s }
     end
 
+    unless cdp_online?
+      return render json: { status: "cdp_offline" }
+    end
+
     job_id = SecureRandom.hex(8)
     Rails.cache.write("td_job_#{job_id}", { status: "pending" }, expires_in: 5.minutes)
     TechnicalDashboardAnalyzeJob.perform_later(symbol, date.to_s, job_id)
@@ -97,6 +107,10 @@ class TechnicalDashboardsController < ApplicationController
          expiration: expiration, strikes_filter: strikes, volume_oi_filter: vol_oi
        ).exists?
       return render json: { status: "ready" }
+    end
+
+    unless cdp_online?
+      return render json: { status: "cdp_offline" }
     end
 
     job_id = SecureRandom.hex(8)

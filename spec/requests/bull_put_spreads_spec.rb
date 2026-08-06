@@ -197,4 +197,35 @@ RSpec.describe "Bull Put Spread (BPUS)", type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
     end
   end
+
+  # ── POST /bpus/volatility — CDP 離線時直接擋下不送 job ──────────────────────
+
+  describe "POST /bpus/volatility" do
+    it "returns 422 without symbol or expiration" do
+      get "/bpus/volatility", params: { symbol: symbol, expiration: "" }, as: :json
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it "returns the cached result without kicking off a job" do
+      Rails.cache.write("bpus_volatility_#{symbol}_#{expiration}", { status: "success", iv: 0.42 })
+      expect(BpusVolatilityJob).not_to receive(:perform_later)
+      get "/bpus/volatility", params: { symbol: symbol, expiration: expiration }, as: :json
+      expect(JSON.parse(response.body)).to eq({ "status" => "success", "iv" => 0.42 })
+    end
+
+    it "does not kick off a job when CDP is unreachable" do
+      allow_any_instance_of(BullPutSpreadsController).to receive(:cdp_online?).and_return(false)
+      expect(BpusVolatilityJob).not_to receive(:perform_later)
+      get "/bpus/volatility", params: { symbol: symbol, expiration: expiration }, as: :json
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)["status"]).to eq("pending")
+    end
+
+    it "kicks off the job when CDP is online and nothing is cached" do
+      allow_any_instance_of(BullPutSpreadsController).to receive(:cdp_online?).and_return(true)
+      expect(BpusVolatilityJob).to receive(:perform_later).with(symbol, expiration)
+      get "/bpus/volatility", params: { symbol: symbol, expiration: expiration }, as: :json
+      expect(JSON.parse(response.body)["status"]).to eq("pending")
+    end
+  end
 end

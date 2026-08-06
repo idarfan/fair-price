@@ -3,6 +3,8 @@
 # BPUS §3.1：代號驗證固定用 \A[A-Z.]{1,6}\z（規格明講），跟其他工具用
 # gsub(/[^A-Z0-9.\-]/, "") 消毒後照單全收不同——這裡不符合格式直接擋，不猜測。
 class BullPutSpreadsController < ApplicationController
+  include CdpPrecheckable
+
   SYMBOL_PATTERN = /\A[A-Z.]{1,6}\z/
 
   def index
@@ -159,7 +161,7 @@ class BullPutSpreadsController < ApplicationController
     return render json: cached if cached
 
     pending_key = "bpus_volatility_pending_#{symbol}_#{expiration}"
-    unless Rails.cache.exist?(pending_key)
+    if !Rails.cache.exist?(pending_key) && cdp_online?
       Rails.cache.write(pending_key, true, expires_in: 30.seconds)
       BpusVolatilityJob.perform_later(symbol, expiration)
     end
@@ -188,16 +190,5 @@ class BullPutSpreadsController < ApplicationController
     rescue ArgumentError, TypeError
       nil
     end.compact
-  end
-
-  def cdp_online?
-    require "net/http"
-    uri  = URI("http://localhost:9222/json/version")
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.open_timeout = 2
-    http.read_timeout = 2
-    http.get(uri.path).is_a?(Net::HTTPSuccess)
-  rescue
-    false
   end
 end

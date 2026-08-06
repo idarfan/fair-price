@@ -77,12 +77,14 @@ _最後更新：2026-07-04_
 
 ---
 
-## 待辦：CdpPrecheckable concern — 尚未開始 ❌
+## CdpPrecheckable concern — 已結案 ✅（2026-08-06）
 
-背景：全域 CLAUDE.md「CDP 預檢（全域強制）」規則要求所有觸發 Barchart/Playwright CDP 抓取的 controller action，在排 job 之前先檢查 CDP 是否連線；但 fairprice app 目前完全沒有落地這個機制（2026-07-11 同步 fairprice-installer 時順手核對發現）。
+背景：全域 CLAUDE.md「CDP 預檢（全域強制）」規則要求所有觸發 Barchart/Playwright CDP 抓取的 controller action，在排 job 之前先檢查 CDP 是否連線；但 fairprice app 原本完全沒有落地這個機制（2026-07-11 同步 fairprice-installer 時順手核對發現）。
 
-- [ ] 建立 `app/controllers/concerns/cdp_precheckable.rb`：對 `http://127.0.0.1:9222/json/version` 發請求，2 秒 timeout，失敗直接回錯誤、不排 job
-- [ ] `LeapsRecommendationsController`、`TechnicalDashboardsController` 等所有會觸發 `BarchartScraperService` 的 controller `include CdpPrecheckable`
-- [ ] 錯誤訊息固定文字：「CDP 未連線，請確認 Windows 端 Chrome 已以 `--remote-debugging-port=9222` 啟動。若電腦曾經睡眠/喚醒，這通常是 WSL2 的 `/mnt/c/` 掛載失效造成的，請在 Windows PowerShell 執行 `wsl --shutdown` 後等待 WSL2 重新啟動，再重試一次。」
-- [ ] 驗收標準：CDP 離線時使用者 1-2 秒內看到錯誤（不是等 job timeout）；每個相關 controller 要有測試覆蓋「CDP 離線時直接擋下、不送 job」
-- [ ] 規則本身只負責回報，不嘗試自動修復（`wsl --shutdown` 需要 Windows 端手動執行，Rails process 跑在 WSL2 內部無法自己叫外部 PowerShell）
+- [x] 建立 `app/controllers/concerns/cdp_precheckable.rb`：對 `http://127.0.0.1:9222/json/version` 發請求，2 秒 timeout，失敗直接回錯誤、不排 job
+- [x] `LeapsRecommendationsController`、`BullPutSpreadsController`、`BullCallSpreadsController` 原本各自維護一份重複的 `cdp_online?`（三份幾乎一樣，timeout 還不一致：5s / 2s / 2s），已收斂成 `include CdpPrecheckable`
+- [x] `TechnicalDashboardsController`（`analyze`、`fetch_max_pain`）原本完全沒有 CDP 預檢，已補上；連帶修正 JS 輪詢邏輯，`cdp_offline` 狀態原本會被吞掉不轉發到 redirect URL
+- [x] `BullPutSpreadsController#volatility`（背景輪詢 endpoint）原本也沒有預檢，已補上（CDP 離線時靜默跳過排 job，維持該 endpoint 原有的「不阻塞、不等待」設計，不彈錯誤給使用者）
+- [x] 錯誤訊息固定文字：`CdpPrecheckable::CDP_OFFLINE_MESSAGE` 常數，四個 controller 共用同一份
+- [x] 驗收：`spec/requests/technical_dashboards_spec.rb`（新建）、`bull_put_spreads_spec.rb`（新增 volatility 覆蓋）等涵蓋「CDP 離線時直接擋下、不送 job」；LEAPS／BPUS fetch_expirations／BCVS fetch_expirations 本來就有覆蓋
+- [x] 規則本身只負責回報，不嘗試自動修復

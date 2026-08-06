@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 class LeapsRecommendationsController < ApplicationController
+  include CdpPrecheckable
   def index
     @symbol        = params[:symbol]&.upcase&.strip&.gsub(/[^A-Z0-9.\-]/, "")
     @candidates    = []
@@ -158,16 +159,5 @@ class LeapsRecommendationsController < ApplicationController
     return { status: :no_data } unless PmccShortCallSnapshot.for_symbol(symbol).exists?
 
     PmccRankingService.new(symbol).call
-  end
-
-  def cdp_online?
-    require "net/http"
-    uri  = URI("http://localhost:9222/json/version")
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.open_timeout = 5
-    http.read_timeout = 5
-    http.get(uri.path).is_a?(Net::HTTPSuccess)
-  rescue
-    false
   end
 end

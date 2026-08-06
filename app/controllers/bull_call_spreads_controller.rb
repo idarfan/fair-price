@@ -3,6 +3,8 @@
 # bcvs.md §路由與入口：代號驗證固定用 \A[A-Z.]{1,6}\z，比照 bpus 分工
 # （BullPutSpreadsController::SYMBOL_PATTERN）。
 class BullCallSpreadsController < ApplicationController
+  include CdpPrecheckable
+
   SYMBOL_PATTERN = /\A[A-Z.]{1,6}\z/
 
   def index
@@ -245,16 +247,5 @@ class BullCallSpreadsController < ApplicationController
     rescue ArgumentError, TypeError
       nil
     end.compact
-  end
-
-  def cdp_online?
-    require "net/http"
-    uri  = URI("http://localhost:9222/json/version")
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.open_timeout = 2
-    http.read_timeout = 2
-    http.get(uri.path).is_a?(Net::HTTPSuccess)
-  rescue
-    false
   end
 end

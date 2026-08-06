@@ -197,6 +197,14 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
         title: "Barchart 登入已過期",
         body:  "請在 Chrome 手動登入 Barchart，再回來重試。"
       )
+    when :cdp_offline
+      render_alert(
+        bg:    "bg-red-50 border-red-200",
+        icon:  "❌",
+        color: "text-red-800",
+        title: "CDP 未連線",
+        body:  CdpPrecheckable::CDP_OFFLINE_MESSAGE
+      )
     when :error
       render_alert(
         bg:    "bg-red-50 border-red-200",
@@ -1278,7 +1286,9 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
               }
               var jobId = data.job_id;
               if (!jobId) {
-                window.location.href = '/technical_dashboard?symbol=' + symbol + '&date=' + date;
+                var qs = '?symbol=' + symbol + '&date=' + date;
+                if (data.status) qs += '&job_status=' + data.status;
+                window.location.href = '/technical_dashboard' + qs;
                 return;
               }
               // Poll job status every 2.5s
@@ -1434,6 +1444,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
           .then(function (d) {
             if (d.status === 'ready') { redirectWithFilters(f); }
             else if (d.job_id) { pollJob(d.job_id, f); }
+            else if (d.status === 'cdp_offline') { showError('CDP 未連線，請確認 Windows 端 Chrome 已以 --remote-debugging-port=9222 啟動後重試'); }
             else { showError('請求失敗：' + (d.error || '未知錯誤')); }
           }).catch(function () { showError('網路錯誤，請重試'); });
         }
