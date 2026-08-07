@@ -95,4 +95,35 @@ RSpec.describe MomentumReportService do
       expect(result[:nq_change]).to be_nil
     end
   end
+
+  # ── Caching ──────────────────────────────────────────────────────────────────
+
+  describe "VIX caching" do
+    it "caches VIX under a fixed key with a 60s TTL" do
+      expect(Rails.cache).to receive(:fetch).with("momentum_vix", expires_in: 60.seconds).and_yield
+      described_class.new(symbols: [ "AAPL" ]).call
+    end
+  end
+
+  describe "futures caching" do
+    it "caches each futures symbol under its own key with a 60s TTL" do
+      expect(Rails.cache).to receive(:fetch).with("momentum_futures:ES=F", expires_in: 60.seconds).and_yield
+      expect(Rails.cache).to receive(:fetch).with("momentum_futures:NQ=F", expires_in: 60.seconds).and_yield
+      described_class.new(symbols: [ "AAPL" ]).call
+    end
+  end
+
+  describe "52-week range caching" do
+    it "caches the 52w high/low separately from intraday volume, with a longer TTL" do
+      expect(Rails.cache).to receive(:fetch).with("momentum_52w_range:AAPL", expires_in: 6.hours).and_yield
+      expect(Rails.cache).to receive(:fetch).with("momentum_day_volume:AAPL", expires_in: 60.seconds).and_yield
+      described_class.new(symbols: [ "AAPL" ]).call
+    end
+
+    it "fetches the 52w range over a 1y window and volume over a cheaper 1d window" do
+      described_class.new(symbols: [ "AAPL" ]).call
+      expect(yahoo_double).to have_received(:chart).with("AAPL", range: "1y")
+      expect(yahoo_double).to have_received(:chart).with("AAPL", range: "1d", interval: "1d")
+    end
+  end
 end

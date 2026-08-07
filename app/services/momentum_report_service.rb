@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 class MomentumReportService
+  QUOTE_CACHE_TTL     = 60.seconds
+  RANGE_52W_CACHE_TTL = 6.hours
+
   def initialize(symbols: nil)
     @finnhub = FinnhubService.new
     @symbols = symbols.presence || yaml_symbols
@@ -40,7 +43,9 @@ class MomentumReportService
 
   # ── VIX ─────────────────────────────────────────────────────────────────
   def fetch_vix
-    VixService.new.fetch
+    Rails.cache.fetch("momentum_vix", expires_in: QUOTE_CACHE_TTL) do
+      VixService.new.fetch
+    end
   end
 
   # ── Watchlist stocks ────────────────────────────────────────────────────
@@ -53,7 +58,7 @@ class MomentumReportService
   end
 
   def fetch_stock(symbol)
-    Rails.cache.fetch("momentum_quote:#{symbol}", expires_in: 60.seconds) do
+    Rails.cache.fetch("momentum_quote:#{symbol}", expires_in: QUOTE_CACHE_TTL) do
       quote = @finnhub.quote(symbol)
       next nil if quote.nil? || (quote["c"].to_f.zero? && quote["pc"].to_f.zero?)
 
@@ -74,15 +79,32 @@ class MomentumReportService
   end
 
   def fetch_futures_change(symbol)
-    YahooFinanceService.new.chart(symbol, range: "1d", interval: "1d")[:change_pct]
+    Rails.cache.fetch("momentum_futures:#{symbol}", expires_in: QUOTE_CACHE_TTL) do
+      YahooFinanceService.new.chart(symbol, range: "1d", interval: "1d")[:change_pct]
+    end
   rescue StandardError => e
     Rails.logger.warn("[MomentumReport] Futures #{symbol} failed: #{e.message}")
     nil
   end
 
+  # 52 週高低點一天內幾乎不變，用長 TTL 快取，跟即時報價分開，
+  # 避免每分鐘都為了它重抓一整年的日 K 線。
   def fetch_candles(symbol)
-    result = YahooFinanceService.new.chart(symbol, range: "1y")
-    { high_52w: result[:high_52w], low_52w: result[:low_52w], volume: result[:volume] }
+    range = fetch_52w_range(symbol)
+    { high_52w: range[:high_52w], low_52w: range[:low_52w], volume: fetch_day_volume(symbol) }
+  end
+
+  def fetch_52w_range(symbol)
+    Rails.cache.fetch("momentum_52w_range:#{symbol}", expires_in: RANGE_52W_CACHE_TTL) do
+      result = YahooFinanceService.new.chart(symbol, range: "1y")
+      { high_52w: result[:high_52w], low_52w: result[:low_52w] }
+    end
+  end
+
+  def fetch_day_volume(symbol)
+    Rails.cache.fetch("momentum_day_volume:#{symbol}", expires_in: QUOTE_CACHE_TTL) do
+      YahooFinanceService.new.chart(symbol, range: "1d", interval: "1d")[:volume]
+    end
   end
 
   # ── Earnings calendar (next 7 days) ─────────────────────────────────────
