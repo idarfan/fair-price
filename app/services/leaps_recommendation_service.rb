@@ -31,19 +31,16 @@ class LeapsRecommendationService
   def recommend_group(group, label)
     return { no_candidates: true, label: label, pick: nil, runner_up: nil, reason: nil } if group.empty?
 
-    all_warned  = group.all? { |c| c[:no_recent_volume_warning] }
-    eligible    = all_warned ? group : group.reject { |c| c[:no_recent_volume_warning] }
-    sorted      = sort_by_liquidity(eligible)
-    pick        = sorted[0]
-    runner_up   = sorted[1]
+    sorted    = sort_by_liquidity(group)
+    pick      = sorted[0]
+    runner_up = sorted[1]
 
     {
       no_candidates: false,
       label:         label,
-      all_warned:    all_warned,
       pick:          pick,
       runner_up:     runner_up,
-      reason:        build_reason(pick, runner_up, all_warned)
+      reason:        build_reason(pick, runner_up)
     }
   end
 
@@ -51,7 +48,7 @@ class LeapsRecommendationService
     candidates.sort_by { |c| [ -TIER_ORDER.fetch(c[:liquidity_tier].to_s, 0), -(c[:open_interest] || 0) ] }
   end
 
-  def build_reason(pick, runner_up, all_warned)
+  def build_reason(pick, runner_up)
     parts = []
 
     parts << sprintf(
@@ -96,10 +93,8 @@ class LeapsRecommendationService
       )
     end
 
-    if all_warned
-      parts << "⚠️ 注意：此天期區間所有候選均有「近期無成交」警示，目前市場成交清淡，進出場可能有困難。"
-    elsif pick[:no_recent_volume_warning]
-      parts << "⚠️ 注意：此推薦候選本身有「近期無成交」警示，需留意進出場流動性。"
+    if pick[:no_recent_volume_warning]
+      parts << "⚠️ 注意：此合約 Volume/OI 比率偏低（本次查詢候選中排名後段），近期成交相對清淡，掛單簿可能已久未更新，進出場前務必先確認報價是否合理。"
     end
 
     parts << "以上為流動性與 Greeks 篩選後的推薦結果，僅供策略篩選參考，非投資建議，請自行評估。"

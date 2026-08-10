@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-08-10 — 修正 LEAPS 推薦分析誤用「近期無成交」警示排除高 OI 候選
+
+- `LeapsRankingService#low_vol_oi?` 的「近期無成交」其實是 Volume/OI 比值在查詢池中的後 1/3 分位（相對排名），不是字面上的零成交，OI 極高但比值偏低的合約也會被誤標
+- `LeapsRecommendationService#recommend_group` 原本拿這個警示做 `reject` 排除，導致近天期推薦選中 OI 遠低於候選表榜首的合約，`build_reason` 卻寫「為此天期區間最高」，跟候選排行表對不上
+- 修正：移除排除邏輯，推薦挑選純依 `liquidity_tier` + OI 排序（跟候選表邏輯一致）；警示改為對 `pick` 本身的資訊性提示，文案改為「Volume/OI 比率偏低」
+- 詳見 `tasks/lessons.md` 2026-08-10 條目
+
 ### 2026-07-13 — 新增牛市差價看跌期權(三級版)試算工具
 
 - 新增 `/bpus` 頁面：輸入代號 → 選履約日 → 從 Barchart Put 鏈選保護腳(Long Put)/CSP 腳(Short Put) → 即時算淨權利金、押金、損益平衡點、ROC、風險報酬比，並標示賠錢情境

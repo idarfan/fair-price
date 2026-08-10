@@ -72,30 +72,18 @@ RSpec.describe LeapsRecommendationService do
     end
   end
 
-  # ── 近期無成交警示排除邏輯 ────────────────────────────────────────────────────
+  # ── 近期無成交警示：純資訊展示，不影響挑選 ──────────────────────────────────────
+  # vol_oi_ratio 是「本次查詢候選中的相對排名」，不是字面上的「沒有成交」，
+  # 所以不該拿來排除掉本來 OI/流動性 tier 更高的候選（見 leaps_ranking_service.rb
+  # 的 low_vol_oi?）。挑選邏輯只看 liquidity_tier + OI，警示只留在 pick 上顯示。
 
-  describe "no_recent_volume_warning exclusion" do
-    it "excludes warned candidates when unwarnced alternatives exist" do
+  describe "no_recent_volume_warning does not exclude candidates" do
+    it "still picks the higher-OI candidate even if it carries the warning" do
       warned   = candidate(dte: 400, no_recent_volume_warning: true,  open_interest: 99_999)
       clean    = candidate(dte: 400, no_recent_volume_warning: false, open_interest: 1_000)
       result   = described_class.new([ warned, clean ]).call
-      expect(result[:near_term][:pick][:no_recent_volume_warning]).to be false
-    end
-
-    it "falls back to warned candidates when ALL are warned" do
-      all_warned = [
-        candidate(dte: 400, no_recent_volume_warning: true, open_interest: 50_000),
-        candidate(dte: 400, no_recent_volume_warning: true, open_interest: 30_000)
-      ]
-      result = described_class.new(all_warned).call
-      expect(result[:near_term][:all_warned]).to be true
-      expect(result[:near_term][:pick]).not_to be_nil
-    end
-
-    it "includes all_warned flag in the group result" do
-      clean  = candidate(dte: 400, no_recent_volume_warning: false)
-      result = described_class.new([ clean ]).call
-      expect(result[:near_term][:all_warned]).to be false
+      expect(result[:near_term][:pick][:open_interest]).to eq(99_999)
+      expect(result[:near_term][:pick][:no_recent_volume_warning]).to be true
     end
   end
 
@@ -131,13 +119,10 @@ RSpec.describe LeapsRecommendationService do
       expect(reason).to include("Vega")
     end
 
-    it "includes all_warned warning when all candidates are warned" do
-      all_warned = [
-        candidate(dte: 400, no_recent_volume_warning: true),
-        candidate(dte: 400, no_recent_volume_warning: true)
-      ]
-      reason = described_class.new(all_warned).call[:near_term][:reason]
-      expect(reason).to include("近期無成交")
+    it "warns when the picked candidate has a low vol/OI ratio" do
+      warned_pick = candidate(dte: 400, no_recent_volume_warning: true)
+      reason = described_class.new([ warned_pick ]).call[:near_term][:reason]
+      expect(reason).to include("Volume/OI 比率偏低")
     end
 
     it "ends with the standard disclaimer" do
