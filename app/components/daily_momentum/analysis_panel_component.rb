@@ -19,7 +19,7 @@ class DailyMomentum::AnalysisPanelComponent < ApplicationComponent
         span(class: "mr-2") { plain("🐱") }
         plain("歐歐投資分析")
       end
-      span(class: "text-xs text-indigo-400 font-medium") { plain("Powered by Groq / Llama 3.3") }
+      span(class: "text-xs text-indigo-400 font-medium") { plain("Powered by Groq / GPT-OSS 120B") }
     end
   end
 
