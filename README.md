@@ -476,3 +476,19 @@ bundle exec rubocop -a   # 自動修正
 | `app/controllers/application_controller.rb` | 新增 `ABSOLUTE_SESSION_TIMEOUT` 常數與 `enforce_absolute_timeout` |
 | `app/controllers/sessions_controller.rb` | 登入時記錄 `session[:login_at]` |
 | `spec/requests/absolute_timeout_spec.rb` | 新增（24 小時強制登出測試，含排除帳號）|
+
+### 2026-08-18 — 帳戶管理列表新增每日停留時間拆分
+
+- 「累積停留時間」欄位維持全部歷史加總的總使用時數不變；新增可展開的近 7 天每日拆分（`<details>/<summary>`），方便判斷總數字是長期累積還是單日異常暴增。
+- `Admin::UsersController#index` 新增 `daily_dwell_by_user`，沿用既有 `UserActivity.recent`（7 天）scope，依日期分組加總 `duration_ms`。
+- `Admin::Users::PageComponent` / `RowComponent` 新增 `daily_dwell` 參數並傳遞、渲染。
+
+**異動檔案**
+
+| 檔案 | 異動類型 |
+|------|----------|
+| `app/controllers/admin/users_controller.rb` | 新增 `daily_dwell_by_user` |
+| `app/components/admin/users/page_component.rb` | 新增 `daily_dwell` 參數 |
+| `app/components/admin/users/row_component.rb` | 新增 `daily_dwell` 參數與可展開的每日拆分渲染 |
+| `app/views/admin/users/index.html.erb` | 傳入 `daily_dwell` |
+| `spec/requests/admin_users_spec.rb` | 新增每日拆分測試 |

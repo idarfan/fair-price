@@ -61,6 +61,29 @@ RSpec.describe "Admin::Users", type: :request, skip_auto_auth: true do
       expect(response.body).to include("leaps_filter")
       expect(response.body).to include("× 2")
     end
+
+    it "shows a per-day breakdown of the last 7 days alongside the accumulated total" do
+      admin  = create(:user, status: :enabled, totp_enabled: true, totp_secret: secret, admin: true)
+      target = create(:user, status: :enabled)
+      create(:user_activity, user: target, kind: :page_view, duration_ms: 60_000,
+                              started_at: Time.zone.local(2026, 8, 17, 10, 0, 0))
+      create(:user_activity, user: target, kind: :page_view, duration_ms: 90_000,
+                              started_at: Time.zone.local(2026, 8, 18, 9, 0, 0))
+      # 8 天前的舊資料不該算進「近7天每日拆分」，但仍計入總使用時數
+      create(:user_activity, user: target, kind: :page_view, duration_ms: 999_000,
+                              started_at: 8.days.ago)
+
+      travel_to Time.zone.local(2026, 8, 18, 12, 0, 0) do
+        sign_in_and_verify_totp!(admin)
+        get "/admin/users"
+      end
+
+      body = response.body
+      expect(body).to include("08/18")
+      expect(body).to include("1分30秒") # 8/18 當日 90_000ms
+      expect(body).to include("08/17")
+      expect(body).to include("1分0秒") # 8/17 當日 60_000ms
+    end
   end
 
   describe "GET /admin/users/:id" do

@@ -9,6 +9,7 @@ module Admin
       user_ids  = @users.map(&:id)
 
       @dwell_totals  = UserActivity.page_view.where(user_id: user_ids).group(:user_id).sum(:duration_ms)
+      @daily_dwell   = daily_dwell_by_user(user_ids)
       @last_activity = UserActivity.where(user_id: user_ids).group(:user_id).maximum(:created_at)
       @top_commands  = top_commands_by_user(user_ids)
     end
@@ -42,6 +43,21 @@ module Admin
 
     def require_admin!
       head :not_found unless current_user&.admin?
+    end
+
+    # 近 7 天，依日期分組的停留時間（跟「近7天常用指令」用同一個時間窗），
+    # 「累積停留時間」欄位本身維持全部歷史加總的總使用時數不變，這裡只是
+    # 額外提供可展開查看的每日拆分，避免總數字掩蓋掉單日暴增的異常狀況。
+    def daily_dwell_by_user(user_ids)
+      UserActivity.page_view.recent.where(user_id: user_ids)
+                  .pluck(:user_id, :started_at, :duration_ms)
+                  .group_by { |user_id, _, _| user_id }
+                  .transform_values do |rows|
+                    rows.group_by { |_, started_at, _| started_at.to_date }
+                        .transform_values { |day_rows| day_rows.sum { |_, _, ms| ms || 0 } }
+                        .sort_by { |date, _| date }
+                        .reverse
+                  end
     end
 
     def top_commands_by_user(user_ids)

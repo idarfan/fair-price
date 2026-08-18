@@ -3,13 +3,15 @@
 class Admin::Users::PageComponent < ApplicationComponent
   # @param users [ActiveRecord::Relation<User>]
   # @param current_admin [User]
-  # @param dwell_totals [Hash<Integer, Integer>] user_id => summed page_view duration_ms
+  # @param dwell_totals [Hash<Integer, Integer>] user_id => summed page_view duration_ms（全部歷史）
+  # @param daily_dwell [Hash<Integer, Array<Array(Date, Integer)>>] user_id => 近7天 [date, duration_ms]，新到舊
   # @param last_activity [Hash<Integer, Time>] user_id => most recent UserActivity#created_at
   # @param top_commands [Hash<Integer, Array<Array(String, Integer)>>] user_id => top-3 [action_name, count]
-  def initialize(users:, current_admin:, dwell_totals: {}, last_activity: {}, top_commands: {})
+  def initialize(users:, current_admin:, dwell_totals: {}, daily_dwell: {}, last_activity: {}, top_commands: {})
     @users         = users
     @current_admin = current_admin
     @dwell_totals  = dwell_totals
+    @daily_dwell   = daily_dwell
     @last_activity = last_activity
     @top_commands  = top_commands
   end
@@ -44,6 +46,7 @@ class Admin::Users::PageComponent < ApplicationComponent
                 user:             user,
                 is_self:          user.id == @current_admin.id,
                 dwell_ms:         @dwell_totals[user.id],
+                daily_dwell:      @daily_dwell[user.id] || [],
                 top_commands:     @top_commands[user.id] || [],
                 last_activity_at: @last_activity[user.id]
               )

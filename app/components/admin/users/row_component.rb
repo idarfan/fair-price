@@ -14,13 +14,15 @@ class Admin::Users::RowComponent < ApplicationComponent
 
   # @param user [User]
   # @param is_self [Boolean] Whether this row is the currently signed-in admin
-  # @param dwell_ms [Integer, nil] Accumulated page_view duration_ms
+  # @param dwell_ms [Integer, nil] Accumulated page_view duration_ms（全部歷史總使用時數）
+  # @param daily_dwell [Array<Array(Date, Integer)>] 近7天 [date, duration_ms]，新到舊
   # @param top_commands [Array<Array(String, Integer)>] [[action_name, count], ...] in the last 7 days
   # @param last_activity_at [Time, nil] Most recent UserActivity#created_at (page_view or command)
-  def initialize(user:, is_self:, dwell_ms: nil, top_commands: [], last_activity_at: nil)
+  def initialize(user:, is_self:, dwell_ms: nil, daily_dwell: [], top_commands: [], last_activity_at: nil)
     @user             = user
     @is_self          = is_self
     @dwell_ms         = dwell_ms
+    @daily_dwell      = daily_dwell
     @top_commands     = top_commands
     @last_activity_at = last_activity_at
   end
@@ -42,7 +44,7 @@ class Admin::Users::RowComponent < ApplicationComponent
       td(class: "px-3 py-2.5 text-sm text-gray-500") do
         plain(@user.last_login_at&.strftime("%Y-%m-%d %H:%M") || "—")
       end
-      td(class: "px-3 py-2.5 text-sm text-gray-500") { plain(fmt_duration_ms(@dwell_ms)) }
+      td(class: "px-3 py-2.5 text-sm text-gray-500") { render_dwell_cell }
       td(class: "px-3 py-2.5 text-sm text-gray-500") { render_top_commands }
       td(class: "px-3 py-2.5 text-sm text-gray-500") do
         plain(@last_activity_at&.strftime("%Y-%m-%d %H:%M") || "—")
@@ -52,6 +54,29 @@ class Admin::Users::RowComponent < ApplicationComponent
   end
 
   private
+
+  # 「累積停留時間」本體仍是全部歷史加總的總使用時數；有近7天每日資料時，
+  # 用 <details>/<summary> 讓 admin 自己展開查看單日拆分，藉此判斷總數字
+  # 是長期累積出來的，還是某一天異常暴增（Phlex 2.x 封鎖 onclick，<details>
+  # 是唯一允許的原生互動元件，沿用 show_component 的既有 pattern）。
+  def render_dwell_cell
+    return plain(fmt_duration_ms(@dwell_ms)) if @daily_dwell.blank?
+
+    details(class: "group") do
+      summary(class: "cursor-pointer select-none list-none flex items-center gap-1 hover:text-gray-700") do
+        span(class: "text-gray-300 text-[10px] transition-transform group-open:rotate-90") { plain("▶") }
+        plain(fmt_duration_ms(@dwell_ms))
+      end
+      div(class: "mt-1.5 space-y-0.5 pl-3 border-l border-gray-100") do
+        @daily_dwell.each do |date, duration_ms|
+          div(class: "text-xs text-gray-400 flex justify-between gap-3") do
+            span { plain(date.strftime("%m/%d")) }
+            span { plain(fmt_duration_ms(duration_ms)) }
+          end
+        end
+      end
+    end
+  end
 
   def render_top_commands
     return plain("—") if @top_commands.blank?
