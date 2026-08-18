@@ -5,6 +5,8 @@ class ApplicationController < ActionController::Base
 
   # 閒置逾時：連續 2 小時沒有任何請求就強制重新登入；此帳號不受限。
   IDLE_TIMEOUT = 2.hours
+  # 每日強制登出：不論有沒有活動，登入滿 24 小時就強制重新登入；此帳號不受限。
+  ABSOLUTE_SESSION_TIMEOUT = 24.hours
   IDLE_TIMEOUT_EXEMPT_EMAIL = "mr.idarfan@gmail.com"
 
   helper_method :current_user, :logged_in?
@@ -32,6 +34,7 @@ class ApplicationController < ActionController::Base
     return if GATE_EXEMPT_PREFIXES.any? { |prefix| request.path.start_with?(prefix) }
     return redirect_to login_path unless logged_in?
     return if enforce_idle_timeout
+    return if enforce_absolute_timeout
 
     if current_user.disabled?
       return if request.path == account_disabled_path
@@ -67,6 +70,19 @@ class ApplicationController < ActionController::Base
 
     reset_session
     redirect_to login_path, alert: "閒置超過 2 小時，請重新登入"
+    true
+  end
+
+  # 回傳 true 代表已經處理完（登入滿 24 小時導回登入頁），呼叫端應立即 return。
+  def enforce_absolute_timeout
+    return false if current_user.email == IDLE_TIMEOUT_EXEMPT_EMAIL
+
+    login_at = session[:login_at]
+    return false if login_at.nil?
+    return false if Time.current.to_i - login_at <= ABSOLUTE_SESSION_TIMEOUT.to_i
+
+    reset_session
+    redirect_to login_path, alert: "登入已滿 24 小時，請重新登入"
     true
   end
 end

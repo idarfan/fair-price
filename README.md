@@ -461,3 +461,18 @@ bundle exec rubocop -a   # 自動修正
 | `eslint.config.js` | 新增（ESLint + react-hooks + typescript-eslint）|
 | `spec/requests/api/v1/charts_rsi_spec.rb` | 新增（RSI 算法單元測試）|
 | `stories/TechnicalsChart.stories.tsx` | 新增（Chromatic 視覺回歸）|
+
+### 2026-08-18 — 新增每日強制登出（24 小時絕對逾時）
+
+- 除了原本的「閒置 2 小時登出」，新增「登入滿 24 小時強制登出」，即使持續有活動也一樣，避免瀏覽器分頁長期開著不關導致 session 一直存活。
+- 登入時（`SessionsController#google_callback`）記錄 `session[:login_at]`，`ApplicationController#enforce_absolute_timeout` 每次請求檢查是否超過 24 小時。
+- `IDLE_TIMEOUT_EXEMPT_EMAIL`（`mr.idarfan@gmail.com`）沿用既有排除設定，兩種逾時機制皆不套用在此帳號。
+- 動機：`/track`、`/api` 皆在 `GATE_EXEMPT_PREFIXES`，不會觸發閒置檢查，若分頁不關、只靠背景 sendBeacon 心跳，session 可能無限期存活，導致帳戶管理頁的「累積停留時間」失真。強制每日登出可限制單一 session 的最長存活時間。
+
+**異動檔案**
+
+| 檔案 | 異動類型 |
+|------|----------|
+| `app/controllers/application_controller.rb` | 新增 `ABSOLUTE_SESSION_TIMEOUT` 常數與 `enforce_absolute_timeout` |
+| `app/controllers/sessions_controller.rb` | 登入時記錄 `session[:login_at]` |
+| `spec/requests/absolute_timeout_spec.rb` | 新增（24 小時強制登出測試，含排除帳號）|
