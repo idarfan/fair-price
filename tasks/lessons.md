@@ -884,3 +884,32 @@ spec 的**頂層摘要句**（「接手前必讀」）與**階段索引**（「�
 **適用範圍**：本專案任何用百分位/相對排名算出來的「異常/警示」欄位（不只
 LEAPS，Options Flow 等其他頁面若有類似「相對排名當警示」的設計也要比照檢查：
 (a) 文案是否照實反映計算方式，(b) 有沒有被拿去做篩選而非單純展示）。
+
+## 拆分大型 Phlex component 為多個 mixin module 時的常數作用域陷阱
+
+`leaps_recommendations/page_component.rb`（2417 行）拆成 12 個檔案時踩到的坑：
+
+1. **Ruby bare 常數查找是 lexical scope，不是 method dispatch**：把方法搬進
+   `module LeapsRecommendations::Xxx` 這種 mixin 完全沒問題（`include` 後透過
+   `self` 動態派發，哪個 mixin 定義的都找得到）；但方法內部直接寫的裸常數
+   （如 `LIQUIDITY_STYLE[tier]`）只會依照**該方法被定義時所在的 module 的
+   lexical nesting + 該 module 自己的 ancestors** 去找，不會管最終被 include
+   進哪個 class。如果 `LIQUIDITY_STYLE` 定義在 A module，卻被 B module 裡的
+   方法引用，會直接 `uninitialized constant`，`ruby -c` 語法檢查完全抓不到，
+   要實際 `bundle exec rails runner` 載入 class 才會炸出來。
+   **解法**：把跨 module 被引用的常數抽進一個共用 module（如
+   `SharedConstants`），所有需要的 module 各自 `include SharedConstants`。
+2. **繼承鏈上的常數同理失效**：原本 `class PageComponent < ApplicationComponent`
+   能直接用父類別常數 `SIGNAL_COLORS`；搬進不繼承 `ApplicationComponent` 的
+   plain module 後要改成完整路徑 `ApplicationComponent::SIGNAL_COLORS`。
+3. **拆檔前先跑一次「常數被誰引用」的全文盤點**（`grep -n <CONST_NAME>` 逐一
+   看使用處是否跨越預定的拆分邊界），比事後除錯快得多。
+4. **Propshaft 有 precompile 過的 `public/assets/.manifest.json` 時**，新增
+   asset 檔即使實際存在於 `app/assets/javascripts/`，`javascript_include_tag`
+   仍會噴 `MissingAssetError`——manifest 存在時優先查 manifest 而非即時掃描
+   來源目錄，新增/搬移 JS 資產後一定要重跑 `assets:precompile`。
+5. **靜態 JS 從 inline `<script>`（原本墊在 body 尾端）搬到 `<head>` 的
+   `javascript_include_tag` 時要加 `defer: true`**：這些 script 若寫成「立即
+   執行、假設 DOM 已建好」（例如 `document.getElementById` 沒包
+   `DOMContentLoaded`），純粹是靠原本放在 body 尾端才恰好能動；搬進 head 不加
+   defer 會提前執行、抓不到還沒渲染的元素、silently 失效。
