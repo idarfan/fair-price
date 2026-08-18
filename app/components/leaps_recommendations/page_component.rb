@@ -14,7 +14,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   }.freeze
 
   TABLE_COLS = [
-    "到期日", "DTE", "履約價", "Delta", "OI", "Volume", "流動性判斷",
+    "價格預估", "到期日", "DTE", "履約價", "Delta", "OI", "Volume", "流動性判斷",
     "Bid", "Ask", "Mid", "Spread%", "內在價值", "外在價值", "外在佔比", "Time Value%", "IV", "Vega", "被指派機率"
   ].freeze
 
@@ -27,6 +27,10 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     "Spread", "NetDebit", "MaxProfit(含SC)", "年化收租率",
     "Golden Rule"
   ].freeze
+
+  # 欄位篩選面板預設隱藏的欄位（key 對應 TABLE_COL_KEYS）：被指派機率預設不顯示，
+  # 讓表格初次呈現不那麼擁擠；使用者可自行從面板勾回來。
+  DEFAULT_HIDDEN_COL_KEYS = %w[itm_prob].freeze
 
   TABLE_RIGHT_ALIGN_COLS = (
     %w[DTE Delta OI Volume Bid Ask Mid IV Vega] +
@@ -88,7 +92,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   # 欄位教學（leaps-column-tooltips-spec.md）：與上面兩個欄位陣列一一對齊的 tip key。
   # freeze 前斷言長度，防止未來加欄位時漏同步導致文案錯位。
   TABLE_COL_KEYS = %w[
-    expiration dte strike delta oi volume liquidity bid ask mid spread
+    price_estimate expiration dte strike delta oi volume liquidity bid ask mid spread
     intrinsic extrinsic extrinsic_pct time_value_pct iv vega itm_prob
   ].freeze
   FLOW_COL_KEYS = %w[
@@ -133,6 +137,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       end
       render_pmcc_edu_section
       render_vocab_cards
+      render_price_estimator_modal
     end
     render_pdf_data_script
     render_loading_script
@@ -140,6 +145,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     render_vector_pdf_script
     render_tooltips_script
     render_sortable_table_script
+    render_price_estimator_script
   end
 
   private
@@ -812,6 +818,22 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     end
   end
 
+  # 欄位篩選面板：每欄一個 checkbox，預設勾選（DEFAULT_HIDDEN_COL_KEYS 除外），
+  # 由 render_price_estimator_script 內的委派 click handler 監聽 change 事件切換
+  # 對應 [data-col] 元素的 leaps-col-hidden class，讓表格不必整段重新渲染。
+  def render_column_toggle_panel
+    div(class: "leaps-col-toggle-panel") do
+      TABLE_COLS.each_with_index do |col, idx|
+        key = TABLE_COL_KEYS[idx]
+        checked = !DEFAULT_HIDDEN_COL_KEYS.include?(key)
+        label do
+          input(type: "checkbox", class: "leaps-col-toggle-checkbox", data_col: key, checked: checked)
+          plain col
+        end
+      end
+    end
+  end
+
   def render_ranking_table
     div(class: "bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden") do
       div(class: "px-4 py-3 border-b border-gray-100 bg-gray-50") do
@@ -819,15 +841,16 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
         p(class: "text-xs text-gray-400 mt-0.5") do
           plain "依 OI 由高到低排序；流動性判斷依本次查詢候選的 OI 相對排名計算，非固定門檻，不同標的會自動調整基準。"
         end
+        render_column_toggle_panel
       end
       div(class: "overflow-x-auto") do
-        table(class: "w-full text-xs text-gray-700") do
+        table(id: "leaps-ranking-table", class: "w-full text-xs text-gray-700") do
           thead(class: "bg-gray-50 text-gray-500 text-xs") do
             tr do
               TABLE_COLS.each_with_index do |col, idx|
                 key = TABLE_COL_KEYS[idx]
-                th(id: "leaps-th-#{key}", data_tip_key: key,
-                   class: "px-3 py-2 text-center font-medium whitespace-nowrap") { plain col }
+                th(id: "leaps-th-#{key}", data_tip_key: key, data_col: key,
+                   class: "px-3 py-2 text-center font-medium whitespace-nowrap#{hidden_col_class(key)}") { plain col }
               end
             end
           end
@@ -871,9 +894,22 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     row_class += " bg-blue-50/70 ring-1 ring-inset ring-blue-300" if mine
 
     tr(class: row_class) do
-      td(class: "px-3 py-2 text-center font-mono whitespace-nowrap") { plain row[:expiration_date].to_s }
-      td(class: "px-3 py-2 text-center")                             { plain row[:dte].to_s }
-      td(class: "px-3 py-2 text-center font-semibold") do
+      td(class: "px-3 py-2 text-center", data_col: "price_estimate") do
+        button(
+          type: "button",
+          class: "leaps-price-estimate-btn px-2 py-1 rounded border border-gray-300 text-xs text-gray-600 " \
+                 "hover:bg-gray-100 whitespace-nowrap",
+          data_strike: row[:strike].to_s,
+          data_underlying: row[:underlying_price].to_s,
+          data_iv: (row[:iv].to_f * 100).to_s,
+          data_dte: row[:dte].to_s,
+          data_expiration: row[:expiration_date].to_s,
+          data_mid: row[:mid].to_s
+        ) { plain "📈 試算" }
+      end
+      td(class: "px-3 py-2 text-center font-mono whitespace-nowrap", data_col: "expiration") { plain row[:expiration_date].to_s }
+      td(class: "px-3 py-2 text-center", data_col: "dte")                                    { plain row[:dte].to_s }
+      td(class: "px-3 py-2 text-center font-semibold", data_col: "strike") do
         div(class: "inline-flex flex-col items-center gap-0.5") do
           span { plain fmt_price(row[:strike]) }
           if mine
@@ -881,10 +917,10 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
           end
         end
       end
-      td(class: "px-3 py-2 text-center")                             { plain fmt_decimal(row[:delta], 4) }
-      td(class: "px-3 py-2 text-center font-semibold")               { plain fmt_int(row[:open_interest]) }
-      td(class: "px-3 py-2 text-center")                             { plain fmt_int(row[:volume]) }
-      td(class: "px-3 py-2 text-center") do
+      td(class: "px-3 py-2 text-center", data_col: "delta")               { plain fmt_decimal(row[:delta], 4) }
+      td(class: "px-3 py-2 text-center font-semibold", data_col: "oi")    { plain fmt_int(row[:open_interest]) }
+      td(class: "px-3 py-2 text-center", data_col: "volume")              { plain fmt_int(row[:volume]) }
+      td(class: "px-3 py-2 text-center", data_col: "liquidity") do
         div(class: "inline-flex flex-col items-center gap-1") do
           div(class: "inline-flex flex-row items-center gap-1.5") do
             span(class: "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs " \
@@ -904,18 +940,24 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
           end
         end
       end
-      td(class: "px-3 py-2 text-center") { plain fmt_price(row[:bid]) }
-      td(class: "px-3 py-2 text-center") { plain fmt_price(row[:ask]) }
-      td(class: "px-3 py-2 text-center") { plain fmt_price(row[:mid]) }
-      td(class: "px-3 py-2 text-center") { plain fmt_pct(row[:bid_ask_spread_pct]) }
-      td(class: "px-3 py-2 text-center") { plain fmt_price(row[:intrinsic_value]) }
-      td(class: "px-3 py-2 text-center") { plain fmt_price(row[:extrinsic_value]) }
-      td(class: "px-3 py-2 text-center font-semibold") { plain fmt_pct(row[:extrinsic_pct]) }
-      td(class: "px-3 py-2 text-center") { plain fmt_pct(row[:time_value_pct]) }
-      td(class: "px-3 py-2 text-center") { plain fmt_pct(row[:iv]) }
-      td(class: "px-3 py-2 text-center") { plain fmt_decimal(row[:vega], 4) }
-      td(class: "px-3 py-2 text-center") { plain fmt_pct(row[:itm_probability]) }
+      td(class: "px-3 py-2 text-center", data_col: "bid")            { plain fmt_price(row[:bid]) }
+      td(class: "px-3 py-2 text-center", data_col: "ask")            { plain fmt_price(row[:ask]) }
+      td(class: "px-3 py-2 text-center", data_col: "mid")            { plain fmt_price(row[:mid]) }
+      td(class: "px-3 py-2 text-center", data_col: "spread")         { plain fmt_pct(row[:bid_ask_spread_pct]) }
+      td(class: "px-3 py-2 text-center", data_col: "intrinsic")      { plain fmt_price(row[:intrinsic_value]) }
+      td(class: "px-3 py-2 text-center", data_col: "extrinsic")      { plain fmt_price(row[:extrinsic_value]) }
+      td(class: "px-3 py-2 text-center font-semibold", data_col: "extrinsic_pct") { plain fmt_pct(row[:extrinsic_pct]) }
+      td(class: "px-3 py-2 text-center", data_col: "time_value_pct") { plain fmt_pct(row[:time_value_pct]) }
+      td(class: "px-3 py-2 text-center", data_col: "iv")             { plain fmt_pct(row[:iv]) }
+      td(class: "px-3 py-2 text-center", data_col: "vega")           { plain fmt_decimal(row[:vega], 4) }
+      td(class: "px-3 py-2 text-center#{hidden_col_class('itm_prob')}", data_col: "itm_prob") { plain fmt_pct(row[:itm_probability]) }
     end
+  end
+
+  # td 版本的預設隱藏 class（th 版本邏輯見 render_ranking_table 的 thead 迴圈），
+  # 兩處都讀同一份 DEFAULT_HIDDEN_COL_KEYS，避免表頭/表身初始狀態不同步。
+  def hidden_col_class(key)
+    DEFAULT_HIDDEN_COL_KEYS.include?(key) ? " leaps-col-hidden" : ""
   end
 
   def render_flow_panel
@@ -1985,6 +2027,167 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
           div(class: "leaps-vc-example")    { plain card[:ex] }
         end
       end
+    end
+  end
+
+  # 「價格預估」試算 Modal：全頁共用一份 DOM，點擊任一列的「📈 試算」按鈕時
+  # 由 render_price_estimator_script 讀該按鈕的 data-* 帶入試算參數（見該按鈕
+  # 於 render_candidate_row 的定義）。不隨列重複渲染。
+  def render_price_estimator_modal
+    div(id: "leaps-price-estimator-overlay", class: "leaps-pe-overlay hidden") do
+      div(id: "leaps-price-estimator-panel", class: "leaps-pe-panel") do
+        div(class: "leaps-pe-header") do
+          h3(class: "leaps-pe-title") { plain "LEAPS Call 價格預估試算" }
+          button(type: "button", id: "leaps-pe-close", class: "leaps-pe-close", aria_label: "關閉") { plain "✕" }
+        end
+
+        div(id: "leaps-pe-contract-info", class: "leaps-pe-contract-info")
+
+        div(class: "leaps-pe-field") do
+          label(class: "leaps-pe-label", for: "leaps-pe-spot") { plain "預期股價" }
+          input(type: "number", id: "leaps-pe-spot", class: "leaps-pe-input", step: "0.01")
+        end
+
+        div(class: "leaps-pe-field") do
+          label(class: "leaps-pe-label", for: "leaps-pe-iv") do
+            plain "IV% "
+            span(id: "leaps-pe-iv-value")
+          end
+          input(type: "range", id: "leaps-pe-iv", class: "leaps-pe-slider", min: "10", max: "50", step: "0.1")
+        end
+
+        div(class: "leaps-pe-results") do
+          div(class: "leaps-pe-result-row") do
+            span(class: "leaps-pe-result-label") { plain "推估 Mid 價格" }
+            span(id: "leaps-pe-result-mid", class: "leaps-pe-result-value leaps-pe-result-primary")
+          end
+          div(class: "leaps-pe-result-row") do
+            span(class: "leaps-pe-result-label") { plain "內在價值" }
+            span(id: "leaps-pe-result-intrinsic", class: "leaps-pe-result-value")
+          end
+          div(class: "leaps-pe-result-row") do
+            span(class: "leaps-pe-result-label") { plain "時間價值" }
+            span(id: "leaps-pe-result-time-value", class: "leaps-pe-result-value")
+          end
+          div(class: "leaps-pe-result-row") do
+            span(class: "leaps-pe-result-label") { plain "與目前 Mid 差異" }
+            span(id: "leaps-pe-result-diff", class: "leaps-pe-result-value")
+          end
+        end
+      end
+    end
+  end
+
+  # Black-Scholes call 價格預估：固定 r=0.045、q=0.012（使用者指定假設值），
+  # T 由被點擊那一列實際的 DTE 換算（不是寫死單一到期日），所以排行表任何一列
+  # 都能各自試算，不只是需求截圖裡的兩檔合約。
+  def render_price_estimator_script
+    script do
+      raw <<~JS.html_safe
+        (function () {
+          var R = 0.045, Q = 0.012;
+
+          function erf(x) {
+            var sign = x < 0 ? -1 : 1;
+            x = Math.abs(x);
+            var a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741,
+                a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+            var t = 1 / (1 + p * x);
+            var y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+            return sign * y;
+          }
+          function normCdf(x) { return 0.5 * (1 + erf(x / Math.SQRT2)); }
+
+          function bsCall(S, K, T, r, sigma, q) {
+            if (!(S > 0) || !(K > 0) || !(T > 0) || !(sigma > 0)) return null;
+            var d1 = (Math.log(S / K) + (r - q + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+            var d2 = d1 - sigma * Math.sqrt(T);
+            return S * Math.exp(-q * T) * normCdf(d1) - K * Math.exp(-r * T) * normCdf(d2);
+          }
+
+          var overlay = document.getElementById("leaps-price-estimator-overlay");
+          if (!overlay) return;
+          var info    = document.getElementById("leaps-pe-contract-info");
+          var spotEl  = document.getElementById("leaps-pe-spot");
+          var ivEl    = document.getElementById("leaps-pe-iv");
+          var ivVal   = document.getElementById("leaps-pe-iv-value");
+          var outMid       = document.getElementById("leaps-pe-result-mid");
+          var outIntrinsic = document.getElementById("leaps-pe-result-intrinsic");
+          var outTimeValue = document.getElementById("leaps-pe-result-time-value");
+          var outDiff      = document.getElementById("leaps-pe-result-diff");
+
+          var current = null; // { strike, dte, expiration, mid }
+
+          function fmtMoney(v) { return isFinite(v) ? "$" + v.toFixed(2) : "—"; }
+
+          function recompute() {
+            if (!current) return;
+            var S = parseFloat(spotEl.value);
+            var sigma = parseFloat(ivEl.value) / 100;
+            ivVal.textContent = parseFloat(ivEl.value).toFixed(1) + "%";
+            var T = current.dte / 365.25;
+            var mid = bsCall(S, current.strike, T, R, sigma, Q);
+            if (mid === null) {
+              outMid.textContent = outIntrinsic.textContent = outTimeValue.textContent = outDiff.textContent = "—";
+              return;
+            }
+            var intrinsic = Math.max(0, S - current.strike);
+            var timeValue = mid - intrinsic;
+            outMid.textContent       = fmtMoney(mid);
+            outIntrinsic.textContent = fmtMoney(intrinsic);
+            outTimeValue.textContent = fmtMoney(timeValue);
+            if (current.mid !== null && isFinite(current.mid)) {
+              var diff = mid - current.mid;
+              outDiff.textContent = (diff >= 0 ? "+" : "") + fmtMoney(diff);
+            } else {
+              outDiff.textContent = "—";
+            }
+          }
+
+          function openModal(btn) {
+            var strike = parseFloat(btn.dataset.strike);
+            var spot   = parseFloat(btn.dataset.underlying);
+            var iv     = parseFloat(btn.dataset.iv);
+            var dte    = parseFloat(btn.dataset.dte);
+            var mid    = parseFloat(btn.dataset.mid);
+            current = {
+              strike: strike, dte: dte,
+              expiration: btn.dataset.expiration,
+              mid: isFinite(mid) ? mid : null
+            };
+            info.textContent = "履約價 $" + strike.toFixed(2) + " · 到期日 " + btn.dataset.expiration +
+              " · 原始 IV " + (isFinite(iv) ? iv.toFixed(1) : "—") + "% · 原始 Mid " +
+              (isFinite(mid) ? "$" + mid.toFixed(2) : "—");
+            spotEl.value = isFinite(spot) ? spot.toFixed(2) : "";
+            ivEl.value = isFinite(iv) ? iv.toFixed(1) : "20";
+            overlay.classList.remove("hidden");
+            recompute();
+          }
+
+          function closeModal() { overlay.classList.add("hidden"); }
+
+          document.addEventListener("click", function (e) {
+            var btn = e.target.closest(".leaps-price-estimate-btn");
+            if (btn) { openModal(btn); return; }
+            if (e.target.closest("#leaps-pe-close")) { closeModal(); return; }
+            if (e.target === overlay) { closeModal(); return; }
+          });
+          document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape" && !overlay.classList.contains("hidden")) closeModal();
+          });
+          spotEl.addEventListener("input", recompute);
+          ivEl.addEventListener("input", recompute);
+
+          document.querySelectorAll(".leaps-col-toggle-checkbox").forEach(function (cb) {
+            cb.addEventListener("change", function () {
+              var key = cb.dataset.col;
+              document.querySelectorAll('#leaps-ranking-table [data-col="' + key + '"]').forEach(function (el) {
+                el.classList.toggle("leaps-col-hidden", !cb.checked);
+              });
+            });
+          });
+        })();
+      JS
     end
   end
 

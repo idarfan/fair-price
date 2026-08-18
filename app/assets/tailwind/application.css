@@ -135,6 +135,64 @@
 th[data-tip-key] { cursor: help; }
 th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 
+/* 「價格預估」試算 Modal */
+.leaps-pe-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: rgba(17, 24, 39, .5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.leaps-pe-overlay.hidden { display: none; }
+.leaps-pe-panel {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0,0,0,.3);
+  width: 100%;
+  max-width: 380px;
+  padding: 20px;
+}
+.leaps-pe-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.leaps-pe-title { font-size: 15px; font-weight: 700; color: #111827; }
+.leaps-pe-close {
+  border: none; background: transparent; cursor: pointer;
+  font-size: 16px; color: #6b7280; line-height: 1; padding: 4px;
+}
+.leaps-pe-close:hover { color: #111827; }
+.leaps-pe-contract-info {
+  font-size: 12px; color: #6b7280; background: #f9fafb;
+  border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 10px; margin-bottom: 14px;
+}
+.leaps-pe-field { margin-bottom: 14px; }
+.leaps-pe-label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+.leaps-pe-input {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 10px; font-size: 14px; color: #111827;
+}
+.leaps-pe-slider { width: 100%; }
+.leaps-pe-results {
+  border-top: 1px solid #e5e7eb; padding-top: 12px; display: flex; flex-direction: column; gap: 6px;
+}
+.leaps-pe-result-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+.leaps-pe-result-label { color: #6b7280; }
+.leaps-pe-result-value { font-weight: 600; color: #111827; font-variant-numeric: tabular-nums; }
+.leaps-pe-result-primary { font-size: 16px; color: #2563eb; }
+
+/* 欄位篩選：勾選面板 + 隱藏欄的 th/td */
+.leaps-col-toggle-panel {
+  display: flex; flex-wrap: wrap; gap: 6px 14px;
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;
+  padding: 10px 12px; margin-top: 8px;
+}
+.leaps-col-toggle-panel label {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; color: #374151; cursor: pointer; white-space: nowrap;
+}
+.leaps-col-hidden { display: none !important; }
+
 /* hover tooltip（#bpus-col-tip）——樣式對齊 /home/idarfan/fairprice/public/csp/option-basics-lesson8.html
    的 #col-tip（深藍底＋金色邊框/標題），bpus-fix.md 項目2 要求「完全一致」。 */
 #bpus-col-tip {
