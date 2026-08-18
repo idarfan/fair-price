@@ -27,6 +27,7 @@
 .release-notes-panel {
   background: #fff;
   border-radius: 12px;
+  border: 2px solid #f97316; /* orange-500：加深外框，讓彈窗更醒目 */
   box-shadow: 0 20px 50px rgba(0,0,0,.3);
   width: 100%;
   max-width: 420px;
@@ -197,6 +198,7 @@ th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 .leaps-pe-panel {
   background: #fff;
   border-radius: 12px;
+  border: 2px solid #f97316; /* orange-500：加深外框，讓彈窗更醒目 */
   box-shadow: 0 20px 50px rgba(0,0,0,.3);
   width: 100%;
   max-width: 380px;
