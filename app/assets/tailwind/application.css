@@ -233,6 +233,8 @@ th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 .leaps-pe-result-label { color: #6b7280; }
 .leaps-pe-result-value { font-weight: 600; color: #111827; font-variant-numeric: tabular-nums; }
 .leaps-pe-result-primary { font-size: 16px; color: #2563eb; }
+.leaps-pe-result-label-diff { font-weight: 700; font-size: 15px; color: #6b7280; }
+.leaps-pe-result-diff-value { font-weight: 700; color: #16a34a; }
 
 /* 欄位篩選：勾選面板 + 隱藏欄的 th/td */
 .leaps-col-toggle-panel {

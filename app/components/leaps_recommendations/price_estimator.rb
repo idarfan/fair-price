@@ -41,8 +41,8 @@ module LeapsRecommendations::PriceEstimator
             span(id: "leaps-pe-result-time-value", class: "leaps-pe-result-value")
           end
           div(class: "leaps-pe-result-row") do
-            span(class: "leaps-pe-result-label") { plain "與目前 Mid 差異" }
-            span(id: "leaps-pe-result-diff", class: "leaps-pe-result-value")
+            span(class: "leaps-pe-result-label leaps-pe-result-label-diff") { plain "與目前 Mid 差異" }
+            span(id: "leaps-pe-result-diff", class: "leaps-pe-result-value leaps-pe-result-diff-value")
           end
         end
       end
