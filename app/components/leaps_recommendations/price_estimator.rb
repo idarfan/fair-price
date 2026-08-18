@@ -15,8 +15,8 @@ module LeapsRecommendations::PriceEstimator
         div(id: "leaps-pe-contract-info", class: "leaps-pe-contract-info")
 
         div(class: "leaps-pe-field") do
-          label(class: "leaps-pe-label", for: "leaps-pe-spot") { plain "預期股價" }
-          input(type: "number", id: "leaps-pe-spot", class: "leaps-pe-input", step: "0.01")
+          input(type: "number", id: "leaps-pe-spot", class: "leaps-pe-input",
+                step: "0.01", placeholder: "請輸入預期的股價")
         end
 
         div(class: "leaps-pe-field") do

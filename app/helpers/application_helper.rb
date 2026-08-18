@@ -20,4 +20,12 @@ module ApplicationHelper
     else                                   "2% 單筆上限，建議空倉觀望"
     end
   end
+
+  def app_version
+    "v#{RELEASE_NOTES.first[:date]}"
+  end
+
+  def latest_release_note
+    RELEASE_NOTES.first
+  end
 end

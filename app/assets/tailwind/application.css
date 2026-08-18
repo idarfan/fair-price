@@ -12,6 +12,53 @@
 .btn-puts-active   { background-color: rgb(225 29 72);  color: #fff; }  /* rose-600 */
 .btn-filter-muted  { background-color: rgb(243 244 246); color: rgb(156 163 175); } /* gray-100 / gray-400 */
 
+/* 全站「版本更新說明」Modal（app/views/layouts/application.html.erb footer） */
+.release-notes-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: rgba(17, 24, 39, .5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.release-notes-overlay.hidden { display: none; }
+.release-notes-panel {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0,0,0,.3);
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+}
+.release-notes-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.release-notes-title { font-size: 15px; font-weight: 700; color: #111827; }
+.release-notes-version { font-size: 12px; font-weight: 400; color: #9ca3af; font-family: monospace; margin-left: 4px; }
+.release-notes-close {
+  border: none; background: transparent; cursor: pointer;
+  font-size: 16px; color: #6b7280; line-height: 1; padding: 4px;
+}
+.release-notes-close:hover { color: #111827; }
+.release-notes-body { font-size: 13px; color: #374151; }
+.release-notes-note-title { font-weight: 600; color: #111827; margin-bottom: 8px; }
+.release-notes-body ul { margin: 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 6px; }
+.release-notes-body li { line-height: 1.6; list-style: disc; }
+.release-notes-footer {
+  border-top: 1px solid #e5e7eb; margin-top: 16px; padding-top: 14px;
+  display: flex; justify-content: flex-end; gap: 8px;
+}
+.release-notes-home-btn {
+  padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 500;
+  background: #2563eb; color: #fff; text-decoration: none;
+}
+.release-notes-home-btn:hover { background: #1d4ed8; }
+.release-notes-close-btn {
+  padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 500;
+  background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; cursor: pointer;
+}
+.release-notes-close-btn:hover { background: #e5e7eb; }
+
 /* Markdown body styles */
 .md-body h1 { font-size: 1.375rem; font-weight: 700; color: #111827; margin-top: 1.5rem; margin-bottom: .5rem; }
 .md-body h2 { font-size: 1.125rem; font-weight: 700; color: #111827; margin-top: 1.5rem; margin-bottom: .5rem; padding-bottom: .25rem; border-bottom: 1px solid #e5e7eb; }
@@ -171,6 +218,12 @@ th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 .leaps-pe-input {
   width: 100%; box-sizing: border-box;
   border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 10px; font-size: 14px; color: #111827;
+  -moz-appearance: textfield; /* Firefox：拿掉數字輸入框的上下微調按鈕 */
+}
+.leaps-pe-input::-webkit-outer-spin-button,
+.leaps-pe-input::-webkit-inner-spin-button {
+  -webkit-appearance: none; /* Chrome/Safari：拿掉數字輸入框的上下微調按鈕 */
+  margin: 0;
 }
 .leaps-pe-slider { width: 100%; }
 .leaps-pe-results {

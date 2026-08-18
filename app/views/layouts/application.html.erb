@@ -114,9 +114,48 @@
       <footer class="border-t border-gray-200 bg-white py-4">
         <p class="text-center text-xs text-gray-400">
           FairPrice — 數據來源 Finnhub ｜ 僅供參考，不構成投資建議
-          <span class="ml-2 text-gray-300 font-mono">v20260420</span>
+          <span class="ml-2 text-gray-300 font-mono"><%= app_version %></span>
+          <button type="button" id="release-notes-btn" class="ml-2 text-blue-500 hover:text-blue-700 underline underline-offset-2">版本更新說明</button>
         </p>
       </footer>
+
+      <div id="release-notes-overlay" class="release-notes-overlay hidden">
+        <div class="release-notes-panel">
+          <div class="release-notes-header">
+            <h3 class="release-notes-title">版本更新說明 <span class="release-notes-version"><%= app_version %></span></h3>
+            <button type="button" id="release-notes-close" class="release-notes-close" aria-label="關閉">✕</button>
+          </div>
+          <div class="release-notes-body">
+            <p class="release-notes-note-title"><%= latest_release_note[:title] %></p>
+            <ul>
+              <% latest_release_note[:items].each do |item| %>
+                <li><%= item %></li>
+              <% end %>
+            </ul>
+          </div>
+          <div class="release-notes-footer">
+            <%= link_to "返回首頁", root_path, class: "release-notes-home-btn" %>
+            <button type="button" id="release-notes-close-2" class="release-notes-close-btn">關閉</button>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        (function () {
+          var overlay = document.getElementById('release-notes-overlay');
+          var openBtn = document.getElementById('release-notes-btn');
+          if (!overlay || !openBtn) return;
+          function open() { overlay.classList.remove('hidden'); }
+          function close() { overlay.classList.add('hidden'); }
+          openBtn.addEventListener('click', open);
+          document.getElementById('release-notes-close').addEventListener('click', close);
+          document.getElementById('release-notes-close-2').addEventListener('click', close);
+          overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+          document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !overlay.classList.contains('hidden')) close();
+          });
+        })();
+      </script>
     <% end %>
 
   </body>
