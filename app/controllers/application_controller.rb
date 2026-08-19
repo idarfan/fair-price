@@ -43,6 +43,7 @@ class ApplicationController < ActionController::Base
     end
 
     return if request.path.start_with?("/two_factor/")
+    return if current_user.admin?
 
     unless current_user.totp_enabled?
       return redirect_to "/two_factor/setup"
