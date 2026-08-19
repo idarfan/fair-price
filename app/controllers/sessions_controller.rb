@@ -28,7 +28,9 @@ class SessionsController < ApplicationController
       redirect_to account_disabled_path and return
     end
 
-    if user.totp_enabled?
+    if user.admin?
+      redirect_to root_path
+    elsif user.totp_enabled?
       redirect_to "/two_factor/challenge"
     else
       redirect_to "/two_factor/setup"
