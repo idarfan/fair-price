@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-08-26 — 修復失效已久的排程備份，並將備份異地同步到 Windows 桌面
+
+- pm2 `fairprice-db-backup`（每日 22:00）產出的備份長期都是 0 或 20 bytes 的無效檔。根因是 `scripts/backup_db.sh` 從未 `source .env`，`DB_PASSWORD` 永遠為空，`pg_dump` 轉為互動式索取密碼而失敗
+- 次要根因：空檔檢查只有 `[[ ! -s ]]`（僅擋 0 bytes），但 `pg_dump` 失敗時 `gzip` 仍會產生 20 bytes 的有效空壓縮檔，通過檢查後冒充成功的備份
+- `scripts/backup_db.sh` 重寫：加 `source .env`；`pg_dump -w` 絕不互動式問密碼；完整性驗證改為 `gzip -t` + 檢查 `PostgreSQL database dump complete` 結尾標記；`pg_isready` 重試等待 PostgreSQL 就緒；備份成功後同步一份到 Windows 桌面 `fairprice backup/`；保留策略 7 天並涵蓋 `pre_edit_*`（舊版只清 `fairprice_development_*`，是本機堆積到 1.7 GB 的原因）
+- 清理空檔必須用 `find -size -1024c`（byte 單位）。`-size -1k` 以 1k 區塊計算且向上取整，20 bytes 算作 1 個區塊，永遠刪不到
+
 ### 2026-08-10 — 修正 LEAPS 推薦分析誤用「近期無成交」警示排除高 OI 候選
 
 - `LeapsRankingService#low_vol_oi?` 的「近期無成交」其實是 Volume/OI 比值在查詢池中的後 1/3 分位（相對排名），不是字面上的零成交，OI 極高但比值偏低的合約也會被誤標
