@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-08-27 — 修復 playwright-chrome MCP 連不上，`@playwright/mcp` 升到 0.0.79
+
+- `@playwright/mcp` 由 0.0.77 升到 0.0.79（local + global）
+- MCP log 顯示 2026-08-07 ~ 08-27 每一次 session 都是同一則錯誤「Chrome CDP（port 9224）連不上」，並非 playwright-mcp 崩潰 —— 8/06 改連 9224 時沒有對應的 keeper，重開機後沒人拉起那個視窗。已在 `x-order-manager-systems` 補上 pm2 `chrome-cdp-keeper-9224`
+- 移除重複的 MCP 定義：user scope 的 `railsMcpServer` 刪除，保留專案 scope 的 `rails-mcp-server`
+- 移除已廢棄的 pm2 `cdp-relay`（Docker 端早已改用 `network_mode: host` 直連 9222）
+
 ### 2026-08-26 — 修復失效已久的排程備份，並將備份異地同步到 Windows 桌面
 
 - pm2 `fairprice-db-backup`（每日 22:00）產出的備份長期都是 0 或 20 bytes 的無效檔。根因是 `scripts/backup_db.sh` 從未 `source .env`，`DB_PASSWORD` 永遠為空，`pg_dump` 轉為互動式索取密碼而失敗
