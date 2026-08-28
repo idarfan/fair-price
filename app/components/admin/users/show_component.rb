@@ -177,30 +177,9 @@ class Admin::Users::ShowComponent < ApplicationComponent
   end
 
   def render_script
-    script do
-      raw <<~JS.html_safe
-        (function () {
-          var buttons = document.querySelectorAll('.tab-btn');
-          var panels = { pageviews: document.getElementById('tab-panel-pageviews'), commands: document.getElementById('tab-panel-commands') };
-
-          buttons.forEach(function (btn) {
-            btn.addEventListener('click', function () {
-              var target = btn.getAttribute('data-tab-target');
-              buttons.forEach(function (b) {
-                var active = b === btn;
-                b.classList.toggle('border-blue-600', active);
-                b.classList.toggle('text-blue-600', active);
-                b.classList.toggle('border-transparent', !active);
-                b.classList.toggle('text-gray-500', !active);
-              });
-              Object.keys(panels).forEach(function (key) {
-                if (panels[key]) panels[key].classList.toggle('hidden', key !== target);
-              });
-            });
-          });
-        })();
-      JS
-    end
+    # JavaScript 已搬到 app/frontend/behaviors/adminUserActivity.js（稽核 H-3 Wave 2）。
+    # 原本的 Ruby 插值改成 data attribute 傳入。
+    div(data: { behavior: "admin-user-activity" })
   end
 
   # 匯出 PDF：先把所有 <details> 暫時展開（不然收摺的日期組不會被拍進圖），
@@ -208,70 +187,8 @@ class Admin::Users::ShowComponent < ApplicationComponent
   # 切成多頁嵌進 PDF（長圖直接分頁嵌入，不是逐頁重新排版）。拍完無論成功
   # 失敗都要還原原本的展開/收摺狀態，不能讓使用者匯出完發現畫面被打亂。
   def render_export_script
-    email_json = @user.email.to_json
-    script do
-      raw <<~JS.html_safe
-        (function () {
-          var btn = document.getElementById('pageviews-export-pdf-btn');
-          if (!btn) return;
-
-          function timestamp() {
-            var d = new Date();
-            function p(n) { return String(n).padStart(2, '0'); }
-            return '' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes());
-          }
-
-          btn.addEventListener('click', function () {
-            if (btn.disabled) return;
-            var root = document.getElementById('tab-panel-pageviews');
-            if (!root) return;
-
-            var detailsEls = root.querySelectorAll('details');
-            var openStates = Array.prototype.map.call(detailsEls, function (d) { return d.open; });
-            detailsEls.forEach(function (d) { d.open = true; });
-
-            var originalText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = '匯出中…';
-
-            function restore() {
-              detailsEls.forEach(function (d, i) { d.open = openStates[i]; });
-              btn.disabled = false;
-              btn.textContent = originalText;
-            }
-
-            var bg = getComputedStyle(document.body).backgroundColor || '#ffffff';
-            htmlToImage.toPng(root, { pixelRatio: 2, backgroundColor: bg })
-              .then(function (dataUrl) {
-                var img = new Image();
-                img.onload = function () {
-                  var pdf = new jspdf.jsPDF({ orientation: 'p', unit: 'pt', format: 'a4', compress: true });
-                  var pageW = pdf.internal.pageSize.getWidth();
-                  var pageH = pdf.internal.pageSize.getHeight();
-                  var imgW  = pageW;
-                  var imgH  = img.height * (imgW / img.width);
-                  var heightLeft = imgH;
-                  var position   = 0;
-
-                  pdf.addImage(dataUrl, 'PNG', 0, position, imgW, imgH, undefined, 'FAST');
-                  heightLeft -= pageH;
-                  while (heightLeft > 0) {
-                    position = heightLeft - imgH;
-                    pdf.addPage();
-                    pdf.addImage(dataUrl, 'PNG', 0, position, imgW, imgH, undefined, 'FAST');
-                    heightLeft -= pageH;
-                  }
-
-                  pdf.save('瀏覽軌跡_' + #{email_json} + '_' + timestamp() + '.pdf');
-                  restore();
-                };
-                img.onerror = restore;
-                img.src = dataUrl;
-              })
-              .catch(restore);
-          });
-        })();
-      JS
-    end
+    # JavaScript 已搬到 app/frontend/behaviors/adminUserExport.js（稽核 H-3 Wave 2）。
+    # 原本的 Ruby 插值改成 data attribute 傳入。
+    div(data: { behavior: "admin-user-export", email: @user.email })
   end
 end

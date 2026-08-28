@@ -95,19 +95,8 @@ class FairValue::MethodologyNoteComponent < ApplicationComponent
   private
 
   def toggle_script
-    script do
-      raw <<~JS.html_safe
-        (function() {
-          var btn = document.querySelector('[data-toggle="#{@uid}"]');
-          var panel = document.getElementById('#{@uid}');
-          var icon = document.getElementById('#{@uid}-icon');
-          if (!btn || !panel) return;
-          btn.addEventListener('click', function() {
-            var hidden = panel.classList.toggle('hidden');
-            icon.textContent = hidden ? '▼' : '▲';
-          });
-        })();
-      JS
-    end
+    # JavaScript 已搬到 app/frontend/behaviors/methodologyNoteToggle.js（稽核 H-3 Wave 2）。
+    # 原本的 Ruby 插值改成 data attribute 傳入。
+    div(data: { behavior: "methodology-note-toggle", uid: @uid })
   end
 end

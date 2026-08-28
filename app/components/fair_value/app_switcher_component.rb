@@ -136,35 +136,8 @@ class FairValue::AppSwitcherComponent < ApplicationComponent
   end
 
   def render_script
-    script do
-      raw <<~JS.html_safe
-        (function() {
-          var btn   = document.getElementById('#{@dd_id}-btn');
-          var panel = document.getElementById('#{@dd_id}');
-          var chev  = document.getElementById('#{@dd_id}-chevron');
-          if (!btn || !panel) return;
-
-          function open() {
-            panel.classList.remove('hidden');
-            btn.setAttribute('aria-expanded', 'true');
-            chev.style.transform = 'rotate(180deg)';
-          }
-          function close() {
-            panel.classList.add('hidden');
-            btn.setAttribute('aria-expanded', 'false');
-            chev.style.transform = '';
-          }
-          function toggle() { panel.classList.contains('hidden') ? open() : close(); }
-
-          btn.addEventListener('click', function(e) { e.stopPropagation(); toggle(); });
-          document.addEventListener('click', function(e) {
-            if (!panel.contains(e.target) && e.target !== btn) close();
-          });
-          document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') close();
-          });
-        })();
-      JS
-    end
+    # JavaScript 已搬到 app/frontend/behaviors/appSwitcher.js（稽核 H-3 Wave 2）。
+    # 原本的 Ruby 插值改成 data attribute 傳入。
+    div(data: { behavior: "app-switcher", dd_id: @dd_id })
   end
 end
