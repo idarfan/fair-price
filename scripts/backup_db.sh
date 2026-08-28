@@ -14,7 +14,7 @@ APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKUP_DIR="${HOME}/fairprice-backups"
 WIN_MIRROR_DIR="/mnt/c/Users/mrida/Desktop/fairprice backup"
 WIN_DESKTOP="/mnt/c/Users/mrida/Desktop"
-DB_NAME="fairprice_development"
+DB_NAME="fairprice_production"
 KEEP_DAYS=7
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }

@@ -1,5 +1,32 @@
 # FairPrice
 
+### 2026-08-28 — 正式資料庫更名，並補回 Rails 破壞性指令的保險
+
+接續同日的稽核修正。稽核時發現「測試環境連到正式資料庫」，堵住測試那一側之後
+追下去，根因是**正式資料住在一個叫 `fairprice_development` 的資料庫裡**，
+`fairprice_production` 根本不存在。
+
+連帶造成 Rails 最重要的一道保險失效：`protected_environments` 檢查的是
+**資料庫裡存的環境標記**，而那個標記是 `development`——
+`rails db:drop` / `db:reset` / `db:schema:load` 打在正式資料上，一句都不會攔。
+（先前 `db:test:prepare` 之所以被擋，撞到的是另一道 `EnvironmentMismatchError`，
+是名字對不上的運氣，不是保護。）
+
+- `ALTER DATABASE fairprice_development RENAME TO fairprice_production`，
+  `ar_internal_metadata.environment` 改為 `production`
+- `.env` 的 `DATABASE_URL`、`scripts/backup_db.sh`、`install.sh`、
+  `python/fix_missing_prices.py`、`scripts/options_collector.py` 一併更新
+- `config/database.yml` 的 `development` 也指向 `fairprice_production`
+  ——這台機器上本來就沒有獨立的開發資料庫，明寫出來比讓它看起來像分開的好
+- `config/application.rb` 設 `protected_environments = %w[production development]`：
+  兩個環境共用同一個庫時，那個標記會被 `db:migrate` 寫成當下的 `RAILS_ENV`，
+  只保護 `production` 的話，隨手跑一次不帶 `RAILS_ENV` 的 `db:migrate`
+  就會把標記翻回 `development`，保險靜靜失效。兩個名字都保護才擋得住
+
+**驗收**：`rails db:drop`（development 模式）已被 `ProtectedEnvironmentError` 擋下；
+`db:test:prepare` 與備份腳本照常運作；RSpec 638 examples / 0 failures；
+資料完好（User 5、OptionSnapshot 796,822）；公網 UI 302、API 未登入 401。
+
 ### 2026-08-28 — 稽核修正：關閉 `/api/*` 公網匿名存取，個人資料加上使用者歸屬
 
 以 `RAILS_AUDIT_REPORT.md` 的稽核結果為依據執行修正。

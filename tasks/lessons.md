@@ -956,3 +956,12 @@ LEAPS，Options Flow 等其他頁面若有類似「相對排名當警示」的�
    否則新使用者的第一筆會拿到別人的序號。同理 factory 要加 `user`，
    而 request spec 建資料時必須掛在「自動登入的那個使用者」身上
    （已在 `spec/support/auth_helpers.rb` 提供 `signed_in_user`）。
+
+7. **`protected_environments` 看的是「資料庫裡存的標記」，不是你下的 `RAILS_ENV`**。
+   標記存在 `ar_internal_metadata.environment`，而且**會被 `db:migrate` 寫成當下的
+   `RAILS_ENV`**。所以 dev 與 prod 共用同一個庫時，只保護 `production` 是不夠的
+   ——隨手跑一次不帶 `RAILS_ENV` 的 `db:migrate` 就會把標記翻成 `development`，
+   `db:drop` / `db:reset` 從此暢行無阻。共用庫的正解是
+   `config.active_record.protected_environments = %w[production development]`。
+   **檢查方式**：
+   `rails runner 'puts ActiveRecord::Base.connection.pool.internal_metadata[:environment]'`。

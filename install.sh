@@ -634,7 +634,7 @@ DB_HOST=${DB_HOST}
 DB_PORT=${DB_PORT}
 DB_USER=${DB_USER}
 DB_PASSWORD=${DB_PASSWORD:-}
-DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD:-}@${DB_HOST}:${DB_PORT}/fairprice_development
+DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD:-}@${DB_HOST}:${DB_PORT}/fairprice_production
 
 # Rails
 RAILS_ENV=development
@@ -1069,7 +1069,7 @@ PRE_MARKET
 set -euo pipefail
 
 BACKUP_DIR="${HOME}/fairprice-backups"
-DB_NAME="fairprice_development"
+DB_NAME="fairprice_production"
 DB_USER_PLACEHOLDER=""
 KEEP_DAYS=7
 

@@ -14,7 +14,7 @@ Usage:
 
 Environment:
     DATABASE_URL — PostgreSQL connection string
-                   (e.g. postgresql://user:pass@localhost:5432/fairprice_development)
+                   (e.g. postgresql://user:pass@localhost:5432/fairprice_production)
 
 Schedule (crontab, Taiwan time):
     0 6 * * 2-7 cd /path/to/project && python3 scripts/options_collector.py

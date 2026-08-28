@@ -37,5 +37,14 @@ module Fairprice
     # config.eager_load_paths << Rails.root.join("extras")
 
     config.generators.system_tests = nil
+
+    # development 與 production 共用同一個資料庫（見 config/database.yml），
+    # 而 Rails 的破壞性指令保險是看「資料庫裡存的環境標記」，那個標記會被
+    # db:migrate 寫成當下的 RAILS_ENV——只保護 production 的話，隨手跑一次
+    # 不帶 RAILS_ENV 的 db:migrate 就會把標記翻成 development，保險靜靜失效。
+    #
+    # 兩個名字都保護，db:drop / db:reset / db:schema:load 不管標記漂到哪一邊
+    # 都會被擋下。test 資料庫的標記是 "test"，不受影響，db:test:prepare 照常。
+    config.active_record.protected_environments = %w[production development]
   end
 end
