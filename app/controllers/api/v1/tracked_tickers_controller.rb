@@ -1,11 +1,8 @@
 # frozen_string_literal: true
 
-require "open3"
-
 class Api::V1::TrackedTickersController < Api::V1::BaseController
   def index
-    tickers = TrackedTicker.order(:symbol).map { |t| serialize_ticker(t) }
-    render json: tickers
+    render json: TrackedTickerSerializer.list(TrackedTicker.order(:symbol))
   end
 
   def create
@@ -16,7 +13,7 @@ class Api::V1::TrackedTickersController < Api::V1::BaseController
     ticker.active = true
 
     if ticker.save
-      render json: serialize_ticker(ticker), status: ticker.previously_new_record? ? :created : :ok
+      render json: TrackedTickerSerializer.one(ticker), status: ticker.previously_new_record? ? :created : :ok
     else
       render json: { error: ticker.errors.full_messages.join(", ") }, status: :unprocessable_entity
     end
@@ -25,7 +22,7 @@ class Api::V1::TrackedTickersController < Api::V1::BaseController
   def update
     ticker = TrackedTicker.find(params[:id])
     if ticker.update(ticker_params)
-      render json: serialize_ticker(ticker)
+      render json: TrackedTickerSerializer.one(ticker)
     else
       render json: { error: ticker.errors.full_messages.join(", ") }, status: :unprocessable_entity
     end
@@ -37,36 +34,36 @@ class Api::V1::TrackedTickersController < Api::V1::BaseController
   end
 
   # POST /api/v1/tracked_tickers/:id/collect
-  # 立即執行 Python 蒐集器，抓取該代號的期權快照
+  # 排入背景 job 執行 Python 蒐集器，立刻回 job_id 讓前端輪詢 #collect_status。
+  # （過去是在 request 內同步跑子行程且無 timeout，會把 Puma thread 卡死。）
   def collect
     ticker = TrackedTicker.find(params[:id])
-    python = Rails.root.join("scripts/venv/bin/python3").to_s
-    script = Rails.root.join("scripts/options_collector.py").to_s
+    job_id = SecureRandom.hex(8)
 
-    _output, status = Open3.capture2e(python, script, "--symbols", ticker.symbol, "--force")
+    Rails.cache.write(
+      CollectOptionSnapshotsJob.cache_key(job_id),
+      { status: "pending", symbol: ticker.symbol },
+      expires_in: CollectOptionSnapshotsJob::CACHE_TTL
+    )
+    CollectOptionSnapshotsJob.perform_later(ticker.id, job_id)
 
-    if status.success?
-      ticker.reload
-      render json: serialize_ticker(ticker)
-    else
-      render json: { error: "#{ticker.symbol} 期權資料抓取失敗，請確認 Python 環境" },
-             status: :unprocessable_entity
-    end
+    render json: { job_id: job_id, symbol: ticker.symbol, status: "pending" }, status: :accepted
+  end
+
+  # GET /api/v1/tracked_tickers/collect_status?job_id=...
+  def collect_status
+    job_id = params[:job_id].to_s.gsub(/[^a-f0-9]/, "")
+    return render json: { status: "error", errors: [ "missing job_id" ] }, status: :unprocessable_entity if job_id.blank?
+
+    cached = Rails.cache.read(CollectOptionSnapshotsJob.cache_key(job_id))
+    return render json: { status: "expired", errors: [ "工作已過期，請重試" ] } if cached.nil?
+
+    render json: cached
   end
 
   private
 
   def ticker_params
     params.require(:tracked_ticker).permit(:active)
-  end
-
-  def serialize_ticker(ticker)
-    {
-      id:                 ticker.id,
-      symbol:             ticker.symbol,
-      name:               ticker.name,
-      active:             ticker.active,
-      last_snapshot_date: ticker.last_snapshot_date
-    }
   end
 end

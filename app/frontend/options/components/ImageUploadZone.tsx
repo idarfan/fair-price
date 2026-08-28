@@ -1,4 +1,5 @@
 import React, { useRef, useState, useCallback } from 'react'
+import { csrfHeaders } from '../../lib/csrf'
 
 export interface OcrResult {
   symbol:         string
@@ -149,7 +150,7 @@ export default function ImageUploadZone({ onResult }: Props) {
     form.append('image', file)
 
     try {
-      const res  = await fetch('/api/v1/options/analyze_image', { method: 'POST', body: form })
+      const res  = await fetch('/api/v1/options/analyze_image', { method: 'POST', headers: csrfHeaders(), body: form })
       const data = await res.json() as OcrResult & { error?: string }
       if (!res.ok) throw new Error(data.error ?? '分析失敗')
       setResult(data)

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Api::IvAnalysisController < ApplicationController
-  protect_from_forgery with: :null_session
+  include JsonAuthGate
 
   # POST /api/iv_analysis
   def create
@@ -88,43 +88,7 @@ class Api::IvAnalysisController < ApplicationController
   def watchlist
     watched = WatchedTicker.active.order(added_at: :desc).to_a
 
-    # Parallel live price + IV fetch (HTTP only — no AR inside threads)
-    live_prices = {}
-    hv_ranks    = {}
-    threads = watched.flat_map { |wt|
-      [
-        Thread.new {
-          begin
-            [ :live, wt.ticker, IvSidecarService.fetch_atm_iv(wt.ticker) ]
-          rescue StandardError
-            [ :live, wt.ticker, nil ]
-          end
-        },
-        Thread.new {
-          begin
-            [ :hv, wt.ticker, IvRankService.new(wt.ticker).call ]
-          rescue StandardError
-            [ :hv, wt.ticker, nil ]
-          end
-        },
-        Thread.new {
-          begin
-            [ :skew, wt.ticker, IvSidecarService.fetch_skew(wt.ticker) ]
-          rescue StandardError
-            [ :skew, wt.ticker, nil ]
-          end
-        }
-      ]
-    }
-    skew_data = {}
-    threads.each do |t|
-      type, ticker, result = t.value
-      case type
-      when :live  then live_prices[ticker] = result
-      when :hv    then hv_ranks[ticker]    = result
-      when :skew  then skew_data[ticker]   = result
-      end
-    end
+    live_prices, hv_ranks, skew_data = parallel_market_data(watched)
 
     tickers = watched.map do |wt|
       snaps          = IvDailySnapshot.for_ticker(wt.ticker).ordered
@@ -236,6 +200,51 @@ class Api::IvAnalysisController < ApplicationController
   end
 
   private
+
+  # 每個代號要抓三種外部資料（即時 IV、HV rank、skew）。
+  # 過去是 watched.flat_map 一次開 3N 條 thread，數量隨清單長度無上限成長——
+  # 100 個代號就是 300 條同時對外的 HTTP 連線。改成比照 MomentumReportService
+  # 的分批寫法，同時在途的請求數有上限。純 HTTP，thread 內不碰 ActiveRecord。
+  PARALLEL_FETCH_BATCH = 6
+
+  def parallel_market_data(watched)
+    jobs = watched.flat_map do |wt|
+      [
+        [ :live, wt.ticker, -> { IvSidecarService.fetch_atm_iv(wt.ticker) } ],
+        [ :hv,   wt.ticker, -> { IvRankService.new(wt.ticker).call } ],
+        [ :skew, wt.ticker, -> { IvSidecarService.fetch_skew(wt.ticker) } ]
+      ]
+    end
+
+    results = jobs.each_slice(PARALLEL_FETCH_BATCH).flat_map do |batch|
+      batch.map { |kind, ticker, fetch|
+        Thread.new do
+          [ kind, ticker, safely_fetch(kind, ticker, &fetch) ]
+        end
+      }.map(&:value)
+    end
+
+    live_prices = {}
+    hv_ranks    = {}
+    skew_data   = {}
+    results.each do |kind, ticker, value|
+      case kind
+      when :live then live_prices[ticker] = value
+      when :hv   then hv_ranks[ticker]    = value
+      when :skew then skew_data[ticker]   = value
+      end
+    end
+
+    [ live_prices, hv_ranks, skew_data ]
+  end
+
+  # 單一代號抓取失敗不該讓整份 watchlist 掛掉，但也不該無聲無息。
+  def safely_fetch(kind, ticker)
+    yield
+  rescue StandardError => e
+    Rails.logger.warn("[IvAnalysis#watchlist] #{kind} #{ticker} 失敗：#{e.class}: #{e.message}")
+    nil
+  end
 
   def build_signal(stats)
     if stats.available_days < 30

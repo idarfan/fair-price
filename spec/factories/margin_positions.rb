@@ -2,6 +2,7 @@
 
 FactoryBot.define do
   factory :margin_position do
+    user
     symbol     { "AAPL" }
     buy_price  { 180.00 }
     shares     { 100.0 }

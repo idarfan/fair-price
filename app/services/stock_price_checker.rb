@@ -14,6 +14,7 @@ class StockPriceChecker
       return
     end
 
+    # 同上：排程作業，刻意跨所有使用者的到價通知。
     alerts = PriceAlert.active.to_a
     return if alerts.empty?
 

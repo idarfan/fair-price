@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class PriceAlert < ApplicationRecord
+  belongs_to :user
+
   VALID_CONDITIONS = %w[above below].freeze
 
   validates :symbol,       presence: true
@@ -23,6 +25,6 @@ class PriceAlert < ApplicationRecord
   end
 
   def set_position
-    self.position = (self.class.maximum(:position) || -1) + 1
+    self.position = (user.price_alerts.maximum(:position) || -1) + 1
   end
 end

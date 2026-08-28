@@ -62,10 +62,18 @@ RSpec.describe PriceAlert, type: :model do
       expect(alert.position).to eq(0)
     end
 
-    it "increments position for subsequent records" do
-      create(:price_alert, symbol: "AAPL")
-      second = create(:price_alert, symbol: "TSLA")
+    it "increments position for subsequent records of the same user" do
+      user = create(:user)
+      create(:price_alert, symbol: "AAPL", user: user)
+      second = create(:price_alert, symbol: "TSLA", user: user)
       expect(second.position).to eq(1)
+    end
+
+    # 稽核 C-2：position 是「這個使用者的第幾筆」，不是全表流水號。
+    it "restarts at 0 for a different user" do
+      create(:price_alert, symbol: "AAPL", user: create(:user))
+      other = create(:price_alert, symbol: "TSLA", user: create(:user))
+      expect(other.position).to eq(0)
     end
   end
 

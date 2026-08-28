@@ -1,90 +1,92 @@
-# Phase H：intrinsic_value / extrinsic_value 衍生欄位
+# 稽核修正 — 2026-08-28
 
-_最後更新：2026-07-04_
+依 `RAILS_AUDIT_REPORT.md` 執行。基準 commit `39ac654`。
 
-規格：`leaps-call-recommendation-spec.md` Phase H 節（2026-07-04 版，人工對照已拆 fixture/live 兩層）
+## 決策（已與使用者確認）
+- `force_ssl`：只在公網網域強制，`localhost` / `127.0.0.1` / `/up` 排除
+- `user_id` 遷移：全部 6 張表都做，既有資料 backfill 給 `mr.idarfan@gmail.com`
 
-- [x] 改前截圖（UI 強制流程第 1 步）
-- [x] Migration：加 `intrinsic_value`/`extrinsic_value`（decimal 10,4，允許 null）+ up_only SQL backfill
-- [x] `LeapsOptionChainSnapshot.derived_values`：公式唯一定義（Mid 基準、option_type 分支、bid/ask/spot 缺值 → 雙欄 null）
-- [x] `persist_leaps`：每筆 row 呼叫 derived_values 存入；`leaps_scraper.py` 零改動
-- [x] `LeapsRankingService#enrich`：改讀 DB 欄位，移除排行層重複公式；新增 `extrinsic_pct = extrinsic_value / mid`（display 層，mid≤0 或缺值 → nil）
-- [x] `page_component.rb`：表格加「內在價值／外在價值／外在佔比」三欄（Spread% 之後、Time Value% 之前），nil 顯示「—」
-- [x] 單元測試：深 ITM call／OTM call／bid 或 ask null／put 分支／NVTS 2026-07-02 fixture 釘公式
-- [x] display 層測試：mid=0 或 null → 佔比 nil
-- [x] request spec：完整 HTTP 路徑驗證新欄位渲染
-- [x] `rails db:migrate` + 全套 RSpec
-- [x] rebuild CSS + E2E：NVTS 不帶 user_strike 完整查詢，新欄位全數有值
-- [x] live 層人工對照：當次抓到的 bid/ask/spot 手算兩筆 vs 頁面顯示（不得對 2026-07-02 歷史數值）
-- [x] 改後截圖比對（UI 強制流程第 3 步）
-- [x] 規格 checklist 打勾附證據、commit、Obsidian 日誌
+## C-1 `/api/*` 認證缺口（公網已實測曝露）
+- [x] `ApplicationController` 把 `/api` 移出白名單，前綴比對改成 anchored regex
+- [x] 抽出 `gate_deny(reason)` hook，讓 API 能改回 JSON 而非 302
+- [x] 新增 `JsonAuthGate` concern（401/403 JSON + CSRF 失敗轉 JSON）
+- [x] `Api::V1::BaseController` 與 `Api::IvAnalysisController` 套用，CSRF 由 `null_session` 改 `exception`
+- [x] 補三處缺 `X-CSRF-Token` 的前端寫入：`OwnershipApp` / `OptionsAnalyzerApp` / `ImageUploadZone`
+- [x] 改寫 `auth_gate_spec` 的 `leaves /api/* accessible`，改成斷言 401
+- [x] 新增 `spec/requests/api/auth_gate_spec.rb` 覆蓋讀取與破壞性端點
 
----
+## C-2 財務資料加 user_id
+- [x] migration：6 張表加 `user_id`，backfill admin，加 index + FK，改 `null: false`
+- [x] model 加 `belongs_to :user`，`User` 加對應 `has_many`
+- [x] controller 全改 `current_user.xxx` scope
+- [x] 既有 spec 與 factory 補 user 關聯
 
-## LEAPS Delta 修正 — 已結案 ✅（2026-07-02）
+## High
+- [x] H-1 `tracked_tickers#collect` 改背景 job（比照 ScrapeLeapsJob 的 cache 回報模式）
+- [x] H-2 `force_ssl` + `assume_ssl` + `ssl_options` 排除 localhost 與 `/up`
+- [x] H-4 `TrackedTicker#last_snapshot_date` N+1 → group query
+- [x] H-5 `iv_analysis#watchlist` 無上限 thread → 固定大小 pool
+- [x] H-6 `bundle update mail`（GHSA-mvxr-6m87-mv2q）
 
-截圖：`leaps-nok-delta-verify.png`、`leaps-klac-partial-error.png`；詳見 git log 與規格第 3 節。
+## Medium
+- [x] M-1 刪 `public/tech_prototype.html`
+- [x] M-2 三處把 `e.message` 直接回客戶端 → log 詳細、回籠統訊息
+- [x] M-3 `barchart_scraper_service.rb:422` 裸 rescue 補 log
+- [x] M-4 `TrackController#page_view` 檢查 `save` 回傳值
+- [x] M-5 `iv_watchlists.ticker` 補 unique index；`iv_queries` 補索引
 
----
+## 不在本次範圍
+- H-3 內嵌 JS 遷移到 Vite（工程量最大，另開）
+- L-2 Service → PORO 更名
+- L-1 補測試：只補本次改動相關的，不做全面補測
 
-## Review（2026-07-04 收尾）
-
-- 全套 RSpec：352 examples, 0 failures（+15：derived_values 9、fixture 層 2、ranking 4、request 2，減去既有重跑）
-- E2E：NVTS 不帶 user_strike，76/76 rows 新欄位有值；live 手算兩筆與頁面一致
-- 插曲：首跑 E2E 因 pm2 server schema cache 過期（migration 前啟動）→ insert_all ROLLBACK；
-  transaction 設計正確保住舊資料；重啟後通過。教訓：migration 後必須重啟 dev server 再跑 E2E。
----
-
-## Phase I：匯出 PNG/PDF — 已結案 ✅（2026-07-05）
-
-- vendor 本地檔（html-to-image-1.11.11 + jspdf-2.5.2，版本釘死）、layout CDN 標籤一併替換
-- 右上角雙按鈕、事件委派、無資料 disabled、匯出中防重複
-- PDF = PNG 嵌入 + FAST 壓縮（48MB→550KB）
-- 修正：clone 內捲軸 → 無條件展開 overflow 容器再還原
-- E2E：真實點擊下載事件 ×2 + 開檔驗收（20 列 flow 完整、中文正常、背景正確）
-- 352 examples, 0 failures
----
-
-## 待辦：Phase H live 對照補驗（台灣時間 2026-07-06 週一 ~21:30 美股開盤後）
-
-- [ ] 重查 NVTS（不帶 user_strike），從當次抓到的資料任取一筆，用當次 bid/ask/spot
-  手算內在/外在/佔比，與頁面顯示值比對，附手算過程。
-  背景：2026-07-05 的 live 對照跑在休市期間、報價凍結、鑑別力不足。
-  一致後 fresh window／Phase H／Phase I 三項才算真正全部結案。
----
-
-## LEAPS 欄位教學（driver.js tooltips）— 已結案 ✅（2026-07-05）
-
-三層互動全驗收：hover 深色 tooltip、點擊聚光 popover（深色）、28 步 tour；
-28 欄 0 dead key；匯出 PNG md5 與前版逐位元組一致；352 examples 全過。
-規格：leaps-column-tooltips-spec.md（checklist 已附證據打勾）
----
-
-## LEAPS 主 spec 索引同步（規格文件，非程式碼）— 已結案 ✅（2026-07-11）
-
-- [x] 審視 `leaps-call-recommendation-spec.md` 是否已納入 `leaps-phase-j-vector-pdf-spec.md`（PDF 向量文字化）的完成狀態
-- [x] 補「接手前必讀」摘要句：加入 Phase J 交付內容＋4 輪補做清單（名詞解釋圖卡／Flow 總額與重疊提示／語意色與推薦徽章／術語字卡＋IPA 音標字型）
-- [x] 補「執行方式」階段索引：Phase J 已結案，指向子規格檔進度追蹤區
-- [x] 補「路由與前端」節：記錄 LEAPS 頁面在 sidebar 的現行位置（`APP_LINKS` 第 12 項、icon/label/href/desc、所屬 app = FairPrice port 3003）
-- [x] commit + push（`a11ac6b..4357146`）
-- [x] Obsidian 工作日誌寫入（`fairprice/2026-07-11 工作日誌.md`）
-
-## Review（2026-07-11）
-
-- 純規格文件同步，無程式碼異動，未觸發 RSpec/E2E。
-- 根因：Phase J 獨立成子規格檔後，主 spec 的頂層摘要句／階段索引沒有同步更新，造成新 session 讀「接手前必讀」時會誤判 Phase J 還沒開始，需額外去查子規格檔進度追蹤區才發現其實已結案。
-- 教訓（已寫入 Obsidian 日誌，待補進 `tasks/lessons.md`）：往後每完成一個獨立 Phase 子規格，除子規格自身的進度追蹤區外，也要回頭檢查主 spec 頂層摘要是否同步列入；規格中的「原則性指示」與「已交付事實」應分開記錄，避免事實面隨程式改動而與規格脫節。
+## 驗收
+- [x] `bundle exec rspec` 全綠
+- [x] 公網 `https://fairprice-ohmy.com/api/v1/tracked_tickers` 未登入回 401
 
 ---
 
-## CdpPrecheckable concern — 已結案 ✅（2026-08-06）
+## Review（2026-08-28 完成）
 
-背景：全域 CLAUDE.md「CDP 預檢（全域強制）」規則要求所有觸發 Barchart/Playwright CDP 抓取的 controller action，在排 job 之前先檢查 CDP 是否連線；但 fairprice app 原本完全沒有落地這個機制（2026-07-11 同步 fairprice-installer 時順手核對發現）。
+### 執行結果
+- RSpec **638 examples / 0 failures**（且是第一次真正跑在隔離的 `fairprice_test` 上）
+- Brakeman 0 warnings｜RuboCop 339 檔無 offense｜bundler-audit 無漏洞｜ESLint 無新增問題
+- 公網實測：`https://fairprice-ohmy.com/api/*` 未登入回 **401**（修正前是 200 + 真實資料）
 
-- [x] 建立 `app/controllers/concerns/cdp_precheckable.rb`：對 `http://127.0.0.1:9222/json/version` 發請求，2 秒 timeout，失敗直接回錯誤、不排 job
-- [x] `LeapsRecommendationsController`、`BullPutSpreadsController`、`BullCallSpreadsController` 原本各自維護一份重複的 `cdp_online?`（三份幾乎一樣，timeout 還不一致：5s / 2s / 2s），已收斂成 `include CdpPrecheckable`
-- [x] `TechnicalDashboardsController`（`analyze`、`fetch_max_pain`）原本完全沒有 CDP 預檢，已補上；連帶修正 JS 輪詢邏輯，`cdp_offline` 狀態原本會被吞掉不轉發到 redirect URL
-- [x] `BullPutSpreadsController#volatility`（背景輪詢 endpoint）原本也沒有預檢，已補上（CDP 離線時靜默跳過排 job，維持該 endpoint 原有的「不阻塞、不等待」設計，不彈錯誤給使用者）
-- [x] 錯誤訊息固定文字：`CdpPrecheckable::CDP_OFFLINE_MESSAGE` 常數，四個 controller 共用同一份
-- [x] 驗收：`spec/requests/technical_dashboards_spec.rb`（新建）、`bull_put_spreads_spec.rb`（新增 volatility 覆蓋）等涵蓋「CDP 離線時直接擋下、不送 job」；LEAPS／BPUS fetch_expirations／BCVS fetch_expirations 本來就有覆蓋
-- [x] 規則本身只負責回報，不嘗試自動修復
+### 與原計畫的三處偏離
+
+1. **C-2 只做 3 張表，不是 6 張**（使用者原選「全部 6 張」）。
+   追下去發現 `TrackedTicker` 驅動夜間 Python 蒐集器、產出 79 萬列共用的
+   `OptionSnapshot`；`WatchlistItem` 是 `OuouPreMarketService` 排程 Telegram
+   盤前報告的來源；`IvWatchlist` 是有 group_tag 分類的共用參考清單。
+   這三張是**共用市場資料**，加 user_id 會讓爬蟲與排程碎片化。
+   只對真正個人性的 `margin_positions` / `portfolios` / `price_alerts` 加歸屬。
+   若仍要全部 6 張，需要先決定排程作業要用哪個使用者的清單。
+
+2. **M-5 的前半段是誤判**。稽核報告寫「`iv_watchlists.ticker` 缺 unique index」，
+   實際上該欄位叫 `symbol` 且已有 unique index——是報告的自動檢查腳本猜錯欄位名。
+   **13 個 uniqueness validation 全部都有對應的 unique index，沒有缺口。**
+   後半段（`iv_queries` 零索引）成立，已修。
+
+3. **`force_ssl` 沒有照原本說的加 `assume_ssl`**。實測 `assume_ssl` 會讓
+   `http://localhost:3003` 的 redirect 也產生 `https://` 網址，本機瀏覽直接壞掉。
+   改為依 cloudflared 的 `X-Forwarded-Proto` 判斷，已實測兩邊都正確。
+
+### 稽核當下沒發現、修的過程中才抓到的
+
+- **測試環境連到正式資料庫**（見 README）。這比報告裡任何一項都嚴重：
+  RSpec 一直跑在 `fairprice_development` 上，13 個失敗中有 8 個是正式資料污染
+  造成的假結果。也代表稽核報告裡「627 examples 全綠」那個基準本身就不可信。
+- `option_price_tracker_controller` 與 API controller 有一份**重複的 serializer**，
+  兩份都踩同一個 N+1（違反 `~/.claude/rules/rails-gotchas.md` 的「Serializer 不可重複定義」）。
+
+### 已知仍未處理
+
+- **H-3 內嵌 JS 遷移到 Vite**（7 個元件、最大單一方法 725 行）。工程量最大，
+  是 13 個 F 級檔案、CSP `unsafe_inline`、元件 5000 行零覆蓋的共同成因。
+- **前端沒有 `tsconfig.json`**，`~/.claude/rules/typescript.md` 要求的
+  `strict` / `noUncheckedIndexedAccess` / `npx tsc --noEmit` 目前都無法執行。
+  ESLint 現存 20 個 `no-undef`（`document` / `window` / `fetch` 等瀏覽器全域）
+  是 ESLint env 設定沒開 browser 造成的，不是真的錯誤。
+- **測試覆蓋率仍偏低**。本次只補了與改動相關的測試（API 閘門、跨使用者隔離、
+  PriceAlert position 分使用者），沒有做全面補測。

@@ -1,5 +1,6 @@
 FactoryBot.define do
   factory :price_alert do
+    user
     symbol      { "AAPL" }
     target_price { 200.0 }
     condition    { "above" }

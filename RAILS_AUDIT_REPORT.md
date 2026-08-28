@@ -2,6 +2,7 @@
 
 - **審計日期**：2026-08-28
 - **審計基準 commit**：`39ac654`（main，工作區乾淨）
+- **修正狀態**：C-1 / C-2 / H-1 / H-2 / H-4 / H-5 / H-6 / M-1～M-5 已於 2026-08-28 修正並上線，詳見 `README.md` 與 `tasks/todo.md` 的 Review。H-3（內嵌 JS 遷移）與 L-1（全面補測）未處理。
 - **Rails 版本**：8.1.3.1 ／ **Ruby**：4.0.1
 - **審計依據**：thoughtbot《Ruby Science》《Testing Rails》最佳實務
 - **規模**：34 controllers、33 models、41 services、75 components、202 個受測 Ruby 檔
@@ -238,12 +239,18 @@ maxes = OptionSnapshot.where(tracked_ticker_id: tickers.map(&:id))
 瀏覽軌跡是 admin 後台「累積停留時間」的資料來源，靜默失敗會讓統計無聲失真。
 至少改成 `Rails.logger.warn unless activity.save`。
 
-### M-5. `iv_watchlists.ticker` 有 uniqueness validation 但缺 unique index
+### M-5. `iv_queries` 表完全沒有任何索引 ✅ 已修
 
-**位置**：`app/models/iv_watchlist.rb:8` vs `db/schema.rb`
+**位置**：`db/schema.rb`
 
-其他 12 個 uniqueness validation **全部**都有對應的 unique index（做得很好），
-只有這一個漏掉，並發時會寫入重複列。`iv_queries` 表則是完全沒有任何索引。
+`Api::IvAnalysisController#watchlist` 對每個 watchlist 代號執行
+`IvQuery.where(ticker:).order(queried_at: :desc).first`——每次全表掃描，
+而這張表只會越長越大。已補上 `[ticker, queried_at]` 索引。
+
+> **勘誤**：本節原本還寫「`iv_watchlists.ticker` 有 uniqueness validation 但缺
+> unique index」，這是誤判——該欄位實際叫 `symbol` 且已有 unique index，是自動
+> 檢查腳本猜錯欄位名。**13 個 uniqueness validation 全部都有對應的 unique index，
+> 沒有缺口**，「DB schema 紀律優良」那條評語比原文寫的更成立。
 
 ### M-6. 兩個大型元件的重複程式碼
 

@@ -4,16 +4,16 @@ class StockAlertsController < ApplicationController
   before_action :set_alert, only: %i[edit update destroy toggle toggle_condition]
 
   def index
-    @alerts = PriceAlert.order(:position, :id)
+    @alerts = current_user.price_alerts.order(:position, :id)
     @market_data = fetch_market_data(@alerts.map(&:symbol).uniq)
   end
 
   def new
-    @alert = PriceAlert.new
+    @alert = current_user.price_alerts.new
   end
 
   def create
-    @alert = PriceAlert.new(alert_params)
+    @alert = current_user.price_alerts.new(alert_params)
     if @alert.save
       redirect_to watchlist_alerts_path, notice: "已建立 #{@alert.symbol} 的到價通知"
     else
@@ -49,7 +49,7 @@ class StockAlertsController < ApplicationController
 
   def reorder
     params[:ids]&.each_with_index do |id, index|
-      PriceAlert.where(id: id.to_i).update_all(position: index) # rubocop:disable Rails/SkipsModelValidations
+      current_user.price_alerts.where(id: id.to_i).update_all(position: index) # rubocop:disable Rails/SkipsModelValidations
     end
     head :ok
   end
@@ -57,7 +57,7 @@ class StockAlertsController < ApplicationController
   private
 
   def set_alert
-    @alert = PriceAlert.find(params[:id])
+    @alert = current_user.price_alerts.find(params[:id])
   end
 
   def alert_params

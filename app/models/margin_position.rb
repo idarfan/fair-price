@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class MarginPosition < ApplicationRecord
+  belongs_to :user
+
   VALID_STATUSES = %w[open closed].freeze
   SYMBOL_FORMAT  = /\A[A-Za-z0-9.\-]{1,10}\z/
 

@@ -17,7 +17,9 @@ class TrackController < ApplicationController
       ended_at:      Time.current,
       duration_ms:   params[:duration_ms]
     )
-    activity.save
+    unless activity.save
+      Rails.logger.warn("[Track#page_view] 寫入失敗：#{activity.errors.full_messages.join(', ')}")
+    end
     head :no_content
   end
 

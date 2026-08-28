@@ -20,7 +20,14 @@ module AuthHelpers
     sign_in_as(user)
     code = ROTP::TOTP.new(DEFAULT_TOTP_SECRET).now
     post "/two_factor/challenge", params: { code: code }
-    user
+    @signed_in_user = user
+  end
+
+  # 自動登入的那個使用者。個人性資料（MarginPosition / Portfolio / PriceAlert）
+  # 現在有 user 歸屬，request spec 建測試資料時必須掛在這個人身上，
+  # 否則 controller 的 current_user scope 會（正確地）看不到。
+  def signed_in_user
+    @signed_in_user
   end
 end
 

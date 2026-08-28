@@ -11,9 +11,24 @@ development:
   <<: *default
   database: fairprice_development
 
+# .env 裡的 DATABASE_URL 指向 fairprice_development，而 dotenv-rails 在 test
+# 環境同樣會載入 .env——沒有下面這行 `url:`，DATABASE_URL 會蓋掉 `database:`，
+# 整套測試就會跑在正式資料上（rspec 讀得到真實資料、db:test:prepare 會試圖
+# purge 正式資料庫，只是被 Rails 的 protected environments 擋下來）。
+#
+# 明確指定 url 是唯一能穩定壓過 DATABASE_URL 的方式，而且寫在版控檔案裡，
+# 不會像放在 .env.test 那樣在新環境 checkout 後無聲消失。
 test:
   <<: *default
   database: fairprice_test
+  url: <%= ENV.fetch("TEST_DATABASE_URL") do
+             require "cgi"
+             user = ENV.fetch("DB_USER", "idarfan")
+             pass = CGI.escape(ENV.fetch("DB_PASSWORD", ""))
+             host = ENV.fetch("DB_HOST", "localhost")
+             port = ENV.fetch("DB_PORT", 5432)
+             "postgresql://#{user}:#{pass}@#{host}:#{port}/fairprice_test"
+           end %>
 
 production:
   <<: *default

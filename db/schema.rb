@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_29_111324) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_28_120307) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -126,6 +126,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_29_111324) do
     t.decimal "strike", precision: 10, scale: 2
     t.string "ticker"
     t.datetime "updated_at", null: false
+    t.index ["ticker", "queried_at"], name: "index_iv_queries_on_ticker_and_queried_at", order: { queried_at: :desc }
   end
 
   create_table "iv_watchlists", force: :cascade do |t|
@@ -175,8 +176,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_29_111324) do
     t.string "status", default: "open", null: false
     t.string "symbol", null: false
     t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
     t.index ["status", "opened_on"], name: "index_margin_positions_on_status_and_opened_on"
     t.index ["status"], name: "index_margin_positions_on_status"
+    t.index ["user_id"], name: "index_margin_positions_on_user_id"
   end
 
   create_table "max_pain_contract_snapshots", force: :cascade do |t|
@@ -385,7 +388,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_29_111324) do
     t.string "symbol", null: false
     t.decimal "unit_cost", precision: 15, scale: 5, null: false
     t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
     t.index ["symbol"], name: "index_portfolios_on_symbol"
+    t.index ["user_id"], name: "index_portfolios_on_user_id"
   end
 
   create_table "price_alerts", force: :cascade do |t|
@@ -398,9 +403,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_29_111324) do
     t.decimal "target_price", precision: 12, scale: 4
     t.datetime "triggered_at"
     t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
     t.index ["active"], name: "index_price_alerts_on_active"
     t.index ["position"], name: "index_price_alerts_on_position"
     t.index ["symbol"], name: "index_price_alerts_on_symbol"
+    t.index ["user_id"], name: "index_price_alerts_on_user_id"
   end
 
   create_table "skew_rank_daily", force: :cascade do |t|
@@ -597,7 +604,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_29_111324) do
     t.index ["symbol"], name: "index_watchlist_items_on_symbol", unique: true
   end
 
+  add_foreign_key "margin_positions", "users"
   add_foreign_key "option_snapshots", "tracked_tickers"
   add_foreign_key "ownership_holders", "ownership_snapshots"
+  add_foreign_key "portfolios", "users"
+  add_foreign_key "price_alerts", "users"
   add_foreign_key "user_activities", "users"
 end

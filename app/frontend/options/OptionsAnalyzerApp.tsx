@@ -22,6 +22,7 @@ import PayoffChart from "./components/PayoffChart";
 import SentimentPanel from "./components/SentimentPanel";
 import { OcrResult } from "./components/ImageUploadZone";
 import StockLogo from "../components/StockLogo";
+import { csrfHeaders } from "../lib/csrf";
 
 // ─── Panel IDs & defaults ─────────────────────────────────────────────────────
 
@@ -304,6 +305,7 @@ function HeaderUploadZone({
       );
       const res = await fetch("/api/v1/options/analyze_image", {
         method: "POST",
+        headers: csrfHeaders(),
         body: fd,
       });
       const data = await res.json();

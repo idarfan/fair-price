@@ -4,10 +4,8 @@ import { PositionRow } from './PositionRow'
 import { PositionTotals } from './PositionTotals'
 import { fmtUSD, fmtDate } from '../utils/format'
 import type { MarginPosition, AddPositionPayload } from '../types'
+import { csrfToken } from '../../lib/csrf'
 
-function csrfToken(): string {
-  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? ''
-}
 
 const API_BASE = '/api/v1/margin_positions'
 

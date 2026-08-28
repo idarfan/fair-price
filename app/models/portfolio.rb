@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Portfolio < ApplicationRecord
+  belongs_to :user
+
   validates :symbol,    presence: true,
                         format: { with: /\A[A-Za-z0-9.\-]{1,10}\z/, message: "格式不正確" }
   validates :shares,    numericality: { greater_than: 0 }

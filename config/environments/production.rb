@@ -21,14 +21,31 @@ Rails.application.configure do
   # Enable serving of images, stylesheets, and JavaScripts from an asset server.
   # config.asset_host = "http://assets.example.com"
 
-  # Assume all access to the app is happening through a SSL-terminating reverse proxy.
-  # config.assume_ssl = true
+  # 對外流量走 Cloudflare Tunnel（cloudflared），TLS 在 Cloudflare 端終結，
+  # 回源是 http://localhost:3003，cloudflared 會帶 X-Forwarded-Proto: https。
+  #
+  # 這裡刻意「不」開 config.assume_ssl：它是無條件把每個請求都標記成 https，
+  # 連本機直連 http://localhost:3003 也會被當成 https，導致所有 redirect_to
+  # 產生 https:// 網址，本機瀏覽與 Playwright 流程整個壞掉。
+  # 不開的話 Rails 依 X-Forwarded-Proto 判斷，公網是 https、本機是 http，兩邊都正確。
+  config.force_ssl = true
 
-  # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
-  # config.force_ssl = true
-
-  # Skip http-to-https redirect for the default health check endpoint.
-  # config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
+  # exclude 同時關掉「導向 https」與「把 cookie 標記 Secure」兩件事，
+  # 所以本機直連（http://localhost:3003）與健康檢查都不受影響——本機沒有 TLS
+  # 監聽器，一旦被導向 https 或拿到 Secure cookie，開發與 Playwright 流程就會壞掉。
+  # 公網網域走完整的 force_ssl。
+  #
+  # HSTS 由 Rails 這邊關掉，改在 Cloudflare 端設定：ActionDispatch::SSL 的 HSTS
+  # header 不受 exclude 管轄，會一起送給 localhost，把瀏覽器對 localhost 的
+  # http 存取永久鎖成 https。
+  config.ssl_options = {
+    hsts:     false,
+    redirect: {
+      exclude: lambda { |request|
+        request.path == "/up" || %w[localhost 127.0.0.1 ::1].include?(request.host)
+      }
+    }
+  }
 
   # Log to STDOUT with the current request id as a default log tag.
   config.log_tags = [ :request_id ]

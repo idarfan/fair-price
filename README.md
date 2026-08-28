@@ -1,5 +1,59 @@
 # FairPrice
 
+### 2026-08-28 — 稽核修正：關閉 `/api/*` 公網匿名存取，個人資料加上使用者歸屬
+
+以 `RAILS_AUDIT_REPORT.md` 的稽核結果為依據執行修正。
+
+**Critical**
+
+- **`/api/*` 整個命名空間過去不需要登入，且 CSRF 關閉**。`ApplicationController` 的
+  `GATE_EXEMPT_PREFIXES` 含 `/api`，導致 Google OAuth + 強制 TOTP + 雙重逾時那一整套
+  防護在 API 上完全不生效。實測 `https://fairprice-ohmy.com/api/v1/tracked_tickers`
+  從公開網際網路匿名回 200 + 真實資料，`DELETE /api/v1/margin_positions/:id` 等
+  破壞性端點同樣匿名可打。現在 API 與 UI 共用同一份閘門，只是把 302 導頁換成
+  401/403 JSON（新增 `JsonAuthGate` concern）；CSRF 由 `null_session` 改為 `exception`
+- 前綴白名單由 `start_with?` 改成 anchored regex，避免 `/logout_backdoor` 這類路徑誤入白名單
+- **個人性資料加上 `user_id`**（`margin_positions` / `portfolios` / `price_alerts`），
+  既有資料歸給 admin。目前有 5 個 enabled 帳號，這些表過去是全站共用的；最嚴重的是
+  `PortfoliosController#ocr_import` 裡的 `Portfolio.delete_all`——任何使用者匯入截圖
+  就會清空所有人的持股。`TrackedTicker` / `WatchlistItem` / `IvWatchlist` 刻意不加歸屬，
+  它們是共用的市場資料與排程來源
+- **測試環境連到正式資料庫**：`.env` 的 `DATABASE_URL` 寫死指向 `fairprice_development`，
+  而 dotenv-rails 在 test 環境同樣會載入 `.env`，整套 RSpec 一直跑在正式資料上
+  （`db:test:prepare` 曾試圖 purge 正式資料庫，被 Rails protected environments 擋下）。
+  `config/database.yml` 的 test 區塊改為明確指定 `url:` 壓過 `DATABASE_URL`。
+  隔離後原本 13 個失敗中有 8 個消失——那些是正式資料污染造成的假結果
+
+**High**
+
+- `tracked_tickers#collect` 從 request 內同步跑 Python 子行程改成 `CollectOptionSnapshotsJob`
+  背景執行，加上 5 分鐘硬性 timeout 與子行程強制回收。過去無 timeout，`RAILS_MAX_THREADS`
+  只有 5，五個請求就能讓整站沒有回應。前端改為輪詢 `collect_status`
+- `config.force_ssl` 啟用（Secure cookie）。刻意不開 `assume_ssl`——它會無條件把每個請求
+  標記成 https，讓本機 `http://localhost:3003` 的 redirect 也變成 https。改為依
+  cloudflared 送來的 `X-Forwarded-Proto` 判斷，公網 https、本機 http 兩邊都正確。
+  HSTS 交給 Cloudflare 端設定，避免把 localhost 鎖成 https
+- `TrackedTicker#last_snapshot_date` 的 N+1：兩個 controller 各自維護一份重複的
+  serializer 且都逐筆查 `MAX(snapshot_date)`（`option_snapshots` 有 79 萬列）。
+  抽成 `TrackedTickerSerializer`，改用單次 group query（實測 3 個代號由 3 次降為 1 次）
+- `api/iv_analysis#watchlist` 每個代號開 3 條 thread 且無上限，改為比照
+  `MomentumReportService` 的分批寫法
+- `bundle update mail`（GHSA-mvxr-6m87-mv2q）
+
+**Medium**
+
+- 移除 `public/tech_prototype.html`——`public/` 下的檔案繞過登入閘門與瀏覽軌跡記錄
+- 三處把 `e.message` 直接回傳給客戶端的地方改為 log 詳細、回籠統訊息
+  （`Api::V1::Valuations#show`、`Api::V1::Options#analyze_image`、`Portfolios#ocr_import`）
+- `BarchartScraperService#cdp_available?` 的裸 `rescue` 補上記錄（全專案唯一一處無記錄的）
+- `TrackController#page_view` 檢查 `save` 回傳值
+- `iv_queries` 補上 `[ticker, queried_at]` 索引（全專案唯一沒有任何索引的表）
+- 三處前端寫入請求缺 `X-CSRF-Token` 已補齊，`csrfToken` 重複定義抽成 `app/frontend/lib/csrf.ts`
+
+**驗收**：RSpec 638 examples / 0 failures（隔離的 test DB）、Brakeman 0 warnings、
+RuboCop 339 檔無 offense、bundler-audit 無漏洞、ESLint 無新增問題。
+公網實測 `/api/*` 未登入回 401。
+
 ### 2026-08-27 — 修復 playwright-chrome MCP 連不上，`@playwright/mcp` 升到 0.0.79
 
 - `@playwright/mcp` 由 0.0.77 升到 0.0.79（local + global）

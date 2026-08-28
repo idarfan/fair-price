@@ -1,5 +1,6 @@
 FactoryBot.define do
   factory :portfolio do
+    user
     sequence(:symbol) { |n| "STK#{n}" }
     shares      { 10 }
     unit_cost   { 100.0 }

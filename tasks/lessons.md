@@ -913,3 +913,46 @@ LEAPS，Options Flow 等其他頁面若有類似「相對排名當警示」的�
    執行、假設 DOM 已建好」（例如 `document.getElementById` 沒包
    `DOMContentLoaded`），純粹是靠原本放在 body 尾端才恰好能動；搬進 head 不加
    defer 會提前執行、抓不到還沒渲染的元素、silently 失效。
+
+## 2026-08-28 — 稽核修正
+
+1. **稽核前先確認測試環境真的是隔離的**。`.env` 的 `DATABASE_URL` 寫死指向
+   `fairprice_development`，dotenv-rails 在 test 環境同樣會載入 `.env`，
+   `DATABASE_URL` 會壓過 `database.yml` 的 `database:` key —— 整套 RSpec 一直
+   跑在正式資料上。症狀是「時好時壞、期望空集合卻拿到資料」的假失敗（13 個失敗中
+   有 8 個是這樣來的），也代表任何「測試全綠」的結論在修好之前都不可信。
+   **檢查方式**：`RAILS_ENV=test rails runner 'puts ActiveRecord::Base.connection_db_config.database'`。
+   **解法**：在 `database.yml` 的 test 區塊明確寫 `url:`（唯一能穩定壓過
+   `DATABASE_URL` 的方式），而且要寫在版控檔案裡，不要放 `.env.test`
+   ——`.env*` 被 gitignore，新環境 checkout 後會無聲消失。
+
+2. **`config.assume_ssl` 不是「告訴 Rails 前面有 TLS 代理」而是「無條件把每個請求
+   當成 https」**。開了之後 `http://localhost:3003` 的 `redirect_to` 也會產生
+   `https://localhost:3003/...`，本機沒有 TLS 監聽器，瀏覽與 Playwright 全壞。
+   Cloudflare Tunnel（cloudflared）本來就會送 `X-Forwarded-Proto: https`，
+   **不開 `assume_ssl`、只開 `force_ssl` + localhost exclude 才是對的**，
+   Rails 會依 header 判斷，公網 https、本機 http 兩邊都正確。
+   另外 `ssl_options` 的 `exclude` **管不到 HSTS header**，HSTS 會照送給 localhost
+   把瀏覽器對 localhost 的 http 存取永久鎖死 —— 要 `hsts: false`，交給 Cloudflare 端設定。
+
+3. **`ssl_options[:redirect][:exclude]` 同時控制「導向」與「Secure cookie 標記」**
+   （`ActionDispatch::SSL#call` 兩個分支都會呼叫 `@exclude`），所以 exclude 掉
+   localhost 之後本機登入不會因為拿到 Secure cookie 而失效。
+
+4. **在 Ruby 裡用「最後一行 `import` 之後插入」來加 TS import 會炸掉多行 import**。
+   `import type {\n  A,\n  B,\n} from './types'` 的第一行也是 `import ` 開頭，
+   插進去就變成語法錯誤，而且 `rspec` 會以 `Vite Ruby can't find entrypoints/...
+   in the manifests` 的形式報錯，跟真正的原因（esbuild transform 失敗）完全對不上。
+   **改動前端後一定要跑 `bundle exec vite build` 確認建置通過**，再去看 RSpec。
+
+5. **加 `user_id` 歸屬前先分清楚「個人資料」與「共用市場資料」**。
+   `TrackedTicker` 驅動夜間爬蟲、產出 79 萬列共用 `OptionSnapshot`；
+   `WatchlistItem` 是排程 Telegram 盤前報告的來源。這類表加 user_id 會讓
+   排程作業不知道該用誰的清單，是錯的。判斷方法：**先查這張表被哪些排程／
+   背景服務讀取**（不是只看 controller），有排程讀取的通常就是共用資料。
+
+6. **加 `belongs_to :user` 之後要一併檢查 `position` 這類「流水號」欄位**：
+   `self.class.maximum(:position)` 必須改成 `user.xxx.maximum(:position)`，
+   否則新使用者的第一筆會拿到別人的序號。同理 factory 要加 `user`，
+   而 request spec 建資料時必須掛在「自動登入的那個使用者」身上
+   （已在 `spec/support/auth_helpers.rb` 提供 `signed_in_user`）。

@@ -23,7 +23,8 @@ module Api
       rescue StockDataService::NotFoundError => e
         render json: { error: e.message }, status: :not_found
       rescue => e
-        render json: { error: "查詢失敗：#{e.message}" }, status: :unprocessable_entity
+        Rails.logger.error("[Api::V1::Valuations#show] #{ticker} #{e.class}: #{e.message}")
+        render json: { error: "查詢失敗，請稍後再試" }, status: :unprocessable_entity
       end
 
       private

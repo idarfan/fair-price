@@ -41,7 +41,8 @@ module Api
         result = OptionsOcrService.new(image, system_data: system_data).call
         render json: result
       rescue => e
-        render json: { error: e.message }, status: :unprocessable_entity
+        Rails.logger.error("[Api::V1::Options#analyze_image] #{e.class}: #{e.message}")
+        render json: { error: "圖片分析失敗，請稍後再試" }, status: :unprocessable_entity
       end
 
       # POST /api/v1/options/strategy_recommend

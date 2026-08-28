@@ -11,13 +11,8 @@ import type {
   OptionSnapshotRow,
   PremiumTrendPoint,
 } from "./types";
-
-function csrfToken(): string {
-  return (
-    (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
-      ?.content ?? ""
-  );
-}
+import { csrfToken } from "../lib/csrf";
+import { waitForCollect } from "./collectJob";
 
 function calcDte(expiration: string): number {
   const today = new Date();
@@ -264,11 +259,18 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
           },
         },
       );
-      if (!collectRes.ok) {
-        const err = (await collectRes.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        setError(err.error ?? "資料抓取失敗");
+      const enqueued = (await collectRes.json().catch(() => ({}))) as {
+        job_id?: string;
+        error?: string;
+      };
+      if (!collectRes.ok || !enqueued.job_id) {
+        setError(enqueued.error ?? "資料抓取失敗");
+        return;
+      }
+
+      const failure = await waitForCollect(enqueued.job_id);
+      if (failure) {
+        setError(failure);
         return;
       }
       await loadSnapshots(newTicker);

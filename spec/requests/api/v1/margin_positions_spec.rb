@@ -6,7 +6,7 @@ RSpec.describe "Api::V1::MarginPositions", type: :request do
   let(:json) { JSON.parse(response.body) }
 
   describe "GET /api/v1/margin_positions" do
-    before { create_list(:margin_position, 3, symbol: "AAPL") }
+    before { create_list(:margin_position, 3, symbol: "AAPL", user: signed_in_user) }
 
     it "returns open positions with computed fields" do
       get "/api/v1/margin_positions"
@@ -18,7 +18,7 @@ RSpec.describe "Api::V1::MarginPositions", type: :request do
     end
 
     it "excludes closed positions" do
-      create(:margin_position, :closed, symbol: "TSLA")
+      create(:margin_position, :closed, symbol: "TSLA", user: signed_in_user)
       get "/api/v1/margin_positions"
       symbols = json["positions"].map { |p| p["symbol"] }
       expect(symbols).not_to include("TSLA")
@@ -53,7 +53,7 @@ RSpec.describe "Api::V1::MarginPositions", type: :request do
   end
 
   describe "PATCH /api/v1/margin_positions/:id" do
-    let(:position) { create(:margin_position) }
+    let(:position) { create(:margin_position, user: signed_in_user) }
 
     it "updates sell_price" do
       patch "/api/v1/margin_positions/#{position.id}",
@@ -64,7 +64,7 @@ RSpec.describe "Api::V1::MarginPositions", type: :request do
   end
 
   describe "DELETE /api/v1/margin_positions/:id" do
-    let!(:position) { create(:margin_position) }
+    let!(:position) { create(:margin_position, user: signed_in_user) }
 
     it "deletes the position" do
       expect {
@@ -75,7 +75,7 @@ RSpec.describe "Api::V1::MarginPositions", type: :request do
   end
 
   describe "POST /api/v1/margin_positions/:id/close" do
-    let(:position) { create(:margin_position) }
+    let(:position) { create(:margin_position, user: signed_in_user) }
 
     it "marks position as closed" do
       post "/api/v1/margin_positions/#{position.id}/close"
@@ -126,6 +126,26 @@ RSpec.describe "Api::V1::MarginPositions", type: :request do
       allow(StockDataService).to receive(:fetch).and_raise(StockDataService::NotFoundError)
       get "/api/v1/margin_positions/price_lookup", params: { symbol: "ZZZZ" }
       expect(response).to have_http_status(:not_found)
+    end
+  end
+
+  # 稽核 C-2 迴歸：margin_positions 過去沒有 user_id，所有人共用同一份部位。
+  describe "跨使用者隔離" do
+    it "看不到別人的部位" do
+      create(:margin_position, symbol: "OTHER", user: create(:user))
+
+      get "/api/v1/margin_positions"
+
+      expect(json["positions"]).to be_empty
+    end
+
+    it "知道 id 也改不到別人的部位" do
+      foreign = create(:margin_position, user: create(:user))
+
+      delete "/api/v1/margin_positions/#{foreign.id}"
+
+      expect(response).to have_http_status(:not_found)
+      expect(foreign.reload).to be_present
     end
   end
 end

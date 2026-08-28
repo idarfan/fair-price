@@ -2,13 +2,13 @@
 
 class PortfoliosController < ApplicationController
   def index
-    @holdings = Portfolio.ordered
+    @holdings = current_user.portfolios.ordered
     symbols   = @holdings.map(&:symbol).uniq
     @quotes   = fetch_quotes(symbols)
   end
 
   def create
-    @holding = Portfolio.new(portfolio_params.merge(position: Portfolio.next_position))
+    @holding = current_user.portfolios.new(portfolio_params.merge(position: current_user.portfolios.next_position))
     if @holding.save
       redirect_to portfolios_path, notice: "已新增 #{@holding.symbol}"
     else
@@ -17,7 +17,7 @@ class PortfoliosController < ApplicationController
   end
 
   def update
-    @holding = Portfolio.find(params[:id])
+    @holding = current_user.portfolios.find(params[:id])
     if @holding.update(portfolio_params)
       redirect_to portfolios_path, notice: "已更新"
     else
@@ -26,7 +26,7 @@ class PortfoliosController < ApplicationController
   end
 
   def destroy
-    Portfolio.find(params[:id]).destroy
+    current_user.portfolios.find(params[:id]).destroy
     redirect_to portfolios_path, notice: "已刪除"
   end
 
@@ -38,9 +38,11 @@ class PortfoliosController < ApplicationController
     return redirect_to(portfolios_path, alert: "無法從圖片辨識持股資料，請確認圖片清晰度") if holdings.empty?
 
     Portfolio.transaction do
-      Portfolio.delete_all
+      # 只清掉自己的持股。過去這裡是 Portfolio.delete_all，
+      # 任何一個使用者匯入截圖就會清空全站所有人的持股。
+      current_user.portfolios.delete_all
       holdings.each_with_index do |h, idx|
-        Portfolio.create!(
+        current_user.portfolios.create!(
           symbol:    h[:symbol],
           shares:    h[:shares],
           unit_cost: h[:unit_cost],
@@ -51,11 +53,12 @@ class PortfoliosController < ApplicationController
 
     redirect_to portfolios_path, notice: "✅ 已從圖片匯入 #{holdings.size} 筆持股"
   rescue StandardError => e
-    redirect_to portfolios_path, alert: "匯入失敗：#{e.message}"
+    Rails.logger.error("[Portfolios#ocr_import] #{e.class}: #{e.message}")
+    redirect_to portfolios_path, alert: "匯入失敗，請確認圖片後再試一次"
   end
 
   def quotes
-    symbols = Portfolio.pluck(:symbol).uniq
+    symbols = current_user.portfolios.pluck(:symbol).uniq
     render json: fetch_quotes(symbols)
   end
 
@@ -72,7 +75,7 @@ class PortfoliosController < ApplicationController
   def reorder
     ids = params[:ids] || []
     ids.each_with_index do |id, idx|
-      Portfolio.where(id: id).update_all(position: idx) # rubocop:disable Rails/SkipsModelValidations
+      current_user.portfolios.where(id: id).update_all(position: idx) # rubocop:disable Rails/SkipsModelValidations
     end
     head :ok
   end

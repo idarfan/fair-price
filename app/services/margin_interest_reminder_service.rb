@@ -7,6 +7,8 @@ class MarginInterestReminderService
   TARGET_DAYS_BEFORE = 2
 
   def call
+    # 刻意跨所有使用者：這是排程通知，沒有 current_user。
+    # 稽核 C-2 把 MarginPosition 加上了 user_id，但這裡的全表掃描是正確行為。
     positions = MarginPosition.open_positions
     upcoming = positions.select { |p|
       MarginInterestService.next_charge_date(p) == Date.current + TARGET_DAYS_BEFORE

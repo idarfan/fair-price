@@ -14,9 +14,19 @@ RSpec.describe "Auth gate", type: :request, skip_auto_auth: true do
       expect(response).to have_http_status(:ok)
     end
 
-    it "leaves /api/* accessible" do
+    # 2026-08-28 安全修正：/api/* 過去被列在 GATE_EXEMPT_PREFIXES，導致整個 API
+    # 命名空間在公網（fairprice-ohmy.com）上可匿名讀取與刪除。現在 API 與 UI
+    # 共用同一份閘門，只是把 302 導頁換成 401 JSON。
+    it "rejects /api/* with 401 JSON instead of redirecting" do
       get "/api/v1/tracked_tickers"
-      expect(response).to have_http_status(:ok)
+
+      expect(response).to have_http_status(:unauthorized)
+      expect(response.parsed_body["error"]).to eq("unauthenticated")
+    end
+
+    it "leaves /track accessible (自行檢查 logged_in?，未登入回 204)" do
+      post "/track/page_view", params: { activity_token: SecureRandom.uuid, path: "/" }
+      expect(response).to have_http_status(:no_content)
     end
   end
 

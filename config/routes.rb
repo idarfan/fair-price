@@ -28,7 +28,8 @@ Rails.application.routes.draw do
 
       # Option Price History Tracker
       resources :tracked_tickers, only: [ :index, :create, :update, :destroy ] do
-        member { post :collect }
+        member     { post :collect }
+        collection { get  :collect_status }
       end
       get "option_snapshots/:symbol",               to: "option_snapshots#index",
           constraints: { symbol: TICKER_CONSTRAINT }

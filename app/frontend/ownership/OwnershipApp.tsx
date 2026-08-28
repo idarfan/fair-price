@@ -6,6 +6,7 @@ import OwnershipTrendChart from './components/OwnershipTrendChart'
 import HoldersTable from './components/HoldersTable'
 import type { ApiSnapshot } from './types'
 import type { RangeKey } from './components/TimeRangeSelector'
+import { csrfHeaders } from '../lib/csrf'
 
 interface Props {
   symbols: string[]
@@ -56,7 +57,7 @@ export default function OwnershipApp({ symbols }: Props) {
     try {
       const res = await fetch(`/api/v1/ownership_snapshots/${encodeURIComponent(selected)}`, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        headers: csrfHeaders({ json: true }),
       })
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))

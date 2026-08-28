@@ -2,14 +2,6 @@
 
 class OptionPriceTrackerController < ApplicationController
   def index
-    @tracked_tickers = TrackedTicker.order(:symbol).map { |t|
-      {
-        id:                 t.id,
-        symbol:             t.symbol,
-        name:               t.name,
-        active:             t.active,
-        last_snapshot_date: t.last_snapshot_date
-      }
-    }
+    @tracked_tickers = TrackedTickerSerializer.list(TrackedTicker.order(:symbol))
   end
 end

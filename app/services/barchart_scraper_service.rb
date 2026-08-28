@@ -419,7 +419,8 @@ class BarchartScraperService
   def cdp_available?
     uri = URI.parse("#{CDP_URL}/json/version")
     Net::HTTP.get_response(uri).is_a?(Net::HTTPSuccess)
-  rescue
+  rescue StandardError => e
+    Rails.logger.warn("[BarchartScraperService] CDP 探測失敗 #{CDP_URL}: #{e.class}: #{e.message}")
     false
   end
 

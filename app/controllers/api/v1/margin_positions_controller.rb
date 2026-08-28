@@ -4,8 +4,8 @@ module Api
   module V1
     class MarginPositionsController < Api::V1::BaseController
       def index
-        open_pos   = MarginPosition.open_positions
-        closed_pos = MarginPosition.closed_positions
+        open_pos   = current_user.margin_positions.open_positions
+        closed_pos = current_user.margin_positions.closed_positions
         render json: {
           positions:        open_pos.map { |p| MarginInterestService.decorate(p) },
           closed_positions: closed_pos.map { |p| MarginInterestService.decorate(p) }
@@ -13,7 +13,7 @@ module Api
       end
 
       def create
-        position = MarginPosition.new(create_params)
+        position = current_user.margin_positions.new(create_params)
         if position.save
           render json: { position: MarginInterestService.decorate(position) }, status: :created
         else
@@ -86,8 +86,10 @@ module Api
 
       private
 
+      # 一律從 current_user 出發：別人的 id 會直接 RecordNotFound，
+      # 不會變成「知道 id 就能改別人部位」。
       def find_position
-        MarginPosition.find(params[:id])
+        current_user.margin_positions.find(params[:id])
       end
 
       def sanitize_symbol(s)
