@@ -36,9 +36,8 @@ class FairValue::AlertComponent < ApplicationComponent
             class: "flex-shrink-0 #{style[:text]} hover:opacity-70",
             data: { dismiss: "alert" }
           ) { plain("✕") }
-          script do
-            raw "document.querySelectorAll('[data-dismiss=\"alert\"]').forEach(function(btn){btn.addEventListener('click',function(){btn.closest('[data-alert]').remove();});});".html_safe
-          end
+          # JavaScript 已搬到 app/frontend/behaviors/alertDismiss.js（稽核 H-3）。
+          div(data: { behavior: "alert-dismiss" })
         end
       end
     end

@@ -1,10 +1,4 @@
 <% content_for(:title) { "到價通知 — FairPrice" } %>
 <%= render StockAlert::AlertListComponent.new(alerts: @alerts, market_data: @market_data) %>
-<script>
-  // Confirm before delete
-  document.addEventListener('submit', function (e) {
-    var form = e.target;
-    var msg  = form.dataset.confirmDelete;
-    if (msg && !confirm(msg)) e.preventDefault();
-  });
-</script>
+<%# 刪除確認已搬到 app/frontend/behaviors/confirmDelete.js（稽核 H-3）%>
+<div data-behavior="confirm-delete"></div>

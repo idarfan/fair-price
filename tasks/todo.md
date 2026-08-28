@@ -41,9 +41,11 @@
 - [x] behaviors entrypoint + 動態 import code-splitting
 - [x] 10 個零插值元件、12 段、2,188 行搬遷（Ruby 求值處理跳脫）
 - [x] spec/frontend/behavior_registry_spec.rb 釘住元件↔模組連結
-- [ ] Wave 2：少量插值 6 個元件（707 行，13 處插值 → data attribute）
-- [ ] Wave 3：bull_put/bull_call（1,038 行，37 處插值；順便解 M-6 重複程式碼）
-- [ ] layout 自己的 inline script + 關閉 CSP unsafe_inline
+- [x] Wave 2：少量插值 6 個元件（707 行 → data attribute）
+- [x] Wave 3：bull_put/bull_call（1,038 行、35 處插值 → data-config JSON）
+- [x] layout 自己的 inline script + 關閉 CSP script-src unsafe_inline（保留 1 段字級還原，用 nonce）
+- [ ] M-6：bull_put/bull_call 兩支的重複程式碼（現在是兩個並排 .js，可直接 diff 抽共用）
+- [ ] style-src 的 unsafe_inline（Phlex/Tailwind 大量 inline style，另一件事）
 - [ ] behaviors/*.js 型別化成 .ts（約 600 個型別錯誤）
 - L-2 Service → PORO 更名
 - L-1 補測試：只補本次改動相關的，不做全面補測

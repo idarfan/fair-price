@@ -1,14 +1,17 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
   <head>
-    <script>
+    <%# 字級還原必須在瀏覽器繪製之前執行，不能等 Vite module 的 defer，
+        否則使用者每次換頁都會看到字級閃動。這是全站唯一保留的 inline script，
+        用 CSP nonce 放行（見 config/initializers/content_security_policy.rb）。 %>
+    <%= javascript_tag nonce: true do %>
       (function() {
         var s = localStorage.getItem('fairprice:font-size');
         if (s && ['14','15','16','17','18'].indexOf(s) !== -1) {
           document.documentElement.style.fontSize = s + 'px';
         }
       })();
-    </script>
+    <% end %>
     <title><%= content_for(:title).presence || "FairPrice" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
@@ -20,22 +23,7 @@
     <%= javascript_include_tag "html-to-image-1.11.11" %>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.css">
     <script src="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.min.js"></script>
-    <script>
-      NProgress.configure({ showSpinner: false, speed: 300, minimum: 0.15 });
-      document.addEventListener('DOMContentLoaded', function () {
-        NProgress.done();
-        document.addEventListener('click', function (e) {
-          var link = e.target.closest('a[href]');
-          if (!link) return;
-          var href = link.getAttribute('href');
-          if (!href || href.startsWith('#') || href.startsWith('javascript') || link.target === '_blank') return;
-          NProgress.start(); NProgress.set(0.4);
-        });
-        document.addEventListener('submit', function () {
-          NProgress.start(); NProgress.set(0.4);
-        });
-      });
-    </script>
+    <%# 換頁進度條的設定已搬到 app/frontend/behaviors/pageProgress.js（稽核 H-3）%>
     <%= vite_client_tag %>
     <%= vite_javascript_tag 'application' %>
     <%# 頁面行為的統一掛載點（稽核 H-3）：掃描 [data-behavior]，只動態載入
@@ -87,6 +75,7 @@
     <% end %>
   </head>
   <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
+    <div data-behavior="page-progress"></div>
 
     <%= render FairValue::NavbarComponent.new(
           ticker:        @ticker,
@@ -144,22 +133,8 @@
         </div>
       </div>
 
-      <script>
-        (function () {
-          var overlay = document.getElementById('release-notes-overlay');
-          var openBtn = document.getElementById('release-notes-btn');
-          if (!overlay || !openBtn) return;
-          function open() { overlay.classList.remove('hidden'); }
-          function close() { overlay.classList.add('hidden'); }
-          openBtn.addEventListener('click', open);
-          document.getElementById('release-notes-close').addEventListener('click', close);
-          document.getElementById('release-notes-close-2').addEventListener('click', close);
-          overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
-          document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && !overlay.classList.contains('hidden')) close();
-          });
-        })();
-      </script>
+      <%# 更新說明彈窗的開關已搬到 app/frontend/behaviors/releaseNotes.js（稽核 H-3）%>
+      <div data-behavior="release-notes"></div>
     <% end %>
 
   </body>

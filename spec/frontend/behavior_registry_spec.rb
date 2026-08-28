@@ -6,13 +6,23 @@ require "rails_helper"
 # 元件與模組之間的連結只剩下一個字串（data-behavior）。這支測試把那個連結釘住——
 # 打錯字或忘記註冊都會在測試階段就被抓到，而不是等到使用者按下去沒反應。
 RSpec.describe "行為模組註冊表", type: :model do
+  # 掛載標記可能出現在 Phlex 元件，也可能直接寫在 layout / view 裡
+  # （例如換頁進度條、更新說明彈窗這種全站層級的行為）。
+  MARKER_GLOBS = [
+    Rails.root.join("app/components/**/*.rb"),
+    Rails.root.join("app/views/**/*.erb")
+  ].freeze
   COMPONENTS_GLOB = Rails.root.join("app/components/**/*.rb")
   BEHAVIORS_DIR   = Rails.root.join("app/frontend/behaviors")
   REGISTRY_FILE   = Rails.root.join("app/frontend/entrypoints/behaviors.ts")
 
   # 元件裡實際輸出的 data-behavior 值
+  # Phlex 寫成 `behavior: "x"`，ERB 寫成 `data-behavior="x"`
   def markers_in_components
-    Dir[COMPONENTS_GLOB].flat_map { |f| File.read(f).scan(/behavior:\s*"([a-z0-9-]+)"/).flatten }.uniq.sort
+    MARKER_GLOBS.flat_map { |g| Dir[g] }.flat_map { |f|
+      src = File.read(f)
+      src.scan(/behavior:\s*"([a-z0-9-]+)"/).flatten + src.scan(/data-behavior="([a-z0-9-]+)"/).flatten
+    }.uniq.sort
   end
 
   # entrypoints/behaviors.ts 的 REGISTRY 註冊了哪些名稱 → 對應哪個模組

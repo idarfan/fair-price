@@ -1007,3 +1007,21 @@ LEAPS，Options Flow 等其他頁面若有類似「相對排名當警示」的�
     (b) `window.foo = fn` 之後用 bare `foo()` 呼叫，在 module 裡**仍然有效**
         （全域物件屬性還在作用域鏈上），但 ESLint 靜態分析看不到，會報 no-undef。
         改寫成 `window.foo()` 語意相同且更清楚。
+
+15. **`dataset` 只能給字串**，所以把 Ruby 值傳進 JS 時，`nil` 會變成空字串、
+    數字會變成字串，truthiness 與型別都會改變。原本 `#{@expiration.to_json}`
+    在 JS 裡是 `null`，改成 `root.dataset.expiration` 就變成 `""`——雖然同樣 falsy，
+    但 `typeof` 與 `=== null` 的判斷會不同。**傳多個值或需要保留型別時，
+    用單一 `data-config` JSON + `JSON.parse` 才安全。**
+
+16. **把 `#{route_path}` 從單引號字串裡抽出來時，用 `' + CFG.routes.x + '` 取代整個
+    `#{...}`**，這樣 `'#{a_path}?job_id='` 會變成合法的 `'' + CFG.routes.x + '?job_id='`，
+    再用 regex 清掉多餘的 `'' +` 即可。比逐處判斷「在不在引號內」可靠得多。
+    清完務必用 `node --check` 驗證語法。
+
+17. **CSP 要真正防 XSS，`script-src` 就不能有 `unsafe_inline`**。必須先把所有 inline
+    `<script>` 清光；剩下那些「必須在繪製前執行」的（例如還原字級、避免閃動），
+    用 `javascript_tag nonce: true` +
+    `config.content_security_policy_nonce_generator` 放行。
+    **前提是專案沒有 fragment cache**——快取到舊 nonce 會讓那段 script 被擋掉。
+    `style-src` 的 `unsafe_inline` 是另一回事，Phlex/Tailwind 的 inline style 拿不掉。

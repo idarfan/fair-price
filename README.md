@@ -1,5 +1,49 @@
 # FairPrice
 
+### 2026-08-28 — H-3 完成：內嵌 JavaScript 全數搬進 Vite，CSP 拿掉 `unsafe_inline`
+
+接續同日的 Wave 1。Wave 2 處理有 Ruby 插值的 6 個元件（707 行，改用 data attribute
+傳值），Wave 3 處理 `bull_put_spreads` / `bull_call_spreads`（1,038 行、35 處插值，
+路由與頁面狀態改用單一 `data-config` JSON——`dataset` 只能給字串，會把 `nil` 變成
+空字串而改變 truthiness，用 JSON 才能保留 `null` 與數值型別）。
+
+最後把 layout 自己的 3 段與 `stock_alerts/index.html.erb`、`alert_component.rb`
+也一併清掉。
+
+**成果**
+
+| | 前 | 後 |
+|---|---|---|
+| 元件內嵌 JS | 3,933 行 / 18 個元件 | **0** |
+| 全站 inline `<script>` | 22 段 | **1 段**（帶 CSP nonce） |
+| CSP `script-src` | `'self' 'unsafe-inline' cdn` | **`'self' cdn 'nonce-…'`** |
+| `npx tsc --noEmit` | 跑不動（沒有 tsconfig） | **0 error** |
+| ESLint | 22 problems（20 個是假陽性） | **0 error** |
+
+唯一保留的 inline script 是還原字級那段——它必須在瀏覽器繪製前執行，不能等
+Vite module 的 defer，否則每次換頁都會看到字級閃動。改用
+`javascript_tag nonce: true` + `content_security_policy_nonce_generator`
+放行（專案沒有 fragment cache，不會有快取到舊 nonce 的問題；日後要加 fragment
+cache 前務必重新確認這點）。
+
+`style-src` 仍保留 `unsafe_inline`：Phlex 與 Tailwind 大量使用 inline style
+屬性與 `<style>` 區塊，那是另一件事。
+
+**ESLint 上線後在搬遷的程式碼裡抓到的**（都是搬遷前就存在的）：
+`bullPutSpreads.js` 的 `hideProgress()` 全專案沒有任何呼叫處；
+`bullCallSpreads.js` 的 `k2Bid`（L378）下一個分支必定覆寫，計算結果永遠沒被讀。
+刻意不在搬遷這一輪動它們（優先保證行為完全不變），已在 `eslint.config.js` 註記。
+
+**瀏覽器實測**（`/login`，唯一不需登入的頁面）：CSP header 已無 `unsafe-inline`、
+inline script 帶 nonce 且正常執行、`releaseNotes` 與 `appSwitcher` 兩個搬遷後的
+模組點擊開關都正常運作、console 零錯誤零警告。
+
+**尚未驗證**：其餘 26 個 behavior 分布在登入閘門後的頁面，尚未做視覺與互動驗證。
+
+**後續**：`behaviors/*.js` 型別化成 `.ts`（逐字搬進 strict TS 光 `ivAnalysis`
+一支就有 209 個錯誤）；`bull_put` / `bull_call` 兩支之間的大量重複（稽核 M-6）
+現在變成兩個並排的 `.js`，可以直接 diff 抽共用，比在 Ruby heredoc 裡容易得多。
+
 ### 2026-08-28 — H-3 Wave 1：內嵌 JavaScript 搬進 Vite，並補上 TypeScript / ESLint 把關
 
 **前置：把前端的檢查機制建起來**
