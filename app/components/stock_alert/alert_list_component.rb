@@ -135,43 +135,9 @@ class StockAlert::AlertListComponent < ApplicationComponent
     end
   end
 
+  # JavaScript 已搬到 app/frontend/behaviors/alertList.ts（稽核 H-3）。
+  # 這裡只留掛載標記，entrypoints/behaviors.ts 會依 data-behavior 動態載入。
   def render_script
-    script do
-      raw <<~'JS'.html_safe
-        (function () {
-          // ── Stock logo fallback ───────────────────────────────────
-          document.querySelectorAll('.stock-logo').forEach(function(img) {
-            img.addEventListener('error', function() {
-              var fb = img.dataset.fallback;
-              if (fb && img.src !== fb) {
-                img.src = fb;
-              } else {
-                img.style.display = 'none';
-                var span = img.nextElementSibling;
-                if (span) span.style.display = 'flex';
-              }
-            });
-          });
-
-          // ── Sortable drag & drop ──────────────────────────────────
-          var tbody = document.getElementById('sortable-alerts');
-          if (tbody && typeof Sortable !== 'undefined') {
-            Sortable.create(tbody, {
-              handle: '.drag-handle',
-              animation: 150,
-              onEnd: function () {
-                var ids = Array.from(tbody.querySelectorAll('tr[data-alert-id]'))
-                              .map(function (r) { return r.dataset.alertId; });
-                fetch('/watchlist/reorder', {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content },
-                  body: JSON.stringify({ ids: ids })
-                });
-              }
-            });
-          }
-        })();
-      JS
-    end
+    div(data: { behavior: "alert-list" })
   end
 end

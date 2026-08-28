@@ -43,6 +43,8 @@
   "scripts": {
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "lint": "eslint app/frontend stories --ext .ts,.tsx"
+    "lint": "eslint app/frontend stories --ext .ts,.tsx,.js",
+    "typecheck": "tsc --noEmit",
+    "check": "tsc --noEmit && eslint app/frontend stories --ext .ts,.tsx,.js"
   }
 }

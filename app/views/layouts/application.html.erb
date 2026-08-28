@@ -38,6 +38,10 @@
     </script>
     <%= vite_client_tag %>
     <%= vite_javascript_tag 'application' %>
+    <%# 頁面行為的統一掛載點（稽核 H-3）：掃描 [data-behavior]，只動態載入
+        該頁真正用到的模組。取代原本散在各 Phlex 元件裡的 inline <script>。
+        新增 behavior 不需要動這個 layout。 %>
+    <%= vite_typescript_tag 'behaviors.ts' %>
     <% if controller_name == 'leaps_recommendations' %>
       <%= javascript_include_tag "jspdf-2.5.2.umd.min" %>
       <%= javascript_include_tag "jspdf-autotable-3.8.4" %>

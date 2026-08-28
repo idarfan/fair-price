@@ -19,7 +19,15 @@ type Story = StoryObj<typeof DaysSelector>
 
 function Controlled({ initialDays }: { initialDays: number }) {
   const [days, setDays] = useState(initialDays)
-  return <DaysSelector days={days} onDaysChange={setDays} />
+  const [customRate, setCustomRate] = useState<number | null>(null)
+  return (
+    <DaysSelector
+      days={days}
+      onDaysChange={setDays}
+      customRate={customRate}
+      onCustomRateChange={setCustomRate}
+    />
+  )
 }
 
 export const Default: Story = {

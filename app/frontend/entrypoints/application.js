@@ -7,7 +7,7 @@ function computeReferrerPath() {
   try {
     var url = new URL(ref);
     return url.origin === window.location.origin ? url.pathname : "external";
-  } catch (e) {
+  } catch {
     return "external";
   }
 }
@@ -51,7 +51,7 @@ function gatherMetadata(el) {
   if (explicit) {
     try {
       return JSON.parse(explicit);
-    } catch (e) {
+    } catch {
       // fall through to form-based metadata
     }
   }

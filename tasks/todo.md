@@ -35,8 +35,16 @@
 - [x] M-4 `TrackController#page_view` 檢查 `save` 回傳值
 - [x] M-5 `iv_watchlists.ticker` 補 unique index；`iv_queries` 補索引
 
-## 不在本次範圍
-- H-3 內嵌 JS 遷移到 Vite（工程量最大，另開）
+## H-3 內嵌 JS 遷移（Wave 1 已完成 2026-08-28）
+- [x] tsconfig.json（strict）+ 修掉既有 9 個型別錯誤 → tsc 0 error
+- [x] eslint 瀏覽器全域 → 假陽性 20 個歸零，再修掉 4 個真錯誤
+- [x] behaviors entrypoint + 動態 import code-splitting
+- [x] 10 個零插值元件、12 段、2,188 行搬遷（Ruby 求值處理跳脫）
+- [x] spec/frontend/behavior_registry_spec.rb 釘住元件↔模組連結
+- [ ] Wave 2：少量插值 6 個元件（707 行，13 處插值 → data attribute）
+- [ ] Wave 3：bull_put/bull_call（1,038 行，37 處插值；順便解 M-6 重複程式碼）
+- [ ] layout 自己的 inline script + 關閉 CSP unsafe_inline
+- [ ] behaviors/*.js 型別化成 .ts（約 600 個型別錯誤）
 - L-2 Service → PORO 更名
 - L-1 補測試：只補本次改動相關的，不做全面補測
 

@@ -1,5 +1,64 @@
 # FairPrice
 
+### 2026-08-28 — H-3 Wave 1：內嵌 JavaScript 搬進 Vite，並補上 TypeScript / ESLint 把關
+
+**前置：把前端的檢查機制建起來**
+
+- 新增 `tsconfig.json`（`strict: true`）。原本專案沒有 tsconfig，`npx tsc --noEmit`
+  根本跑不動。修掉既有的 9 個型別錯誤後，型別檢查現在是 **0 error** 的真實 gate。
+  `noUncheckedIndexedAccess` 暫時關閉——開啟後還有約 30 個「可能是 undefined」要處理，
+  集中在 `OptionsChainTable.tsx` 與 `payoff.ts`，留給獨立的一輪
+- `eslint.config.js` 補上瀏覽器全域宣告。原本沒有宣告，導致 `document` / `window` /
+  `fetch` 一律被 `no-undef` 判成錯誤——**20 個假陽性，等於 ESLint 對前端形同虛設**。
+  修好之後又修掉 4 個真錯誤（2 個未使用的 catch 參數、2 個 `any`），
+  現在是 **0 error / 2 warning**
+- `package.json` 新增 `npm run typecheck` 與 `npm run check`
+
+**搬遷**
+
+新增 `app/frontend/entrypoints/behaviors.ts`：掃描 `[data-behavior]`，用動態 import
+只載入該頁真正需要的模組，Vite 自動 code-split。Phlex 元件只留一行掛載標記
+`div(data: { behavior: "..." })`，新增行為不需要動 layout。
+
+搬遷 10 個元件、12 段、**2,188 行**（占全部內嵌 JS 的 56%）：
+
+| 元件 | 檔案行數 |
+|---|---|
+| `iv_analysis/page_component.rb` | 751 → **30** |
+| `iv_analysis/education_component.rb` | 1348 → 884 |
+| `daily_momentum/analysis_panel_component.rb` | 277 → 49 |
+| `iv_watchlists/index_view.rb` | 263 → 46 |
+| `portfolio/holding_list_component.rb` | 326 → 170 |
+| `shared/ownership_panel_component.rb` | 213 → 72 |
+| `daily_momentum/news_tab_panel_component.rb` | 184 → 49 |
+| `daily_momentum/watchlist_manager_component.rb` | 149 → 77 |
+| `stock_alert/alert_list_component.rb` | 177 → 143 |
+| `fair_value/search_bar_component.rb` | 147 → 127 |
+
+擷取用 **Ruby 自己求值**而不是純文字複製：unquoted heredoc（`<<~JS`）Ruby 會先處理
+反斜線跳脫，直接複製會讓 `'\n'` 從換行變成 literal `\n`、`/\d+/` 變成 `/\\d+/`。
+實際有 14 行受影響。
+
+最小的兩支（`tickerSearch` / `alertList`）直接改寫成 strict TypeScript；其餘 10 段
+逐字搬成 `.js`（`allowJs: true, checkJs: false`，誠實標示未型別化），
+優先保證行為完全不變。逐字搬進 strict TS 光 `ivAnalysis` 一支就有 209 個型別錯誤，
+全部型別化是獨立的一輪工作。
+
+**ESLint 上線後立刻抓到的東西**：`window.switchDashMode` 被以 bare call 呼叫
+（語意正確但靜態分析看不到，已改成 `window.` 前綴）、`Option` / `Audio` /
+`EventSource` 等未宣告全域、6 處 `var` 重複宣告。
+
+新增 `spec/frontend/behavior_registry_spec.rb`（5 個案例）把元件與模組之間那條
+只剩字串的連結釘住：未註冊的 marker、註冊了卻沒有檔案、模組沒 export `init`、
+沒人使用的孤兒、以及「已搬遷的元件不可以又把 JS 塞回 heredoc」。
+
+**驗收**：RSpec 653 examples / 0 failures、`tsc --noEmit` 0 error、
+ESLint 0 error、RuboCop 無 offense、12 個 behavior chunk 都有產出 source map。
+
+**剩餘**：8 個元件、1,745 行內嵌 JS（`bull_put_spreads` 552、`bull_call_spreads` 486、
+`technical_dashboard` 458 是大宗，都有較多 Ruby 插值），以及 layout 自己的
+inline `<script>`。要拿掉 CSP 的 `unsafe_inline` 得等這些全部清完。
+
 ### 2026-08-28 — 觀察清單加上使用者歸屬（C-2 第二階段）
 
 稽核 C-2 原本只做了 `margin_positions` / `portfolios` / `price_alerts`，

@@ -34,12 +34,27 @@ function SummaryRow({ summary }: { summary: PayoffSummary }) {
   )
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+// Recharts 這個版本的 TooltipProps 泛型沒有帶 payload / label，
+// 宣告實際用到的最小形狀，避免 any（見 OwnershipTrendChart 同樣處理）。
+interface TooltipEntry {
+  dataKey?: string | number
+  name?: string
+  value?: number
+  color?: string
+}
+
+interface CustomTooltipProps {
+  active?: boolean
+  label?: string | number
+  payload?: TooltipEntry[]
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-2 shadow text-xs">
       <p className="font-semibold text-gray-700 mb-1">價格 ${(label as number).toFixed(1)}</p>
-      {payload.map((p: any) => (
+      {payload.map((p) => (
         <p key={p.dataKey} style={{ color: p.color }}>
           {p.name}：${(p.value as number).toFixed(2)}
         </p>

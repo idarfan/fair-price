@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+
+    "strict": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": false,
+
+    // TODO（稽核 L-1／清單第二項）：開啟後現有程式碼還有約 30 個
+    // 「可能是 undefined」要處理，集中在 OptionsChainTable.tsx 與 payoff.ts。
+    // 那是獨立的一輪工作，不在 H-3 內嵌 JS 遷移的範圍內。
+    "noUncheckedIndexedAccess": false,
+
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    // behaviors/*.js 是從 Phlex heredoc 逐字搬出來的 ES5 vanilla JS（稽核 H-3）。
+    // allowJs 讓 TS 解析得到這些模組，checkJs 關閉代表不對它們做型別檢查——
+    // 誠實反映現況，而不是用 @ts-nocheck 假裝它們已經型別化。
+    // TODO：逐檔轉成 .ts 之後把這兩個選項拿掉。
+    "allowJs": true,
+    "checkJs": false,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["app/frontend/**/*.ts", "app/frontend/**/*.tsx", "app/frontend/**/*.js", "stories/**/*.ts", "stories/**/*.tsx"],
+  "exclude": ["node_modules", "public"]
+}

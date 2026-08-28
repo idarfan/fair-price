@@ -982,3 +982,28 @@ LEAPS，Options Flow 等其他頁面若有類似「相對排名當警示」的�
     既有資料全部 backfill 給 admin 的話兩者必然相等，跑一次
     `OuouPreMarketService.new.send(:watchlist_symbols).size` 對照修改前的數字，
     就能證明排程行為沒有回歸。
+
+11. **內嵌 JS 的行數跟 RubyCritic 的 F 級評分無關**。flog / reek 量的是 Ruby 複雜度，
+    heredoc 不論裡面塞幾行 JavaScript，對 Ruby 來說就是一個字串字面值。
+    反證：`IvAnalysis::PageComponent` 有 721 行內嵌 JS，評分卻是 B / cx=28.1；
+    搬走 464 行之後 `education_component` 只從 964.1 降到 956.5。
+    **F 級來自 Phlex 巢狀 markup，不是內嵌的 JS**——稽核報告曾把兩者混為一談，已勘誤。
+    搬遷 JS 的正當理由是 ESLint／型別檢查／source map／打包／可測試／CSP，不是評分。
+
+12. **從 Ruby heredoc 擷取 JavaScript 必須用 Ruby 求值，不能純文字複製**。
+    unquoted heredoc（`<<~JS`）會先處理反斜線跳脫：`'\\n'` 在輸出的 JS 裡是換行跳脫、
+    `/\\d+/` 是 `\d`、`−` 是「−」。直接複製檔案內容會全部多一層反斜線。
+    正確做法：`eval(%(<<~JS\n#{body}\nJS))`；quoted heredoc（`<<~'JS'`）才可以逐字複製。
+    先用 `grep '\\'` 找出受影響的行（本次 14 行）再決定怎麼處理。
+
+13. **ESLint 沒有宣告瀏覽器全域時，`no-undef` 會把 `document` / `window` / `fetch`
+    全部判成錯誤**——本專案原本 20 個「錯誤」裡全部是這種假陽性，等於 lint 形同虛設，
+    真正的錯誤被淹沒。修好之後立刻浮出 4 個真錯誤。
+    檢查方式：看 lint 錯誤是不是集中在 `no-undef` 且對象都是瀏覽器內建物件。
+
+14. **把 inline `<script>` 改成 ES module 時，注意兩個作用域差異**：
+    (a) 同一頁多個 inline script 共享全域作用域，拆成獨立模組後互相看不見——
+        搬遷前要先檢查跨 script 的函式引用；
+    (b) `window.foo = fn` 之後用 bare `foo()` 呼叫，在 module 裡**仍然有效**
+        （全域物件屬性還在作用域鏈上），但 ESLint 靜態分析看不到，會報 no-undef。
+        改寫成 `window.foo()` 語意相同且更清楚。

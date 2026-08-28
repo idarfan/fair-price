@@ -119,29 +119,9 @@ class FairValue::SearchBarComponent < ApplicationComponent
     end
   end
 
+  # JavaScript 已搬到 app/frontend/behaviors/tickerSearch.ts（稽核 H-3）。
+  # 這裡只留掛載標記，entrypoints/behaviors.ts 會依 data-behavior 動態載入。
   def inline_script
-    script do
-      raw <<~JS.html_safe
-        (function() {
-          var form = document.getElementById('ticker-form');
-          if (!form) return;
-          form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            var ticker = (document.getElementById('ticker-input').value || '').trim().toUpperCase();
-            if (!ticker) { document.getElementById('ticker-input').focus(); return; }
-            var dr = document.getElementById('dr-input');
-            var rate = dr ? dr.value : '10';
-            window.location.href = '/valuations/' + encodeURIComponent(ticker) + '?discount_rate=' + rate;
-          });
-          var slider = document.getElementById('dr-input');
-          if (slider && slider.type === 'range') {
-            slider.addEventListener('input', function() {
-              var display = document.getElementById('dr-display');
-              if (display) display.textContent = this.value + '%';
-            });
-          }
-        })();
-      JS
-    end
+    div(data: { behavior: "ticker-search" })
   end
 end

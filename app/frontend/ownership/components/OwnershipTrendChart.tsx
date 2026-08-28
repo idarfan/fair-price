@@ -1,7 +1,7 @@
 import React from 'react'
 import {
   ComposedChart, Area, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, TooltipProps,
+  ResponsiveContainer,
 } from 'recharts'
 import type { ApiSnapshot } from '../types'
 import type { RangeKey } from './TimeRangeSelector'
@@ -40,11 +40,25 @@ function buildChartData(snapshots: ApiSnapshot[], range: RangeKey): ChartPoint[]
   })
 }
 
-function CustomTooltip({ active, payload, label }: TooltipProps<number, string>) {
+// Recharts 這個版本的 TooltipProps 泛型沒有把 payload / label 放進型別，
+// 這裡宣告實際用到的最小形狀，避免 as 強轉。
+interface TooltipEntry {
+  dataKey?: string | number
+  value?: number
+  payload?: Record<string, number | null | undefined>
+}
+
+interface CustomTooltipProps {
+  active?: boolean
+  label?: string | number
+  payload?: TooltipEntry[]
+}
+
+function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload?.length) return null
 
-  const instEntry    = payload.find(p => p.dataKey === 'institutional')
-  const insiderEntry = payload.find(p => p.dataKey === 'insider')
+  const instEntry    = payload.find((p) => p.dataKey === 'institutional')
+  const insiderEntry = payload.find((p) => p.dataKey === 'insider')
 
   function deltaStr(current: number | undefined, prev: number | null | undefined) {
     if (current == null || prev == null) return ''

@@ -140,9 +140,19 @@ _output, status = Open3.capture2e(python, script, "--symbols", ticker.symbol, "-
 考量到這個 session 背後是 Google OAuth + TOTP，cookie 被明文傳輸的代價很高。
 若已由反向代理終結 TLS，至少要開 `config.assume_ssl = true` + `config.force_ssl = true`。
 
-### H-3. 數千行 JavaScript 內嵌在 Phlex 元件的 heredoc 裡
+### H-3. 數千行 JavaScript 內嵌在 Phlex 元件的 heredoc 裡（Wave 1 已完成）
 
-這是本專案 **RubyCritic 13 個 F 級檔案的共同成因**，也是覆蓋率上不去的主因。
+> **勘誤（2026-08-28 實測後修正）**：本節原文寫「這是 RubyCritic 13 個 F 級檔案的
+> 共同成因」，**這是錯的**。flog / reek 量的是 Ruby 複雜度，而一段 heredoc 不論裡面
+> 塞了多少行 JavaScript，對 Ruby 來說都只是「一個字串字面值」，對評分幾乎沒有貢獻。
+>
+> 反證就在本節自己的表格裡：`IvAnalysis::PageComponent` 有全專案最大的 721 行內嵌 JS，
+> 稽核當時的評分卻是 **B / 複雜度 28.1**。搬遷後實測 `education_component` 只從
+> 964.1 降到 956.5。**F 級評分來自 Phlex 的巢狀 markup 程式碼，不是內嵌的 JS。**
+>
+> H-3 真正成立的效益是下面那幾條（ESLint／型別檢查／source map／打包／可測試／CSP），
+> 以及檔案行數大幅縮小（`page_component.rb` 751 → 30 行）。降低 F 級評分要另外處理
+> Phlex markup 本身的巢狀結構，是不同的一件事。
 
 | 方法 | 行數 |
 |------|------|
