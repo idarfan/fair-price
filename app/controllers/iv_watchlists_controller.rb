@@ -2,8 +2,8 @@
 
 class IvWatchlistsController < ApplicationController
   def index
-    @grouped  = IvWatchlist.active.by_group.group_by(&:group_tag)
-    @new_item = IvWatchlist.new
+    @grouped  = current_user.iv_watchlists.active.by_group.group_by(&:group_tag)
+    @new_item = current_user.iv_watchlists.new
     render IvWatchlists::IndexView.new(grouped: @grouped, new_item: @new_item)
   end
 
@@ -70,7 +70,7 @@ class IvWatchlistsController < ApplicationController
   end
 
   def create
-    @item = IvWatchlist.new(watchlist_params)
+    @item = current_user.iv_watchlists.new(watchlist_params)
     if @item.save
       respond_to do |format|
         format.html { redirect_to iv_watchlists_path, notice: "#{@item.symbol} 已加入追蹤清單" }
@@ -85,7 +85,7 @@ class IvWatchlistsController < ApplicationController
   end
 
   def destroy
-    @item  = IvWatchlist.find(params[:id])
+    @item  = current_user.iv_watchlists.find(params[:id])
     symbol = @item.symbol
     @item.destroy
     respond_to do |format|
@@ -95,7 +95,7 @@ class IvWatchlistsController < ApplicationController
   end
 
   def toggle
-    @item = IvWatchlist.find(params[:id])
+    @item = current_user.iv_watchlists.find(params[:id])
     @item.update(active: !@item.active)
     render json: { success: true, active: @item.active }
   end

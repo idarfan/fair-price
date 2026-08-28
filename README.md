@@ -1,5 +1,39 @@
 # FairPrice
 
+### 2026-08-28 — 觀察清單加上使用者歸屬（C-2 第二階段）
+
+稽核 C-2 原本只做了 `margin_positions` / `portfolios` / `price_alerts`，
+剩下三張表被擱置的原因是**它們都有排程在讀，而排程沒有 `current_user`**：
+
+| 表 | 誰在讀 | 頻率 |
+|---|---|---|
+| `tracked_tickers` | systemd `options-collector.timer` + `options-intraday.timer` → `options_collector.py:138` | 每日 EOD + 每 30 分 |
+| `watchlist_items` | pm2 `ouou-pre-market` → `OuouPreMarketService#watchlist_symbols` | 每日盤前 Telegram |
+| `iv_watchlists` | pm2 `iv-skew-snapshot` / `iv-skew-intraday` → `lib/tasks/iv.rake:25,51`、`backfill_iv_skew.py:168` | 每日 + 盤中 |
+
+能不能分人，取決於**蒐集結果怎麼 key**：`iv_daily_snapshots` / `skew_rank_daily` /
+`skew_rank_intradays` 都是 ticker-keyed，一個代號只會有一份，多人追蹤不會重複抓；
+`option_snapshots` 則是綁 `tracked_ticker_id` 且有 80 萬列。
+
+- `watchlist_items`、`iv_watchlists` 加 `user_id`，既有資料歸給 admin。
+  `symbol` 的唯一索引從「全站唯一」改成 `[user_id, symbol]`，
+  否則第二個使用者連加入同一個代號都會被擋
+- 排程改取**所有使用者的聯集**（`WatchlistItem.ordered.pluck(:symbol).uniq`、
+  `IvWatchlist.active.pluck(:symbol).uniq`）。既有資料全歸 admin，
+  所以聯集 == 目前的集合，排程行為完全不變（實測盤前 23 個代號、skew 7 個代號，與修改前一致）
+- `db/seeds.rb` 改成掛在 admin 底下；沒有任何使用者時跳過而不是炸掉
+- `tracked_tickers` 維持共用，改為**只有 admin 能寫入**（`create` / `update` /
+  `destroy` / `collect`），避免其他帳號刪代號時連帶 `dependent: :destroy`
+  掉整段歷史快照；讀取仍開放給所有登入者
+- 新增 `spec/requests/watchlist_isolation_spec.rb`：跨使用者看不到／刪不掉、
+  排程取聯集、tracked_tickers 的 admin 限制，共 9 個案例
+
+**仍未處理**：`tracked_tickers` 要真正分人，得先把 `option_snapshots` 從
+`tracked_ticker_id` 改成 symbol-keyed 再拆出個人訂閱表——那是 80 萬列的遷移，另開。
+
+**驗收**：RSpec 648 examples / 0 failures、Brakeman 0 warnings、RuboCop 349 檔無 offense；
+正式資料完好（WatchlistItem 23、IvWatchlist 6、OptionSnapshot 801,222）。
+
 ### 2026-08-28 — 正式資料庫更名，並補回 Rails 破壞性指令的保險
 
 接續同日的稽核修正。稽核時發現「測試環境連到正式資料庫」，堵住測試那一側之後

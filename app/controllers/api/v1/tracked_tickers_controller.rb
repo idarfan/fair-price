@@ -1,6 +1,16 @@
 # frozen_string_literal: true
 
 class Api::V1::TrackedTickersController < Api::V1::BaseController
+  # tracked_tickers 是共用的蒐集設定，不是個人清單：systemd 的
+  # options-collector.timer 與 options-intraday.timer 直接讀
+  # `SELECT ... FROM tracked_tickers WHERE active = true`，蒐集結果
+  # option_snapshots（79 萬列）綁的是 tracked_ticker_id 而非 symbol，
+  # 所以沒辦法像觀察清單那樣簡單地分給每個使用者。
+  #
+  # 折衷做法：讀取所有人都可以，但**只有 admin 能改動**，避免其他帳號
+  # 刪掉代號時連帶 dependent: :destroy 掉整段歷史快照。
+  before_action :require_admin!, only: %i[create update destroy collect]
+
   def index
     render json: TrackedTickerSerializer.list(TrackedTicker.order(:symbol))
   end
@@ -62,6 +72,13 @@ class Api::V1::TrackedTickersController < Api::V1::BaseController
   end
 
   private
+
+  def require_admin!
+    return if current_user&.admin?
+
+    render json: { error: "admin_required", message: "追蹤代號清單為共用設定，僅管理員可修改" },
+           status: :forbidden
+  end
 
   def ticker_params
     params.require(:tracked_ticker).permit(:active)

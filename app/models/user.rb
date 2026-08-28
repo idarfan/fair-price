@@ -7,11 +7,14 @@ class User < ApplicationRecord
   enum :status, { pending: 0, enabled: 1, disabled: 2 }
 
   has_many :user_activities,  dependent: :destroy
-  # 個人性資料（稽核 C-2）。共用的市場資料（TrackedTicker / WatchlistItem /
-  # IvWatchlist）刻意不歸屬到使用者，它們是排程與爬蟲的共同來源。
+  # 個人性資料（稽核 C-2）。TrackedTicker 刻意不歸屬到使用者——option_snapshots
+  # 綁 tracked_ticker_id 且有 79 萬列，分人需要先把它改成 symbol-keyed；
+  # 改為限制只有 admin 能寫入。
   has_many :margin_positions, dependent: :destroy
   has_many :portfolios,       dependent: :destroy
   has_many :price_alerts,     dependent: :destroy
+  has_many :watchlist_items,  dependent: :destroy
+  has_many :iv_watchlists,    dependent: :destroy
 
   validates :email,      presence: true, uniqueness: true
   validates :google_uid, presence: true, uniqueness: true

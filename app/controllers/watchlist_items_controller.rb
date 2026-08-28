@@ -10,9 +10,9 @@ class WatchlistItemsController < ApplicationController
       return
     end
 
-    item = WatchlistItem.find_or_initialize_by(symbol: symbol)
+    item = current_user.watchlist_items.find_or_initialize_by(symbol: symbol)
     if item.new_record?
-      item.position = WatchlistItem.next_position
+      item.position = current_user.watchlist_items.next_position
       item.save!
     end
 
@@ -22,7 +22,7 @@ class WatchlistItemsController < ApplicationController
   end
 
   def update
-    item   = WatchlistItem.find(params[:id])
+    item   = current_user.watchlist_items.find(params[:id])
     symbol = params.require(:symbol).upcase.strip
     quote  = FinnhubService.new.quote(symbol)
 
@@ -38,7 +38,7 @@ class WatchlistItemsController < ApplicationController
   end
 
   def destroy
-    WatchlistItem.find(params[:id]).destroy
+    current_user.watchlist_items.find(params[:id]).destroy
     redirect_to momentum_report_path
   rescue ActiveRecord::RecordNotFound
     redirect_to momentum_report_path
@@ -46,7 +46,7 @@ class WatchlistItemsController < ApplicationController
 
   def reorder
     ids = params.require(:ids)
-    ids.each_with_index { |id, i| WatchlistItem.where(id: id).update_all(position: i) }
+    ids.each_with_index { |id, i| current_user.watchlist_items.where(id: id).update_all(position: i) }
     head :ok
   end
 end

@@ -4,7 +4,7 @@ class ReportsController < ApplicationController
   include ActionController::Live
   include MarkdownRendering
   def index
-    @watchlist_items = WatchlistItem.ordered
+    @watchlist_items = current_user.watchlist_items.ordered
     symbols          = @watchlist_items.map(&:symbol)
     @report          = MomentumReportService.new(symbols: symbols).call
     @vix             = @report[:vix]

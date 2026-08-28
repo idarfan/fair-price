@@ -965,3 +965,20 @@ LEAPS，Options Flow 等其他頁面若有類似「相對排名當警示」的�
    `config.active_record.protected_environments = %w[production development]`。
    **檢查方式**：
    `rails runner 'puts ActiveRecord::Base.connection.pool.internal_metadata[:environment]'`。
+
+8. **要不要把一張表分給每個使用者，看的是「下游蒐集結果怎麼 key」**，
+   不是那張表本身有幾列。`iv_watchlists` 只有 6 列但下游
+   （`iv_daily_snapshots` / `skew_rank_*`）是 ticker-keyed，一個代號一份快照，
+   分人很便宜；`tracked_tickers` 同樣只有 6 列，但 `option_snapshots` 綁的是
+   `tracked_ticker_id` 且有 80 萬列，兩個人追同一個代號就會變成兩份，
+   要先把下游改成 symbol-keyed 才有辦法分。
+   **判斷順序**：先查排程讀誰 → 再查下游資料表的識別欄位是 symbol 還是 FK。
+
+9. **加 `user_id` 時，原本 `symbol` 的全站 unique index 必須改成
+   `[user_id, symbol]`**，否則第二個使用者連加入同一個代號都會被擋，
+   而且這個錯誤在只有一個使用者的環境（backfill 之後）完全不會出現。
+
+10. **排程作業改用「所有使用者的聯集」時，要驗證聯集後的集合跟修改前一樣**。
+    既有資料全部 backfill 給 admin 的話兩者必然相等，跑一次
+    `OuouPreMarketService.new.send(:watchlist_symbols).size` 對照修改前的數字，
+    就能證明排程行為沒有回歸。

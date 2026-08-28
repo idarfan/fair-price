@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_28_120307) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_28_145316) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -135,8 +135,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_120307) do
     t.string "group_tag", default: "general"
     t.string "symbol", null: false
     t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
     t.index ["group_tag"], name: "index_iv_watchlists_on_group_tag"
-    t.index ["symbol"], name: "index_iv_watchlists_on_symbol", unique: true
+    t.index ["user_id", "symbol"], name: "index_iv_watchlists_on_user_id_and_symbol", unique: true
+    t.index ["user_id"], name: "index_iv_watchlists_on_user_id"
   end
 
   create_table "leaps_option_chain_snapshots", force: :cascade do |t|
@@ -600,14 +602,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_120307) do
     t.integer "position", default: 0, null: false
     t.string "symbol", null: false
     t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
     t.index ["position"], name: "index_watchlist_items_on_position"
-    t.index ["symbol"], name: "index_watchlist_items_on_symbol", unique: true
+    t.index ["user_id", "symbol"], name: "index_watchlist_items_on_user_id_and_symbol", unique: true
+    t.index ["user_id"], name: "index_watchlist_items_on_user_id"
   end
 
+  add_foreign_key "iv_watchlists", "users"
   add_foreign_key "margin_positions", "users"
   add_foreign_key "option_snapshots", "tracked_tickers"
   add_foreign_key "ownership_holders", "ownership_snapshots"
   add_foreign_key "portfolios", "users"
   add_foreign_key "price_alerts", "users"
   add_foreign_key "user_activities", "users"
+  add_foreign_key "watchlist_items", "users"
 end

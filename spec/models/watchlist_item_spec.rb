@@ -12,9 +12,17 @@ RSpec.describe WatchlistItem, type: :model do
       expect(build(:watchlist_item, symbol: nil)).not_to be_valid
     end
 
-    it "is invalid when symbol is duplicated (case-insensitive)" do
-      create(:watchlist_item, symbol: "AAPL")
-      expect(build(:watchlist_item, symbol: "aapl")).not_to be_valid
+    it "is invalid when symbol is duplicated for the same user (case-insensitive)" do
+      user = create(:user)
+      create(:watchlist_item, symbol: "AAPL", user: user)
+      expect(build(:watchlist_item, symbol: "aapl", user: user)).not_to be_valid
+    end
+
+    # 稽核 C-2：唯一性是「每個使用者各自唯一」，不是全站唯一——
+    # 否則第二個使用者連加入同一個代號都會被擋。
+    it "is valid when a different user adds the same symbol" do
+      create(:watchlist_item, symbol: "AAPL", user: create(:user))
+      expect(build(:watchlist_item, symbol: "AAPL", user: create(:user))).to be_valid
     end
 
     it "is invalid when symbol contains illegal characters" do

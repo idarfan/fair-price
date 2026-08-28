@@ -2,7 +2,7 @@
 
 class OwnershipController < ApplicationController
   def index
-    @symbols  = WatchlistItem.order(:position, :created_at).pluck(:symbol).uniq
+    @symbols  = current_user.watchlist_items.order(:position, :created_at).pluck(:symbol).uniq
     @selected = sanitize_symbol(params[:symbol]) || @symbols.first
     render Ownership::PageComponent.new(symbols: @symbols, selected: @selected)
   end

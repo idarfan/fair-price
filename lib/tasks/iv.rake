@@ -22,6 +22,8 @@ namespace :iv do
       next
     end
     puts "[iv:skew_snapshot] 開始執行，#{et.strftime("%Y-%m-%d %H:%M ET")}"
+    # 排程作業沒有 current_user：取所有使用者 IV 追蹤清單的聯集。
+    # skew_rank_daily 是 ticker-keyed，一個代號只會有一份快照。
     tickers = (IvWatchlist.active.pluck(:symbol) + WatchedTicker.active.pluck(:ticker)).uniq
     success = 0
     failures = 0
@@ -48,7 +50,8 @@ namespace :iv do
     puts "[iv:skew_intraday_snapshot] 強制執行模式" if forced
 
     puts "[iv:skew_intraday_snapshot] 開始執行，#{et_now}"
-    tickers  = IvWatchlist.active.pluck(:symbol)
+    # 同上：所有使用者的聯集，skew_rank_intradays 是 ticker-keyed。
+    tickers  = IvWatchlist.active.pluck(:symbol).uniq
     success  = 0
     failures = 0
 

@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
 class IvWatchlist < ApplicationRecord
+  belongs_to :user
+
   GROUP_TAGS = %w[general index leveraged macro].freeze
 
   validates :symbol,
             presence: true,
-            uniqueness: { case_sensitive: false },
+            uniqueness: { scope: :user_id, case_sensitive: false },
             format: {
               with: /\A[A-Za-z\-\.]{1,10}\z/,
               message: "只允許英文字母、- 和 ."

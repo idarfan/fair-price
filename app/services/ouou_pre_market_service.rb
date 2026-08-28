@@ -42,8 +42,10 @@ class OuouPreMarketService
     chunks
   end
 
+  # 排程作業沒有 current_user：取所有使用者觀察清單的聯集。
+  # 蒐集出來的報價是 symbol-keyed，多人追同一個代號不會重複抓。
   def watchlist_symbols
-    WatchlistItem.ordered.map(&:symbol)
+    WatchlistItem.ordered.pluck(:symbol).uniq
   rescue StandardError
     YAML.load_file(Rails.root.join("config/watchlist.yml")).fetch("symbols", [])
   end
