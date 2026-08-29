@@ -1,5 +1,44 @@
 # FairPrice
 
+### 2026-08-29（九）— `CompositeSignalService` 補測（稽核 L-1）
+
+三維度儀表板的核心服務，388 行長期 **0% 覆蓋**。新增
+`spec/services/composite_signal_service_spec.rb`，**33 個測試**。
+
+測試釘住的是**分數門檻**與**背離判斷**——那是投資決策直接依賴、而且改動時最容易
+在無聲中偏掉的部分。評分權重本身未經回測（見 memory
+`project_scoring_weights_unvalidated`），這些測試釘的是**目前的行為**，不代表權重
+是對的；要調權重時它們會如實失敗，那正是用途：讓調整是有意識的。
+
+**用 mutation testing 驗證測試是否真的有效**
+
+第一版 33 個測試一次全過，但拿 mutation 一試就發現破口：
+
+| Mutation | 第一版 | 補強後 |
+|---|---|---|
+| 技術面門檻 `>= 4` → `>= 3` | **沒抓到** ❌ | 1 failure ✅ |
+| 基本面門檻 `>= 3` → `>= 2` | — | 1 failure ✅ |
+| Flow 門檻 `>= 2` → `>= 1` | — | 1 failure ✅ |
+| 200 日均線權重 `2` → `1` | — | 7 failures ✅ |
+| `opposite?` 判斷反轉 | — | 3 failures ✅ |
+| 財報前提前 `return` 拿掉 | 2 failures ✅ | ✅ |
+| CSV 統計不排除已取消成交 | 1 failure ✅ | ✅ |
+
+破口的原因很典型：我只驗了「達到門檻 → bullish」，沒驗「**差一分 → 仍是
+neutral**」。少了那一格，門檻被改小完全看不出來。三個維度各補一個邊界測試後補齊。
+
+**順帶記錄的行為**
+
+- 技術面門檻**刻意不對稱**：`>= 4` 才偏多，`<= -3` 就偏空
+- 財報前 7 天內基本面直接 `return :watching`，**不計分**（結果沒有 `:points` 鍵）
+- `:watching` 會被排除在「三維度一致」判斷之外，避免財報前誤報
+- `net_sentiment == 0` 不計分也不產生訊號（0 不代表方向）
+
+**註**：SimpleCov 不在 Gemfile 裡（稽核時的 43.59% 是臨時裝了量的），所以無法直接
+報出覆蓋率變化。要讓覆蓋率可持續追蹤需另外決定是否常駐。
+
+RSpec 669 → **702**，0 failures。
+
 ### 2026-08-29（八）— 開啟 `noUncheckedIndexedAccess`，並修好 `/options/:symbol` 的 500
 
 **`noUncheckedIndexedAccess: true`**（global rules 要求，原本掛著 TODO）
