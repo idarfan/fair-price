@@ -1280,3 +1280,88 @@ graph 裡沒有類別層級的資訊，也就沒有 `callers_of` / `inheritors_o
 
 對照：同一類「動作先斬後奏、使用者來不及過目」的問題還有自動提交 hook 搶先 commit
 （見該則教訓），差別在 commit 可以 `git reset --soft` 收回，公開發表收不回來。
+
+## 2026-08-29（六）— 型別化最大的風險是「把隱式強制轉型換成嚴格檢查」
+
+### 事件
+
+30 支 behaviors 從 `.js` 轉 `.ts`（765 個 strict error → 0）。轉換本身很機械，
+但造成了一個真實回歸：**IV 分析頁的 Skew Rank 全部變成「—」、摘要計數 3/0/0
+變 0/0/0、觀察清單的履約價欄整欄消失。**
+
+根因：**Rails 把 BigDecimal 序列化成字串**。`/api/iv_analysis/watchlist` 回的是
+
+```json
+{ "skew_rank": "78.87", "strike": "100.0", "ivr_1y": 3.06 }
+```
+
+同一個 API 裡有的欄位是數字、有的是字串。原碼一律 `parseFloat()` 所以看不出
+差別；我寫的收窄函式是
+
+```ts
+export function num(source: unknown, key: string): number | undefined {
+  const v = source[key];
+  return typeof v === "number" && !isNaN(v) ? v : undefined;   // 字串直接丟掉
+}
+```
+
+字串欄位全部變 `undefined`，畫面就變成「—」。
+
+### 規則
+
+**把 `parseFloat` / 隱式強制轉型換成型別檢查時，必須先確認 API 實際回什麼型別，
+不能假設。** 最快的確認方式是在瀏覽器直接打 API 看 `typeof`：
+
+```js
+const d = await (await fetch('/api/...')).json();
+Object.entries(d.watchlist[0]).map(([k, v]) => [k, typeof v]);
+```
+
+**修法要分辨兩種原始語意，不能一律放寬：**
+
+| 原碼寫法 | 語意 | 對應的收窄函式 |
+|---|---|---|
+| `parseFloat(x)` | 接受數字與數字字串 | `numeric()` |
+| `typeof x === 'number'` | 字串本來就顯示「—」 | `num()`（維持嚴格）|
+
+價差頁的 `fmt()` 屬於後者，如果為了修 ivAnalysis 就把 `num()` 一起放寬，反而
+會改壞那邊本來正確的行為。
+
+### 字面值比對：抓到一個測試與肉眼都抓不到的錯
+
+型別化不該改動任何數值常數。寫了一支比對腳本，每批轉完就跟轉換前的 commit 比對
+數值與字串字面值的多重集合。
+
+它抓到我把 `ivEducationChart` 的 `normCDF` 常數 `0.3989422820` 打成
+`0.3989422804`（1/√(2π) 的真值）。**這種錯測試抓不到、code review 也看不出來。**
+
+差異不一定是錯（字串串接改 template literal、重複內容抽成常數都會產生差異），
+腳本只負責把差異攤開；需要解釋的再逐一程式化驗證是否逐字相同。
+
+### 改副檔名會動到 Rails 端
+
+`entrypoints/application.js` → `.ts` 之後 `vite_javascript_tag 'application'`
+**解析失敗**（`ViteRuby.instance.manifest.path_for` 直接拋錯），整站白畫面。
+要改成 `vite_typescript_tag 'application.ts'`。
+
+改 entrypoint 副檔名前先跑：
+
+```ruby
+RAILS_ENV=production bin/rails runner 'puts ViteRuby.instance.manifest.path_for("x.ts", type: :typescript)'
+```
+
+### 幾個 TS 本身的坑
+
+- **`instanceof` narrowing 在巢狀 function declaration 裡不保證留存**。與其到處
+  寫 `!` 非空斷言，不如在 guard 之後宣告一個明確型別的 const
+  （`const btn: HTMLButtonElement = found;`），整批轉換因此零個 `!`。
+- **在 `forEach` callback 裡賦值，TS 看不到那次賦值**，會把變數窄化成 `never`。
+  改用 `for...of`。
+- **`no-irregular-whitespace` 不管單引號字串，但管 template literal**。原碼裡
+  刻意的全形空格分隔符改成 template literal 就會被擋，維持字串串接即可。
+
+### 自己造出來的死碼
+
+`shared/dom.ts` 一開始寫了 `byId()` 與 `isWithin()`，轉完 25 個模組後零呼叫端
+——正是這個 codebase 前一輪剛清掉的同一種東西。刪掉之後順帶消除了整批唯一的
+`as`（`byId` 的 `as T | null`）。**寫工具函式時先確認真的有人要用。**

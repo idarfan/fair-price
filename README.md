@@ -1,5 +1,70 @@
 # FairPrice
 
+### 2026-08-29（五）— behaviors 全面型別化：765 個 strict error → 0
+
+30 支 behaviors、共用模組與 entrypoints 全部從 `.js` 轉成 `.ts`。
+`tsconfig.json` 的 `allowJs` / `checkJs` 已移除——**現在每一支前端程式碼都在
+strict 型別檢查之下，沒有例外**。
+
+> **歷史說明**：這一輪被自動提交 hook 拆成四筆 `chore: 自動提交` 且已推送
+> （`5272f58` 基礎建設＋前 16 檔、`6772c7d` 中段 8 檔、`47acfd7` 最後 3 檔＋
+> tsconfig 收尾、`9efc16e` `numeric()` 回歸修正）。因為禁止 force push，
+> 歷史保持原樣，說明補在這裡。
+
+**新增的基礎建設**
+
+| 檔案 | 作用 |
+|---|---|
+| `types/globals.d.ts` | CDN 全域：`Chart` / `Sortable` / `NProgress` / `htmlToImage` / `jspdf` / `window.driver` / `ttsSpeak` / `switchDashMode` |
+| `behaviors/shared/dom.ts` | `closestFrom` / `valueOf` / `csrfToken` |
+| `behaviors/shared/json.ts` | fetch 回應收窄：`isRecord` / `str` / `num` / `numeric` / `arr` / `firstString` |
+
+**零 `as`、零 `!`**
+
+Global rules 要求 API 回應用 Zod 驗證、禁 `as`，但本專案 `npm install` 卡在
+vite 的 peer dependency 衝突，Zod 裝不了。改用手寫 type predicate，整批轉換
+**沒有任何 `as` 強轉，也沒有任何 `!` 非空斷言**（narrowing 在巢狀 function
+declaration 裡會失效，一律改用明確型別的 const）。
+
+**一個型別化造成的回歸（已修）**
+
+Rails 把 BigDecimal 序列化成**字串**——`/api/iv_analysis/watchlist` 回的是
+`skew_rank: "78.87"`、`strike: "100.0"`。原碼 `parseFloat` 吃得下，改成嚴格的
+`num()`（`typeof === "number"`）之後整批被丟掉：Skew Rank 三張卡全變「—」、
+摘要計數 3/0/0 變 0/0/0、觀察清單的履約價欄消失。
+
+修法是新增 `numeric()`（parseFloat 語意），`ivAnalysis` 30 處改用。
+**刻意不放寬 `num()`**：價差頁的 `fmt()` 原本就用 `typeof === 'number'` 判斷，
+字串本來就顯示「—」，一起放寬會改壞那邊。
+
+**保護機制：字面值比對**
+
+型別化不該改動任何數值。`literal_check.py` 每批轉完就跟 `77c504f` 的原檔比對
+數值與字串的多重集合。它抓到一次真錯：`ivEducationChart` 的 `normCDF` 常數被我
+打成 `0.3989422804`（1/√(2π) 的真值），原碼是 `0.3989422820`。肉眼與測試都
+抓不到。**30 支最終全部「數值零差異」。**
+
+需要解釋的差異逐一程式化驗證：`techDashOptionsCharts` 的 4 份 tooltip CSS、
+`momentumAnalysisPanel` 的 1309 字元 PDF CSS、`ivEducationChainTooltip` 的
+177 條中文教學文案，都確認逐字相同。
+
+**兩個靜態檢查抓不到、會炸站的問題**
+
+- `entrypoints/application.js` → `.ts` 後 `vite_javascript_tag 'application'`
+  解析失敗（實測 `ViteRuby.instance.manifest.path_for` 拋錯），layout 已改用
+  `vite_typescript_tag 'application.ts'`
+- `window.mountTechChart` 在 `technicals.tsx` 已宣告且簽名不同，重複宣告觸發
+  TS2717，移除我的版本以實作端為準
+
+**驗證**
+
+`tsc --noEmit` 0 error、`eslint .` 0 error（warning 10 → 2）、RSpec 665/0、
+RuboCop 無 offense。12 個頁面在瀏覽器逐頁實測，`/bpus` 與 `/bcvs` 走完整
+Barchart 抓取流程，數字與型別化前逐項相同（bcvs K2 $327.50、淨成本 $6.40）。
+
+**未驗到**：`portfolioHoldings` 的拖曳排序與獲利↔賣價雙向試算——`/portfolio`
+目前無持股資料，那些路徑進不去。
+
 ### 2026-08-29（四）— M-6：兩支價差試算頁抽出共用模組
 
 `bull_put_spreads` 與 `bull_call_spreads` 的重複程式碼在 H-3 之後變成兩支並排的
