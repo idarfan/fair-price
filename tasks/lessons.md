@@ -1152,3 +1152,66 @@ Rails.application.routes.recognize_path("/valuations/BRK.B")
 時 `innerText` 回傳空字串。要用 `innerHTML` 或 `getBoundingClientRect` 交叉確認，
 不然會把「已經正常渲染」讀成「壞掉了」。
 
+
+## 2026-08-29（四）— code-review-graph MCP：整場沒用，事後實測發現該怎麼用
+
+### 流程失誤
+
+`CLAUDE.md` 寫得很明確：**探索程式碼一律先用 code-review-graph MCP，Grep/Glob/Read
+只在 graph 覆蓋不到時才退回**。這次從稽核到死碼普查，我一次都沒用過，全程 python
+讀檔 + 自己寫掃描腳本。每次 `Read` 都跳 `⚠️ GRAPH-FIRST RULE` 提醒，我一直略過。
+
+規則本身寫的是「graph 覆蓋不到時才退回」——**我從來沒花一次呼叫去確認它覆不覆蓋
+得到**，直接跳過。這才是真正的問題，不是「沒用工具」。
+
+### 事後實測：這個 graph 對 Rails 的實際能力
+
+事後補跑，結果不是單純的「早該用」：
+
+**`refactor_tool mode=dead_code` 對 Rails 幾乎不能用。**
+回傳 194 個「死碼」類別，裡面包含 `ApplicationRecord`、`ApplicationJob`、
+`MarginController`、`OptionsController`、`OwnershipSnapshot`、`PriceAlert`……
+全都是活的。原因是 Rails 大量靠慣例隱式實例化（controller 由路由按名字找、model
+由 ActiveRecord 驅動），靜態呼叫分析看不到那些邊。這一輪如果照它的清單刪，會直接
+把專案刪爆。
+
+**元件類別不一定搜得到。**
+`semantic_search_nodes` 找 `WatchlistManagerComponent`（確實存在、`/momentum`
+上正在用）回傳 0 筆；`query_graph callers_of` 同樣 `not_found`。但
+`query_graph file_summary` 指到那個檔案路徑就正常回傳 8 個節點。
+→ **檔案層級可靠，Ruby 巢狀命名空間的類別名不可靠。**
+
+### 最重要的一個陷阱
+
+工具回應裡有 `confidence` 欄位，它會老實說：
+
+```
+"confidence": "target not indexed: no node matching 'WatchlistManagerComponent',
+               so this 0 is not evidence that none exist"
+```
+
+**「0 個呼叫端」和「查不到這個節點」是兩件事，工具分得清楚，但只寫在 `confidence`
+裡。** 如果我當初用 `callers_of` 查那三個候選元件、拿到 0 就直接刪，而沒讀
+`confidence`，很可能刪掉的是活的元件。
+
+→ 用 graph 查詢時，**`confidence` 與 `status` 欄位必讀**，不能只看
+`result_count`。
+
+### 結論：怎麼用才對
+
+| 用途 | 適不適合這個 graph |
+|---|---|
+| `file_summary`（某檔案有哪些節點） | ✅ 可靠 |
+| `get_impact_radius`（改動的影響範圍） | ✅ 檔案層級可靠 |
+| post-commit 自動 `detect_changes` 風險評分 | ✅ 已在跑，commit 後那段就是 |
+| `dead_code` 找 Rails 死碼 | ❌ 194 個假陽性，不能用 |
+| 用類別名反查呼叫端（Ruby 巢狀命名空間） | ⚠️ 常查不到，且 0 ≠ 沒有 |
+
+**規則修正**：不是「一律先用 graph」，而是**「先花一次呼叫確認 graph 覆不覆蓋得到
+這個問題，再決定用它還是退回 Grep/Read」**。這次省掉那一次呼叫，等於連「該不該
+用」都沒判斷過。
+
+而死碼判斷這種**刪東西的決定**，無論 graph 說什麼，都要用實際執行的證據交叉驗證
+（本次用的是：正式碼 `.new` 掃描 + `log/development.log` 的例外記錄 + 665 個測試
++ 瀏覽器實測）。
+
