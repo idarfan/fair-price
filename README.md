@@ -1,5 +1,67 @@
 # FairPrice
 
+### 2026-08-29（六）— 升 vite 8、解開兩個相依衝突、補上前端單元測試
+
+> **歷史說明**：這一輪同樣被自動提交 hook 拆成兩筆並已推送
+> （`567f579` json 測試＋vitest 設定、`a18c5ea` 升 vite 8＋dom 測試）。
+> 禁止 force push，說明補在這裡。
+
+**兩個先前就存在的相依衝突**
+
+`npm install` 一直裝不了任何新套件，原因是兩組 peer dependency 互斥：
+
+```
+@vitejs/plugin-react@6.0.1        要 vite@^8.0.0，專案卻釘 vite@^6.4.1
+eslint-plugin-react-hooks@7.0.1   peer 只到 eslint@^9，專案已裝 eslint@10.2.0
+```
+
+兩者都是先前用 `--force` 之類硬裝起來的。升級前先確認所有 vite 消費端都接受
+`^8`（`vite-plugin-ruby >=5.0.0`、`@storybook/react-vite` 與 `vitest@4.1.1`
+都列了 `^8`），才動手。
+
+| 套件 | 前 | 後 |
+|---|---|---|
+| `vite` | 6.4.1 | **8.2.2** |
+| `eslint-plugin-react-hooks` | 7.0.1 | **7.1.1** |
+| `happy-dom` | 未安裝 | **20.11.15** |
+
+**production build 從約 10 秒降到 1.80 秒**，`react-resizable-panels` 的
+`"use client"` 警告也消失。
+
+**剩一個不影響 Rails 的 peer 不符**：`@joshwooding/vite-plugin-react-docgen-typescript@0.6.4`
+（`@storybook/react-vite` 的相依）只支援到 vite 7。**只影響 Storybook**，
+Rails 建置與測試都不碰它——跑 `npx chromatic` 前要留意。
+
+**前端單元測試（28 個）**
+
+之前說「這專案沒有前端測試框架」是錯的——`vitest@4.1.1` 早就裝好了，缺的是
+DOM 環境（被上面的衝突擋住）。
+
+| 檔案 | 測試數 | 重點 |
+|---|---:|---|
+| `shared/json.test.ts` | 17 | 把 `num()`（嚴格）與 `numeric()`（parseFloat 語意）的差別釘死——那正是 Skew Rank 回歸的根因 |
+| `shared/dom.test.ts` | 11 | 釘住「取不到就安靜回退」的新語意（型別化前那些寫法會拋 TypeError）|
+
+新增 `vitest.config.ts`（獨立於 `vite.config.ts`，不載入 `vite-plugin-ruby`）。
+`package.json` 加 `test` / `test:watch`；`check` 改成
+`tsc --noEmit && eslint . && vitest run`；`lint` 從已失效的 `--ext` 改成 `eslint .`。
+
+**兩支測試都驗證過是有效防護**：把 `numeric()` 改回嚴格 → 3 個失敗；拿掉
+`closestFrom` 的 `instanceof` 保護 → 1 個失敗。
+
+**順帶把 `portfolioHoldings` 補驗完**
+
+`/portfolio` 無持股資料，改用元件真實標記建合成 DOM、攔截 `/portfolio/quotes`
+回 Finnhub 真實形狀（實測 `c`/`d`/`dp` 都是 `Float`，所以嚴格的 `num()` 在那裡
+是對的）。六個報價欄位與手算逐項相符（市值 $3,197.00、損益 +$1,697.00、
+損益率 +113.13%），雙向試算 160.00 / 50.00 也對。未動任何真實資料。
+
+**驗證**
+
+`npm run check` 全綠、RSpec 665/0、RuboCop 無 offense。vite 8 換掉所有 chunk
+hash，重啟後逐頁重驗 `/iv_analysis`、`/watchlist`、`/technical_dashboard`，
+console 零錯誤。
+
 ### 2026-08-29（五）— behaviors 全面型別化：765 個 strict error → 0
 
 30 支 behaviors、共用模組與 entrypoints 全部從 `.js` 轉成 `.ts`。

@@ -1365,3 +1365,71 @@ RAILS_ENV=production bin/rails runner 'puts ViteRuby.instance.manifest.path_for(
 `shared/dom.ts` 一開始寫了 `byId()` 與 `isWithin()`，轉完 25 個模組後零呼叫端
 ——正是這個 codebase 前一輪剛清掉的同一種東西。刪掉之後順帶消除了整批唯一的
 `as`（`byId` 的 `as T | null`）。**寫工具函式時先確認真的有人要用。**
+
+## 2026-08-29（七）— 「裝不了套件」通常是兩個獨立衝突疊在一起
+
+### 事件
+
+整個 session 裡我三次說「`npm install` 卡在 vite 的 peer dependency 衝突，
+裝不了新套件」，並據此放棄用 Zod、放棄裝 DOM 測試環境。實際動手升級才發現：
+
+1. `@vitejs/plugin-react@6.0.1` 要 `vite@^8`，專案釘 `vite@^6.4.1`
+2. `eslint-plugin-react-hooks@7.0.1` peer 只到 `eslint@^9`，專案已裝 `eslint@10.2.0`
+
+**第二個是修完第一個才浮出來的。** 只看第一次的錯誤訊息會以為只有一個問題。
+
+而且我還說錯了一件事：「這專案沒有前端測試框架、`npx vitest` 跑不了」——
+**`vitest@4.1.1` 早就裝好了**，缺的只是 DOM 環境。我沒查就下了結論。
+
+### 規則
+
+**「裝不了」不是終點，是待查的症狀。** 遇到 ERESOLVE 要做三件事：
+
+1. **看完整錯誤**，不要只看 `tail`——npm 會把真正的衝突印在中段
+2. **查每個消費端的 peer 範圍**，確認升級目標是否真的可行：
+   ```bash
+   python3 -c "import json; [print(p, json.load(open(f'node_modules/{p}/package.json')).get('peerDependencies',{}).get('vite')) for p in [...]]"
+   ```
+   註：這些套件多半是 ESM-only，`require()` 會失敗，直接讀 `package.json` 比較可靠
+3. **確認實際安裝了什麼**，`package.json` 的宣告與 `node_modules` 可能不一致
+   （本例：eslint 宣告與安裝都是 10，但 plugin 的 peer 只到 9——先前用 `--force` 裝的）
+
+### 升級前的檢查清單
+
+升 vite 這種核心建置工具前，先列出所有消費端的 peer 範圍再動手：
+
+```
+vite-plugin-ruby      >=5.0.0                      ✓
+@storybook/react-vite ^5||^6||^7||^8               ✓
+vitest@4.1.1          ^6||^7||^8                   ✓
+@vitejs/plugin-react  ^8（就是它逼著要升）          ✓
+```
+
+升完之後**至少要驗這三件**：Rails 端 `bundle exec vite build` 能跑、manifest
+的 entrypoint 與 chunk 數量不變、chunk hash 全換所以要重啟並重驗頁面。
+
+本例 vite 6 → 8 的意外收穫：production build 從約 10 秒降到 1.80 秒。
+
+### 殘留的不相容要講清楚，不要當作沒事
+
+升完仍有一個 peer 不符：`@joshwooding/vite-plugin-react-docgen-typescript`
+（Storybook 的相依）只支援到 vite 7。**它只影響 Storybook，不影響 Rails 建置**，
+所以沒有為它再動 Storybook——但必須寫進 README 與交接說明，因為
+`npx chromatic` 是這個專案的既有流程。
+
+### 沒有測試資料時怎麼驗一個模組
+
+`portfolioHoldings` 因為 `/portfolio` 是空的而長期沒驗過。解法不是「建假資料
+進資料庫」，而是**照元件真實標記建合成 DOM、載入 chunk 呼叫 `init()`、
+攔截 fetch 回真實形狀的 payload**，再拿渲染結果跟手算對照。
+
+```js
+window.fetch = (url, opts) => url.includes('/portfolio/quotes')
+  ? Promise.resolve(new Response(JSON.stringify({ AAPL: { c: 319.7, d: 5.12, dp: 1.6276 } })))
+  : realFetch(url, opts);
+const mod = await import('/vite/assets/portfolioHoldings-<hash>.js');
+mod.init();
+```
+
+前提是**payload 形狀要有依據**——我先用 `rails runner` 確認 Finnhub 回的是
+`Float`，才敢用 number 型別餵進去。憑印象捏形狀等於沒驗。
