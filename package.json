@@ -43,8 +43,10 @@
   "scripts": {
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "lint": "eslint app/frontend stories --ext .ts,.tsx,.js",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "check": "tsc --noEmit && eslint app/frontend stories --ext .ts,.tsx,.js"
+    "check": "tsc --noEmit && eslint . && vitest run",
+    "test": "vitest run",
+    "test:watch": "vitest"
   }
 }
