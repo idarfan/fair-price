@@ -26,7 +26,7 @@
     // 誠實反映現況，而不是用 @ts-nocheck 假裝它們已經型別化。
     // TODO：逐檔轉成 .ts 之後把這兩個選項拿掉。
     "allowJs": true,
-    "checkJs": false,
+    "checkJs": true,
     "forceConsistentCasingInFileNames": true
   },
   "include": ["app/frontend/**/*.ts", "app/frontend/**/*.tsx", "app/frontend/**/*.js", "stories/**/*.ts", "stories/**/*.tsx"],
