@@ -40,3 +40,25 @@ export function firstString(source: unknown, key: string): string | undefined {
   const first = arr(source, key)[0];
   return typeof first === "string" ? first : undefined;
 }
+
+/**
+ * parseFloat 語意的數字讀取：接受數字，也接受「數字字串」。
+ *
+ * Rails 把 BigDecimal 欄位序列化成字串（例如 IV watchlist 的 skew_rank 回
+ * `"78.87"`、strike 回 `"100.0"`）。型別化前這些欄位都經過 `parseFloat`，
+ * 所以字串照樣能用；改成嚴格的 `num()` 之後整批被丟掉，Skew Rank 與履約價
+ * 欄位全變成「—」。凡是原本走 parseFloat 的欄位，一律用這支。
+ *
+ * `num()` 保留給原本就用 `typeof === 'number'` 判斷的地方（例如價差頁的
+ * fmt()），那裡字串本來就會顯示成「—」，不能一起放寬。
+ */
+export function numeric(source: unknown, key: string): number | undefined {
+  if (!isRecord(source)) return undefined;
+  const v = source[key];
+  if (typeof v === "number") return isNaN(v) ? undefined : v;
+  if (typeof v === "string") {
+    const n = parseFloat(v);
+    return isNaN(n) ? undefined : n;
+  }
+  return undefined;
+}

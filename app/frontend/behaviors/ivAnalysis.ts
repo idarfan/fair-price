@@ -5,7 +5,7 @@
  */
 
 import { closestFrom, csrfToken } from "./shared/dom";
-import { arr, isRecord, num, str } from "./shared/json";
+import { arr, isRecord, numeric, str } from "./shared/json";
 
 // ── 後端回傳的形狀（只列這個檔案會碰到的欄位）────────────────────────────
 interface WatchlistItem {
@@ -39,22 +39,22 @@ function parseItem(raw: unknown): WatchlistItem | null {
   if (ticker === undefined) return null;
   return {
     ticker,
-    latest_atm_iv: num(raw, "latest_atm_iv"),
+    latest_atm_iv: numeric(raw, "latest_atm_iv"),
     data_quality: str(raw, "data_quality"),
     last_fetched_at: str(raw, "last_fetched_at"),
-    intrinsic_value: num(raw, "intrinsic_value"),
-    time_value: num(raw, "time_value"),
+    intrinsic_value: numeric(raw, "intrinsic_value"),
+    time_value: numeric(raw, "time_value"),
     is_live: raw["is_live"] === true,
     query_label: str(raw, "query_label"),
     option_type: str(raw, "option_type"),
-    strike: num(raw, "strike"),
+    strike: numeric(raw, "strike"),
     expiry_date: str(raw, "expiry_date"),
-    ivr_1y: num(raw, "ivr_1y"), ivp_1y: num(raw, "ivp_1y"),
-    ivr_2y: num(raw, "ivr_2y"), ivp_2y: num(raw, "ivp_2y"),
-    skew_rank: num(raw, "skew_rank"), skew_pts: num(raw, "skew_pts"),
-    put_iv_025: num(raw, "put_iv_025"), call_iv_025: num(raw, "call_iv_025"),
-    available_days: num(raw, "available_days"),
-    live_price: num(raw, "live_price"), live_iv: num(raw, "live_iv"),
+    ivr_1y: numeric(raw, "ivr_1y"), ivp_1y: numeric(raw, "ivp_1y"),
+    ivr_2y: numeric(raw, "ivr_2y"), ivp_2y: numeric(raw, "ivp_2y"),
+    skew_rank: numeric(raw, "skew_rank"), skew_pts: numeric(raw, "skew_pts"),
+    put_iv_025: numeric(raw, "put_iv_025"), call_iv_025: numeric(raw, "call_iv_025"),
+    available_days: numeric(raw, "available_days"),
+    live_price: numeric(raw, "live_price"), live_iv: numeric(raw, "live_iv"),
   };
 }
 
@@ -288,7 +288,7 @@ export function init(): void {
         const expirations = arr(data, "expirations")
           .filter((v): v is string => typeof v === "string");
         if (expirations.length) {
-          buildExpiryOptions(expirations, num(data, "weekly_count") ?? 6);
+          buildExpiryOptions(expirations, numeric(data, "weekly_count") ?? 6);
         }
       })
       .catch(() => {});
@@ -357,7 +357,7 @@ export function init(): void {
     document.getElementById("iv-result-section")?.classList.remove("hidden");
     setText("iv-result-ticker",
       `${str(d, "ticker") ?? ""} ${(str(d, "option_type") ?? "").toUpperCase()} `
-      + `${num(d, "strike") ?? ""} ${str(d, "expiry_date") ?? ""}`);
+      + `${numeric(d, "strike") ?? ""} ${str(d, "expiry_date") ?? ""}`);
 
     const snapWarn = document.getElementById("iv-snap-warning");
     const snapNotice = str(d, "snap_notice");
@@ -371,27 +371,27 @@ export function init(): void {
       }
     }
     setText("iv-result-time", new Date(str(d, "queried_at") ?? "").toLocaleString("zh-TW"));
-    setText("iv-card-price", `$${(num(d, "current_price") ?? NaN).toFixed(2)}`);
+    setText("iv-card-price", `$${(numeric(d, "current_price") ?? NaN).toFixed(2)}`);
 
     const deltaEl = document.getElementById("iv-card-delta");
-    const delta = num(d, "delta") ?? NaN;
+    const delta = numeric(d, "delta") ?? NaN;
     if (deltaEl) {
       deltaEl.textContent = delta.toFixed(4);
       deltaEl.className = "text-lg font-bold "
         + (delta > 0.5 ? "text-blue-600" : delta >= 0.3 ? "text-green-600" : "text-gray-500");
     }
 
-    setText("iv-card-iv", `${((num(d, "iv") ?? NaN) * 100).toFixed(2)}%`);
+    setText("iv-card-iv", `${((numeric(d, "iv") ?? NaN) * 100).toFixed(2)}%`);
 
-    const dte = num(d, "dte");
+    const dte = numeric(d, "dte");
     setText("iv-card-dte", dte !== undefined ? `${dte} 天` : "—");
 
-    const atmIv = num(d, "atm_iv");
+    const atmIv = numeric(d, "atm_iv");
     setText("iv-card-atm", atmIv !== undefined ? `${(atmIv * 100).toFixed(2)}%` : "—%");
 
     const hvEl = document.getElementById("iv-card-hv");
     const hvWin = document.getElementById("iv-card-hv-window");
-    const hvDte = num(d, "hv_dte");
+    const hvDte = numeric(d, "hv_dte");
     if (hvEl) {
       if (hvDte !== undefined) {
         const hvPct = hvDte * 100;
@@ -409,13 +409,13 @@ export function init(): void {
       }
     }
 
-    renderIvrCell("iv-ivr-1y", num(d, "ivr_1y"));
-    renderIvrCell("iv-ivr-2y", num(d, "ivr_2y"));
-    renderStatCell("iv-ivp-1y", num(d, "ivp_1y"));
-    renderStatCell("iv-ivp-2y", num(d, "ivp_2y"));
+    renderIvrCell("iv-ivr-1y", numeric(d, "ivr_1y"));
+    renderIvrCell("iv-ivr-2y", numeric(d, "ivr_2y"));
+    renderStatCell("iv-ivp-1y", numeric(d, "ivp_1y"));
+    renderStatCell("iv-ivp-2y", numeric(d, "ivp_2y"));
 
-    renderQualityBanner(str(d, "data_quality") ?? "", num(d, "available_days"), str(d, "notice"));
-    renderConclusion(num(d, "ivr_1y"), num(d, "ivr_2y"));
+    renderQualityBanner(str(d, "data_quality") ?? "", numeric(d, "available_days"), str(d, "notice"));
+    renderConclusion(numeric(d, "ivr_1y"), numeric(d, "ivr_2y"));
   }
 
   function renderIvrCell(id: string, val: number | undefined): void {
