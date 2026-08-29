@@ -5,37 +5,19 @@
  * 原本用 Ruby 插值寫進來的路由與狀態，改成掛載元素上的 data-config
  * JSON（用 JSON 而不是逐個 data attribute，是為了保留 null 與數值型別，
  * dataset 只能給字串，會把 nil 變成空字串而改變 truthiness）。
- * TODO：型別化成 .ts；與另一支 spread 頁面之間仍有大量重複（稽核 M-6）。
+ * 與 Bull Call 共用的小工具已抽到 shared/spreadHelpers.js（稽核 M-6）。
+ * TODO：型別化成 .ts。
  */
+
+import { createSpreadHelpers } from "./shared/spreadHelpers";
 
 export function init(root) {
   var CFG = JSON.parse(root.dataset.config);
 
   (function () {
-    function csrf() {
-      var m = document.querySelector('meta[name="csrf-token"]');
-      return m ? m.content : '';
-    }
-
-    function pollJob(jobId, onDone) {
-      var attempts = 0;
-      var timer = setInterval(function () {
-        if (++attempts > 60) { clearInterval(timer); onDone('error'); return; }
-        fetch(CFG.routes.status + '?job_id=' + jobId)
-          .then(function (r) { return r.json(); })
-          .then(function (d) {
-            if (d.status === 'pending' || d.status === 'not_found') return;
-            clearInterval(timer);
-            onDone(d.status);
-          }).catch(function () {});
-      }, 2000);
-    }
-
-    // ── 進度條：抓履約日／Put 鏈共用 ─────────────────────────────────────
-    function showProgress() {
-      var bar = document.getElementById('bpus-progress');
-      if (bar) bar.classList.remove('hidden');
-    }
+    var H = createSpreadHelpers({ prefix: 'bpus', statusPath: CFG.routes.status });
+    var csrf = H.csrf, pollJob = H.pollJob, showProgress = H.showProgress;
+    var fmt = H.fmt, fmtLots = H.fmtLots, currentLots = H.currentLots;
 
     // ── Step1: 送出代號 → 抓履約日 ──────────────────────────────────────
     var form = document.getElementById('bpus-symbol-form');
@@ -363,22 +345,8 @@ export function init(root) {
       });
     });
 
-    function fmt(n) { return (typeof n === 'number' && !isNaN(n)) ? n.toFixed(2) : '—'; }
-
     // 口數：金額類結果用「單口 × 口數 = 總計」呈現；BE/ROC/風險報酬比是
     // 比率，不隨口數變化，維持單口顯示(bpus-fix.md 項目5)。
-    function currentLots() {
-      var el = document.getElementById('bpus-lots-input');
-      var n = el ? parseInt(el.value, 10) : 1;
-      return (!n || n < 1) ? 1 : n;
-    }
-
-    function fmtLots(perLot, lots) {
-      if (typeof perLot !== 'number' || isNaN(perLot)) return '—';
-      if (lots <= 1) return '$' + fmt(perLot);
-      return '$' + fmt(perLot) + ' × ' + lots + ' = $' + fmt(perLot * lots);
-    }
-
     var lastCalcResult = null;
 
     function runCalculate() {

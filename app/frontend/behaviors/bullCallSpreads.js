@@ -5,19 +5,19 @@
  * 原本用 Ruby 插值寫進來的路由與狀態，改成掛載元素上的 data-config
  * JSON（用 JSON 而不是逐個 data attribute，是為了保留 null 與數值型別，
  * dataset 只能給字串，會把 nil 變成空字串而改變 truthiness）。
- * TODO：型別化成 .ts；與另一支 spread 頁面之間仍有大量重複（稽核 M-6）。
+ * 與 Bull Put 共用的小工具已抽到 shared/spreadHelpers.js（稽核 M-6）。
+ * TODO：型別化成 .ts。
  */
+
+import { createSpreadHelpers } from "./shared/spreadHelpers";
 
 export function init(root) {
   var CFG = JSON.parse(root.dataset.config);
 
   (function () {
-    function csrf() {
-      var m = document.querySelector('meta[name="csrf-token"]');
-      return m ? m.content : '';
-    }
-
-    function fmt(n) { return (typeof n === 'number' && !isNaN(n) && n !== null) ? n.toFixed(2) : '—'; }
+    var H = createSpreadHelpers({ prefix: 'bcvs', statusPath: CFG.routes.status });
+    var csrf = H.csrf, pollJob = H.pollJob, showProgress = H.showProgress;
+    var fmt = H.fmt, fmtLots = H.fmtLots, currentLots = H.currentLots;
 
     // 與 Ruby #strike_row_id 用同一種格式化方式組 row id，避免 Float#to_s
     // 與 JS Number 序列化不一致造成兩端 id 對不上。
@@ -26,25 +26,6 @@ export function init(root) {
     }
 
     var CURRENT_PRICE = CFG.underlyingPrice;
-
-    function pollJob(jobId, statusPath, onDone) {
-      var attempts = 0;
-      var timer = setInterval(function () {
-        if (++attempts > 60) { clearInterval(timer); onDone('error'); return; }
-        fetch(statusPath + '?job_id=' + jobId)
-          .then(function (r) { return r.json(); })
-          .then(function (d) {
-            if (d.status === 'pending' || d.status === 'not_found') return;
-            clearInterval(timer);
-            onDone(d.status);
-          }).catch(function () {});
-      }, 2000);
-    }
-
-    function showProgress() {
-      var bar = document.getElementById('bcvs-progress');
-      if (bar) bar.classList.remove('hidden');
-    }
 
     // ── Step1: 送出代號 → 抓到期日 ──────────────────────────────────────
     var form = document.getElementById('bcvs-symbol-form');
@@ -71,7 +52,7 @@ export function init(root) {
         } else if (d.status === 'cdp_offline') {
           window.location.href = CFG.routes.index + '?symbol=' + symbol + '&job_status=cdp_offline';
         } else if (d.job_id) {
-          pollJob(d.job_id, CFG.routes.status, function (status) {
+          pollJob(d.job_id, function (status) {
             window.location.href = CFG.routes.index + '?symbol=' + symbol + '&job_status=' + status;
           });
         } else {
@@ -118,7 +99,7 @@ export function init(root) {
           } else if (d.status === 'cdp_offline') {
             window.location.href = base + '&chain_job_status=cdp_offline';
           } else if (d.job_id) {
-            pollJob(d.job_id, CFG.routes.status, function (status) { window.location.href = base + '&chain_job_status=' + status; });
+            pollJob(d.job_id, function (status) { window.location.href = base + '&chain_job_status=' + status; });
           } else {
             window.location.href = base + '&chain_job_status=error';
           }
@@ -131,18 +112,6 @@ export function init(root) {
     // ── Step3/4: K1 下拉 → 三 tab K2 建議 ────────────────────────────────
     var lastTabs = null;
     var activeTab = 'balanced';
-
-    function currentLots() {
-      var el = document.getElementById('bcvs-lots-input');
-      var n = el ? parseInt(el.value, 10) : 1;
-      return (!n || n < 1) ? 1 : n;
-    }
-
-    function fmtLots(perLot, lots) {
-      if (typeof perLot !== 'number' || isNaN(perLot) || perLot === null) return '—';
-      if (lots <= 1) return '$' + fmt(perLot);
-      return '$' + fmt(perLot) + ' × ' + lots + ' = $' + fmt(perLot * lots);
-    }
 
     function setActiveTab(kind) {
       activeTab = kind;

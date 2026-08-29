@@ -5,53 +5,15 @@
  * 原本用 Ruby 插值寫進來的路由與狀態，改成掛載元素上的 data-config
  * JSON（用 JSON 而不是逐個 data attribute，是為了保留 null 與數值型別，
  * dataset 只能給字串，會把 nil 變成空字串而改變 truthiness）。
- * TODO：型別化成 .ts；與另一支 spread 頁面之間仍有大量重複（稽核 M-6）。
+ *
+ * 稽核 M-6：tooltip 本體與 Bull Call 那支逐字相同，已抽到 shared/colTooltip.js。
+ * 這支頁面沒有額外的導覽行為，所以就是一行轉呼叫。
  */
+
+import { initColTooltip } from "./shared/colTooltip";
 
 export function init(root) {
   var CFG = JSON.parse(root.dataset.config);
 
-  (function () {
-    var BPUS_COL_EXPLAIN = CFG.colExplain;
-
-    var tip = document.createElement('div');
-    tip.id = 'bpus-col-tip';
-    tip.innerHTML = '<div class="tip-t"></div><div class="tip-b"></div>';
-    document.body.appendChild(tip);
-    var tT = tip.querySelector('.tip-t'), tB = tip.querySelector('.tip-b');
-    function posTip(e) {
-      var x = e.clientX + 14, y = e.clientY + 12,
-          w = tip.offsetWidth || 280, h = tip.offsetHeight || 100;
-      if (x + w > window.innerWidth - 10)  x = e.clientX - w - 10;
-      if (y + h > window.innerHeight - 10) y = e.clientY - h - 10;
-      tip.style.left = x + 'px'; tip.style.top = y + 'px';
-    }
-    document.addEventListener('mouseover', function (e) {
-      var el = e.target.closest('[data-tip-key]');
-      if (el) {
-        var d = BPUS_COL_EXPLAIN[el.dataset.tipKey];
-        if (!d) return;
-        tT.textContent = d.title; tB.textContent = d.desc;
-        tip.style.opacity = '1'; posTip(e);
-      } else { tip.style.opacity = '0'; }
-    });
-    document.addEventListener('mousemove', function (e) {
-      if (tip.style.opacity !== '0') posTip(e);
-    });
-    document.addEventListener('mouseout', function (e) {
-      if (!e.target.closest('[data-tip-key]')) tip.style.opacity = '0';
-    });
-
-    function drv() { return window.driver && window.driver.js && window.driver.js.driver; }
-    document.addEventListener('click', function (e) {
-      var el = e.target.closest('[data-tip-key]');
-      if (el && drv()) {
-        var d = BPUS_COL_EXPLAIN[el.dataset.tipKey];
-        if (!d) return;
-        tip.style.opacity = '0';
-        drv()({ animate: true, allowClose: true, overlayOpacity: 0.35,
-                steps: [{ element: el, popover: { title: d.title, description: d.desc, side: 'bottom', align: 'center' } }] }).drive();
-      }
-    });
-  })();
+  initColTooltip({ prefix: "bpus", colExplain: CFG.colExplain });
 }

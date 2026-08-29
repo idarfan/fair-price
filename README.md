@@ -1,5 +1,58 @@
 # FairPrice
 
+### 2026-08-29（四）— M-6：兩支價差試算頁抽出共用模組
+
+`bull_put_spreads` 與 `bull_call_spreads` 的重複程式碼在 H-3 之後變成兩支並排的
+`.js`，這次把真正重複的部分抽掉。實測兩檔完全相同的行有 101 行（占 put 檔 22%），
+其餘差異幾乎只是 DOM id 前綴（`bpus-` / `bcvs-`）。
+
+**新增兩個共用模組**
+
+- `behaviors/shared/spreadHelpers.js` —— `createSpreadHelpers({ prefix, statusPath })`
+  回傳 `csrf` / `fmt` / `fmtLots` / `currentLots` / `showProgress` / `pollJob`
+- `behaviors/shared/colTooltip.js` —— `initColTooltip({ prefix, colExplain })`，
+  回傳 `{ drv, hide }` 供呼叫端擴充
+
+Vite 確認兩對頁面各自 import 同一份 chunk（`_spreadHelpers`、`_colTooltip`），
+不是各打包一份。
+
+| 檔案 | 前 | 後 |
+|---|---:|---:|
+| `bullPutSpreads.js` | 503 | 471 |
+| `bullCallSpreads.js` | 434 | 403 |
+| `bullPutTooltips.js` | 57 | **19** |
+| `bullCallTooltips.js` | 73 | 57 |
+
+**三個實作決定**
+
+1. **tip 容器 id 用 prefix 參數化，不改名**——`application.css` 對
+   `#bpus-col-tip` 與 `#bcvs-col-tip` 各有一份樣式，`.tip-t` 字級還不同
+   （13px vs 22px）。`prefix + '-col-tip'` 產生完全相同的 id，CSS 一行不用改。
+2. **`pollJob` 的 statusPath 改成建立時綁定**——原本 put 版讀 `CFG.routes.status`、
+   call 版當第二個參數傳，統一後 call 端兩處呼叫各少一個參數。
+3. **bcvs 的 9 步導覽改成獨立 click listener**——原本接在欄位 popover 的 `return`
+   之後。共用核心只處理 `[data-tip-key]`、這裡只處理 `#bcvs-tour-btn`，同一次點擊
+   不會同時命中（已實測：點欄位只開 1 of 1，不會誤觸 1 of 9）。
+
+順帶清掉 bcvs 版 `fmt` / `fmtLots` 多寫的 `n !== null`——前面已有
+`typeof n === 'number'`，而 `typeof null === 'object'`，那個檢查永遠不成立。
+
+**驗證**
+
+665 examples / 0 failures、RuboCop 通過、`tsc` 0 error、`eslint .` 0 error。
+
+兩頁在瀏覽器各跑完整流程，數字與重構前逐項相同：
+
+| | `/bpus` | `/bcvs` |
+|---|---|---|
+| 選擇權鏈 | 108 列 | 105 列 |
+| 試算 | 淨權利金 $55.00、ROC 5.8% | K2 $327.50、淨成本 $6.40 |
+| 口數 3 | `$55.00 × 3 = $165.00` | `$640.00 × 3 = $1920.00` |
+| tooltip | 13px ✅ | 22px ✅ |
+| 其他 | — | 修復模式 $-530/-60/+720、導覽 1 of 9 |
+
+console 零錯誤零警告。
+
 ### 2026-08-29（三）— 全面清掃「原始碼裡有、執行時到不了」的死碼
 
 把當天稍早發現的兩類問題掃過整個 codebase：預設關閉但沒人開啟的可選功能，
