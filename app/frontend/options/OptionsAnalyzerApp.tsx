@@ -441,8 +441,11 @@ export default function OptionsAnalyzerApp({
 
   useEffect(() => {
     setSelectedIdx(0);
-    if (strategies.length > 0 && price > 0) {
-      const builtLegs = buildLegsForPrice(strategies[0], price);
+    // noUncheckedIndexedAccess：length > 0 不會幫 strategies[0] 收窄，
+    // 直接取出來判斷比較誠實。
+    const first = strategies[0];
+    if (first && price > 0) {
+      const builtLegs = buildLegsForPrice(first, price);
       setLegs(builtLegs.map((l) => ({ ...l, id: nextLegId++ })));
     }
   }, [strategies, price]);

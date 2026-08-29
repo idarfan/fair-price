@@ -30,7 +30,7 @@ export function parseFlexDate(s: string): string | null {
 }
 
 export function todayISO(): string {
-  return new Date().toISOString().split('T')[0]
+  return new Date().toISOString().slice(0, 10)
 }
 
 // Convert a date string (YYYY-MM-DD) to days from today (min 1)
@@ -47,5 +47,5 @@ export function daysToDate(days: number): string {
   const d = new Date()
   d.setHours(0, 0, 0, 0)
   d.setDate(d.getDate() + days)
-  return d.toISOString().split('T')[0]
+  return d.toISOString().slice(0, 10)
 }

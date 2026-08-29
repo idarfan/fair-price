@@ -1,5 +1,45 @@
 # FairPrice
 
+### 2026-08-29（八）— 開啟 `noUncheckedIndexedAccess`，並修好 `/options/:symbol` 的 500
+
+**`noUncheckedIndexedAccess: true`**（global rules 要求，原本掛著 TODO）
+
+開啟後 46 個錯誤**全在 React/TSX 側**——剛型別化完的 30 支 behaviors 一個都沒有，
+那批當初就寫得防禦性。
+
+| 檔案 | 錯誤 | 修法 |
+|---|---:|---|
+| `options/payoff.ts` | 15 | 係數陣列標成 tuple 型別（索引即 `number`，不需 `as`）；`calcSummary` 補一道不會觸發的防護 |
+| `option_price_tracker/components/OptionsChainTable.tsx` | 13 | `buildTips` 從 `Record<string, TipDef>` 改用 **`satisfies`**——每項仍檢查 `TipDef`，但 key 保持精確 |
+| `options/components/SentimentPanel.tsx` | 6 | `data[0]` 取出當 reduce 種子，同時取代原本的 `!data.length` 判斷 |
+| `options/strategies.ts` | 6 | `offsetAt()` helper，**回 NaN 而非 `?? 0`**——`?? 0` 會把越界從 NaN 悄悄變成價平，那是行為改變 |
+| `options/components/StrategyDetailPanel.tsx` | 3 | `bes.length === 1` 不會幫 `bes[0]` 收窄，補明確判斷 |
+| `margin/utils/format.ts` | 2 | `toISOString().split('T')[0]` → `.slice(0, 10)` |
+| `options/OptionsAnalyzerApp.tsx` | 1 | `strategies[0]` 先取出再判斷 |
+
+**零個 `as` 強轉**（`satisfies` 是驗證不是斷言）。7 個檔案的數值常數比對全部零差異。
+
+**過程中自己製造又抓到的一個 bug**：用字串取代插入 `offsetAt` helper 時，同一次
+`replace` 把 helper **自己內文**的 `offsets[i]` 也換掉，變成
+`return offsetAt(offsets, i) ?? NaN`——**無限遞迴**。TS 完全不抱怨（型別對得上），
+執行時會 stack overflow。同一次還把 `export function` 的 `export` 跟函式拆開。
+教訓：批次字串取代會咬到自己剛插入的內容。
+
+**順帶修好一個既有的 500**
+
+驗證時發現 `/options/AAPL` 直接 500，見上一則 commit（`OptionsController#show`
+的常數解析少了前綴 `::`，從 `ca052af` 起就一直壞著）。
+
+**瀏覽器驗證**
+
+| 頁面 | 驗到 |
+|---|---|
+| `/options/AAPL` | Call Wall 361 / Put Wall 281、最大獲利 $1675、損益兩平 $273.25；切「大波動」→ 跨式 → 雙 BE $229.25 / $370.75，「盈利走廊」分支出現 |
+| `/option_price_tracker` | 切 Calls → 13 個展開欄位全部渲染且各帶 ⓘ（tips 若為 undefined，`TipContent` 讀 `title` 會直接爆）|
+| `/margin` | 30d / 90d / 365d 日期計算與手算逐項相符 |
+
+`npm run check` 全綠、RSpec 669/0、RuboCop 無 offense、console 零錯誤。
+
 ### 2026-08-29（七）— npm 安全漏洞 8 → 1，並確認 Storybook 在 vite 8 下正常
 
 升 vite 8 時跑了一次 `npm audit`，才看見既有的 8 個漏洞（含 4 個 critical）。

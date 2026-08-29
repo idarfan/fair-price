@@ -166,7 +166,10 @@ function calcDerived(
 
 // ── Tooltip definitions ───────────────────────────────────────────────────────
 
-function buildTips(s: number): Record<string, TipDef> {
+// 回傳型別刻意不標成 Record<string, TipDef>：那樣在 noUncheckedIndexedAccess
+// 之下每個 tips.xxx 都會變成 TipDef | undefined。改用 satisfies——每個項目
+// 仍然對 TipDef 做檢查，但 key 保持精確，取值不會是 undefined。
+function buildTips(s: number) {
   const rStr  = (RISK_FREE_RATE * 100).toFixed(1);
   const sStr  = s > 0 ? s.toFixed(2) : "—";
   // ~5% OTM strike rounded to nearest $0.50
@@ -248,7 +251,7 @@ function buildTips(s: number): Record<string, TipDef> {
       title: "未平倉量 (持倉量)",
       desc: "Open Interest：目前市場上尚未結算的合約總數。OI 越高代表市場參與度越高，與成交量結合可判斷市場動向。",
     },
-  };
+  } satisfies Record<string, TipDef>;
 }
 
 // ── Main component ────────────────────────────────────────────────────────────

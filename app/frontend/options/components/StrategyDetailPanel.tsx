@@ -207,12 +207,14 @@ export default function StrategyDetailPanel({ template, legs, price, summary }: 
             {bes.map((b, i) => (
               <span key={i} className="text-xl font-bold text-amber-700">${b.toFixed(2)}</span>
             ))}
-            {bes.length === 1 && (
+            {/* noUncheckedIndexedAccess：length 判斷不會幫 bes[0] / bes[1] 收窄，
+                改成先取值再判斷，條件與原本等價（長度 1 / 長度 2）。 */}
+            {bes.length === 1 && bes[0] !== undefined && (
               <span className="text-sm text-gray-500">
                 （距現價 {((bes[0] - price) / price * 100).toFixed(1)}%）
               </span>
             )}
-            {bes.length === 2 && (
+            {bes.length === 2 && bes[0] !== undefined && bes[1] !== undefined && (
               <span className="text-sm text-gray-500">
                 （盈利走廊寬 {(bes[1] - bes[0]).toFixed(2)}）
               </span>

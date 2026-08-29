@@ -11,10 +11,9 @@
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": false,
 
-    // TODO（稽核 L-1／清單第二項）：開啟後現有程式碼還有約 30 個
-    // 「可能是 undefined」要處理，集中在 OptionsChainTable.tsx 與 payoff.ts。
-    // 那是獨立的一輪工作，不在 H-3 內嵌 JS 遷移的範圍內。
-    "noUncheckedIndexedAccess": false,
+    // 2026-08-29 開啟（global rules 要求）。當時 46 個錯誤全在 React/TSX 側，
+    // 剛型別化完的 30 支 behaviors 一個都沒有——那批當初就寫得防禦性。
+    "noUncheckedIndexedAccess": true,
 
     "noEmit": true,
     "skipLibCheck": true,

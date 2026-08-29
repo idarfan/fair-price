@@ -72,10 +72,13 @@ function IvSkewRow({
 }
 
 function OiChart({ data }: { data: { strike: number; call_oi: number; put_oi: number }[] }) {
-  if (!data.length) return null
+  // noUncheckedIndexedAccess：`!data.length` 不會讓 TS 認定 data[0] 存在，
+  // 直接取出第一筆當 reduce 的種子，同時取代原本的長度判斷（語意等價）。
+  const first = data[0]
+  if (!first) return null
   const maxOI = Math.max(...data.flatMap(d => [d.call_oi, d.put_oi]))
-  const callWall = data.reduce((m, d) => d.call_oi > m.call_oi ? d : m, data[0])
-  const putWall  = data.reduce((m, d) => d.put_oi  > m.put_oi  ? d : m, data[0])
+  const callWall = data.reduce((m, d) => d.call_oi > m.call_oi ? d : m, first)
+  const putWall  = data.reduce((m, d) => d.put_oi  > m.put_oi  ? d : m, first)
 
   return (
     <div>

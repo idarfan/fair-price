@@ -1,7 +1,11 @@
 import type { PayoffLeg, PayoffPoint, PayoffSummary } from './types'
 
 function normCDF(x: number): number {
-  const a = [0.254829592, -0.284496736, 1.421413741, -1.453152027, 1.061405429]
+  // 五個係數是 Abramowitz-Stegun 近似式的固定常數。標成 tuple 型別之後，
+  // noUncheckedIndexedAccess 之下 a[0]..a[4] 的型別仍是 number（長度已知），
+  // 不需要 `as` 也不必加防護。
+  const a: [number, number, number, number, number] =
+    [0.254829592, -0.284496736, 1.421413741, -1.453152027, 1.061405429]
   const p = 0.3275911
   const sign = x < 0 ? -1 : 1
   const ax = Math.abs(x)
@@ -126,6 +130,9 @@ export function calcSummary(pts: PayoffPoint[]): PayoffSummary {
   const breakevens: number[] = []
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i], b = pts[i + 1]
+    // 迴圈上界保證兩者都存在；noUncheckedIndexedAccess 不會這樣推論，
+    // 補一道不會觸發的防護即可（行為不變）。
+    if (!a || !b) continue
     if ((a.expiryPnl >= 0 && b.expiryPnl < 0) || (a.expiryPnl <= 0 && b.expiryPnl > 0)) {
       const r = Math.abs(a.expiryPnl) / (Math.abs(a.expiryPnl) + Math.abs(b.expiryPnl))
       breakevens.push(Math.round((a.price + r * (b.price - a.price)) * 100) / 100)

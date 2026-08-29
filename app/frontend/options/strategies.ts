@@ -373,6 +373,19 @@ export function getStrategies(outlook: MarketOutlook, ivRank: number): StrategyT
   )
 }
 
+/**
+ * 取偏移量陣列的第 i 項。
+ *
+ * noUncheckedIndexedAccess 之下，索引存取的型別是 `number | undefined`。各策略的
+ * offsets 長度都與 defaultLegs 對齊，實務上不會越界；回 NaN 是為了保留型別化前
+ * 的語意——原本 `undefined * step` 就是 NaN，越界時會算出 NaN 履約價而不是
+ * 悄悄變成價平（`?? 0` 會造成後者，那是行為改變）。
+ */
+function offsetAt(offsets: number[], i: number): number {
+  const value = offsets[i]
+  return value === undefined ? NaN : value
+}
+
 export function buildLegsForPrice(
   template: StrategyTemplate,
   price: number
@@ -385,32 +398,32 @@ export function buildLegsForPrice(
     if (template.key === 'iron_condor') {
       // [long_put, short_put, short_call, long_call]
       const offsets = [-2, -1, 1, 2]
-      strike = Math.round((price + offsets[i] * step * 1.5) / step) * step
+      strike = Math.round((price + offsetAt(offsets, i) * step * 1.5) / step) * step
 
     } else if (template.key === 'iron_butterfly') {
       // [long_put, short_put(ATM), short_call(ATM), long_call]
       const offsets = [-2, 0, 0, 2]
-      strike = Math.round((price + offsets[i] * step * 2) / step) * step
+      strike = Math.round((price + offsetAt(offsets, i) * step * 2) / step) * step
 
     } else if (template.key === 'long_call_butterfly') {
       // [long_call(low), short_call×2(ATM), long_call(high)]
       const offsets = [-2, 0, 2]
-      strike = Math.round((price + offsets[i] * step) / step) * step
+      strike = Math.round((price + offsetAt(offsets, i) * step) / step) * step
 
     } else if (template.key === 'jade_lizard') {
       // [short_put(OTM), short_call(OTM), long_call(further OTM)]
       const offsets = [-1, 1, 2]
-      strike = Math.round((price + offsets[i] * step * 1.5) / step) * step
+      strike = Math.round((price + offsetAt(offsets, i) * step * 1.5) / step) * step
 
     } else if (template.key === 'put_ratio_backspread') {
       // [short_put(ATM), long_put×2(OTM)]
       const offsets = [0, -1]
-      strike = Math.round((price + offsets[i] * step) / step) * step
+      strike = Math.round((price + offsetAt(offsets, i) * step) / step) * step
 
     } else if (template.key === 'double_diagonal') {
       // [short_put(near OTM), long_put(far OTM), short_call(near OTM), long_call(far OTM)]
       const offsets = [-1, -1, 1, 1]
-      strike = Math.round((price + offsets[i] * step * 1.5) / step) * step
+      strike = Math.round((price + offsetAt(offsets, i) * step * 1.5) / step) * step
 
     } else if (template.key === 'call_calendar_spread') {
       // Both legs ATM
