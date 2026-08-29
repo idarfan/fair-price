@@ -1101,3 +1101,54 @@ Rails.application.routes.recognize_path("/valuations/BRK.B")
 `.`，剛好讓 `BRK.B` 不被切成 `ticker=BRK, format=B`。改成 `%r{[^/]{1,64}}` 之後
 必須補 `format: false`，否則含小數點的代號全掛。這種事只能靠實測，不能靠讀 code。
 
+
+## 2026-08-29（三）— 死碼普查：兩類「原始碼裡有、執行時到不了」
+
+把前兩則教訓的偵測方式掃過整個 codebase，一次找出 7 處。方法可重複使用：
+
+### 掃法 1：預設關閉的布林 keyword argument
+
+抓出所有 `def foo(..., bar: false, ...)`，再統計正式碼裡 `bar: true` 與
+`bar: <變數>` 各出現幾次。兩者都是 0 = 這個分支永遠不會執行。
+
+12 個候選裡命中 2 個（`show_formulas`、`show_search_in_nav`）。
+
+**關鍵區分**：`show_formulas` 的呼叫端是**明確傳 `false`**，那是刻意關閉，
+不是疏漏——不要一律翻成 true。只有「沒有任何呼叫端提到過這個參數」才算死碼。
+
+### 掃法 2：正式碼零呼叫端的元件
+
+列出所有 `class X < ApplicationComponent`，再到 `app/**/*.{rb,erb}` 找
+`X.new`。命中 3 個（171 行），全部只剩 Lookbook preview 在引用。
+
+`ApplicationComponent` 本身會被誤判（它是被繼承而不是被 `.new`），要排除基底類別。
+
+**額外訊號**：`log/development.log` 裡搜元件名。`PageLayoutComponent` 留有
+`undefined method 'stylesheet_link_tag'` 的例外——它不只沒人用，最後一次被渲染
+時就已經壞了。舊 log 是判斷「這東西是被取代還是被遺忘」的好證據。
+
+### 掃法 3：讓 ESLint 真的跑得動
+
+`npx eslint .` 原本吐出兩萬多則來自 `storybook-static/`、`vendor/assets/`、
+`venv/` 的雜訊。**一個沒人跑得動的 lint 閘門等同不存在**——這本身就是同一類問題。
+
+先補建置產物的 ignores 讓訊號浮出來，再處理剩下的 error。修好之後 ESLint 立刻
+抓到兩處我讀 code 沒看出來的死碼：
+
+- `no-redeclare` → `bullPutSpreads.js` 有兩個 `runCalculate()`。函式宣告會提升，
+  **後面那份永遠覆蓋前面**，前面那份從未執行
+- `no-useless-assignment` → 先算一次、下面必定覆寫的變數
+
+**注意**：`(cond) ? '' : ''` 這種兩邊相同的三元運算子 ESLint 不會抓（它是合法的
+賦值運算式）。要靠「這個 data attribute 有沒有人讀」反查。
+
+### 修完之後必須重驗
+
+我改的兩支 behavior 先前都驗過，改完必須重跑一次完整流程——`/bpus` 走到選擇權鏈
+→ 選腳 → 試算 → 改口數重繪（重繪成功才證明 `lastCalcResult` 有寫入，也就是存活
+的那份 `runCalculate` 確實是正確的那份）。
+
+**量測陷阱**：用 `innerText` 判斷結果區塊是不是空的會誤判——元素在未展開的容器裡
+時 `innerText` 回傳空字串。要用 `innerHTML` 或 `getBoundingClientRect` 交叉確認，
+不然會把「已經正常渲染」讀成「壞掉了」。
+

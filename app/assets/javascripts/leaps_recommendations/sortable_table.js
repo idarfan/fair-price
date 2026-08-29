@@ -8,7 +8,7 @@
       if (v === null || v === undefined) return null;
       var f = parseFloat(v);
       return isFinite(f) ? f : null;
-    } catch (e) { return null; }
+    } catch { return null; }
   }
 
   function sortTable(table, key, dir) {

@@ -1,5 +1,60 @@
 # FairPrice
 
+### 2026-08-29（三）— 全面清掃「原始碼裡有、執行時到不了」的死碼
+
+把當天稍早發現的兩類問題掃過整個 codebase：預設關閉但沒人開啟的可選功能，
+以及被上游 constraint 蓋掉的驗證。
+
+**刪掉 3 個正式碼零呼叫端的元件（171 行）**
+
+| 死元件 | 被什麼取代 |
+|---|---|
+| `DailyMomentum::NewsCardComponent` | `NewsTabPanelComponent` + `momentumNewsTabs.js` |
+| `DailyMomentum::WatchlistTableComponent` | `WatchlistManagerComponent` |
+| `FairValue::PageLayoutComponent` | `app/views/layouts/application.html.erb` |
+
+`PageLayoutComponent` 在 `log/development.log` 裡留有 `undefined method
+'stylesheet_link_tag'` 的例外記錄——它不只沒人用，最後一次被渲染時就已經壞了。
+三個都只剩 Lookbook preview 在引用，preview 一併刪除。
+
+**清掉 4 處死碼／no-op**
+
+- `bullPutSpreads.js` `hideProgress()`——沒有任何呼叫處。`showProgress()` 之後
+  每條路徑都是整頁導覽，頁面直接被銷毀，所以本來就不需要收起進度條
+- `bullPutSpreads.js` 重複的 `runCalculate()`——函式宣告會提升，後面同名那份
+  永遠覆蓋前面這份（少了 `lastCalcResult` 與追蹤事件），從未執行過
+- `bullCallSpreads.js` `k2Bid`——先用 `tab.k2 - tab.breakeven + k1` 算一次，
+  下面必定覆寫，算出來的值從來沒被讀過
+- `bullCallSpreads.js` `fillRepairFromTab()`——寫進 `basisInput` 的兩個 data
+  attribute 全專案沒人讀（其中一行的三元運算子兩邊還都是空字串），
+  `runRepairIfReady()` 是從 `lastTabs[activeTab]` 與鏈上那一列取值。移除後整個
+  包裝函式只剩一行轉呼叫且參數已無用，直接內聯
+
+**ESLint 閘門修好**
+
+`npx eslint .` 原本會吐出兩萬多則來自 `storybook-static/`、`vendor/assets/`、
+`venv/` 的雜訊——等於整個 lint 閘門沒人跑得動（先前回報的「0 error」是限定範圍
+跑出來的）。補上建置產物的 ignores，再為 `app/assets/javascripts/**`（Wave 1 拆出
+的 LEAPS 靜態檔）與 `.cjs` 補上正確的 globals，剩下的 12 個 error 逐一處理完。
+
+現在 `npx eslint .` 全庫 **0 error**，10 個 warning 是逐字搬移的 ES5 慣用寫法
+（`no-redeclare`、三元運算子當敘述）與兩處刻意的 `set-state-in-effect`，留給
+型別化那一輪。
+
+**沒有動的**
+
+`ValuationTableComponent` 的 `show_formulas` 也是永遠 false，但呼叫端
+（`valuations/show.html.erb:39`）是**明確傳 `false`**，屬於刻意關閉而非疏漏，
+跟 `alert-dismiss` 那種沒人想過的情況不同，留待產品決定。
+
+**驗證**
+
+665 examples / 0 failures、RuboCop 通過、`tsc --noEmit` 0 error、`eslint .` 0 error。
+瀏覽器實測受影響的兩支：`/bpus` 走完到 108 列選擇權鏈 → 選腳 → 試算（$55.00
+淨權利金）→ 改口數重繪（`$55.00 × 3 = $165.00`，證明 `lastCalcResult` 有寫入）；
+`/bcvs` 走完到 105 列 → K1 推薦三分頁 → 修復模式試算（≤K1 $-530.00／口、
+中間情境 $-60.00／口、≥K2 鎖定 $720.00／口）。
+
 ### 2026-08-29（二）— 兩處「原始碼裡有、執行時到不了」的死碼修好
 
 同日稍早的瀏覽器驗證挖出兩個同一類問題：程式碼寫了、測試也掃得到，但實際跑起來

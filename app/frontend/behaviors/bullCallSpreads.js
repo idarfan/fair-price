@@ -215,7 +215,9 @@ export function init(root) {
       renderIntervalTable(tab, lots);
       renderNakedComparison(tab, lots);
       renderEarlyClose(tab, lots);
-      fillRepairFromTab(tab);
+      // basis 欄位保留使用者已輸入的值，不覆蓋；runRepairIfReady 自己會從
+      // lastTabs[activeTab] 與鏈上那一列取 K2 / K2_bid。
+      runRepairIfReady();
     }
 
     // ── 損益區間表（bcvs.md §損益區間表：動態，以實際數字渲染）───────────────
@@ -356,14 +358,6 @@ export function init(root) {
     }
 
     // ── 修復模式 ─────────────────────────────────────────────────────────
-    function fillRepairFromTab(tab) {
-      // basis 欄位保留使用者已輸入的值，不覆蓋；K2/K2_bid 隨目前 tab 更新。
-      var basisInput = document.getElementById('bcvs-repair-basis-input');
-      if (basisInput) basisInput.dataset.k2 = tab.k2;
-      if (basisInput) basisInput.dataset.k2Bid = (tab.debit !== null && tab.max_loss !== null) ? '' : '';
-      runRepairIfReady();
-    }
-
     function runRepairIfReady() {
       var basisInput = document.getElementById('bcvs-repair-basis-input');
       var currentBidInput = document.getElementById('bcvs-repair-current-bid-input');
@@ -375,13 +369,14 @@ export function init(root) {
       var tab = lastTabs[activeTab];
       if (!tab || tab.k2 === undefined) return;
       var k1 = parseFloat(document.getElementById('bcvs-k1-select').value);
-      var k2Bid = tab.k2 - tab.breakeven + k1; // k2_bid = breakeven - k1... reconstruct if needed
-      // k2_bid is directly derivable from tab.debit and the select's ask, but
-      // simplest reliable source is the chain row rendered for this K2.
+      // k2_bid 理論上可以從 tab.debit 與下拉選單的 ask 回推，但最可靠的來源是
+      // 這個 K2 實際渲染出來的鏈上那一列，所以直接讀它。
+      // （原本這裡先用 tab.k2 - tab.breakeven + k1 算一次，但下面必定覆寫，
+      //   算出來的值從來沒被讀過。）
       var k2Row = document.getElementById(strikeRowId(tab.k2));
       var bidAttr = k2Row ? k2Row.getAttribute('data-bid') : null;
       if (bidAttr === null || bidAttr === '') return;
-      k2Bid = parseFloat(bidAttr);
+      var k2Bid = parseFloat(bidAttr);
 
       var payload = { k1: k1, k2: tab.k2, k2_bid: k2Bid, basis: basis };
       var currentBid = parseFloat(currentBidInput ? currentBidInput.value : '');

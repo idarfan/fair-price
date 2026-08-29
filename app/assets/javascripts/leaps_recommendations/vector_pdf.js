@@ -373,11 +373,15 @@
 
     if (data.flow_rows && data.flow_rows.length) {
       if (y > pageH - 40) { pdf.addPage(); y = margin; }
+      // y 是逐段累加的版面游標。這裡（與下面 vocab cards）是目前的最後一段，
+      // 回傳值當下沒人讀，但保留賦值才不會讓之後新增區段的人漏接游標。
+      // eslint-disable-next-line no-useless-assignment
       y = renderFlowTable(pdf, data.flow_rows, margin, y, data.flow_summary, data.flow_highlights, pageW - margin * 2);
     }
 
     if (data.vocab_cards && data.vocab_cards.length) {
       pdf.addPage(); y = margin; // 教學資源另起一頁，跟查詢結果本身分開
+      // eslint-disable-next-line no-useless-assignment
       y = renderVocabCards(pdf, data.vocab_cards, margin, y, pageW - margin * 2);
     }
 
@@ -401,7 +405,7 @@
     var payload;
     try {
       payload = JSON.parse(dataEl ? dataEl.textContent : 'null');
-    } catch (parseErr) {
+    } catch {
       return Promise.reject(new Error('PDF 資料解析失敗，已中止匯出'));
     }
     if (!payload) return Promise.reject(new Error('找不到匯出資料，已中止匯出'));

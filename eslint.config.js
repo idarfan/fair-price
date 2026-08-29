@@ -80,6 +80,37 @@ export default tseslint.config(
     files: ["app/frontend/**/*.{ts,tsx}", "stories/**/*.{ts,tsx}"],
   },
   {
+    // Wave 1 從 heredoc 拆出來的 LEAPS 靜態 asset 檔（由 layout 以 <script> 直接
+    // 載入，不走 Vite）。它們用到的第三方全域與 Web Speech / base64 API 原本一律被
+    // no-undef 判成錯誤——跟 behaviors 當初的情況同一類假陽性。
+    files: ["app/assets/javascripts/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "script",
+      globals: {
+        ...browserGlobals,
+        btoa: "readonly",
+        atob: "readonly",
+        speechSynthesis: "readonly",
+        SpeechSynthesisUtterance: "readonly",
+        htmlToImage: "readonly",
+        jspdf: "readonly",
+        Chart: "readonly",
+        Sortable: "readonly",
+        NProgress: "readonly",
+        driver: "readonly",
+      },
+    },
+  },
+  {
+    // pm2 設定檔是 CommonJS，不是瀏覽器程式碼。
+    files: ["*.cjs", "*.config.js"],
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: { module: "writable", require: "readonly", process: "readonly", __dirname: "readonly" },
+    },
+  },
+  {
     // 從 Phlex heredoc 搬出來的行為模組（稽核 H-3）。內容是逐字搬移的 ES5 風格
     // vanilla JS，先求「行為完全不變」，型別化是後續獨立的一輪工作。
     // 這裡放寬 var/ES5 相關規則，但 no-undef、no-unused-vars 這些真正會抓到
@@ -111,18 +142,30 @@ export default tseslint.config(
       "no-empty": "warn",
       "@typescript-eslint/no-this-alias": "off",
       "@typescript-eslint/no-unused-expressions": "warn",
-      // 搬遷後 ESLint 首次看得到這些程式碼，抓到兩處搬遷前就存在的死碼：
-      //   bullPutSpreads.js  function hideProgress()  — 全專案沒有任何呼叫處
-      //   bullCallSpreads.js var k2Bid = ...（L378）— 下一個分支必定覆寫，計算結果永遠沒被讀
-      // 刻意不在搬遷這一輪動它們（優先保證行為完全不變），列為後續清理項目。
+      // 搬遷後 ESLint 首次看得到這些程式碼，抓到三處搬遷前就存在的死碼，
+      // 都已於 2026-08-29 清除：
+      //   bullPutSpreads.js  function hideProgress()   — 沒有任何呼叫處
+      //   bullPutSpreads.js  重複的 runCalculate()      — 被後面同名宣告覆蓋，從未執行
+      //   bullCallSpreads.js var k2Bid（L378）         — 下一個分支必定覆寫
+      // 剩下的 no-redeclare / no-unused-expressions 是逐字搬移的 ES5 慣用寫法，
+      // 留給型別化那一輪一起處理，所以維持 warn。
       "no-useless-assignment": "warn",
       "@typescript-eslint/no-unused-vars": ["warn", { args: "none", varsIgnorePattern: "^_" }],
     },
   },
   {
     ignores: [
+      // 建置產物與第三方，不是我們寫的原始碼。少了這些，`npx eslint .` 會吐出
+      // 兩萬多則來自 storybook-static / vendor / venv 的雜訊，等於整個 lint
+      // 閘門沒人跑得動。
       "node_modules/**",
       "public/**",
+      "storybook-static/**",
+      "vendor/**",
+      "**/venv/**",
+      "coverage/**",
+      "tmp/**",
+      "mcp_temp_picture/**",
       "stories/Configure.mdx",
       "stories/Button.jsx",
       "stories/Header.jsx",

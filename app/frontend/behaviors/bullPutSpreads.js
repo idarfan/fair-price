@@ -36,10 +36,6 @@ export function init(root) {
       var bar = document.getElementById('bpus-progress');
       if (bar) bar.classList.remove('hidden');
     }
-    function hideProgress() {
-      var bar = document.getElementById('bpus-progress');
-      if (bar) bar.classList.add('hidden');
-    }
 
     // ── Step1: 送出代號 → 抓履約日 ──────────────────────────────────────
     var form = document.getElementById('bpus-symbol-form');
@@ -366,20 +362,6 @@ export function init(root) {
         applyRecommendation(btn.getAttribute('data-bpus-recommend-tab'));
       });
     });
-
-    function runCalculate() {
-      fetch(CFG.routes.calculate, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf() },
-        body: JSON.stringify({
-          short_strike: state.csp.strike, short_bid: state.csp.bid,
-          long_strike: state.protection.strike, long_ask: state.protection.ask
-        })
-      })
-      .then(function (r) { return r.json(); })
-      .then(renderCalcResult)
-      .catch(function () {});
-    }
 
     function fmt(n) { return (typeof n === 'number' && !isNaN(n)) ? n.toFixed(2) : '—'; }
 
