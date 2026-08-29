@@ -1197,6 +1197,15 @@ graph 裡沒有類別層級的資訊，也就沒有 `callers_of` / `inheritors_o
 `code-review-graph 2.3.8`，就是 PyPI 上的最新版（2026-08-21 發布）。
 `uvx code-review-graph --version` 可自行確認。
 
+**根因（AST 層級確認）**：tree-sitter-ruby 對兩種寫法的 `name` field 型別不同——
+`class Foo::Bar` 是 `scope_resolution`，`module Foo` + `class Bar` 是 `constant`。
+`parser.py` 的 `_get_name` 只處理 `constant`，遇到 `scope_resolution` 回傳 `None`，
+整個 Class 節點就被丟掉，方法也跟著變成 `parent_name = NULL` 的孤兒。
+
+已回報上游：**https://github.com/tirth8205/code-review-graph/issues/932**
+（附最小重現、AST 證據、本專案 64 檔缺 62 檔的統計）。修好之前，本專案的 Phlex
+元件層在 graph 裡就是沒有類別資訊，`callers_of` / `inheritors_of` 一律查不到。
+
 ### 最重要的一個陷阱
 
 工具回應裡有 `confidence` 欄位，它會老實說：
