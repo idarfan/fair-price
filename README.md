@@ -1,5 +1,31 @@
 # FairPrice
 
+### 2026-08-29 — H-3 瀏覽器實測 30 個 behavior，順手修掉字級還原白名單漂移
+
+H-3 搬遷完成當下，30 個 behavior 裡只有 4 個（登入頁上的）驗過。這次登入後在真實
+瀏覽器把 12 個頁面全部走完，確認每個 chunk 都以 200 載入、CSP 沒擋下任何 script，
+並對互動類的實際操作過（tooltip hover、分頁切換、拖曳排序掛載、刪除確認攔截、
+Chart.js 建立、bpus/bcvs 完整跑到選擇權鏈 108 列）。
+
+`alert-dismiss` 是唯一無法在正式站觸發的——所有呼叫端都沒傳 `dismissible: true`
+（只有 Lookbook preview 會），它在正式站從來不會渲染。這是搬遷前就存在的死路，
+改用直接載入 chunk + 重建元件 DOM 形狀的方式驗證模組本身。
+
+**修正：字級選 19–22px 換頁後被打回預設**
+
+`FontSizeControlsComponent::SIZES` 給的是 18–22px，但 layout 裡「繪製前還原字級」
+的白名單寫死 `['14','15','16','17','18']`，交集只有 `18`。`git show cdd4964^`
+確認搬遷前就是這樣，不是 H-3 造成的。
+
+改成兩邊都從同一個常數推導（元件新增 `.allowed_sizes`，layout 與 behavior 都讀它，
+behavior 改吃 `data-sizes`），避免兩份寫死再次漂移。
+
+**涉及檔案**
+
+- `app/components/fair_value/font_size_controls_component.rb`
+- `app/views/layouts/application.html.erb`
+- `app/frontend/behaviors/fontSizeControls.js`
+
 ### 2026-08-28 — H-3 完成：內嵌 JavaScript 全數搬進 Vite，CSP 拿掉 `unsafe_inline`
 
 接續同日的 Wave 1。Wave 2 處理有 Ruby 插值的 6 個元件（707 行，改用 data attribute

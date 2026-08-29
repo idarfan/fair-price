@@ -10,6 +10,13 @@ class FairValue::FontSizeControlsComponent < ApplicationComponent
   ].freeze
   STORAGE_KEY = "fairprice:font-size"
 
+  # layout 的「繪製前還原字級」inline script 與下面的 behavior 都從這裡取值，
+  # 避免兩邊各自寫死而漂移（曾經發生：白名單停在 14–18，按鈕卻是 18–22，
+  # 導致選 19–22 的使用者換頁後字級被打回預設）。
+  def self.allowed_sizes
+    SIZES.map { |s| s[:px].to_s }
+  end
+
   def view_template
     div(class: "flex items-center gap-1", id: "font-size-controls") do
       span(class: "text-xs text-gray-400 mr-0.5 select-none") { plain("字體調整") }
@@ -31,6 +38,7 @@ class FairValue::FontSizeControlsComponent < ApplicationComponent
   def render_script
     # JavaScript 已搬到 app/frontend/behaviors/fontSizeControls.js（稽核 H-3 Wave 2）。
     # 原本的 Ruby 插值改成 data attribute 傳入。
-    div(data: { behavior: "font-size-controls", storage_key: STORAGE_KEY })
+    div(data: { behavior: "font-size-controls", storage_key: STORAGE_KEY,
+                sizes: self.class.allowed_sizes.to_json })
   end
 end

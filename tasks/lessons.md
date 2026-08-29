@@ -1025,3 +1025,47 @@ LEAPS，Options Flow 等其他頁面若有類似「相對排名當警示」的�
     `config.content_security_policy_nonce_generator` 放行。
     **前提是專案沒有 fragment cache**——快取到舊 nonce 會讓那段 script 被擋掉。
     `style-src` 的 `unsafe_inline` 是另一回事，Phlex/Tailwind 的 inline style 拿不掉。
+
+## 2026-08-29 — H-3 瀏覽器驗證：三個教訓
+
+### 教訓 1：「搬遷完成」不等於「驗證完成」，載入成功也不等於功能正常
+
+H-3 搬完 30 個 behavior、RSpec 全綠、tsc/ESLint 零錯，但其中 26 個在登入閘門後面，
+當下一個都沒在瀏覽器跑過。實際登入後逐頁驗，才發現兩件靜態檢查抓不到的事：
+
+1. `alert-dismiss` 在正式站**從來不會渲染**——`AlertComponent` 的 `dismissible`
+   預設 false，所有呼叫端都沒傳 true（只有 Lookbook preview 會）。
+   `behavior_registry_spec` 掃原始碼看到 `behavior: "alert-dismiss"` 就算通過，
+   但那是「原始碼裡有」，不是「執行時會渲染」。
+2. 字級白名單漂移（見教訓 2）。
+
+**規則**：behavior/前端行為搬遷後，驗證要分三層，缺一層就不算完成——
+chunk 以 200 載入 → 掛載點在真實頁面上存在 → 實際觸發互動看到預期結果。
+
+**驗證手法**（可重複使用）：marker → chunk 名可由 kebab→camel 推導，不必手抄註冊表，
+再比對 `performance.getEntriesByType('resource')` 裡有沒有對應的 `/assets/<camel>-` 檔。
+
+要驗需要資料才渲染的元件（如 `tech-dash-options-charts` 要有 max_pain 快照），
+先查 DB 找歷史上有資料的 symbol + date，用 query string 直接進去，不必重跑抓取。
+
+### 教訓 2：同一份設定寫死在兩個地方，遲早會漂移
+
+`FontSizeControlsComponent::SIZES` 是 18–22px，layout 裡還原字級的 inline script
+白名單卻是 `['14','15','16','17','18']`——交集只有 `18`，使用者選 19–22 換頁後
+字級被靜靜打回預設，沒有任何錯誤訊息。這在 H-3 之前就存在。
+
+**規則**：inline script 無法 import，但**可以用 ERB 從 Ruby 常數插值**。
+需要在 layout 的 inline script 裡用到某個清單/key 時，一律寫成
+`var ALLOWED = <%= SomeComponent.allowed_sizes.to_json.html_safe %>;`
+而不是手抄一份。前端模組同理——改從 data attribute 吃，不要自己再寫死一份。
+
+**偵測方式**：這種 bug 不會拋錯，只能靠「改設定 → 換頁 → 確認還在」的往返測試抓到。
+凡是有持久化（localStorage / cookie / session）的 UI 設定，驗收一定要含換頁往返。
+
+### 教訓 3：`<script type="application/json">` 不是 inline script，別誤判 CSP
+
+盤點 inline script 時用 `document.querySelectorAll('script:not([src])')`
+會把資料島一起算進去。`/leaps` 因此被我誤報成「2 段 inline script、其中一段沒有 nonce」。
+
+非可執行 type（`application/json`、`text/template` 等）不受 `script-src` 管轄，
+本來就不需要 nonce。正確的過濾條件是 type 為空字串、含 `javascript`、或等於 `module`。
