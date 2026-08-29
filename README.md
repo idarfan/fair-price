@@ -1,5 +1,43 @@
 # FairPrice
 
+### 2026-08-29（七）— npm 安全漏洞 8 → 1，並確認 Storybook 在 vite 8 下正常
+
+升 vite 8 時跑了一次 `npm audit`，才看見既有的 8 個漏洞（含 4 個 critical）。
+**這些不是升級引入的**——`@vitest/browser-playwright`、`@storybook/addon-vitest`、
+`@vitest/coverage-v8` 早在 `99012c5`（Storybook/Chromatic 修正那次）就在
+`package.json` 裡了，只是先前沒跑過 audit。
+
+| 嚴重度 | 前 | 後 |
+|---|---:|---:|
+| critical | 4 | **0** |
+| high | 2 | **0** |
+| low | 2 | **1** |
+
+**4 個 critical 全部來自 `@vitest/browser`**，而拉它進來的三個套件查證後都沒在用：
+
+| 套件 | 實際狀況 | 處置 |
+|---|---|---|
+| `@storybook/addon-vitest` | 不在 `.storybook/main.js` 的 addons 清單 | 移除 |
+| `@vitest/browser-playwright` | 全專案零引用（測試用 happy-dom，不是 browser mode）| 移除 |
+| `@vitest/coverage-v8` | `@vitest/browser` 是它的 **optional** peer | 保留 |
+
+移除前兩個之後 `npm ls @vitest/browser` 變成 `(empty)`，4 個 critical 一次消失。
+再跑 `npm audit fix` 收掉 `brace-expansion`（high）、`picomatch`（high）、
+`@babel/core`（low）。
+
+**剩下的一個**：`esbuild` 巢狀在 `storybook` 底下，`npm audit fix` 動不了（要等
+Storybook 更新自己的相依），且該漏洞只影響**在 Windows 上跑 dev server**——
+本專案跑在 WSL2/Linux，不成立。
+
+**Storybook 在 vite 8 下正常**
+
+升級時留下的未知數（`@joshwooding/vite-plugin-react-docgen-typescript@0.6.4`
+只支援到 vite 7）已實測：`npm run build-storybook` 成功（Vite ✓ built in 12.15s）。
+那個 peer 不符只是宣告問題，功能沒壞，`npx chromatic` 應該正常。
+
+**驗證**：`npm run check` 全綠、production build 1.01s、manifest 仍是 30 個
+behaviors + 8 個 entrypoints、RSpec 665/0、RuboCop 無 offense。
+
 ### 2026-08-29（六）— 升 vite 8、解開兩個相依衝突、補上前端單元測試
 
 > **歷史說明**：這一輪同樣被自動提交 hook 拆成兩筆並已推送
