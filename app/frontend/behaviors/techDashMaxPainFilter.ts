@@ -18,8 +18,9 @@ interface Filters {
 const SELECT_PREFIXES = ["mp-exp-", "mp-str-", "mp-oi-"] as const;
 
 export function init(root: HTMLElement): void {
-  const sym = root.dataset["symbol"];
-  if (!sym) return;
+  const rawSym = root.dataset["symbol"];
+  if (!rawSym) return;
+  const sym: string = rawSym;
   const base = "/technical_dashboard";
 
   function getFilters(): Filters {
@@ -48,7 +49,7 @@ export function init(root: HTMLElement): void {
 
   function redirectWithFilters(f: Filters): void {
     const p = new URLSearchParams({
-      symbol: sym!, mp_expiration: f.expiration,
+      symbol: sym, mp_expiration: f.expiration,
       mp_strikes: f.strikes, mp_vol_oi: f.volume_oi,
     });
     window.location.href = `${base}?${p.toString()}`;

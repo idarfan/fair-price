@@ -39,22 +39,39 @@ declare global {
     driver?: { js?: { driver?: (config: DriverConfig) => DriverInstance } };
     // 教學頁把朗讀函式掛上 window 供其他區塊呼叫（見 behaviors/ivEducationTts.ts）
     ttsSpeak?: (text: string, gender: string) => void;
+    // 註：window.mountTechChart 由 entrypoints/technicals.tsx 自行宣告（實作也在那），
+    // 這裡不重複宣告，否則兩份簽名不一致會觸發 TS2717。
   }
 
-  // Chart.js 4.x（CDN UMD build）。behaviors 只用建構子與 getChart。
+  // Chart.js 4.x（CDN UMD build）。只宣告 behaviors 實際碰到的成員——
+  // 刻意不抄一份會過期的完整定義。
+  interface ChartScaleInstance {
+    width: number;
+  }
+
+  interface ChartDatasetMeta {
+    data: { x: number; y: number }[];
+  }
+
+  interface ChartInstance {
+    destroy(): void;
+    update(): void;
+    canvas: HTMLCanvasElement;
+    scales: Record<string, ChartScaleInstance | undefined>;
+    tooltip?: { _active?: { index: number }[] };
+    getDatasetMeta(index: number): ChartDatasetMeta;
+    data: unknown;
+    config: unknown;
+    width: number;
+    height: number;
+  }
+
   const Chart: {
     new (
       ctx: CanvasRenderingContext2D | HTMLCanvasElement,
       config: unknown,
-    ): {
-      destroy(): void;
-      update(): void;
-      data: unknown;
-      config: unknown;
-      width: number;
-      height: number;
-    };
-    getChart(el: HTMLCanvasElement | string): { destroy(): void } | undefined;
+    ): ChartInstance;
+    getChart(el: HTMLCanvasElement | string): ChartInstance | undefined;
   };
 
   // SortableJS 1.15（CDN）

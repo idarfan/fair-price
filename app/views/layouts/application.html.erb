@@ -29,7 +29,8 @@
     <script src="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.min.js"></script>
     <%# 換頁進度條的設定已搬到 app/frontend/behaviors/pageProgress.js（稽核 H-3）%>
     <%= vite_client_tag %>
-    <%= vite_javascript_tag 'application' %>
+    <%# entrypoints/application 已型別化成 .ts；vite_javascript_tag 只找 .js，必須改用 typescript 版 %>
+    <%= vite_typescript_tag 'application.ts' %>
     <%# 頁面行為的統一掛載點（稽核 H-3）：掃描 [data-behavior]，只動態載入
         該頁真正用到的模組。取代原本散在各 Phlex 元件裡的 inline <script>。
         新增 behavior 不需要動這個 layout。 %>
