@@ -21,16 +21,11 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    // behaviors 已從 30 檔 .js 轉成 27 檔 .ts，只剩三支尚未型別化：
-    //   ivAnalysis.js（207 errors）、bullPutSpreads.js、bullCallSpreads.js
-    // 這三支改完都需要一次完整的 Barchart 抓取驗證，所以與驗證併成獨立一輪。
-    // allowJs 讓 TS 解析得到它們，checkJs 關閉代表不對它們做型別檢查——
-    // 誠實反映現況，而不是用 @ts-nocheck 假裝它們已經型別化。
-    // TODO：那三支轉完之後把這兩個選項一起拿掉。
-    "allowJs": true,
-    "checkJs": false,
+    // app/frontend 已無任何 .js——30 支 behaviors、共用模組與 entrypoints
+    // 全部型別化完成（稽核 H-3 後續）。allowJs / checkJs 因此移除：
+    // 現在每一支前端程式碼都在 strict 型別檢查之下，沒有例外。
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["app/frontend/**/*.ts", "app/frontend/**/*.tsx", "app/frontend/**/*.js", "stories/**/*.ts", "stories/**/*.tsx"],
+  "include": ["app/frontend/**/*.ts", "app/frontend/**/*.tsx", "stories/**/*.ts", "stories/**/*.tsx"],
   "exclude": ["node_modules", "public"]
 }

@@ -39,6 +39,8 @@ declare global {
     driver?: { js?: { driver?: (config: DriverConfig) => DriverInstance } };
     // 教學頁把朗讀函式掛上 window 供其他區塊呼叫（見 behaviors/ivEducationTts.ts）
     ttsSpeak?: (text: string, gender: string) => void;
+    // IV 分析頁的儀表板模式切換（behaviors/ivAnalysis.ts 掛上，Phlex 端也會呼叫）
+    switchDashMode?: (mode: string) => void;
     // 註：window.mountTechChart 由 entrypoints/technicals.tsx 自行宣告（實作也在那），
     // 這裡不重複宣告，否則兩份簽名不一致會觸發 TS2717。
   }
