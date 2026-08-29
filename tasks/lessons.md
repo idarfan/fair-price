@@ -1175,11 +1175,27 @@ Rails.application.routes.recognize_path("/valuations/BRK.B")
 由 ActiveRecord 驅動），靜態呼叫分析看不到那些邊。這一輪如果照它的清單刪，會直接
 把專案刪爆。
 
-**元件類別不一定搜得到。**
+**parser 看不懂 `class A::B` 這種緊湊命名空間寫法。**（2026-08-29 追加查證後更正）
+
 `semantic_search_nodes` 找 `WatchlistManagerComponent`（確實存在、`/momentum`
-上正在用）回傳 0 筆；`query_graph callers_of` 同樣 `not_found`。但
-`query_graph file_summary` 指到那個檔案路徑就正常回傳 8 個節點。
-→ **檔案層級可靠，Ruby 巢狀命名空間的類別名不可靠。**
+上正在用）回傳 0 筆，`callers_of` 也 `not_found`。但 `file_summary` 指到那個檔案
+路徑正常回傳 8 個節點——1 個 File + 7 個 Function，**沒有 Class 節點**，而且每個
+Function 的 `parent_name` 都是 `null`、`edges` 是空的。
+
+直接查 `.code-review-graph/graph.db` 量化，結果非常乾淨：
+
+| 宣告寫法 | 檔案數 | 有 Class 節點 |
+|---|---|---|
+| `class DailyMomentum::WatchlistManagerComponent` | 64 | **2**（缺 62）|
+| `module DailyMomentum` + `class MarketStancePresenter` | 19 | 19（全中）|
+
+→ **不是「巢狀命名空間不可靠」，剛好相反**：巢狀寫法 100% 正常，緊湊寫法
+`class A::B` 幾乎全軍覆沒。本專案的 Phlex 元件絕大多數是緊湊寫法，所以整批在
+graph 裡沒有類別層級的資訊，也就沒有 `callers_of` / `inheritors_of` 可查。
+
+這是 tree-sitter Ruby query 的覆蓋缺口，**不是版本過舊**：實測安裝的是
+`code-review-graph 2.3.8`，就是 PyPI 上的最新版（2026-08-21 發布）。
+`uvx code-review-graph --version` 可自行確認。
 
 ### 最重要的一個陷阱
 
@@ -1205,7 +1221,8 @@ Rails.application.routes.recognize_path("/valuations/BRK.B")
 | `get_impact_radius`（改動的影響範圍） | ✅ 檔案層級可靠 |
 | post-commit 自動 `detect_changes` 風險評分 | ✅ 已在跑，commit 後那段就是 |
 | `dead_code` 找 Rails 死碼 | ❌ 194 個假陽性，不能用 |
-| 用類別名反查呼叫端（Ruby 巢狀命名空間） | ⚠️ 常查不到，且 0 ≠ 沒有 |
+| 用類別名反查呼叫端（`class A::B` 緊湊寫法） | ❌ 64 檔裡 62 檔沒有 Class 節點 |
+| 用類別名反查呼叫端（`module A` + `class B`） | ✅ 19/19 都有節點 |
 
 **規則修正**：不是「一律先用 graph」，而是**「先花一次呼叫確認 graph 覆不覆蓋得到
 這個問題，再決定用它還是退回 Grep/Read」**。這次省掉那一次呼叫，等於連「該不該
