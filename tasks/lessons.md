@@ -1069,3 +1069,35 @@ chunk 以 200 載入 → 掛載點在真實頁面上存在 → 實際觸發互�
 
 非可執行 type（`application/json`、`text/template` 等）不受 `script-src` 管轄，
 本來就不需要 nonce。正確的過濾條件是 type 為空字串、含 `javascript`、或等於 `module`。
+
+## 2026-08-29（二）— 「原始碼裡有」不等於「執行時到得了」
+
+同一天挖出兩個同構的死碼，成因都是**條件的上游把路堵死了，而條件本身看起來很合理**：
+
+| 死碼 | 上游把路堵死的東西 |
+|---|---|
+| `AlertComponent` 的 ✕ 與 `alert-dismiss` | `dismissible` 預設 false，5 個呼叫端沒人傳 true |
+| `ValuationsController#validate_ticker` | 路由 `TICKER_CONSTRAINT` 與它的正規表示式等價，不合法代號先被 404 |
+
+兩者都通過既有測試——`behavior_registry_spec` 掃原始碼看到字串就算過，
+`validate_ticker` 則根本沒有測試。
+
+**規則**：寫「防呆 / 錯誤處理 / 可選 UI」時，一定要問一句**「這條路真的走得到嗎？」**
+並用可執行的方式證明，而不是讀程式碼推論。兩個好用的證明手法：
+
+```ruby
+# 路由到底收不收這個輸入（比讀 constraint 正規表示式可靠）
+Rails.application.routes.recognize_path("/valuations/BRK.B")
+```
+
+用 Grep tool 搜 keyword argument 的實際傳值，確認有沒有呼叫端真的開啟這個選項。
+本例中 `dismissible: true` 只出現在 Lookbook preview，等於正式站永遠不渲染。
+
+**寫測試時的連帶陷阱**：我第一版測試就是拿 `/valuations/!!!` 去打 `validate_ticker`，
+吃到 404 才發現那條路不通。**測試失敗有時不是程式錯，是你以為的執行路徑不存在**——
+這種時候要先確認路徑，不要急著改斷言去迎合結果。
+
+**放寬路由 constraint 的連帶效應**：`get "valuations/:ticker"` 的 constraint 原本含
+`.`，剛好讓 `BRK.B` 不被切成 `ticker=BRK, format=B`。改成 `%r{[^/]{1,64}}` 之後
+必須補 `format: false`，否則含小數點的代號全掛。這種事只能靠實測，不能靠讀 code。
+

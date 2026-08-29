@@ -12,8 +12,11 @@ class FairValue::AlertComponent < ApplicationComponent
   # @param type [Symbol] Alert type: :error, :warning, :info, :success
   # @param title [String, nil] Optional bold title above message
   # @param dismissible [Boolean] Show a close button (requires JS)
+  #   預設 true：目前所有呼叫端都是 flash 提示，本來就該能關掉。
+  #   預設值曾經是 false 且沒有任何呼叫端傳 true，導致 ✕ 與對應的
+  #   alert-dismiss behavior 在正式站從來不會渲染（2026-08-29 修正）。
   # @param icon [String, nil] Override the default emoji icon
-  def initialize(message:, type: :error, title: nil, dismissible: false, icon: nil)
+  def initialize(message:, type: :error, title: nil, dismissible: true, icon: nil)
     @message     = message
     @type        = type.to_sym
     @title       = title

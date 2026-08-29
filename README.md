@@ -1,5 +1,48 @@
 # FairPrice
 
+### 2026-08-29（二）— 兩處「原始碼裡有、執行時到不了」的死碼修好
+
+同日稍早的瀏覽器驗證挖出兩個同一類問題：程式碼寫了、測試也掃得到，但實際跑起來
+永遠不會執行。
+
+**1. 提示訊息的關閉按鈕（`alert-dismiss`）**
+
+`FairValue::AlertComponent` 的 `dismissible` 預設 `false`，而全部 5 個呼叫端都沒有
+傳 `true`（只有 Lookbook preview 會），所以那顆 ✕ 在正式站從來不會渲染。
+
+預設值改成 `true`——現有用法全是 flash 提示，本來就該能關掉。要保留不可關閉的
+用法仍可明確傳 `dismissible: false`。
+
+**2. `ValuationsController#validate_ticker`**
+
+HTML 路由的 `TICKER_CONSTRAINT` 與 controller 裡的檢查等價，不合法代號在路由層
+就被擋成 404，那段「無效的股票代號」的友善提示永遠進不去。
+
+但搜尋列（`tickerSearch.ts`）只檢查非空就直接 `window.location.href = ...`，所以
+使用者打「台積電」或帶空白的代號，看到的是原始 404 頁。
+
+HTML 路由改成收下整個 segment、由 controller 驗證並導回首頁。兩個實測確認的細節：
+
+- `format: false` 是必要的——放寬 constraint 之後 Rails 會把 `BRK.B` 的 `.B` 當成
+  格式後綴切掉（原本的 constraint 剛好含 `.` 才沒發生）
+- API 端（`api/v1/valuations`）維持嚴格 constraint：對 API 而言 404 才是對的回應
+
+**新增測試**
+
+`behavior_registry_spec` 掃原始碼，看到 `behavior: "alert-dismiss"` 就算通過，
+但那證明的是「原始碼裡有」，不是「執行時會渲染」。新增的兩支 request spec 補的
+就是那一層：
+
+- `spec/requests/alert_dismiss_spec.rb`（4）
+- `spec/requests/valuation_ticker_validation_spec.rb`（8）
+
+**涉及檔案**
+
+- `app/components/fair_value/alert_component.rb`
+- `app/controllers/valuations_controller.rb`
+- `config/routes.rb`
+- `test/components/previews/fair_value/alert_component_preview.rb`
+
 ### 2026-08-29 — H-3 瀏覽器實測 30 個 behavior，順手修掉字級還原白名單漂移
 
 H-3 搬遷完成當下，30 個 behavior 裡只有 4 個（登入頁上的）驗過。這次登入後在真實

@@ -32,12 +32,15 @@ class ValuationsController < ApplicationController
 
   private
 
+  # 路由只收下整個 segment（見 routes.rb 的說明），真正的代號驗證在這裡做，
+  # 讓使用者拿到「無效的股票代號」而不是原始 404 頁。
   def validate_ticker
     ticker = params[:ticker].to_s
-    unless ticker.match?(/\A[A-Za-z0-9.\-]{1,10}\z/)
-      flash[:error] = "無效的股票代號"
-      redirect_to root_path
-    end
+    return if ticker.valid_encoding? && ticker.match?(/\A[A-Za-z0-9.\-]{1,10}\z/)
+
+    # 壞掉的百分比編碼會產生無效 UTF-8，直接丟給 match? 會拋 ArgumentError。
+    flash[:error] = "無效的股票代號"
+    redirect_to root_path
   end
 
   def parse_discount_rate(raw)

@@ -8,7 +8,7 @@ class FairValue::AlertComponentPreview < Lookbook::Preview
   # @param message text "Alert message text"
   # @param title text "Optional bold title"
   # @param dismissible toggle
-  def error(message: "找不到股票：INVALID（請確認代號正確）", title: "查詢失敗", dismissible: false)
+  def error(message: "找不到股票：INVALID（請確認代號正確）", title: "查詢失敗", dismissible: true)
     render FairValue::AlertComponent.new(message:, type: :error, title:, dismissible:)
   end
 

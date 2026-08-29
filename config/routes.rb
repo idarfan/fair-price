@@ -87,8 +87,16 @@ Rails.application.routes.draw do
   post "track/command",   to: "track#command"
 
   # HTML app
+  #
+  # 這裡刻意不用 TICKER_CONSTRAINT：搜尋列（tickerSearch.ts）只檢查非空就直接導頁，
+  # 嚴格的路由 constraint 會讓「台積電」「AAPL X」這類輸入直接吃到原始 404 頁，
+  # 而 ValuationsController#validate_ticker 那段友善提示因為永遠進不來而形同虛設。
+  # 改成收下整個 segment、由 controller 驗證並導回首頁顯示「無效的股票代號」。
+  # format: false 是必要的——放寬 constraint 之後，Rails 會把 BRK.B 的 .B 當成
+  # 格式後綴切掉（原本的 constraint 因為含 `.` 才剛好沒發生）。
+  # API 端（api/v1/valuations）維持嚴格 constraint：對 API 而言 404 才是對的回應。
   get "valuations/:ticker", to: "valuations#show", as: :valuation,
-      constraints: { ticker: TICKER_CONSTRAINT }
+      constraints: { ticker: %r{[^/]{1,64}} }, format: false
   root "valuations#index"
 
   # Watchlist / Price Alerts
