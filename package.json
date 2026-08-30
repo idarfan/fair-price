@@ -21,7 +21,7 @@
     "prettier": "^3.8.1",
     "prop-types": "^15.8.1",
     "react-is": "^19.2.4",
-    "storybook": "^10.3.3",
+    "storybook": "^10.5.10",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.58.0",
     "vite": "^8.2.2",
@@ -47,5 +47,8 @@
     "check": "tsc --noEmit && eslint . && vitest run",
     "test": "vitest run",
     "test:watch": "vitest"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
   }
 }
