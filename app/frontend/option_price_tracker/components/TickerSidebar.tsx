@@ -7,6 +7,13 @@ interface Props {
   onSelect: (ticker: TrackedTicker) => void;
   onAdd: (symbol: string) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
+  /**
+   * 是否顯示新增/移除。追蹤清單是共用的蒐集設定，只有 admin 能改
+   * （後端由 require_admin! 把關）。這裡只負責讓 UI 誠實——
+   * 之前非 admin 看得到按鈕、按下去只拿到一句「新增失敗」，
+   * 看起來像功能壞掉而不是權限限制。
+   */
+  canManage: boolean;
 }
 
 export default function TickerSidebar({
@@ -15,6 +22,7 @@ export default function TickerSidebar({
   onSelect,
   onAdd,
   onDelete,
+  canManage,
 }: Props) {
   const [input, setInput] = useState("");
   const [adding, setAdding] = useState(false);
@@ -106,23 +114,29 @@ export default function TickerSidebar({
             ◀
           </button>
         </div>
-        <form onSubmit={handleAdd} className="flex gap-1">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value.toUpperCase())}
-            placeholder="代號 e.g. NOK"
-            maxLength={10}
-            className="flex-1 min-w-0 bg-white border border-teal-500 rounded px-2 py-1 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-teal-300"
-          />
-          <button
-            type="submit"
-            disabled={adding || !input.trim()}
-            className="px-2 py-1 text-xs bg-orange-500 hover:bg-orange-400 disabled:opacity-40 rounded text-white transition-colors"
-          >
-            {adding ? "…" : "+"}
-          </button>
-        </form>
+        {canManage ? (
+          <form onSubmit={handleAdd} className="flex gap-1">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value.toUpperCase())}
+              placeholder="代號 e.g. NOK"
+              maxLength={10}
+              className="flex-1 min-w-0 bg-white border border-teal-500 rounded px-2 py-1 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-teal-300"
+            />
+            <button
+              type="submit"
+              disabled={adding || !input.trim()}
+              className="px-2 py-1 text-xs bg-orange-500 hover:bg-orange-400 disabled:opacity-40 rounded text-white transition-colors"
+            >
+              {adding ? "…" : "+"}
+            </button>
+          </form>
+        ) : (
+          <p className="text-xs text-teal-200 leading-relaxed">
+            追蹤清單為共用的蒐集設定，僅管理員可增減。
+          </p>
+        )}
         {error && <p className="text-xs text-red-300 mt-1">{error}</p>}
         {autoStatus === "detecting" && (
           <p className="text-xs text-teal-200 mt-1">偵測中…</p>
@@ -158,16 +172,18 @@ export default function TickerSidebar({
                 </p>
               )}
             </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(ticker.id);
-              }}
-              title="移除"
-              className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-red-500 transition-colors"
-            >
-              ✕
-            </button>
+            {canManage && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(ticker.id);
+                }}
+                title="移除"
+                className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-red-500 transition-colors"
+              >
+                ✕
+              </button>
+            )}
           </div>
         ))}
       </div>

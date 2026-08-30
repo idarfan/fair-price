@@ -135,9 +135,11 @@ function buildChainRows(
 
 interface Props {
   initialTickers: TrackedTicker[];
+  /** 是否可以新增/移除追蹤代號（僅 admin）。真正的把關在後端 require_admin!。 */
+  canManage: boolean;
 }
 
-export default function OptionPriceTrackerApp({ initialTickers }: Props) {
+export default function OptionPriceTrackerApp({ initialTickers, canManage }: Props) {
   const [tickers, setTickers] = useState<TrackedTicker[]>(initialTickers);
   const [selected, setSelected] = useState<TrackedTicker | null>(
     initialTickers[0] ?? null,
@@ -329,6 +331,7 @@ export default function OptionPriceTrackerApp({ initialTickers }: Props) {
         onSelect={handleSelect}
         onAdd={handleAdd}
         onDelete={handleDelete}
+        canManage={canManage}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">

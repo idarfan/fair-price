@@ -61,6 +61,11 @@ RSpec.describe "觀察清單的跨使用者隔離", type: :request do
   end
 
   describe "tracked_tickers（共用蒐集設定）" do
+    let(:admin_user) do
+      create(:user, status: :enabled, admin: true, totp_enabled: true,
+                    totp_secret: AuthHelpers::DEFAULT_TOTP_SECRET)
+    end
+
     it "非 admin 不能刪除，避免連帶砍掉歷史快照" do
       ticker = create(:tracked_ticker)
 
@@ -79,12 +84,48 @@ RSpec.describe "觀察清單的跨使用者隔離", type: :request do
     end
 
     it "admin 可以刪除" do
-      admin = create(:user, status: :enabled, admin: true, totp_enabled: true,
-                            totp_secret: AuthHelpers::DEFAULT_TOTP_SECRET)
-      sign_in_and_pass_totp!(user: admin)
+      sign_in_and_pass_totp!(user: admin_user)
       ticker = create(:tracked_ticker)
 
       expect { delete "/api/v1/tracked_tickers/#{ticker.id}" }.to change(TrackedTicker, :count).by(-1)
+    end
+
+    # require_admin! 的 only: 清單有四個 action。原本只測 destroy——
+    # 把 create 從清單裡拿掉不會有任何測試失敗，那道閘門等於沒被釘住。
+    it "非 admin 不能新增" do
+      expect { post "/api/v1/tracked_tickers", params: { symbol: "NEWSYM" } }
+        .not_to change(TrackedTicker, :count)
+
+      expect(response).to have_http_status(:forbidden)
+      expect(response.parsed_body["error"]).to eq("admin_required")
+    end
+
+    it "非 admin 不能修改（例如停用別人在用的代號）" do
+      ticker = create(:tracked_ticker, active: true)
+
+      patch "/api/v1/tracked_tickers/#{ticker.id}",
+            params: { tracked_ticker: { active: false } }
+
+      expect(response).to have_http_status(:forbidden)
+      expect(ticker.reload.active).to be(true)
+    end
+
+    it "非 admin 不能觸發蒐集（會花掉爬蟲配額）" do
+      ticker = create(:tracked_ticker)
+
+      expect { post "/api/v1/tracked_tickers/#{ticker.id}/collect" }
+        .not_to have_enqueued_job(CollectOptionSnapshotsJob)
+
+      expect(response).to have_http_status(:forbidden)
+    end
+
+    it "admin 可以新增" do
+      sign_in_and_pass_totp!(user: admin_user)
+
+      expect { post "/api/v1/tracked_tickers", params: { symbol: "NEWSYM" } }
+        .to change(TrackedTicker, :count).by(1)
+
+      expect(response).to have_http_status(:created)
     end
   end
 end
