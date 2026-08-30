@@ -1,5 +1,61 @@
 # FairPrice
 
+### 2026-08-30（六）— 補齊稽核工具鏈，發現 Brakeman 一直在空轉
+
+#### 裝了什麼
+
+| gem | 用途 | 接在哪 |
+|-----|------|--------|
+| `simplecov` | 測試覆蓋率（含 branch） | `spec/spec_helper.rb`，`COVERAGE=1` 才啟用 |
+| `database_consistency` | DB 結構稽核：缺索引、冗餘索引、validation 與 NOT NULL 不一致 | `bin/audit schema`（報告用，不設閘門） |
+| `rubocop-rspec` | spec 本身的 lint | `.rubocop.yml` |
+| `bullet` | N+1 查詢偵測 | `config/initializers/bullet.rb`，僅 development |
+
+未採用 `traceroute`（偵測未使用的路由）——最後一版停在 2020-04-28，違反「引入前確認仍在維護」。
+
+新增 `bin/audit` 作為單一入口：`style` / `security` / `coverage` / `frontend` / `schema` / `n1`。
+
+#### 最重要的發現：Brakeman 掃描一直沒有真的執行
+
+`bin/brakeman` binstub 會注入 `--ensure-latest`。本機裝的是 8.0.5、最新是 8.0.6，
+於是 Brakeman **在掃描開始前就 exit 5**，只印一行版本訊息。`bin/ci` 的
+「Security: Brakeman code analysis」步驟因此長期空轉——就算真有漏洞也不會被回報，
+而失敗訊息只有一行版本提示，看起來完全不像掃描沒跑。
+
+升到 8.0.6 後掃描恢復：**Security Warnings: 0、Errors: 0**。同時清掉 2 筆過期的
+忽略項（`config/brakeman.ignore` 5 → 3），過期的忽略項留著會遮蔽未來的警告。
+
+#### 第二個發現：`bin/ci` 根本沒跑測試
+
+`config/ci.rb` 只有 Setup / RuboCop / bundler-audit / Brakeman 四步，
+**一行 spec 都沒執行**。已補上 RSpec（含覆蓋率門檻）與 `npm run check`。
+
+#### rubocop-rspec：657 → 0
+
+導入時 657 個 offense，但**沒有任何一個是缺陷偵測類**（`RepeatedDescription`、
+`EmptyExampleGroup`、`VoidExpect` 全部 0）。597 個集中在八個「風格偏好」cop
+（`MultipleExpectations` 252、`ExampleLength` 116、`ContextWording` 38——後者要求
+context 用英文 when/with 開頭，本專案 spec 一律繁中）。
+
+**一個永遠紅的閘門等於沒有閘門**，所以把偏好類關掉並在 `.rubocop.yml` 寫明理由，
+剩下的 60 個全部修完：自動修正 63 個、手動修 `LeakyConstantDeclaration`（describe
+區塊裡的 `X = ...` 其實定義在全域 `Object` 上，兩支 spec 撞名會靜默取到別人的值）
+與 `LetSetup`。同時開啟 `AllCops: NewCops: enable`。
+
+#### 覆蓋率現況
+
+**line 51.72%（4525/8748）、branch 40.59%（1148/2828）。**
+門檻設 50 / 38 當棘輪防倒退。已驗證閘門會真的擋（只跑單一 spec 會失敗），不是擺設。
+
+#### database_consistency：40 項發現，4 項是誤報
+
+4 筆 `MissingUniqueIndexChecker`（WatchlistItem / WatchedTicker / TrackedTicker /
+IvWatchlist 建議加 `lower(symbol)` 唯一索引）**是誤報**——這四個 model 都在存檔前
+把代號 `upcase`，DB 裡只會有大寫，現有的 case-sensitive 索引已經足夠。
+
+其餘 36 項多為「validation 與 DB constraint 不對稱」，需要 migration；
+dev/prod 共用同一個資料庫，未擅自執行，列為待辦。
+
 ### 2026-08-29（九）— `CompositeSignalService` 補測（稽核 L-1）
 
 三維度儀表板的核心服務，388 行長期 **0% 覆蓋**。新增

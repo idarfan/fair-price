@@ -1,6 +1,50 @@
 # Omakase Ruby styling for Rails
 inherit_gem: { rubocop-rails-omakase: rubocop.yml }
 
+# spec 品質檢查
+plugins:
+  - rubocop-rspec
+
+AllCops:
+  # 新 cop 一律先開。RSpec 的新 cop（DiscardedMatcher、LeakyLocalVariable…）
+  # 多半屬於缺陷偵測，pending 等於白裝。
+  NewCops: enable
+
+RSpec:
+  Include:
+    - "spec/**/*_spec.rb"
+
+# ── 以下是「風格偏好」而非「缺陷偵測」，本專案刻意不採用 ──────────────
+# 導入時這八個 cop 共 597 / 657 個 offense。留著等於讓 CI 永遠紅，
+# 那種閘門沒人會看。要收緊請一次開一個並把既有 offense 修完。
+
+# 一個 example 只能有一個 expect。本專案許多測試在釘「一組互相關聯的
+# 欄位」（例如 include(points: 3, score: :neutral)），拆開反而更難讀。
+RSpec/MultipleExpectations: { Enabled: false }
+RSpec/ExampleLength:       { Enabled: false }
+
+# context 描述必須是英文 when/with/without 開頭。本專案 spec 一律繁中。
+RSpec/ContextWording:      { Enabled: false }
+
+# expect(x).to have_received 優於 expect(x).to receive。是偏好，
+# 且本專案大量測試外部 API 呼叫，先設期望比事後驗證直覺。
+RSpec/MessageSpies:        { Enabled: false }
+
+# 以下三個是真的 smell，但既有量體太大（55 / 30 / 21），
+# 現在開會淹沒新訊號。列為待辦而非現在的閘門。
+RSpec/SubjectStub:           { Enabled: false }   # TODO: 55 處
+RSpec/MessageChain:          { Enabled: false }   # TODO: 30 處
+RSpec/AnyInstance:           { Enabled: false }   # TODO: 21 處
+RSpec/MultipleMemoizedHelpers: { Enabled: false }
+
+# spec 檔名必須對應到被測方法。本專案刻意把大型 service 依「抓取目標」拆檔
+# （barchart_scraper_service_bpus / _leaps / _pmcc），改名反而失去這個分組。
+RSpec/SpecFilePathFormat:  { Enabled: false }
+
+# `expect(x).to receive(...).and_return(y)` 同時設樁與斷言。改成 allow 會
+# 拿掉「有被呼叫」這個斷言，是弱化而非改善；這裡的 6 處都是刻意要斷言呼叫。
+RSpec/StubbedMock:         { Enabled: false }
+
 # Overwrite or add rules to create your own house style
 #
 # # Use `[a, [b, c]]` not `[ a, [ b, c ] ]`

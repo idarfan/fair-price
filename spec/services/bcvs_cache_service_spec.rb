@@ -8,15 +8,15 @@ RSpec.describe BcvsCacheService do
 
   describe ".fresh_expirations? / .upsert_expirations!" do
     it "is not fresh when nothing cached" do
-      expect(described_class.fresh_expirations?(symbol)).to eq(false)
+      expect(described_class.fresh_expirations?(symbol)).to be(false)
     end
 
     it "is fresh immediately after upsert and stale after 30 minutes" do
       described_class.upsert_expirations!(symbol, expirations: [ "2026-08-21-m" ], underlying_price: 42.5)
-      expect(described_class.fresh_expirations?(symbol)).to eq(true)
+      expect(described_class.fresh_expirations?(symbol)).to be(true)
 
       travel 31.minutes do
-        expect(described_class.fresh_expirations?(symbol)).to eq(false)
+        expect(described_class.fresh_expirations?(symbol)).to be(false)
       end
     end
 
@@ -53,15 +53,15 @@ RSpec.describe BcvsCacheService do
 
   describe ".fresh_chain? / .upsert_chain!" do
     it "is not fresh when nothing cached" do
-      expect(described_class.fresh_chain?(symbol, expiration)).to eq(false)
+      expect(described_class.fresh_chain?(symbol, expiration)).to be(false)
     end
 
     it "is fresh immediately after upsert and stale after 30 minutes" do
       described_class.upsert_chain!(symbol, expiration, strikes: [], underlying_price: 42.5)
-      expect(described_class.fresh_chain?(symbol, expiration)).to eq(true)
+      expect(described_class.fresh_chain?(symbol, expiration)).to be(true)
 
       travel 31.minutes do
-        expect(described_class.fresh_chain?(symbol, expiration)).to eq(false)
+        expect(described_class.fresh_chain?(symbol, expiration)).to be(false)
       end
     end
 
@@ -103,7 +103,7 @@ RSpec.describe BcvsCacheService do
       expect(BarchartScraperService).not_to receive(:new)
 
       # Mirrors the controller's read path: check freshness before ever touching the scraper.
-      expect(described_class.fresh_expirations?(symbol)).to eq(true)
+      expect(described_class.fresh_expirations?(symbol)).to be(true)
     end
   end
 end

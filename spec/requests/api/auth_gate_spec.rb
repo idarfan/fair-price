@@ -4,7 +4,7 @@ require "rails_helper"
 
 # 迴歸測試：2026-08-28 之前 GATE_EXEMPT_PREFIXES 含 "/api"，整個 API 命名空間
 # 在公網上可匿名讀取與刪除。這支測試把「API 必須認證」釘住。
-RSpec.describe "API auth gate", type: :request, skip_auto_auth: true do
+RSpec.describe "API auth gate", :skip_auto_auth, type: :request do
   describe "未登入" do
     it "讀取端點回 401 JSON，而不是 302 導頁" do
       get "/api/v1/tracked_tickers"

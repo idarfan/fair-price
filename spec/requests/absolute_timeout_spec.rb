@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe "Absolute (daily) session timeout", type: :request, skip_auto_auth: true do
+RSpec.describe "Absolute (daily) session timeout", :skip_auto_auth, type: :request do
   include ActiveSupport::Testing::TimeHelpers
 
   after { travel_back }

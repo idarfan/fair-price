@@ -35,9 +35,7 @@ RSpec.describe Api::V1::ChartsController, type: :controller do
       expect(subsequent).not_to be_nil
       expect(subsequent).not_to be_empty
       # Wilder's smoothing makes RSI stable, not jumping to extremes
-      subsequent.each do |v|
-        expect(v).to be_between(0, 100)
-      end
+      expect(subsequent).to all(be_between(0, 100))
     end
 
     it "never produces RSI outside 0..100" do

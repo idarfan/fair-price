@@ -79,3 +79,6 @@ csv_files/
 # Python bytecode cache
 __pycache__/
 *.pyc
+
+# Bullet N+1 稽核輸出
+/log/bullet.log

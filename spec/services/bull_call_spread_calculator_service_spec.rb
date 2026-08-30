@@ -100,7 +100,7 @@ RSpec.describe BullCallSpreadCalculatorService do
       result = described_class.new(k1: 70.0, k1_ask: 8.00, k2: 80.0, k2_bid: 4.10).call
 
       [ result.debit, result.max_profit, result.max_loss, result.breakeven, result.risk_reward ].each do |v|
-        expect(v.finite?).to eq(true)
+        expect(v.finite?).to be(true)
       end
     end
   end

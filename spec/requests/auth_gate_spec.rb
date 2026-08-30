@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe "Auth gate", type: :request, skip_auto_auth: true do
+RSpec.describe "Auth gate", :skip_auto_auth, type: :request do
   describe "unauthenticated" do
     it "redirects an existing page to /login" do
       get "/momentum"

@@ -124,7 +124,7 @@ RSpec.describe OptionSnapshot, type: :model do
       _other = create(:option_snapshot, tracked_ticker: ticker, strike: 200.0,
                       expiration: exp, option_type: "put", contract_symbol: "AAPL_3")
 
-      trend = OptionSnapshot.premium_trend(
+      trend = described_class.premium_trend(
         ticker_id: ticker.id, strike: 150.0,
         expiration: exp, option_type: "put"
       )

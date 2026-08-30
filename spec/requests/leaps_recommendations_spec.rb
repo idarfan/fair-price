@@ -30,6 +30,29 @@ RSpec.describe "GET /leaps", type: :request do
 
   # ── 1. 空白頁（未輸入 symbol） ────────────────────────────────────────────
 
+  let(:stub_recommendation) do
+    pick = stub_candidate
+    {
+      near_term: { label: "近天期 LEAPS（DTE 364–550）", no_candidates: false,
+                   pick: pick, runner_up: nil, reason: "建議到期日：2027-12-17" },
+      far_term:  { label: "遠天期 LEAPS（DTE 550+）",    no_candidates: false,
+                   pick: pick.merge(expiration_date: Date.new(2028, 1, 21), dte: 570), runner_up: nil, reason: "建議到期日：2028-01-21" }
+    }
+  end
+  # ── 5b. job_status=partial_error WITH fresh data（重疊 UX 邏輯）──────────────
+
+  let(:stub_candidate) do
+    {
+      expiration_date: Date.new(2027, 12, 17), dte: 535,
+      strike: 7.0, delta: 0.875,
+      open_interest: 1304, volume: 1, bid: 7.40, ask: 7.75, mid: 7.58,
+      iv: 0.765, vega: 0.0311, itm_probability: 0.755, vol_oi_ratio: 0.001,
+      underlying_price: 4.70, liquidity_tier: "普通",
+      no_recent_volume_warning: false,
+      time_value_pct: 0.098, bid_ask_spread_pct: 0.046
+    }
+  end
+
   describe "without symbol" do
     it "returns 200 and renders the search form" do
       get "/leaps"
@@ -198,7 +221,7 @@ RSpec.describe "GET /leaps", type: :request do
       get "/leaps", params: { symbol: symbol }
       body = response.body
 
-      expect(body).to match(/data-sort-scope="true"/)
+      expect(body).to include('data-sort-scope="true"')
       expect(body).to match(/data-sort-key="ks"[^>]*class="sort-toggle/)
       expect(body).to match(/data-sort-key="max_profit"[^>]*class="sort-toggle/)
       # LEAPS 排行表本身沒有排序功能（只有 PMCC 表才有），確認沒有意外外溢
@@ -214,9 +237,9 @@ RSpec.describe "GET /leaps", type: :request do
     it "renders pmcc_ prefixed data-tip-key on every PMCC header (driver.js hover/click explain)" do
       get "/leaps", params: { symbol: symbol }
       body = response.body
-      expect(body).to match(/<th data-tip-key="pmcc_ks"/)
-      expect(body).to match(/<th data-tip-key="pmcc_max_profit"/)
-      expect(body).to match(/<th data-tip-key="pmcc_passes"/)
+      expect(body).to include('<th data-tip-key="pmcc_ks"')
+      expect(body).to include('<th data-tip-key="pmcc_max_profit"')
+      expect(body).to include('<th data-tip-key="pmcc_passes"')
       # 這個 fixture 只有 1 個到期日桶；真實資料有 3 桶時，同一個 key 的 th
       # 會出現 3 次（沒有唯一 id，故意設計成這樣，見 render_pmcc_table 註解）。
       expect(body.scan('data-tip-key="pmcc_ks"').size).to eq(1)
@@ -282,29 +305,7 @@ RSpec.describe "GET /leaps", type: :request do
     end
   end
 
-  # ── 5b. job_status=partial_error WITH fresh data（重疊 UX 邏輯）──────────────
 
-  let(:stub_candidate) do
-    {
-      expiration_date: Date.new(2027, 12, 17), dte: 535,
-      strike: 7.0, delta: 0.875,
-      open_interest: 1304, volume: 1, bid: 7.40, ask: 7.75, mid: 7.58,
-      iv: 0.765, vega: 0.0311, itm_probability: 0.755, vol_oi_ratio: 0.001,
-      underlying_price: 4.70, liquidity_tier: "普通",
-      no_recent_volume_warning: false,
-      time_value_pct: 0.098, bid_ask_spread_pct: 0.046
-    }
-  end
-
-  let(:stub_recommendation) do
-    pick = stub_candidate
-    {
-      near_term: { label: "近天期 LEAPS（DTE 364–550）", no_candidates: false,
-                   pick: pick, runner_up: nil, reason: "建議到期日：2027-12-17" },
-      far_term:  { label: "遠天期 LEAPS（DTE 550+）",    no_candidates: false,
-                   pick: pick.merge(expiration_date: Date.new(2028, 1, 21), dte: 570), runner_up: nil, reason: "建議到期日：2028-01-21" }
-    }
-  end
 
   def stub_fresh_with_recommendation(recommendation)
     allow(LeapsOptionChainSnapshot)
@@ -704,6 +705,7 @@ RSpec.describe "GET /leaps", type: :request do
       end
     end
   end
+
   # ── 10. Phase H：內在/外在價值欄位走完整 HTTP 路徑（真實 DB rows）──────────────
   # 規格明文：「兩個 service 單元測試全過、controller 串接處從未被 request 過、
   # 使用者一按就炸」的前例，request spec 必交付。

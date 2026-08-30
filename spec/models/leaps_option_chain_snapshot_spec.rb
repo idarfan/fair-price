@@ -37,6 +37,7 @@ RSpec.describe LeapsOptionChainSnapshot, type: :model do
       end
     end
   end
+
   # Phase H：內在/外在價值公式（唯一定義處）的單元測試。
   # PMCC v3 §2.1 改版：derived_values 改接收呼叫端決定好的 mid，不再自己從 bid/ask 重算；
   # 這裡的 mid 一律用 (bid+ask)/2 模擬 LEAPS 呼叫端行為（改版前後數值必須一致）。
@@ -110,12 +111,13 @@ RSpec.describe LeapsOptionChainSnapshot, type: :model do
   # （live 的 spot/bid/ask 早已變動，live 層對照見 E2E 驗收）。
   # PMCC v3 §0/§13 Step0 回歸：derived_values 改接口後，這組 fixture 數值必須完全不變。
   describe ".derived_values — NVTS 2026-07-02 fixture（釘公式，PMCC v3 Step0 回歸）" do
-    SPOT_20260702 = 14.46
+    # let 而非常數：describe 內的常數會外洩到全域 Object（RSpec/LeakyConstantDeclaration）。
+    let(:spot_20260702) { 14.46 }
 
     it "strike 5（bid 10.70/ask 11.30 → Mid 11.00）→ 內在 9.46、外在 1.54、佔比 14%" do
       mid = (10.70 + 11.30) / 2.0
       d = described_class.derived_values(
-        option_type: "Call", strike: 5.0, underlying_price: SPOT_20260702, mid: mid
+        option_type: "Call", strike: 5.0, underlying_price: spot_20260702, mid: mid
       )
       expect(d[:intrinsic_value]).to be_within(0.005).of(9.46)
       expect(d[:extrinsic_value]).to be_within(0.005).of(1.54)
@@ -125,7 +127,7 @@ RSpec.describe LeapsOptionChainSnapshot, type: :model do
     it "strike 10（bid 8.70/ask 9.95 → Mid 9.325）→ 內在 4.46、外在 4.87、佔比 52%" do
       mid = (8.70 + 9.95) / 2.0
       d = described_class.derived_values(
-        option_type: "Call", strike: 10.0, underlying_price: SPOT_20260702, mid: mid
+        option_type: "Call", strike: 10.0, underlying_price: spot_20260702, mid: mid
       )
       expect(d[:intrinsic_value]).to be_within(0.005).of(4.46)
       expect(d[:extrinsic_value]).to be_within(0.005).of(4.865)

@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe "TwoFactor", type: :request, skip_auto_auth: true do
+RSpec.describe "TwoFactor", :skip_auto_auth, type: :request do
   let(:user) { create(:user, status: :enabled) }
 
   describe "GET /two_factor/setup" do

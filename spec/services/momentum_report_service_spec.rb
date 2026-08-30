@@ -18,9 +18,7 @@ RSpec.describe MomentumReportService do
     allow(VixService).to receive(:new).and_return(vix_double)
 
     allow(FinnhubService).to receive(:new).and_return(finnhub_double)
-    allow(finnhub_double).to receive(:quote).and_return(fake_quote)
-    allow(finnhub_double).to receive(:earnings_calendar).and_return([])
-    allow(finnhub_double).to receive(:candles).and_return(nil)
+    allow(finnhub_double).to receive_messages(quote: fake_quote, earnings_calendar: [], candles: nil)
 
     allow(YahooFinanceService).to receive(:new).and_return(yahoo_double)
     allow(yahoo_double).to receive(:chart).and_return(fake_chart)

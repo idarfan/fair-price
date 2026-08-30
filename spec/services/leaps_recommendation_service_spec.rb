@@ -90,9 +90,11 @@ RSpec.describe LeapsRecommendationService do
   # ── 理由文字包含必要資訊 ──────────────────────────────────────────────────────
 
   describe "reason text" do
+    subject(:reason) { described_class.new([ pick, runner_up ]).call[:near_term][:reason] }
+
     let(:pick)     { candidate(dte: 400, open_interest: 80_000, strike: 10.0) }
     let(:runner_up) { candidate(dte: 400, open_interest: 50_000, strike: 11.0) }
-    subject(:reason) { described_class.new([ pick, runner_up ]).call[:near_term][:reason] }
+
 
     it "includes expiration date and strike" do
       expect(reason).to include(pick[:expiration_date].to_s)

@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe "Admin::Users", type: :request, skip_auto_auth: true do
+RSpec.describe "Admin::Users", :skip_auto_auth, type: :request do
   let(:secret) { "base32secret3232" }
 
   def sign_in_and_verify_totp!(user)

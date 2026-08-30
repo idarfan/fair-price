@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe "CSP lessons", type: :request, skip_auto_auth: true do
+RSpec.describe "CSP lessons", :skip_auto_auth, type: :request do
   describe "unauthenticated" do
     it "redirects /csp/index.html to /login instead of serving the file" do
       get "/csp/index.html"

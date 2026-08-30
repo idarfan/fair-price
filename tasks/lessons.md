@@ -1,5 +1,85 @@
 # 專案教訓紀錄
 
+## 2026-08-30 — 「工具裝了」不等於「工具在跑」
+
+### 教訓 A：帶 `--ensure-latest` 的 binstub 會在版本落後時整個不執行
+
+`bin/brakeman` 注入 `--ensure-latest`。本機 8.0.5、上游 8.0.6，Brakeman 就在
+**掃描開始前** exit 5，輸出只有一行「Brakeman 8.0.5 is not the latest version 8.0.6」。
+
+`bin/ci` 的資安步驟因此長期空轉。危險之處在於**失敗長得不像失敗**——沒有 stack trace、
+沒有「scan failed」，只有一行版本提示，很容易被當成無害的雜訊略過。
+
+**防治規則：**
+```
+稽核／掃描工具接進 CI 後，必須確認它「真的掃了東西」，不能只看 exit code：
+  * 找輸出裡的規模證據——掃了幾個檔、幾個 controller、跑了哪些 check
+  * exit 0 + 輸出只有一兩行 = 高度可疑，先當成沒跑
+  * 有 --ensure-latest / --strict 這類 binstub 注入時，先確認版本是最新
+```
+
+### 教訓 B：CI 設定要逐行讀，別假設「有 CI 就有測試」
+
+`config/ci.rb` 有 Setup / RuboCop / bundler-audit / Brakeman 四步，看起來很完整，
+**但一行 spec 都沒跑**。lint 全綠、資安全綠，測試從來沒進過 CI。
+
+**防治規則：** 接手或稽核專案時，把 CI 設定檔整份讀完並逐步驟問「這一步實際執行什麼」，
+不要因為檔案存在、步驟數量看起來合理就跳過。
+
+### 教訓 C：導入 linter 時，永遠紅的閘門等於沒有閘門
+
+`rubocop-rspec` 一開就是 657 個 offense。若原樣接進 CI，結果只有兩種：
+CI 永遠紅沒人看，或立刻被整包關掉——兩種都等於沒裝。
+
+實際分佈：**0 個缺陷偵測類**（`RepeatedDescription`、`EmptyExampleGroup`、`VoidExpect`
+全部沒觸發），597 個集中在八個風格偏好 cop。其中 `ContextWording` 要求 context 描述以
+英文 `when`/`with` 開頭，本專案 spec 一律寫繁中——這條規則對本專案在結構上就不適用。
+
+**防治規則：**
+```
+導入新 linter 的四步：
+  1. 先跑一次，用 --format json 統計「每個 cop 各幾個」，不要只看總數
+  2. 分兩堆：缺陷偵測 vs 風格偏好。前者留、後者對照專案實況決定
+  3. 關掉的每一條都要在設定檔寫明理由，量體太大而暫緩的標 TODO + 數量
+  4. 剩下的必須修到 0，閘門才有意義
+```
+
+### 教訓 D：`describe` 區塊裡宣告常數 = 定義在全域 `Object` 上
+
+```ruby
+RSpec.describe Foo do
+  SPOT = 14.46          # ← 這是 Object::SPOT，不是 describe 的區域變數
+end
+```
+兩支 spec 用同名常數會互相覆寫，且因為 Ruby 只在重新指派時警告、單純讀取不會，
+問題會以「某支 spec 單獨跑會過、整包跑就掛」的形式出現，極難追。改用 `let`。
+
+### 教訓 E：驗證第三方 gem 的設定有沒有生效，要找副作用不要讀 getter
+
+驗證 `Bullet.bullet_logger = true` 時讀 `UniformNotifier.customized_logger` 得到 `nil`，
+一度以為設定沒生效，往下追了三輪。實際上那個 getter 的語意跟 setter 不對稱，設定是好的。
+
+**真正有效的驗證是找 setter 的副作用**——`bullet_logger=` 會開啟 `log/bullet.log`，
+砍掉檔案再重新 boot，檔案有沒有被建出來就是答案。後續再用一段刻意的 N+1 查詢
+確認端到端會偵測、會寫 log、且不拋錯。
+
+```
+驗證外部套件設定的優先順序：
+  1. 副作用（建立了什麼檔、插入了什麼 middleware、寫了什麼 log）
+  2. 端到端行為（餵一個該被抓到的案例，看有沒有被抓到）
+  3. getter ← 最不可靠，getter 與 setter 語意常常不對稱
+```
+
+### 教訓 F：靜態稽核工具的發現要逐條驗，不要照單全收
+
+`database_consistency` 報 40 項，其中 4 筆 `MissingUniqueIndexChecker` 建議加
+`lower(symbol)` 唯一索引。逐一讀 model 後發現**全是誤報**——那四個 model 都有
+`before_validation`／`before_save` 把代號 `upcase`，DB 裡只會有大寫，
+現有的 case-sensitive 索引已經足夠。
+
+照單全收會產出 4 個沒必要的 migration，而且是動在 dev/prod 共用的資料庫上。
+
+
 ## 2026-04-17 — react-resizable-panels v4 + CSS 高度鏈三個教訓
 
 ### 教訓 A：npm 套件裝完必須讀 `.d.ts`，不能從文件/記憶寫 code

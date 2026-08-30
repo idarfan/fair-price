@@ -55,11 +55,21 @@ group :development, :test do
   gem "rspec-rails",  "~> 7.0"
   gem "factory_bot_rails"
   gem "faker"
+  gem "simplecov", require: false          # 覆蓋率（bin/audit coverage）
+
+  # 稽核工具
+  # spec 本身的 lint（EmptyExampleGroup、重複 describe、未使用的 let…）
+  gem "rubocop-rspec", require: false
+  # schema 稽核：缺索引、缺 FK、validation 與 NOT NULL 不一致
+  gem "database_consistency", require: false
 end
 
 group :development do
   gem "web-console"
   gem "lookbook", ">= 2.3"
+
+  # N+1 查詢偵測（只記錄不拋錯，設定見 config/initializers/bullet.rb）
+  gem "bullet"
 end
 
 gem "ruby-lsp", "~> 0.26.8", group: :development

@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe "AccountSecurity", type: :request, skip_auto_auth: true do
+RSpec.describe "AccountSecurity", :skip_auto_auth, type: :request do
   let(:secret) { "base32secret3232" }
   let(:user) { create(:user, status: :enabled, totp_enabled: true, totp_secret: secret) }
 

@@ -15,15 +15,15 @@ RSpec.describe "Api::V1::OwnershipSnapshots", type: :request do
     end
 
     context "with multiple snapshots" do
-      let!(:old_snap) do
-        snap = create(:ownership_snapshot, ticker: ticker, quarter: "2025-Q3",
-                      snapshot_date: 45.days.ago.to_date)
-        create(:ownership_holder, ownership_snapshot: snap, name: "Vanguard", pct: 9.82)
-        snap
-      end
-      let!(:new_snap) do
+      # 兩筆快照只為了建立資料狀態，測試不透過名稱引用它們，
+      # 因此用 before 而非 let!（RSpec/LetSetup）。
+      before do
+        old_snap = create(:ownership_snapshot, ticker: ticker, quarter: "2025-Q3",
+                                               snapshot_date: 45.days.ago.to_date)
+        create(:ownership_holder, ownership_snapshot: old_snap, name: "Vanguard", pct: 9.82)
+
         create(:ownership_snapshot, ticker: ticker, quarter: "2025-Q4",
-               snapshot_date: Date.current)
+                                    snapshot_date: Date.current)
       end
 
       it "returns snapshots with correct structure" do

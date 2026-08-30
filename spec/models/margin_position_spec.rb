@@ -83,11 +83,11 @@ RSpec.describe MarginPosition, type: :model do
     end
 
     it "open_positions returns only open" do
-      expect(MarginPosition.open_positions.pluck(:status).uniq).to eq([ "open" ])
+      expect(described_class.open_positions.pluck(:status).uniq).to eq([ "open" ])
     end
 
     it "closed_positions returns only closed" do
-      expect(MarginPosition.closed_positions.pluck(:status).uniq).to eq([ "closed" ])
+      expect(described_class.closed_positions.pluck(:status).uniq).to eq([ "closed" ])
     end
   end
 end

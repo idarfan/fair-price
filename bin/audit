@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# 稽核工具總入口。用法：bin/audit [目標]
+#
+#   bin/audit            全部跑一遍
+#   bin/audit coverage   測試覆蓋率（SimpleCov → coverage/index.html）
+#   bin/audit schema     DB 結構稽核（database_consistency，報告用不設閘門）
+#   bin/audit security   brakeman + bundler-audit
+#   bin/audit style      rubocop（含 rubocop-rspec）
+#   bin/audit frontend   tsc + eslint + vitest
+#   bin/audit n1         顯示 Bullet 記錄到的 N+1（需先在 dev 瀏覽過頁面）
+#
+# 註：DATABASE_URL 在 .env，必須 source 進來，否則會連到不存在的
+# fairprice_development（見 memory/project_database_topology）。
+set -uo pipefail
+cd "$(dirname "$0")/.."
+
+[ -f .env ] && { set -a; . ./.env; set +a; }
+eval "$(rbenv init -)"
+
+status=0
+run() { local title="$1"; shift; echo; echo "── ${title} ─────────────────────────"; "$@" || status=1; }
+
+usage() { awk 'NR>=2 && NR<=10' "$0"; }
+
+audit_coverage() { run "覆蓋率" env COVERAGE=1 bundle exec rspec; }
+audit_schema()   { echo; echo "── DB 結構（報告用，不影響 exit code）──"; bundle exec database_consistency || true; }
+audit_security() {
+  run "Brakeman" bin/brakeman --quiet --no-pager --exit-on-warn --exit-on-error
+  run "Gem 漏洞" bin/bundler-audit
+}
+audit_style()    { run "RuboCop" bin/rubocop; }
+audit_frontend() { run "前端 tsc/eslint/vitest" npm run check; }
+audit_n1() {
+  if [ -s log/bullet.log ]; then cat log/bullet.log
+  else echo "log/bullet.log 是空的——Bullet 只在 development 瀏覽時記錄，先操作頁面再回來看。"; fi
+}
+
+case "${1:-all}" in
+  all)      audit_style; audit_security; audit_coverage; audit_frontend; audit_schema ;;
+  coverage) audit_coverage ;;
+  schema)   audit_schema ;;
+  security) audit_security ;;
+  style)    audit_style ;;
+  frontend) audit_frontend ;;
+  n1)       audit_n1 ;;
+  *)        echo "未知目標：${1}"; usage; exit 2 ;;
+esac
+
+echo; echo "═══ 稽核結束（exit ${status}）═══"
+exit "$status"
