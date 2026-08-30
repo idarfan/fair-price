@@ -4,6 +4,9 @@ CI.run do
   step "Setup", "bin/setup --skip-server"
 
   step "Style: Ruby", "bin/rubocop"
+  # traceroute gem 的前半（路由指向不存在的 action）。後半（action 沒有路由）
+  # 由 spec/routing/unreachable_actions_spec.rb 負責，隨 RSpec 一起跑。
+  step "Style: 未使用的路由", "bin/rails routes --unused"
 
   step "Security: Gem audit", "bin/bundler-audit"
   step "Security: Brakeman code analysis", "bin/brakeman --quiet --no-pager --exit-on-warn --exit-on-error"

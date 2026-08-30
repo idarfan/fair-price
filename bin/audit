@@ -5,7 +5,7 @@
 #   bin/audit coverage   測試覆蓋率（SimpleCov → coverage/index.html）
 #   bin/audit schema     DB 結構稽核（database_consistency，報告用不設閘門）
 #   bin/audit security   brakeman + bundler-audit
-#   bin/audit style      rubocop（含 rubocop-rspec）
+#   bin/audit style      rubocop（含 rubocop-rspec）+ rails routes --unused
 #   bin/audit frontend   tsc + eslint + vitest
 #   bin/audit n1         顯示 Bullet 記錄到的 N+1（需先在 dev 瀏覽過頁面）
 #
@@ -28,7 +28,7 @@ audit_security() {
   run "Brakeman" bin/brakeman --quiet --no-pager --exit-on-warn --exit-on-error
   run "Gem 漏洞" bin/bundler-audit
 }
-audit_style()    { run "RuboCop" bin/rubocop; }
+audit_style()    { run "RuboCop" bin/rubocop; run "未使用的路由" bin/rails routes --unused; }
 audit_frontend() { run "前端 tsc/eslint/vitest" npm run check; }
 audit_n1() {
   if [ -s log/bullet.log ]; then cat log/bullet.log

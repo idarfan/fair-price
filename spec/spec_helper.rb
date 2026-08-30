@@ -17,10 +17,16 @@ if ENV["COVERAGE"]
     add_group "Components", "app/components"
     add_group "Scrapers",   "app/scrapers"
 
-    # 棘輪：門檻設在目前水位（2026-08-30：line 52.4% / branch 41.26%）之下一點點，
-    # 防止覆蓋率倒退，又不會因為刪掉幾行就誤報。
+    # 棘輪：門檻設在目前水位之下一點點，防止倒退，又不會因為刪掉幾行就誤報。
     # 每次補測後再往上調——調高是刻意的動作，不該自動跟著跑。
-    minimum_coverage line: 50, branch: 38
+    #
+    # 2026-08-30 水位：line 57.94% / branch 40.59%。
+    #
+    # 注意 line 這個數字被高估了：spec/routing/unreachable_actions_spec.rb 會
+    # `Rails.application.eager_load!`，把所有類別的 body 執行一遍，那些行因此
+    # 被算成「已覆蓋」但其實沒有被測到（導入該 spec 前是 51.72%）。
+    # branch 覆蓋率不受影響，要看真實測試強度請以 branch 為準。
+    minimum_coverage line: 56, branch: 38
   end
 end
 

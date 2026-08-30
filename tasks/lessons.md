@@ -1,5 +1,58 @@
 # 專案教訓紀錄
 
+## 2026-08-30 — 停更的 gem 未必需要替代 gem
+
+### 教訓 A：先問「這個功能是不是已經進了框架」
+
+`traceroute`（偵測路由／action 不匹配）停更於 2020-04-28。第一直覺是找替代 gem，
+但它的一半功能從 **Rails 7.1 起就是內建的 `rails routes --unused`**。
+
+停更的第三方工具往往正是因為功能被上游吸收才停更。找替代品之前，先查框架
+本身的 CHANGELOG 與 `rails --help` / `rake -T`。
+
+### 教訓 B：Rails 把 controller 上每一個 public method 都當成可路由的 action
+
+```ruby
+class Api::V1::ChartsController < Api::V1::BaseController
+  include Charts::TechnicalIndicators   # ← 模組的 6 個 public 方法全都變成 action
+end
+```
+
+`include` 進 controller 的模組，其 public 方法會進入 `action_methods`，
+跟真正的 action 只差一條路由。純計算模組必須降級：
+
+```ruby
+private(*Charts::TechnicalIndicators.public_instance_methods)
+```
+
+用 splat 而非逐一列名——之後在模組新增方法會自動涵蓋，不會因為漏改而重新曝露。
+
+### 教訓 C：稽核腳本值得升格成 spec
+
+臨時寫的 `bin/rails runner` 探針只在跑的那一刻有效。改寫成
+`spec/routing/unreachable_actions_spec.rb` 之後就進了 CI，每次都會跑。
+本專案已有同型前例：`spec/frontend/behavior_registry_spec.rb`
+（釘住 `data-behavior` 與模組註冊的對應）。
+
+**升格時務必反向驗證**：把修好的地方暫時還原，確認測試會紅。
+本次驗過——註解掉 `private(...)` 那行，測試立刻失敗。沒驗過的守門測試等於沒有。
+
+### 教訓 D：`eager_load!` 會灌水覆蓋率數字
+
+新 spec 需要 `Rails.application.eager_load!` 才能列舉所有 controller，
+副作用是全部類別的 body 被執行一次，那些行被 SimpleCov 算成「已覆蓋」。
+
+**line 覆蓋率因此從 51.72% 跳到 58.36%，測試強度一點都沒變。**
+branch 覆蓋率不受影響（40.59% → 41.08%）。
+
+```
+覆蓋率數字看 branch 不看 line：
+  * line 會被 class body、常數定義、require 灌水
+  * eager_load! / 大量 model 載入都會推高 line 而不推高 branch
+  * 門檻調整時要記錄「為什麼水位變了」，否則下次沒人知道那 6 個百分點是假的
+```
+
+
 ## 2026-08-30 — 「工具裝了」不等於「工具在跑」
 
 ### 教訓 A：帶 `--ensure-latest` 的 binstub 會在版本落後時整個不執行

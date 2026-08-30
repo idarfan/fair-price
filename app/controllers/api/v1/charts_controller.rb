@@ -3,6 +3,15 @@
 class Api::V1::ChartsController < Api::V1::BaseController
   include Charts::TechnicalIndicators
 
+  # Rails 把 controller 上的每一個 public method 都視為可路由的 action。
+  # TechnicalIndicators 是純計算模組，include 之後它的 6 個方法就跟 #show
+  # 一樣是「只差一條路由就能被外部呼叫」的狀態，必須降為 private。
+  #
+  # 寫成 splat 而非逐一列名：之後在模組裡新增方法會自動被涵蓋，
+  # 不會因為漏改這一行而重新曝露。
+  # 由 spec/routing/unreachable_actions_spec.rb 把關。
+  private(*Charts::TechnicalIndicators.public_instance_methods)
+
   RANGE_MAP = {
     "1d" => { range: "1d",  interval: "5m"  },
     "5d" => { range: "5d",  interval: "15m" },

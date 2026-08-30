@@ -1,5 +1,48 @@
 # FairPrice
 
+### 2026-08-30（六）— traceroute 的替代方案：內建指令 + 一支 spec
+
+`traceroute` gem 停更於 2020-04-28 不予採用。它報兩件事，各自有更好的替代：
+
+| traceroute 的功能 | 替代方案 |
+|---|---|
+| 路由指向不存在的 action | **Rails 內建** `bin/rails routes --unused`（7.1 起）|
+| action 沒有任何路由指到它 | `spec/routing/unreachable_actions_spec.rb`（新增）|
+
+兩者都已接進 `bin/audit style` 與 `config/ci.rb`。評估過但未採用：`coverband`
+（需 production 常駐 + Redis）、`debride`（對 Rails 動態呼叫誤報多）。
+
+#### 第二半抓到的兩個真問題
+
+**1. `Charts::TechnicalIndicators` 的 6 個方法是公開 action**
+
+`Api::V1::ChartsController` 做了 `include Charts::TechnicalIndicators`。Rails 把
+controller 上的每一個 public method 都視為可路由的 action，所以這 6 個純計算方法
+跟 `#show` 一樣，只差一條路由就能被外部呼叫。
+
+目前沒有路由匹配（全庫僅有的兩條無 action 路由是 `/csp` 與 `/lookbook` 這兩個
+mount，不是 `:controller/:action` 萬用路由），**所以沒有實際可達的漏洞**。已改為：
+
+```ruby
+private(*Charts::TechnicalIndicators.public_instance_methods)
+```
+
+寫成 splat 而非逐一列名，之後在模組裡新增方法會自動涵蓋。
+
+**2. `PagesController` 是死碼**
+
+從 initial commit 起就沒有路由、全庫零引用，view 只有一行註解。已刪除
+controller 與 `app/views/pages/`。
+
+#### 覆蓋率數字要打折看
+
+新 spec 需要 `Rails.application.eager_load!` 才能列舉 controller，副作用是所有
+類別的 body 都被執行一次，那些行被算成「已覆蓋」但其實沒被測到——
+**line 覆蓋率因此從 51.72% 跳到 58.36%，不是真的變好。**
+branch 覆蓋率不受影響（40.59% → 41.08%），要看真實測試強度請以 branch 為準。
+
+門檻調到 line 56 / branch 38，並在 `spec_helper.rb` 註明這個高估。
+
 ### 2026-08-30（六）— 補齊稽核工具鏈，發現 Brakeman 一直在空轉
 
 #### 裝了什麼
