@@ -1,0 +1,58 @@
+# database_consistency 設定。跑法：bin/audit schema
+#
+# 這裡關掉的每一項都必須寫明理由。「因為很吵所以關掉」不是理由——
+# 那會讓下一個人無法分辨「已判斷過的例外」與「還沒看的問題」。
+
+# ── snapshot 表：uniqueness 驗證器永遠不會執行 ──────────────────────────
+#
+# 下列八張表全部由爬蟲以 `upsert` / `insert_all` 寫入
+# （barchart_scraper_service.rb:608/677/699、skew_intraday_snapshot_service.rb:31、
+#  skew_snapshot_service.rb:22），這兩個 API **完全跳過 ActiveRecord 驗證**。
+#
+# 加上 uniqueness 驗證器的結果是：永遠不執行的死碼、每次 .create 多一次
+# SELECT、以及「這張表有唯一性驗證」的假象。唯一性由 DB 的唯一索引保證，
+# 那才是真正生效的那一層。
+#
+# OptionSnapshot 另有一個無解之處：索引是
+#   (tracked_ticker_id, date_trunc('hour', snapped_at), contract_symbol)
+# Rails 的 uniqueness 驗證器無法表達 date_trunc 這種運算式。
+
+OptionSnapshot:
+  idx_option_snapshots_hourly:
+    UniqueIndexChecker:
+      enabled: false
+
+StrikeChainSnapshot:
+  index_strike_chain_snapshots_on_symbol:
+    UniqueIndexChecker:
+      enabled: false
+
+SkewRankIntraday:
+  index_skew_rank_intradays_on_ticker_and_snapshot_time:
+    UniqueIndexChecker:
+      enabled: false
+
+SkewRankDaily:
+  index_skew_rank_daily_on_ticker_and_snapshot_date:
+    UniqueIndexChecker:
+      enabled: false
+
+PmccShortCallSnapshot:
+  idx_pmcc_short_unique:
+    UniqueIndexChecker:
+      enabled: false
+
+LeapsOptionChainSnapshot:
+  idx_leaps_chain_unique:
+    UniqueIndexChecker:
+      enabled: false
+
+BcvsExpirationSnapshot:
+  index_bcvs_expiration_snapshots_on_symbol:
+    UniqueIndexChecker:
+      enabled: false
+
+BcvsChainSnapshot:
+  index_bcvs_chain_snapshots_on_symbol_and_expiration:
+    UniqueIndexChecker:
+      enabled: false

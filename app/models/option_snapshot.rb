@@ -3,7 +3,9 @@
 class OptionSnapshot < ApplicationRecord
   belongs_to :tracked_ticker
 
-  validates :snapshot_date, :contract_symbol, :option_type, :expiration, :strike, presence: true
+  # snapped_at 在 DB 是 NOT NULL，原本漏了驗證（NullConstraintChecker）。
+  validates :snapshot_date, :contract_symbol, :option_type, :expiration, :strike,
+            :snapped_at, presence: true
   validates :option_type, inclusion: { in: %w[call put] }
 
   scope :puts,           -> { where(option_type: "put") }

@@ -3,7 +3,7 @@
 #
 #   bin/audit            全部跑一遍
 #   bin/audit coverage   測試覆蓋率（SimpleCov → coverage/index.html）
-#   bin/audit schema     DB 結構稽核（database_consistency，報告用不設閘門）
+#   bin/audit schema     DB 結構稽核（database_consistency；例外寫在 .database_consistency.yml）
 #   bin/audit security   brakeman + bundler-audit
 #   bin/audit style      rubocop（含 rubocop-rspec）+ rails routes --unused
 #   bin/audit frontend   tsc + eslint + vitest
@@ -23,7 +23,7 @@ run() { local title="$1"; shift; echo; echo "── ${title} ──────�
 usage() { awk 'NR>=2 && NR<=10' "$0"; }
 
 audit_coverage() { run "覆蓋率" env COVERAGE=1 bundle exec rspec; }
-audit_schema()   { echo; echo "── DB 結構（報告用，不影響 exit code）──"; bundle exec database_consistency || true; }
+audit_schema()   { run "DB 結構" bundle exec database_consistency; }
 audit_security() {
   run "Brakeman" bin/brakeman --quiet --no-pager --exit-on-warn --exit-on-error
   run "Gem 漏洞" bin/bundler-audit

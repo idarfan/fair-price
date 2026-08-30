@@ -15,9 +15,9 @@ CI.run do
   step "Tests: RSpec (含覆蓋率門檻)", "COVERAGE=1 bundle exec rspec"
   step "Tests: 前端 tsc + eslint + vitest", "npm run check"
 
-  # 報告用，不設閘門：40 項發現裡含刻意的取捨與已知誤報
-  # （四個 MissingUniqueIndexChecker 是誤報，那些 model 存檔前都會 upcase）。
-  # 用 bin/audit schema 單獨檢視。
+  # 2026-08-30：40 項發現已全數處置（修 32、以 .database_consistency.yml
+  # 逐項註明理由忽略 8），因此升格成閘門。新的不一致會讓 CI 紅。
+  step "Schema: DB 結構一致性", "bundle exec database_consistency"
 
 
   # Optional: set a green GitHub commit status to unblock PR merge.

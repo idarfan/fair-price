@@ -1,102 +1,169 @@
-# 稽核修正 — 2026-08-28
+# database_consistency 36 項處置計畫（2026-08-30）
 
-依 `RAILS_AUDIT_REPORT.md` 執行。基準 commit `39ac654`。
+## 盤點結論：24 項該修，12 項不該修
 
-## 決策（已與使用者確認）
-- `force_ssl`：只在公網網域強制，`localhost` / `127.0.0.1` / `/up` 排除
-- `user_id` 遷移：全部 6 張表都做，既有資料 backfill 給 `mr.idarfan@gmail.com`
-
-## C-1 `/api/*` 認證缺口（公網已實測曝露）
-- [x] `ApplicationController` 把 `/api` 移出白名單，前綴比對改成 anchored regex
-- [x] 抽出 `gate_deny(reason)` hook，讓 API 能改回 JSON 而非 302
-- [x] 新增 `JsonAuthGate` concern（401/403 JSON + CSRF 失敗轉 JSON）
-- [x] `Api::V1::BaseController` 與 `Api::IvAnalysisController` 套用，CSRF 由 `null_session` 改 `exception`
-- [x] 補三處缺 `X-CSRF-Token` 的前端寫入：`OwnershipApp` / `OptionsAnalyzerApp` / `ImageUploadZone`
-- [x] 改寫 `auth_gate_spec` 的 `leaves /api/* accessible`，改成斷言 401
-- [x] 新增 `spec/requests/api/auth_gate_spec.rb` 覆蓋讀取與破壞性端點
-
-## C-2 財務資料加 user_id
-- [x] migration：6 張表加 `user_id`，backfill admin，加 index + FK，改 `null: false`
-- [x] model 加 `belongs_to :user`，`User` 加對應 `has_many`
-- [x] controller 全改 `current_user.xxx` scope
-- [x] 既有 spec 與 factory 補 user 關聯
-
-## High
-- [x] H-1 `tracked_tickers#collect` 改背景 job（比照 ScrapeLeapsJob 的 cache 回報模式）
-- [x] H-2 `force_ssl` + `assume_ssl` + `ssl_options` 排除 localhost 與 `/up`
-- [x] H-4 `TrackedTicker#last_snapshot_date` N+1 → group query
-- [x] H-5 `iv_analysis#watchlist` 無上限 thread → 固定大小 pool
-- [x] H-6 `bundle update mail`（GHSA-mvxr-6m87-mv2q）
-
-## Medium
-- [x] M-1 刪 `public/tech_prototype.html`
-- [x] M-2 三處把 `e.message` 直接回客戶端 → log 詳細、回籠統訊息
-- [x] M-3 `barchart_scraper_service.rb:422` 裸 rescue 補 log
-- [x] M-4 `TrackController#page_view` 檢查 `save` 回傳值
-- [x] M-5 `iv_watchlists.ticker` 補 unique index；`iv_queries` 補索引
-
-## H-3 內嵌 JS 遷移（Wave 1 已完成 2026-08-28）
-- [x] tsconfig.json（strict）+ 修掉既有 9 個型別錯誤 → tsc 0 error
-- [x] eslint 瀏覽器全域 → 假陽性 20 個歸零，再修掉 4 個真錯誤
-- [x] behaviors entrypoint + 動態 import code-splitting
-- [x] 10 個零插值元件、12 段、2,188 行搬遷（Ruby 求值處理跳脫）
-- [x] spec/frontend/behavior_registry_spec.rb 釘住元件↔模組連結
-- [x] Wave 2：少量插值 6 個元件（707 行 → data attribute）
-- [x] Wave 3：bull_put/bull_call（1,038 行、35 處插值 → data-config JSON）
-- [x] layout 自己的 inline script + 關閉 CSP script-src unsafe_inline（保留 1 段字級還原，用 nonce）
-- [ ] M-6：bull_put/bull_call 兩支的重複程式碼（現在是兩個並排 .js，可直接 diff 抽共用）
-- [ ] style-src 的 unsafe_inline（Phlex/Tailwind 大量 inline style，另一件事）
-- [ ] behaviors/*.js 型別化成 .ts（約 600 個型別錯誤）
-- L-2 Service → PORO 更名
-- L-1 補測試：只補本次改動相關的，不做全面補測
-
-## 驗收
-- [x] `bundle exec rspec` 全綠
-- [x] 公網 `https://fairprice-ohmy.com/api/v1/tracked_tickers` 未登入回 401
+「全部修掉」不是正確目標——其中 12 項若照著修，會產生**永遠不會執行的驗證器**，
+反而製造「這裡有驗證」的假象。
 
 ---
 
-## Review（2026-08-28 完成）
+## A. 不修，寫進設定檔並記錄理由（12 項）
 
-### 執行結果
-- RSpec **638 examples / 0 failures**（且是第一次真正跑在隔離的 `fairprice_test` 上）
-- Brakeman 0 warnings｜RuboCop 339 檔無 offense｜bundler-audit 無漏洞｜ESLint 無新增問題
-- 公網實測：`https://fairprice-ohmy.com/api/*` 未登入回 **401**（修正前是 200 + 真實資料）
+### A-1　8 個 snapshot 表的 UniqueIndexChecker
 
-### 與原計畫的三處偏離
+`StrikeChainSnapshot` / `SkewRankIntraday` / `SkewRankDaily` / `PmccShortCallSnapshot` /
+`OptionSnapshot` / `LeapsOptionChainSnapshot` / `BcvsExpirationSnapshot` / `BcvsChainSnapshot`
 
-1. **C-2 只做 3 張表，不是 6 張**（使用者原選「全部 6 張」）。
-   追下去發現 `TrackedTicker` 驅動夜間 Python 蒐集器、產出 79 萬列共用的
-   `OptionSnapshot`；`WatchlistItem` 是 `OuouPreMarketService` 排程 Telegram
-   盤前報告的來源；`IvWatchlist` 是有 group_tag 分類的共用參考清單。
-   這三張是**共用市場資料**，加 user_id 會讓爬蟲與排程碎片化。
-   只對真正個人性的 `margin_positions` / `portfolios` / `price_alerts` 加歸屬。
-   若仍要全部 6 張，需要先決定排程作業要用哪個使用者的清單。
+已查證全部走 `upsert` / `insert_all` 寫入（`barchart_scraper_service.rb:608/677/699`、
+`skew_intraday_snapshot_service.rb:31`、`skew_snapshot_service.rb:22`），
+**這兩個 API 完全跳過 ActiveRecord 驗證**。加上去的驗證器永遠不會執行。
 
-2. **M-5 的前半段是誤判**。稽核報告寫「`iv_watchlists.ticker` 缺 unique index」，
-   實際上該欄位叫 `symbol` 且已有 unique index——是報告的自動檢查腳本猜錯欄位名。
-   **13 個 uniqueness validation 全部都有對應的 unique index，沒有缺口。**
-   後半段（`iv_queries` 零索引）成立，已修。
+`OptionSnapshot` 更是無解——索引是
+`(tracked_ticker_id, date_trunc('hour', snapped_at), contract_symbol)`，
+Rails 的 uniqueness 驗證器無法表達 `date_trunc` 這種運算式。
 
-3. **`force_ssl` 沒有照原本說的加 `assume_ssl`**。實測 `assume_ssl` 會讓
-   `http://localhost:3003` 的 redirect 也產生 `https://` 網址，本機瀏覽直接壞掉。
-   改為依 cloudflared 的 `X-Forwarded-Proto` 判斷，已實測兩邊都正確。
+### A-2　保留給 B 段處理的 4 項
 
-### 稽核當下沒發現、修的過程中才抓到的
+（見下）
 
-- **測試環境連到正式資料庫**（見 README）。這比報告裡任何一項都嚴重：
-  RSpec 一直跑在 `fairprice_development` 上，13 個失敗中有 8 個是正式資料污染
-  造成的假結果。也代表稽核報告裡「627 examples 全綠」那個基準本身就不可信。
-- `option_price_tracker_controller` 與 API controller 有一份**重複的 serializer**，
-  兩份都踩同一個 N+1（違反 `~/.claude/rules/rails-gotchas.md` 的「Serializer 不可重複定義」）。
+---
 
-### 已知仍未處理
+## B. 用「修對」的方式消掉 8 項（4 UniqueIndex + 4 MissingUniqueIndex）
 
-- **H-3 內嵌 JS 遷移到 Vite**（7 個元件、最大單一方法 725 行）。工程量最大，
-  是 13 個 F 級檔案、CSP `unsafe_inline`、元件 5000 行零覆蓋的共同成因。
-- **前端沒有 `tsconfig.json`**，`~/.claude/rules/typescript.md` 要求的
-  `strict` / `noUncheckedIndexedAccess` / `npx tsc --noEmit` 目前都無法執行。
-  ESLint 現存 20 個 `no-undef`（`document` / `window` / `fetch` 等瀏覽器全域）
-  是 ESLint env 設定沒開 browser 造成的，不是真的錯誤。
-- **測試覆蓋率仍偏低**。本次只補了與改動相關的測試（API 閘門、跨使用者隔離、
-  PriceAlert position 分使用者），沒有做全面補測。
+這 8 項其實是**同一個根因的兩面**：`WatchlistItem` / `WatchedTicker` /
+`TrackedTicker` / `IvWatchlist` 都寫 `uniqueness: { case_sensitive: false }`，
+於是 database_consistency 認為「驗證器管的是 `lower(symbol)`，但索引是 `symbol`」，
+同時報「索引沒有對應驗證器」與「應該建 `lower()` 索引」。
+
+正解不是加索引，而是**拿掉 `case_sensitive: false`**：
+
+- 這四個 model 存檔前都會 `upcase`，DB 裡只有大寫，比對大小寫毫無意義
+- `case_sensitive: false` 會產生 `LOWER(symbol) = LOWER($1)` 查詢，
+  **用不到 `(user_id, symbol)` btree 索引**——是純粹的浪費
+- 已查證：四張表現有資料**非大寫筆數皆為 0**
+
+⚠️ 但 `TrackedTicker` 與 `IvWatchlist` 的正規化寫在 **`before_save`**（驗證之後）。
+若只改 `case_sensitive` 而不動這裡，使用者送 `aapl` 時驗證會比對未正規化的值
+→ 驗證通過 → 存檔時 upcase → 撞上唯一索引 → 500。
+**必須同時把 `before_save` 移到 `before_validation`。**
+（順帶修掉一個既有小瑕疵：`IvWatchlist` 的 format 驗證目前跑在未 strip 的值上。）
+
+- [x] B-1 四個 model 移除 `case_sensitive: false`
+- [x] B-2 `TrackedTicker` / `IvWatchlist` 正規化 `before_save` → `before_validation`
+- [x] B-3 補 request/model spec 釘住「小寫輸入不會產生重複列」
+
+---
+
+## C. Model 加 presence 驗證（6 項 NullConstraintChecker）
+
+`UserActivity.kind`、`SkewRankIntraday.ticker/snapshot_time`、
+`SkewRankDaily.ticker/snapshot_date`、`OptionSnapshot.snapped_at`
+
+DB 已是 NOT NULL 但 model 沒驗證 → 目前會拋原始 PG 例外而非驗證錯誤。
+
+與 A-1 的差別：**presence 驗證不產生額外查詢**（uniqueness 每次存檔要多一次 SELECT）。
+即使部分寫入路徑走 upsert 不會觸發，成本仍是零，且能表達意圖。
+
+- [x] C-1 六個欄位加 `presence: true`
+
+---
+
+## D. Migration 1：刪 7 個冗餘索引
+
+已用 `pg_indexes` 逐一驗證：**7 個全部是真的 leftmost-prefix 重複，沒有 partial index**
+（工具在有 `WHERE` 條件時會誤判，這次沒有這個問題）。
+
+| 刪除 | 被誰涵蓋 |
+|---|---|
+| `index_watchlist_items_on_user_id` | `..._on_user_id_and_symbol` |
+| `index_user_activities_on_user_id` | `..._on_user_id_and_kind_and_started_at` |
+| `index_ownership_holders_on_ownership_snapshot_id` | `..._and_name` |
+| `index_options_flow_trades_on_symbol_and_snapshot_date` | `idx_oft_directional` |
+| `index_option_snapshots_on_tracked_ticker_id` | `idx_option_snapshots_hourly` |
+| `index_margin_positions_on_status` | `..._on_status_and_opened_on` |
+| `index_iv_watchlists_on_user_id` | `..._on_user_id_and_symbol` |
+
+- [x] D-1 migration（含正確的 `down`，逐一重建）
+
+---
+
+## E. Migration 2：3 個 NOT NULL + 1 個 boolean
+
+`price_alerts.target_price`、`iv_queries.ticker`、`iv_queries.option_type`、
+`iv_queries.low_iv_signal`（boolean 補 NOT NULL + default false）
+
+**已驗證現有資料 NULL 筆數皆為 0**（price_alerts 3 筆、iv_queries 20 筆）。
+
+- [x] E-1 migration
+
+---
+
+## F. Migration 3：7 個 CHECK constraint
+
+`price_alerts.target_price > 0`、`margin_positions.buy_price/shares > 0`、
+`margin_positions.sell_price > 0 OR NULL`、
+`portfolios.shares/unit_cost > 0`、`portfolios.sell_price > 0 OR NULL`
+
+**已驗證現有資料違反筆數皆為 0**（margin_positions 與 portfolios 目前都是 0 筆）。
+
+- [x] F-1 migration
+
+---
+
+## 執行順序與安全措施
+
+1. [ ] **先備份資料庫**（dev/prod 共用 `fairprice_production`）並驗證備份檔完整
+       ——不能只驗非空，要驗 gzip 結尾標記（見 memory `feedback_backup_validation`）
+2. [ ] B / C（純 model 改動，零 DB 風險）→ 跑測試
+3. [ ] D / E / F（三支 migration）→ 每支都要能 `db:rollback`
+       ——memory `feedback_migration_rollback_risk`：down 失敗可能連鎖回滾前一個 migration
+4. [ ] 重新跑 `bin/audit schema` 確認只剩 A 段那 8 項
+5. [ ] `bin/audit all` 全綠
+6. [ ] 需要重啟 `fairprice-rails`（schema 變更）——**先徵求同意**
+
+## 風險
+
+- `option_snapshots` 有 **810,382 筆**，刪索引時會取得短暫 ACCESS EXCLUSIVE 鎖。
+  DROP INDEX 只動 catalog 與檔案，實際是毫秒級；但若當下有爬蟲在寫入會被擋一下。
+- 其餘表都很小（price_alerts 3、iv_queries 20、margin_positions 0、portfolios 0）。
+
+---
+
+# Review（2026-08-30 完成）
+
+## 結果：40 → 0，`bin/audit schema` exit 0
+
+| 段落 | 項數 | 實際做了什麼 |
+|---|---|---|
+| B | 8 | 四個 model 移除 `case_sensitive: false`；`TrackedTicker` / `IvWatchlist` 的正規化從 `before_save` 移到 `before_validation` |
+| C | 6 | 六個欄位加 `presence: true` |
+| D | 7 | migration 刪 7 個冗餘索引 |
+| E | 4 | migration 加 3 個 NOT NULL + 1 個 boolean NOT NULL/default |
+| F | 7 | migration 加 7 個 CHECK constraint |
+| A | 8 | `.database_consistency.yml` 逐項忽略並註明理由 |
+
+## 驗證
+
+- 三支 migration 的 `down` **全部實測往返過**（索引 7 → 0 → 7 → 0）
+- 新增 9 個測試釘住正規化順序，**反向驗證過**：改回 `before_save` 立刻紅
+- RSpec **712 examples / 0 failures**（原 703）
+- `bin/audit all` exit 0
+- 備份已建立並驗證完整（21MB、`dump complete` 標記、`option_snapshots` 810,382 筆對得上）
+
+## 與計畫的差異
+
+`bin/audit schema` 從「報告用」升格為**閘門**，`config/ci.rb` 同步加上該步驟。
+原計畫沒寫這條——既然歸零了，不設閘門就會慢慢漂回去。
+
+`.database-consistency.yml` 檔名錯誤（連字號），正確是 `.database_consistency.yml`
+（底線）。第一次跑出現 `No configuration files were provided` 才發現。
+
+新增的測試原本寫成一支跨四個 model 的 `symbol_normalization_spec.rb`，
+被 `RSpec/DescribeClass` 與 `RSpec/MultipleDescribes` 兩條規則夾住
+（一個要類別、一個要單一 top-level）。正解是拆進各自 model 的 spec，
+順帶補了原本不存在的 `iv_watchlist_spec.rb` 與 `watched_ticker_spec.rb`。
+
+## 尚未處理
+
+- `style-src` 的 `unsafe_inline`
+- `tracked_tickers` 沒有 per-user ownership（需重新 key 81 萬筆 `option_snapshots`）

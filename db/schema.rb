@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_28_145316) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_30_065800) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -120,11 +120,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_145316) do
     t.decimal "ivp_2y", precision: 6, scale: 2
     t.decimal "ivr_1y", precision: 6, scale: 2
     t.decimal "ivr_2y", precision: 6, scale: 2
-    t.boolean "low_iv_signal"
-    t.string "option_type"
+    t.boolean "low_iv_signal", default: false, null: false
+    t.string "option_type", null: false
     t.datetime "queried_at"
     t.decimal "strike", precision: 10, scale: 2
-    t.string "ticker"
+    t.string "ticker", null: false
     t.datetime "updated_at", null: false
     t.index ["ticker", "queried_at"], name: "index_iv_queries_on_ticker_and_queried_at", order: { queried_at: :desc }
   end
@@ -138,7 +138,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_145316) do
     t.bigint "user_id", null: false
     t.index ["group_tag"], name: "index_iv_watchlists_on_group_tag"
     t.index ["user_id", "symbol"], name: "index_iv_watchlists_on_user_id_and_symbol", unique: true
-    t.index ["user_id"], name: "index_iv_watchlists_on_user_id"
   end
 
   create_table "leaps_option_chain_snapshots", force: :cascade do |t|
@@ -180,8 +179,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_145316) do
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.index ["status", "opened_on"], name: "index_margin_positions_on_status_and_opened_on"
-    t.index ["status"], name: "index_margin_positions_on_status"
     t.index ["user_id"], name: "index_margin_positions_on_user_id"
+    t.check_constraint "buy_price > 0::numeric", name: "buy_price_positive"
+    t.check_constraint "sell_price IS NULL OR sell_price > 0::numeric", name: "sell_price_positive"
+    t.check_constraint "shares > 0::numeric", name: "shares_positive"
   end
 
   create_table "max_pain_contract_snapshots", force: :cascade do |t|
@@ -238,7 +239,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_145316) do
     t.index ["expiration"], name: "index_option_snapshots_on_expiration"
     t.index ["option_type", "strike"], name: "index_option_snapshots_on_option_type_and_strike"
     t.index ["snapshot_date"], name: "index_option_snapshots_on_snapshot_date"
-    t.index ["tracked_ticker_id"], name: "index_option_snapshots_on_tracked_ticker_id"
     t.check_constraint "bid > 0::numeric OR ask > 0::numeric OR last_price > 0::numeric", name: "chk_option_has_market_quote"
   end
 
@@ -272,7 +272,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_145316) do
     t.boolean "urgency_high", default: false, null: false
     t.integer "volume"
     t.index ["symbol", "snapshot_date", "is_cancelled", "is_multi_leg"], name: "idx_oft_directional"
-    t.index ["symbol", "snapshot_date"], name: "index_options_flow_trades_on_symbol_and_snapshot_date"
   end
 
   create_table "options_flows", force: :cascade do |t|
@@ -330,7 +329,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_145316) do
     t.decimal "pct_change", precision: 8, scale: 4
     t.datetime "updated_at", null: false
     t.index ["ownership_snapshot_id", "name"], name: "index_ownership_holders_on_ownership_snapshot_id_and_name", unique: true
-    t.index ["ownership_snapshot_id"], name: "index_ownership_holders_on_ownership_snapshot_id"
   end
 
   create_table "ownership_snapshots", force: :cascade do |t|
@@ -393,6 +391,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_145316) do
     t.bigint "user_id", null: false
     t.index ["symbol"], name: "index_portfolios_on_symbol"
     t.index ["user_id"], name: "index_portfolios_on_user_id"
+    t.check_constraint "sell_price IS NULL OR sell_price > 0::numeric", name: "sell_price_positive"
+    t.check_constraint "shares > 0::numeric", name: "shares_positive"
+    t.check_constraint "unit_cost > 0::numeric", name: "unit_cost_positive"
   end
 
   create_table "price_alerts", force: :cascade do |t|
@@ -402,7 +403,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_145316) do
     t.text "notes"
     t.integer "position", default: 0, null: false
     t.string "symbol", null: false
-    t.decimal "target_price", precision: 12, scale: 4
+    t.decimal "target_price", precision: 12, scale: 4, null: false
     t.datetime "triggered_at"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
@@ -410,6 +411,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_145316) do
     t.index ["position"], name: "index_price_alerts_on_position"
     t.index ["symbol"], name: "index_price_alerts_on_symbol"
     t.index ["user_id"], name: "index_price_alerts_on_user_id"
+    t.check_constraint "target_price > 0::numeric", name: "target_price_positive"
   end
 
   create_table "skew_rank_daily", force: :cascade do |t|
@@ -566,7 +568,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_145316) do
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.index ["user_id", "kind", "started_at"], name: "index_user_activities_on_user_id_and_kind_and_started_at"
-    t.index ["user_id"], name: "index_user_activities_on_user_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -605,7 +606,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_145316) do
     t.bigint "user_id", null: false
     t.index ["position"], name: "index_watchlist_items_on_position"
     t.index ["user_id", "symbol"], name: "index_watchlist_items_on_user_id_and_symbol", unique: true
-    t.index ["user_id"], name: "index_watchlist_items_on_user_id"
   end
 
   add_foreign_key "iv_watchlists", "users"

@@ -3,9 +3,12 @@
 class TrackedTicker < ApplicationRecord
   has_many :option_snapshots, dependent: :destroy
 
-  validates :symbol, presence: true, uniqueness: { case_sensitive: false }
+  # 正規化必須在驗證「之前」。原本寫在 before_save，唯一性驗證因此比對的是
+  # 未正規化的值——搭配 case_sensitive: true 會讓 "aapl" 通過驗證、存檔時
+  # upcase 成 "AAPL" 再撞上唯一索引，變成 500 而不是驗證錯誤。
+  before_validation { self.symbol = symbol&.upcase&.strip }
 
-  before_save { self.symbol = symbol.upcase.strip }
+  validates :symbol, presence: true, uniqueness: true
 
   scope :active, -> { where(active: true) }
 
