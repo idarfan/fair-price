@@ -80,7 +80,7 @@ class StockAlert::AlertRowComponent < ApplicationComponent
       form(
         action: "/watchlist/#{@alert.id}/toggle_condition",
         method: "post",
-        style: "display:inline"
+        class: "inline"
       ) do
         input(type: "hidden", name: "_method", value: "patch")
         input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
@@ -110,7 +110,7 @@ class StockAlert::AlertRowComponent < ApplicationComponent
       form(
         action: "/watchlist/#{@alert.id}/toggle",
         method: "post",
-        style: "display:inline"
+        class: "inline"
       ) do
         input(type: "hidden", name: "_method", value: "patch")
         input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)

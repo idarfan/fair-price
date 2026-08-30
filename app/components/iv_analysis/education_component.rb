@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
 class IvAnalysis::EducationComponent < ApplicationComponent
-  FORMULA_STYLE = "background:#0d1117; border: 1.5px dashed #a3e635;"
-  CHART_BG      = "background:#161b22; border:1px solid #30363d;"
+  # 這兩個原本是 inline style 字串常數，改成 class 名（CSP style-src 收斂）。
+  # 定義在 app/assets/tailwind/application.css。
+  FORMULA_CLASS = "ivedu-formula-call"
+  CHART_BG_CLASS = "ivedu-chart-bg"
 
   def view_template
     section(class: "mt-10 space-y-6") do
@@ -32,11 +34,11 @@ class IvAnalysis::EducationComponent < ApplicationComponent
         div(class: "flex items-center gap-2 flex-shrink-0 mt-1") do
           span(class: "text-gray-400 text-sm select-none", title: "音量") { plain "🔊" }
           input(id: "tts-volume", type: "range", min: "0", max: "1", step: "0.05", value: "1.0",
-                class: "w-20 h-1 cursor-pointer", style: "accent-color:#3b82f6;", title: "音量調整")
+                class: "w-20 h-1 cursor-pointer ivedu-accent-input", title: "音量調整")
           button(id: "tts-settings-btn", type: "button",
                  class: "flex items-center gap-1 px-2 py-1 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-gray-700 text-xs transition-colors",
                  title: "語音設定") do
-            raw '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="display:inline-block;vertical-align:middle"><path fill-rule="evenodd" clip-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"/></svg>'.html_safe
+            raw '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" class="ivedu-icon-inline"><path fill-rule="evenodd" clip-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"/></svg>'.html_safe
             plain " 語音設定"
           end
         end
@@ -84,53 +86,51 @@ class IvAnalysis::EducationComponent < ApplicationComponent
       end
 
       # Dark formula card
-      div(class: "rounded-xl p-6 mb-6 text-center", style: FORMULA_STYLE) do
+      div(class: "rounded-xl p-6 mb-6 text-center #{FORMULA_CLASS}") do
         # Plain-language prefix line
-        p(class: "mb-3", style: "font-size:13px; color:#7d8590; letter-spacing:0.03em;") do
-          span(style: "color:#e8f5a3; font-weight:600") { plain "C（買權價格）" }
+        p(class: "mb-3 ivedu-lead") do
+          span(class: "ivedu-lead-term") { plain "C（買權價格）" }
           plain " 約等於"
         end
 
         # Formula line — 22px
-        p(style: "font-size:22px; letter-spacing:0.04em; color:#d4e157; font-style:italic; line-height:1.4;") do
-          span(style: "color:#e8f5a3; font-weight:700") { plain "C" }
-          span(style: "color:#7ecaf5; font-weight:300; margin:0 8px") { plain "≈" }
-          span(style: "color:#81c784; font-weight:700") { plain "Δ" }
-          span(style: "color:#b0bec5") { plain "(" }
-          span(style: "color:#e8f5a3; font-weight:700") { plain "S" }
-          span(style: "color:#b0bec5; margin:0 5px") { plain "−" }
-          span(style: "color:#e8f5a3; font-weight:700") { plain "K" }
-          span(style: "color:#b0bec5") { plain ")" }
-          span(style: "color:#7ecaf5; margin:0 10px") { plain "+" }
-          span(style: "color:#b0bec5; font-weight:400; font-style:normal") { plain "0.4" }
-          span(style: "color:#7ecaf5; margin:0 5px") { plain "·" }
-          span(style: "color:#e8f5a3; font-weight:700") { plain "S" }
-          span(style: "color:#7ecaf5; margin:0 5px") { plain "·" }
-          span(style: "color:#ffb74d; font-weight:700") { plain "σ" }
-          span(style: "color:#7ecaf5; margin:0 5px") { plain "·" }
-          span(style: "color:#b0bec5; font-weight:400; font-style:normal") { plain "√" }
-          span(style: "color:#e8f5a3; font-weight:700") { plain "T" }
+        p(class: "ivedu-eq") do
+          span(class: "ivedu-var") { plain "C" }
+          span(class: "ivedu-op-approx") { plain "≈" }
+          span(class: "ivedu-delta") { plain "Δ" }
+          span(class: "ivedu-paren") { plain "(" }
+          span(class: "ivedu-var") { plain "S" }
+          span(class: "ivedu-minus") { plain "−" }
+          span(class: "ivedu-var") { plain "K" }
+          span(class: "ivedu-paren") { plain ")" }
+          span(class: "ivedu-op-xwide") { plain "+" }
+          span(class: "ivedu-const") { plain "0.4" }
+          span(class: "ivedu-op-tight") { plain "·" }
+          span(class: "ivedu-var") { plain "S" }
+          span(class: "ivedu-op-tight") { plain "·" }
+          span(class: "ivedu-sigma") { plain "σ" }
+          span(class: "ivedu-op-tight") { plain "·" }
+          span(class: "ivedu-const") { plain "√" }
+          span(class: "ivedu-var") { plain "T" }
         end
 
         # Two-term breakdown cards inside formula card
         div(class: "mt-5 flex flex-wrap justify-center gap-4 text-left") do
-          div(class: "rounded-lg px-4 py-3 flex-1",
-              style: "background:#112240; border:1px solid #1e3a5f; min-width:200px; max-width:260px") do
-            p(style: "color:#58a6ff; font-size:0.68rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px") do
+          div(class: "rounded-lg px-4 py-3 flex-1 ivedu-term-card ivedu-term-card-blue") do
+            p(class: "ivedu-term-title ivedu-term-title-blue") do
               plain "① 內涵價值"
             end
-            p(style: "color:#c9d1d9; font-size:0.9rem; font-style:italic; margin-bottom:6px") { plain "Δ · (S − K)" }
-            p(style: "color:#8b949e; font-size:0.72rem; line-height:1.6") do
+            p(class: "ivedu-term-eq") { plain "Δ · (S − K)" }
+            p(class: "ivedu-term-desc") do
               plain "S（股價）− K（行權價）= 「立刻行權能拿到多少錢」。若 S < K（OTM 價外），視同零。乘以 Δ 是因為期權並非直接持股，Delta 代表對股價變動的實際放大比例。"
             end
           end
-          div(class: "rounded-lg px-4 py-3 flex-1",
-              style: "background:#1a1200; border:1px solid #3d2e00; min-width:200px; max-width:260px") do
-            p(style: "color:#d29922; font-size:0.68rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px") do
+          div(class: "rounded-lg px-4 py-3 flex-1 ivedu-term-card ivedu-term-card-amber") do
+            p(class: "ivedu-term-title ivedu-term-title-amber") do
               plain "② 時間價值"
             end
-            p(style: "color:#c9d1d9; font-size:0.9rem; font-style:italic; margin-bottom:6px") { plain "0.4 · S · σ · √T" }
-            p(style: "color:#8b949e; font-size:0.72rem; line-height:1.6") do
+            p(class: "ivedu-term-eq") { plain "0.4 · S · σ · √T" }
+            p(class: "ivedu-term-desc") do
               plain "S · σ · √T 是「股票在剩餘期間的預期波動幅度（1個標準差）」，例如 S=100、σ=30%、T=1年 → 預期震幅 ±$30。0.4 是 ATM 近似係數（B-S 推導：N′(0) = 1/√2π ≈ 0.3989 ≈ 0.4），把預期震幅轉換為期權溢價。"
             end
           end
@@ -188,52 +188,49 @@ class IvAnalysis::EducationComponent < ApplicationComponent
         end
 
         # Dark formula card — Put
-        div(class: "rounded-xl p-6 mb-6 text-center",
-            style: "background:#0d1117; border:1.5px dashed #f48fb1;") do
-          p(class: "mb-3", style: "font-size:13px; color:#7d8590; letter-spacing:0.03em;") do
-            span(style: "color:#f8c8d4; font-weight:600") { plain "P（賣權價格）" }
+        div(class: "rounded-xl p-6 mb-6 text-center ivedu-formula-put") do
+          p(class: "mb-3 ivedu-lead") do
+            span(class: "ivedu-lead-term-put") { plain "P（賣權價格）" }
             plain " 約等於"
           end
-          p(style: "font-size:22px; letter-spacing:0.04em; color:#f48fb1; font-style:italic; line-height:1.4;") do
-            span(style: "color:#f8c8d4; font-weight:700") { plain "P" }
-            span(style: "color:#7ecaf5; font-weight:300; margin:0 8px") { plain "≈" }
-            span(style: "color:#ef9a9a; font-weight:700") { plain "|Δ" }
-            span(style: "color:#ef9a9a; font-style:normal; font-size:0.7em; vertical-align:sub; font-weight:700") { plain "P" }
-            span(style: "color:#ef9a9a; font-weight:700") { plain "|" }
-            span(style: "color:#b0bec5") { plain "·(" }
-            span(style: "color:#f8c8d4; font-weight:700") { plain "K" }
-            span(style: "color:#b0bec5; margin:0 5px") { plain "−" }
-            span(style: "color:#f8c8d4; font-weight:700") { plain "S" }
-            span(style: "color:#b0bec5") { plain ")" }
-            span(style: "color:#7ecaf5; margin:0 10px") { plain "+" }
-            span(style: "color:#b0bec5; font-weight:400; font-style:normal") { plain "0.4" }
-            span(style: "color:#7ecaf5; margin:0 5px") { plain "·" }
-            span(style: "color:#f8c8d4; font-weight:700") { plain "S" }
-            span(style: "color:#7ecaf5; margin:0 5px") { plain "·" }
-            span(style: "color:#ffb74d; font-weight:700") { plain "σ" }
-            span(style: "color:#7ecaf5; margin:0 5px") { plain "·" }
-            span(style: "color:#b0bec5; font-weight:400; font-style:normal") { plain "√" }
-            span(style: "color:#f8c8d4; font-weight:700") { plain "T" }
+          p(class: "ivedu-eq-put") do
+            span(class: "ivedu-var-put") { plain "P" }
+            span(class: "ivedu-op-approx") { plain "≈" }
+            span(class: "ivedu-delta-put") { plain "|Δ" }
+            span(class: "ivedu-sub") { plain "P" }
+            span(class: "ivedu-delta-put") { plain "|" }
+            span(class: "ivedu-paren") { plain "·(" }
+            span(class: "ivedu-var-put") { plain "K" }
+            span(class: "ivedu-minus") { plain "−" }
+            span(class: "ivedu-var-put") { plain "S" }
+            span(class: "ivedu-paren") { plain ")" }
+            span(class: "ivedu-op-xwide") { plain "+" }
+            span(class: "ivedu-const") { plain "0.4" }
+            span(class: "ivedu-op-tight") { plain "·" }
+            span(class: "ivedu-var-put") { plain "S" }
+            span(class: "ivedu-op-tight") { plain "·" }
+            span(class: "ivedu-sigma") { plain "σ" }
+            span(class: "ivedu-op-tight") { plain "·" }
+            span(class: "ivedu-const") { plain "√" }
+            span(class: "ivedu-var-put") { plain "T" }
           end
 
           div(class: "mt-5 flex flex-wrap justify-center gap-4 text-left") do
-            div(class: "rounded-lg px-4 py-3 flex-1",
-                style: "background:#1a0808; border:1px solid #5f1e1e; min-width:200px; max-width:260px") do
-              p(style: "color:#ef9a9a; font-size:0.68rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px") do
+            div(class: "rounded-lg px-4 py-3 flex-1 ivedu-term-card ivedu-term-card-red") do
+              p(class: "ivedu-term-title ivedu-term-title-red") do
                 plain "① 內涵價值"
               end
-              p(style: "color:#c9d1d9; font-size:0.9rem; font-style:italic; margin-bottom:6px") { plain "|Δ_P| · (K − S)" }
-              p(style: "color:#8b949e; font-size:0.72rem; line-height:1.6") do
+              p(class: "ivedu-term-eq") { plain "|Δ_P| · (K − S)" }
+              p(class: "ivedu-term-desc") do
                 plain "K − S = 立刻行權能拿到的錢（看跌方向）。S > K（OTM 價外）時視同零。Put Delta 本為負值（−1 ~ 0），取絕對值 |Δ_P|：ATM ≈ 0.5，深度 ITM → 1.0，深度 OTM → 0.0。"
               end
             end
-            div(class: "rounded-lg px-4 py-3 flex-1",
-                style: "background:#1a1200; border:1px solid #3d2e00; min-width:200px; max-width:260px") do
-              p(style: "color:#d29922; font-size:0.68rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px") do
+            div(class: "rounded-lg px-4 py-3 flex-1 ivedu-term-card ivedu-term-card-amber") do
+              p(class: "ivedu-term-title ivedu-term-title-amber") do
                 plain "② 時間價值"
               end
-              p(style: "color:#c9d1d9; font-size:0.9rem; font-style:italic; margin-bottom:6px") { plain "0.4 · S · σ · √T" }
-              p(style: "color:#8b949e; font-size:0.72rem; line-height:1.6") do
+              p(class: "ivedu-term-eq") { plain "0.4 · S · σ · √T" }
+              p(class: "ivedu-term-desc") do
                 plain "時間價值公式與買權完全相同——Put-Call Parity 的數學體現：ATM 附近買賣權時間溢價對稱，差異僅來自內涵價值方向相反。"
               end
             end
@@ -241,28 +238,25 @@ class IvAnalysis::EducationComponent < ApplicationComponent
         end
 
         # Put-Call Parity
-        div(class: "rounded-xl px-5 py-4 mb-5",
-            style: "background:#0d1117; border:1px solid #30363d;") do
-          p(class: "text-xs font-bold mb-2",
-            style: "color:#d29922; letter-spacing:0.06em; text-transform:uppercase;") do
+        div(class: "rounded-xl px-5 py-4 mb-5 ivedu-formula-parity") do
+          p(class: "text-xs font-bold mb-2 ivedu-parity-title") do
             plain "⚖️  Put-Call Parity"
           end
-          p(class: "text-center mb-3",
-            style: "font-size:18px; color:#c9d1d9; font-style:italic; letter-spacing:0.04em;") do
-            span(style: "color:#e8f5a3") { plain "C" }
-            span(style: "color:#7ecaf5; margin:0 8px") { plain "−" }
-            span(style: "color:#f8c8d4") { plain "P" }
-            span(style: "color:#7ecaf5; margin:0 8px") { plain "=" }
-            span(style: "color:#e8f5a3") { plain "S" }
-            span(style: "color:#7ecaf5; margin:0 8px") { plain "−" }
-            span(style: "color:#b0bec5") { plain "K" }
-            span(style: "color:#b0bec5; font-size:0.7em; vertical-align:super") { plain " · e" }
-            span(style: "color:#b0bec5; font-size:0.58em; vertical-align:super") { plain "−rT" }
+          p(class: "text-center mb-3 ivedu-parity-eq") do
+            span(class: "ivedu-parity-call") { plain "C" }
+            span(class: "ivedu-op-wide") { plain "−" }
+            span(class: "ivedu-parity-put") { plain "P" }
+            span(class: "ivedu-op-wide") { plain "=" }
+            span(class: "ivedu-parity-call") { plain "S" }
+            span(class: "ivedu-op-wide") { plain "−" }
+            span(class: "ivedu-paren") { plain "K" }
+            span(class: "ivedu-sup") { plain " · e" }
+            span(class: "ivedu-sup-sm") { plain "−rT" }
           end
-          p(style: "color:#8b949e; font-size:0.75rem; line-height:1.7") do
+          p(class: "ivedu-parity-note") do
             plain "買賣權價差等於現股價減行權價現值，無套利條件下恆成立。"
             plain "若兩者偏離，套利者立即介入修正。"
-            span(style: "color:#d4e157") { plain " ATM 時（S ≈ K）：C ≈ P" }
+            span(class: "ivedu-accent-lime") { plain " ATM 時（S ≈ K）：C ≈ P" }
             plain "，買賣權溢價幾乎相等。"
           end
         end
@@ -287,22 +281,24 @@ class IvAnalysis::EducationComponent < ApplicationComponent
   end
 
   def tts_speaker_btn(text, gender)
-    color    = gender == "male" ? "#3b82f6" : "#ef4444"
-    label    = gender == "male" ? "男聲朗讀" : "女聲朗讀"
-    ml_style = gender == "female" ? "margin-left:20px;" : ""
+    # 只有男聲／女聲兩種配色，寫成 class 就夠——不需要動態色機制。
+    # 女聲那個 class 自帶 margin-left（原本的 ml_style）。
+    tone  = gender == "male" ? "ivedu-tts-male" : "ivedu-tts-female"
+    label = gender == "male" ? "男聲朗讀" : "女聲朗讀"
     button(type: "button",
-           class: "tts-btn inline-flex items-center justify-center flex-shrink-0 transition-transform duration-100 hover:scale-125 active:scale-95",
-           style: "color:#{color}; background:none; border:none; padding:4px 5px; cursor:pointer; line-height:1; #{ml_style}",
+           class: "tts-btn ivedu-tts #{tone} inline-flex items-center justify-center flex-shrink-0 " \
+                  "transition-transform duration-100 hover:scale-125 active:scale-95",
            data: { tts_text: text, tts_gender: gender },
            title: label) do
-      raw '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="20" height="20" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg>'.html_safe
+      raw '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="20" height="20" class="ivedu-tts-icon"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"/></svg>'.html_safe
     end
   end
 
   def symbol_card(sym, color, name_zh, name_en, unit, desc)
     div(class: "rounded-lg border border-gray-200 bg-gray-50 p-3.5") do
       div(class: "flex items-start gap-2.5 mb-2") do
-        span(style: "font-size:1.4rem; font-weight:700; font-style:italic; color:#{color}; line-height:1.1; flex-shrink:0") { plain sym }
+        # 符號顏色由呼叫端決定，改走 data attribute + CSSOM（見 shared/dataStyles.ts）。
+        span(class: "ivedu-sym", data_accent_color: color) { plain sym }
         div(class: "flex-1 min-w-0") do
           p(class: "text-xs font-bold text-gray-800 leading-tight") { plain name_zh }
           div(class: "flex items-center gap-0.5 mt-0.5") do
@@ -311,8 +307,8 @@ class IvAnalysis::EducationComponent < ApplicationComponent
             tts_speaker_btn(name_en, "female")
           end
         end
-        span(class: "text-xs rounded-full px-2 py-0.5 bg-white border border-gray-200 text-gray-500 whitespace-nowrap flex-shrink-0",
-             style: "font-size:0.65rem") { plain unit }
+        span(class: "text-xs rounded-full px-2 py-0.5 bg-white border border-gray-200 text-gray-500 whitespace-nowrap flex-shrink-0 ivedu-chip",
+) { plain unit }
       end
       p(class: "text-xs text-gray-600 leading-relaxed") { plain desc }
     end
@@ -327,18 +323,18 @@ class IvAnalysis::EducationComponent < ApplicationComponent
   end
 
   def chart_section
-    div(class: "rounded-xl overflow-hidden shadow-sm", style: CHART_BG) do
+    div(class: "rounded-xl overflow-hidden shadow-sm #{CHART_BG_CLASS}") do
       div(class: "px-5 pt-4 pb-2 flex flex-wrap items-start justify-between gap-3") do
         div do
-          h3(class: "font-bold", style: "color:#e6edf3; font-size:1rem") { plain "期權 Delta 與履約價關係" }
-          p(class: "text-xs mt-0.5", style: "color:#7d8590") do
+          h3(class: "font-bold ivedu-stat-label") { plain "期權 Delta 與履約價關係" }
+          p(class: "text-xs mt-0.5 ivedu-muted") do
             plain "不同 IV 底下，Call Delta 隨履約價的分布（標的價格 = 100，剩餘時間 1 年）"
           end
         end
-        div(class: "flex gap-4 text-xs", style: "color:#7d8590") do
+        div(class: "flex gap-4 text-xs ivedu-muted") do
           [ [ "標的價格", "100" ], [ "剩餘時間", "1.00 年" ], [ "利率 (R)", "0%" ] ].each do |k, v|
             div(class: "text-center") do
-              div(style: "color:#e6edf3; font-weight:600; font-size:0.85rem") { plain v }
+              div(class: "ivedu-stat-value") { plain v }
               div { plain k }
             end
           end
@@ -346,25 +342,24 @@ class IvAnalysis::EducationComponent < ApplicationComponent
       end
       div(class: "px-5 pb-2 flex gap-4") do
         [ [ "10%", "#58a6ff" ], [ "30%", "#3fb950" ], [ "50%", "#d29922" ], [ "80%", "#bc8cff" ] ].each do |label, color|
-          div(class: "flex items-center gap-1.5 text-xs", style: "color:#7d8590") do
-            div(class: "w-8 rounded-full", style: "height:2px; background:#{color}")
+          div(class: "flex items-center gap-1.5 text-xs ivedu-muted") do
+            div(class: "w-8 rounded-full ivedu-legend-line", data_accent_bg: color)
             span { plain label }
           end
         end
       end
       div(class: "px-2 pb-4") do
-        canvas(id: "iv-delta-chart", class: "w-full", height: "320",
-               style: "max-height:320px; display:block;")
+        canvas(id: "iv-delta-chart", class: "w-full ivedu-canvas", height: "320")
       end
-      div(class: "mx-4 mb-4 rounded-lg p-4", style: "background:#1f2937; border:1px solid #374151;") do
-        p(class: "font-semibold text-sm mb-2", style: "color:#fbbf24") { plain "📌 從圖表看出的關鍵事實" }
+      div(class: "mx-4 mb-4 rounded-lg p-4 ivedu-callout") do
+        p(class: "font-semibold text-sm mb-2 ivedu-callout-title") { plain "📌 從圖表看出的關鍵事實" }
         ul(class: "space-y-1") do
           [ "IV = 10% 時，履約價 115 的 OTM（價外）Call Delta 幾乎趨近於 0 ——買了幾乎不動",
            "IV = 80% 時，同樣履約價 115 的 Delta 可達 0.4 以上 ——對股價極度敏感",
            "IV 上升 8 倍（10% → 80%），OTM（價外）Call 的 Δ 可能翻倍甚至高達五倍",
            "無論是內涵價值（Δ 變大）還是時間價值（σ 直接乘進去），都以倍數放大" ].each do |txt|
-            li(class: "text-xs leading-relaxed", style: "color:#9ca3af") do
-              span(style: "color:#6b7280; margin-right:6px") { plain "•" }
+            li(class: "text-xs leading-relaxed ivedu-callout-item") do
+              span(class: "ivedu-callout-dot") { plain "•" }
               plain txt
             end
           end
@@ -469,34 +464,28 @@ class IvAnalysis::EducationComponent < ApplicationComponent
           img(
             src:   "/images/options_chain_example.png",
             alt:   "Barchart 選擇權鏈截圖",
-            class: "w-full block select-none",
-            style: "display:block"
+            class: "w-full block select-none ivedu-block"
           )
-          div(id: "barchart-col-hl", class: "absolute inset-y-0 pointer-events-none",
-              style: "opacity:0;background:rgba(59,130,246,0.18);transition:left 0.06s,width 0.06s;")
+          div(id: "barchart-col-hl", class: "absolute inset-y-0 pointer-events-none ivedu-hover-band")
         end
       end
 
       # Barchart tooltip overlay (fixed, JS-managed)
       div(id: "barchart-col-tooltip",
-          class: "hidden fixed z-50 rounded-xl shadow-2xl overflow-hidden select-none",
-          style: "max-width:320px;pointer-events:none;border:1px solid #e5e7eb;") do
+          class: "hidden fixed z-50 rounded-xl shadow-2xl overflow-hidden select-none ivedu-tip") do
         div(id: "barchart-tt-hdr", class: "px-4 py-3 flex items-center gap-2") do
           span(id: "barchart-tt-num",
-               class: "w-6 h-6 rounded-full flex items-center justify-center text-white flex-shrink-0 font-bold",
-               style: "font-size:0.82rem;background:rgba(0,0,0,0.25)")
+               class: "w-6 h-6 rounded-full flex items-center justify-center text-white flex-shrink-0 font-bold ivedu-tip-head")
           div(class: "flex-1 min-w-0") do
-            p(id: "barchart-tt-en", class: "font-bold font-mono text-white leading-tight", style: "font-size:0.95rem")
-            p(id: "barchart-tt-zh", class: "mt-0.5", style: "font-size:0.82rem;color:rgba(255,255,255,0.85)")
+            p(id: "barchart-tt-en", class: "font-bold font-mono text-white leading-tight ivedu-tip-title")
+            p(id: "barchart-tt-zh", class: "mt-0.5 ivedu-tip-sub")
           end
           span(id: "barchart-tt-ex",
-               class: "ml-auto font-mono rounded px-2 py-0.5 whitespace-nowrap flex-shrink-0",
-               style: "font-size:0.82rem;background:rgba(0,0,0,0.2);color:rgba(255,255,255,0.9)")
+               class: "ml-auto font-mono rounded px-2 py-0.5 whitespace-nowrap flex-shrink-0 ivedu-tip-foot")
         end
         div(class: "bg-white px-4 py-3") do
           p(id: "barchart-tt-sum",
-            class: "text-gray-800 font-medium leading-relaxed mb-2",
-            style: "font-size:0.85rem")
+            class: "text-gray-800 font-medium leading-relaxed mb-2 ivedu-body")
           div(id: "barchart-tt-bul", class: "space-y-1")
         end
       end
@@ -651,11 +640,10 @@ class IvAnalysis::EducationComponent < ApplicationComponent
           img(
             src:   "/images/options_chain_puts_example.png",
             alt:   "選擇權 Puts 報價表截圖",
-            class: "w-full block select-none",
-            style: "display:block"
+            class: "w-full block select-none ivedu-block"
           )
           # column highlight overlay — JS manages left/width dynamically
-          div(id: "chain-col-hl", class: "absolute inset-y-0 pointer-events-none", style: "opacity:0;background:rgba(59,130,246,0.18);transition:left 0.06s,width 0.06s;")
+          div(id: "chain-col-hl", class: "absolute inset-y-0 pointer-events-none ivedu-hover-band")
         end
         p(class: "mt-2 text-xs text-gray-400") do
           plain "① Strike　② Latest　③ Theor.　④ IV　⑤ Delta　⑥ Gamma　⑦ Theta　⑧ Vega　⑨ Rho　⑩ Volume　⑪ Open Int　⑫ Vol/OI　⑬ ITM Prob　⑭ Type"
@@ -664,22 +652,19 @@ class IvAnalysis::EducationComponent < ApplicationComponent
 
       # Fixed tooltip overlay — JS fills & positions on hover
       div(id: "chain-col-tooltip",
-          class: "hidden fixed z-50 rounded-xl shadow-2xl overflow-hidden select-none",
-          style: "max-width:300px;pointer-events:none;border:1px solid #e5e7eb;") do
+          class: "hidden fixed z-50 rounded-xl shadow-2xl overflow-hidden select-none ivedu-tip-narrow") do
         div(id: "chain-tt-hdr", class: "px-4 py-3 flex items-center gap-2") do
           span(id: "chain-tt-num",
-               class: "w-6 h-6 rounded-full flex items-center justify-center text-white flex-shrink-0 font-bold",
-               style: "font-size:0.7rem;background:rgba(0,0,0,0.25)")
+               class: "w-6 h-6 rounded-full flex items-center justify-center text-white flex-shrink-0 font-bold ivedu-tip-head-sm")
           div(class: "flex-1 min-w-0") do
             p(id: "chain-tt-en", class: "text-sm font-bold font-mono text-white leading-tight")
-            p(id: "chain-tt-zh", class: "text-xs mt-0.5", style: "color:rgba(255,255,255,0.8)")
+            p(id: "chain-tt-zh", class: "text-xs mt-0.5 ivedu-tip-sub")
           end
           span(id: "chain-tt-ex",
-               class: "ml-auto text-xs font-mono rounded px-2 py-0.5 whitespace-nowrap flex-shrink-0",
-               style: "background:rgba(0,0,0,0.2);color:rgba(255,255,255,0.9)")
+               class: "ml-auto text-xs font-mono rounded px-2 py-0.5 whitespace-nowrap flex-shrink-0 ivedu-tip-foot-sm")
         end
         div(class: "bg-white px-4 py-3") do
-          p(id: "chain-tt-sum", class: "text-gray-800 font-medium leading-relaxed mb-2", style: "font-size:0.85rem")
+          p(id: "chain-tt-sum", class: "text-gray-800 font-medium leading-relaxed mb-2 ivedu-body")
           div(id: "chain-tt-bul", class: "space-y-1")
         end
       end
@@ -803,13 +788,13 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
   end
 
   def tipdoc(num, en_name, zh_name, accent, summary, bullets, example)
-    div(class: "rounded-lg bg-white",
-        style: "border: 1px solid #e5e7eb; border-left: 4px solid #{accent};") do
+    div(class: "rounded-lg bg-white ivedu-gloss-card", data_accent_border_left: accent) do
       div(class: "p-3.5") do
         div(class: "flex items-start justify-between gap-2 mb-2") do
           div(class: "flex items-center gap-1.5") do
-            span(class: "inline-flex items-center justify-center w-5 h-5 rounded-full text-white text-xs font-bold flex-shrink-0",
-                 style: "background:#{accent}; font-size:0.65rem") { plain num }
+            span(class: "inline-flex items-center justify-center w-5 h-5 rounded-full " \
+                        "text-white text-xs font-bold flex-shrink-0 ivedu-chip",
+                 data_accent_bg: accent) { plain num }
             div do
               div(class: "flex items-center gap-0.5") do
                 p(class: "text-sm font-bold font-mono text-gray-900 leading-tight") { plain en_name }
@@ -819,14 +804,14 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
               p(class: "text-xs text-gray-500 mt-0.5") { plain zh_name }
             end
           end
-          span(class: "text-xs font-mono rounded px-1.5 py-0.5 bg-gray-100 text-gray-400 whitespace-nowrap flex-shrink-0",
-               style: "font-size:0.65rem") { plain example }
+          span(class: "text-xs font-mono rounded px-1.5 py-0.5 bg-gray-100 text-gray-400 whitespace-nowrap flex-shrink-0 ivedu-chip",
+) { plain example }
         end
         p(class: "text-xs text-gray-700 leading-relaxed mb-1.5") { plain summary }
         div(class: "space-y-0.5") do
           bullets.split("\n").each do |line|
             p(class: "text-xs text-gray-500 leading-relaxed") do
-              span(class: "mr-1", style: "color:#{accent}") { plain "›" }
+              span(class: "mr-1", data_accent_color: accent) { plain "›" }
               plain line
             end
           end
@@ -844,8 +829,8 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
   end
 
   def gloss_card(en_name, zh_name, accent_color, example, desc)
-    div(class: "rounded-lg bg-white overflow-hidden",
-        style: "border: 1px solid #e5e7eb; border-left: 4px solid #{accent_color};") do
+    div(class: "rounded-lg bg-white overflow-hidden ivedu-gloss-card",
+        data_accent_border_left: accent_color) do
       div(class: "p-3.5 flex flex-col gap-2") do
         div(class: "flex items-start justify-between gap-2") do
           div do
@@ -856,8 +841,8 @@ Wheel: 賣 Put（CSP）或賣 Call（CC）",
             end
             p(class: "text-xs text-gray-500 mt-0.5") { plain zh_name }
           end
-          span(class: "text-xs rounded px-1.5 py-0.5 bg-gray-100 text-gray-400 font-mono whitespace-nowrap flex-shrink-0",
-               style: "font-size:0.65rem") { plain example }
+          span(class: "text-xs rounded px-1.5 py-0.5 bg-gray-100 text-gray-400 font-mono whitespace-nowrap flex-shrink-0 ivedu-chip",
+) { plain example }
         end
         p(class: "text-xs text-gray-600 leading-relaxed") { plain desc }
       end

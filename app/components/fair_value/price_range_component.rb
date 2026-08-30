@@ -43,12 +43,12 @@ class FairValue::PriceRangeComponent < ApplicationComponent
         # Fill bar: from low to current
         div(
           class: "absolute left-0 top-0 #{@bar_height} rounded-full #{fill_color}",
-          style: "width: #{fill_percent}%"
+          data_bar_pct: fill_percent
         )
         # Current price marker
         div(
           class: "absolute top-0 bottom-0 w-0.5 bg-gray-800",
-          style: "left: calc(#{position_percent}% - 1px)"
+          data_marker_pct: position_percent, data_marker_offset: 1
         )
       end
 

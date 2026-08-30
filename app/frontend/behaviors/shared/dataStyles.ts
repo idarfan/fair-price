@@ -22,9 +22,29 @@ function percent(raw: string | undefined): number | null {
   return n;
 }
 
+/** 只接受 #rrggbb。任何其他形式（含 CSS 函式、url()、變數）一律拒絕。 */
+function hexColor(raw: string | undefined): string | null {
+  if (raw === undefined) return null;
+  return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : null;
+}
+
+/**
+ * 強調色：伺服器端從固定調色盤挑出的色碼，由呼叫端決定要套到哪個屬性。
+ *
+ * 這裡「不」提供通用的「任意屬性 = 任意值」——那等於把 style 屬性換個名字。
+ * 每個 data attribute 對應一條寫死的宣告，值只接受 #rrggbb。
+ */
+const ACCENT_TARGETS: ReadonlyArray<readonly [string, (el: HTMLElement, hex: string) => void]> = [
+  ["accentColor", (el, hex) => { el.style.color = hex; }],
+  ["accentBg", (el, hex) => { el.style.backgroundColor = hex; }],
+  ["accentBorderLeft", (el, hex) => { el.style.borderLeftColor = hex; }],
+  ["accentBorder", (el, hex) => { el.style.borderColor = hex; }],
+];
+
 /**
  * data-bar-pct：填滿條的寬度百分比。
- * data-marker-pct：標記的水平位置百分比（會扣掉半個字寬讓箭頭對準）。
+ * data-marker-pct：標記的水平位置百分比；data-marker-offset 可覆寫位移 px（預設 4）。
+ * data-accent-color / -bg / -border / -border-left：強調色（#rrggbb）。
  */
 export function applyDataStyles(root: ParentNode = document): void {
   root.querySelectorAll<HTMLElement>("[data-bar-pct]").forEach((el) => {
@@ -34,6 +54,18 @@ export function applyDataStyles(root: ParentNode = document): void {
 
   root.querySelectorAll<HTMLElement>("[data-marker-pct]").forEach((el) => {
     const pct = percent(el.dataset["markerPct"]);
-    if (pct !== null) el.style.left = `calc(${pct}% - 4px)`;
+    if (pct === null) return;
+    // 位移是為了讓標記的中心對準百分比位置，預設半個箭頭寬。
+    const raw = Number(el.dataset["markerOffset"] ?? 4);
+    const offset = Number.isFinite(raw) && raw >= 0 && raw <= 64 ? raw : 4;
+    el.style.left = `calc(${pct}% - ${offset}px)`;
+  });
+
+  ACCENT_TARGETS.forEach(([key, apply]) => {
+    const attr = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+    root.querySelectorAll<HTMLElement>(`[${attr}]`).forEach((el) => {
+      const hex = hexColor(el.dataset[key]);
+      if (hex !== null) apply(el, hex);
+    });
   });
 }

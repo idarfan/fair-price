@@ -402,7 +402,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
     nc    = missing ? "#9ca3af" : "#111827"
 
     <<~SVG.html_safe
-      <svg viewBox="-10 -5 220 140" width="100%" xmlns="http://www.w3.org/2000/svg" style="display:block">
+      <svg viewBox="-10 -5 220 140" width="100%" xmlns="http://www.w3.org/2000/svg" class="block">
         <path d="M 20,100 A 80,80 0 0,1 180,100" fill="none" stroke="#e5e7eb" stroke-width="12" stroke-linecap="round"/>
         #{segs}
         <circle cx="20"  cy="100" r="6" fill="#{c0}"/>
@@ -467,7 +467,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
           span(class: "text-red-500 font-medium")  { plain "Put $#{sprintf("%.1f", put_prem / 1_000_000.0)}M (#{put_pct}%)" }
         end
         div(class: "h-3 rounded-full bg-red-200 overflow-hidden flex") do
-          div(class: "h-full bg-green-600 rounded-l-full", style: "width:#{call_pct}%")
+          div(class: "h-full bg-green-600 rounded-l-full", data_bar_pct: call_pct)
         end
         div(class: "flex items-center gap-4 mt-1") do
           if ratio
@@ -491,7 +491,7 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
             span(class: "text-red-500")  { plain "Put $#{sprintf("%.1f", ask_put / 1_000_000.0)}M (#{(100 - ask_call_pct).round(1)}%)" }
           end
           div(class: "h-2 rounded-full bg-red-100 overflow-hidden") do
-            div(class: "h-full bg-green-500 rounded-l-full", style: "width:#{ask_call_pct}%")
+            div(class: "h-full bg-green-500 rounded-l-full", data_bar_pct: ask_call_pct)
           end
         else
           p(class: "text-xs text-gray-400") { plain "無 Ask 成交紀錄" }
@@ -842,13 +842,13 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
 
       # Chart 1: Max Pain
       div do
-        div(class: "relative", style: "height:260px") do
+        div(class: "relative h-[260px]") do
           canvas(id: "mp-c1-#{symbol}", class: "w-full h-full")
         end
         script(type: "application/json", id: "mp-d1-#{symbol}") { raw pain_json.html_safe }
 
-          p(class: "text-amber-600 font-semibold mt-1", style: "font-size:14px") { raw "⚠️ Max Pain 判讀提醒".html_safe }
-            div(class: "mt-1 text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1", style: "font-size:22px") do
+          p(class: "text-amber-600 font-semibold mt-1 text-[14px]") { raw "⚠️ Max Pain 判讀提醒".html_safe }
+            div(class: "mt-1 text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1 text-[22px]") do
               p { "Max Pain 理論假設選擇權賣方有能力將股價推向 OI 最集中的價位，但在市值大、流動性好的標的上，股票本身的成交量遠大於選擇權的槓桿影響力，此效應通常較弱。" }
               p { raw "遠月合約 OI 結構較為分散，深度價外的高 OI 較可能反映 PMCC 長腿或長期避險需求，<strong>不宜直接解讀為方向性訊號</strong>。".html_safe }
               p { raw "<strong>使用建議</strong>：僅作為「到期日附近短期磁吸效應」的參考，到期日越遠，參考價值越低。".html_safe }
@@ -857,13 +857,13 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
 
       # Chart 2: Open Interest by Strike
       div do
-        div(class: "relative", style: "height:220px") do
+        div(class: "relative h-[220px]") do
           canvas(id: "mp-c2-#{symbol}", class: "w-full h-full")
         end
         script(type: "application/json", id: "mp-d2-#{symbol}") { raw oi_json.html_safe }
 
-          p(class: "text-amber-600 font-semibold mt-1", style: "font-size:14px") { raw "⚠️ #{vol_oi_filter == 'volume' ? 'Volume' : 'OI'} 分布判讀提醒".html_safe }
-            div(class: "mt-1 text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1", style: "font-size:22px") do
+          p(class: "text-amber-600 font-semibold mt-1 text-[14px]") { raw "⚠️ #{vol_oi_filter == 'volume' ? 'Volume' : 'OI'} 分布判讀提醒".html_safe }
+            div(class: "mt-1 text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1 text-[22px]") do
               p { "高 OI 集中的 strike 無法直接判斷多空方向：Put OI 可能是保護性避險（偏空），也可能是賣 Put 收保費（偏多）；Call OI 可能是方向性押注（偏多），也可能是持股者賣出 Covered Call 收取權利金（中性偏多策略，非方向性看空）。" }
               p { raw "<strong>使用建議</strong>：須搭配 Options Flow 的 Trade 方向（成交於 Ask 或 Bid）及 Code 交叉比對，不可單憑 OI 集中度判斷。".html_safe }
             end
@@ -871,13 +871,13 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
 
       # Chart 3: Vol Skew
       div do
-        div(class: "relative", style: "height:220px") do
+        div(class: "relative h-[220px]") do
           canvas(id: "mp-c3-#{symbol}", class: "w-full h-full")
         end
         script(type: "application/json", id: "mp-d3-#{symbol}") { raw skew_json.html_safe }
 
-          p(class: "text-amber-600 font-semibold mt-1", style: "font-size:14px") { raw "⚠️ Vol Skew 判讀提醒".html_safe }
-            div(class: "mt-1 text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1", style: "font-size:22px") do
+          p(class: "text-amber-600 font-semibold mt-1 text-[14px]") { raw "⚠️ Vol Skew 判讀提醒".html_safe }
+            div(class: "mt-1 text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1 text-[22px]") do
               p { "下傾斜（Put 端 IV 高於 Call 端）是選擇權市場的結構性常態，反映避險需求長期偏 Put，本身不是看空訊號。" }
               p { raw "單一時間點的 Skew 形狀<strong>不具判斷力</strong>，必須與該標的自身歷史 Skew 比較（Skew Rank）才能判斷是否異常。跨標的直接比較 Skew 形狀沒有意義，不同產業、不同標的的「正常」Skew 基準本來就不同。".html_safe }
               p { raw "<strong>使用建議</strong>：本圖為單次快照，務必對照 IV Skew Tracker 的 Skew Rank 歷史百分位一併判讀，不可僅憑當下曲線形狀下結論。".html_safe }
@@ -886,13 +886,13 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
 
       # Chart 4: Max Pain by Contract
       div do
-        div(class: "relative", style: "height:200px") do
+        div(class: "relative h-[200px]") do
           canvas(id: "mp-c4-#{symbol}", class: "w-full h-full")
         end
         script(type: "application/json", id: "mp-d4-#{symbol}") { raw contract_json.html_safe }
 
-          p(class: "text-amber-600 font-semibold mt-1", style: "font-size:14px") { raw "⚠️ Max Pain by Expiry 判讀提醒".html_safe }
-            div(class: "mt-1 text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1", style: "font-size:22px") do
+          p(class: "text-amber-600 font-semibold mt-1 text-[14px]") { raw "⚠️ Max Pain by Expiry 判讀提醒".html_safe }
+            div(class: "mt-1 text-gray-500 leading-relaxed bg-amber-50 rounded p-2 space-y-1 text-[22px]") do
               p { "若某個到期日的數值明顯偏離其他到期日，優先檢查是否緊鄰財報公布日期。" }
               p { "財報前後市場會大量布局跨事件選擇權倉位，使該到期日的 OI 結構暫時失真，Max Pain 的參考價值會明顯降低。" }
               p { raw "<strong>使用建議</strong>：財報前後 14 天內的到期日數據，Max Pain 可信度打折。".html_safe }
@@ -901,8 +901,8 @@ class TechnicalDashboard::PageComponent < ApplicationComponent
 
       # 整合判讀：四圖核心原則（規格文件 §3 整合判讀節）
       div(class: "mt-2 bg-blue-50 border border-blue-200 rounded-lg p-3") do
-        p(class: "text-blue-800 font-semibold mb-2", style: "font-size:13px") { raw "📋 四圖整合判讀：使用時的核心原則".html_safe }
-        ul(class: "text-gray-600 space-y-1 list-disc pl-4", style: "font-size:12px; line-height:1.6") do
+        p(class: "text-blue-800 font-semibold mb-2 text-[13px]") { raw "📋 四圖整合判讀：使用時的核心原則".html_safe }
+        ul(class: "text-gray-600 space-y-1 list-disc pl-4 text-[12px] leading-[1.6]") do
           li { raw "<strong>Skew 形狀不是方向訊號</strong>：看 Skew Rank（相對自身歷史的排名），不看當下曲線形狀。下傾斜是所有股票的結構性常態，跨標的比較 Skew 形狀沒有意義。".html_safe }
           li { raw "<strong>財報日期附近 Max Pain 可信度打折</strong>：數值劇烈震盪時，先查是否緊鄰財報，不要直接解讀為市場情緒轉變。".html_safe }
           li { raw "<strong>不同圖表的訊號可以互相矛盾，這是正常現象</strong>：近月避險 Put 集中、遠月看多 Call 布局可以並存，各代表不同時間維度的參與者行為，不必強行整合成單一結論。".html_safe }

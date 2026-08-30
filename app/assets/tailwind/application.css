@@ -377,3 +377,220 @@ th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 }
 .leaps-concept-body p { margin-top: 8px; }
 .leaps-concept-body strong { color: #111827; font-weight: 700; }
+
+/* ═══ IV 教學面板（app/components/iv_analysis/education_component.rb）═══
+ *
+ * 抽成 class 而非 inline style：CSP 的 style-src 拿掉 'unsafe-inline' 之後
+ * style 屬性一律被擋，而 nonce 只對 <style> 區塊有效、對屬性無效。
+ *
+ * 顏色在這裡有語意角色（變數符號／運算子／括號常數…），集中定義比散在
+ * 一百多個 style 屬性裡好維護——原本要改一個符號的顏色得逐行找。
+ * 命名前綴 ivedu- 以免和 Tailwind utility 混淆。
+ */
+
+/* ── 公式卡外框 ───────────────────────────────────────── */
+.ivedu-formula-call   { background:#0d1117; border:1.5px dashed #a3e635; }
+.ivedu-formula-put    { background:#0d1117; border:1.5px dashed #f48fb1; }
+.ivedu-formula-parity { background:#0d1117; border:1px solid #30363d; }
+.ivedu-chart-bg       { background:#161b22; border:1px solid #30363d; }
+
+/* ── 公式前言 ─────────────────────────────────────────── */
+.ivedu-lead      { font-size:13px; color:#7d8590; letter-spacing:0.03em; }
+.ivedu-lead-term { color:#e8f5a3; font-weight:600; }
+.ivedu-lead-term-put { color:#f8c8d4; font-weight:600; }
+
+/* ── 公式本體（買權：黃綠系）───────────────────────────── */
+.ivedu-eq       { font-size:22px; letter-spacing:0.04em; color:#d4e157; font-style:italic; line-height:1.4; }
+.ivedu-eq-put   { font-size:22px; letter-spacing:0.04em; color:#f48fb1; font-style:italic; line-height:1.4; }
+.ivedu-var      { color:#e8f5a3; font-weight:700; }   /* 變數符號 C S K T */
+.ivedu-var-put  { color:#f8c8d4; font-weight:700; }
+.ivedu-delta    { color:#81c784; font-weight:700; }
+.ivedu-delta-put{ color:#ef9a9a; font-weight:700; }
+.ivedu-sigma    { color:#ffb74d; font-weight:700; }
+.ivedu-paren    { color:#b0bec5; }                     /* 括號 */
+.ivedu-const    { color:#b0bec5; font-weight:400; font-style:normal; }  /* 常數 0.4 √ */
+.ivedu-op       { color:#7ecaf5; }                     /* 運算子 */
+.ivedu-op-tight { color:#7ecaf5; margin:0 5px; }
+.ivedu-op-wide  { color:#7ecaf5; margin:0 8px; }
+.ivedu-op-xwide { color:#7ecaf5; margin:0 10px; }
+.ivedu-op-approx{ color:#7ecaf5; font-weight:300; margin:0 8px; }
+.ivedu-minus    { color:#b0bec5; margin:0 5px; }
+.ivedu-sub      { color:#ef9a9a; font-style:normal; font-size:0.7em; vertical-align:sub; font-weight:700; }
+
+/* ── 公式拆解小卡 ─────────────────────────────────────── */
+.ivedu-term-card       { min-width:200px; max-width:260px; }
+.ivedu-term-card-blue  { background:#112240; border:1px solid #1e3a5f; }
+.ivedu-term-card-amber { background:#1a1200; border:1px solid #3d2e00; }
+.ivedu-term-card-red   { background:#1a0808; border:1px solid #5f1e1e; }
+.ivedu-term-title      { font-size:0.68rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px; }
+.ivedu-term-title-blue { color:#58a6ff; }
+.ivedu-term-title-amber{ color:#d29922; }
+.ivedu-term-title-red  { color:#ef9a9a; }
+.ivedu-term-eq         { color:#c9d1d9; font-size:0.9rem; font-style:italic; margin-bottom:6px; }
+.ivedu-term-desc       { color:#8b949e; font-size:0.72rem; line-height:1.6; }
+
+/* ── 買賣權平價 ───────────────────────────────────────── */
+.ivedu-parity-title { color:#d29922; letter-spacing:0.06em; text-transform:uppercase; }
+.ivedu-parity-eq    { font-size:18px; color:#c9d1d9; font-style:italic; letter-spacing:0.04em; }
+.ivedu-parity-call  { color:#e8f5a3; }
+.ivedu-parity-put   { color:#f8c8d4; }
+.ivedu-parity-note  { color:#8b949e; font-size:0.75rem; line-height:1.7; }
+.ivedu-sup          { color:#b0bec5; font-size:0.7em; vertical-align:super; }
+.ivedu-sup-sm       { color:#b0bec5; font-size:0.58em; vertical-align:super; }
+.ivedu-accent-lime  { color:#d4e157; }
+
+/* ── TTS 朗讀按鈕（只有男聲／女聲兩種顏色）─────────────── */
+.ivedu-tts        { background:none; border:none; padding:4px 5px; cursor:pointer; line-height:1; }
+.ivedu-tts-male   { color:#3b82f6; }
+.ivedu-tts-female { color:#ef4444; margin-left:20px; }
+.ivedu-tts-icon   { display:block; }
+
+/* ── 圖表區 ───────────────────────────────────────────── */
+.ivedu-stat-value  { color:#e6edf3; font-weight:600; font-size:0.85rem; }
+.ivedu-stat-label  { color:#e6edf3; font-size:1rem; }
+.ivedu-muted       { color:#7d8590; }
+.ivedu-legend-line { height:2px; }
+.ivedu-canvas      { max-height:320px; display:block; }
+.ivedu-callout     { background:#1f2937; border:1px solid #374151; }
+.ivedu-callout-title { color:#fbbf24; }
+.ivedu-callout-item  { color:#9ca3af; }
+.ivedu-callout-dot   { color:#6b7280; margin-right:6px; }
+
+/* ── 期權鏈 tooltip ───────────────────────────────────── */
+.ivedu-tip           { max-width:320px; pointer-events:none; border:1px solid #e5e7eb; }
+.ivedu-tip-narrow    { max-width:300px; pointer-events:none; border:1px solid #e5e7eb; }
+.ivedu-tip-head      { font-size:0.82rem; background:rgba(0,0,0,0.25); }
+.ivedu-tip-head-sm   { font-size:0.7rem;  background:rgba(0,0,0,0.25); }
+.ivedu-tip-title     { font-size:0.95rem; }
+.ivedu-tip-sub       { font-size:0.82rem; color:rgba(255,255,255,0.85); }
+.ivedu-tip-foot      { font-size:0.82rem; background:rgba(0,0,0,0.2); color:rgba(255,255,255,0.9); }
+.ivedu-tip-foot-sm   { background:rgba(0,0,0,0.2); color:rgba(255,255,255,0.9); }
+.ivedu-hover-band    { opacity:0; background:rgba(59,130,246,0.18); transition:left 0.06s, width 0.06s; }
+.ivedu-block         { display:block; }
+.ivedu-body          { font-size:0.85rem; }
+
+/* ── 名詞卡 ───────────────────────────────────────────── */
+.ivedu-gloss-card { border:1px solid #e5e7eb; border-left:4px solid transparent; }
+.ivedu-sym        { font-size:1.4rem; font-weight:700; font-style:italic; line-height:1.1; flex-shrink:0; }
+.ivedu-chip       { font-size:0.65rem; }
+.ivedu-accent-input { accent-color:#3b82f6; }
+.ivedu-icon-inline  { display:inline-block; vertical-align:middle; }
+
+/* ── IV 儀表板卡片（app/frontend/behaviors/ivAnalysis.ts 以 innerHTML 產生）──
+ * innerHTML 裡的 style 屬性一樣會被 CSP 的 style-src 擋（它走的是 HTML 解析），
+ * 所以這裡同樣抽成 class。動態色（卡片邊框、策略標籤）走 data-accent-*，
+ * 插入 DOM 後由 applyDataStyles() 以 CSSOM 套用。
+ */
+.ivdash-card {
+  border:2px solid transparent; border-radius:12px; padding:6px 4px 4px;
+  background:#fff; width:128px; cursor:pointer;
+  transition:box-shadow .15s, transform .15s; box-sizing:border-box;
+}
+.ivdash-ticker      { font-size:0.75rem; font-weight:700; color:#374151; text-align:center; margin-bottom:1px; }
+.ivdash-rank-tip    { text-align:center; margin-top:-12px; margin-bottom:2px; }
+.ivdash-tip-q       { cursor:pointer; color:#94a3b8; font-size:9px; user-select:none; }
+.ivdash-tip-q-inline{ cursor:pointer; color:#94a3b8; font-size:9px; vertical-align:middle; margin-left:2px; user-select:none; }
+.ivdash-detail      { text-align:center; font-size:10px; color:#9ca3af; margin-top:-2px; }
+.ivdash-detail-flat { text-align:center; font-size:10px; color:#9ca3af; }
+.ivdash-strat       { text-align:center; font-size:11px; font-weight:700; margin-top:3px; padding-bottom:2px; }
+.ivdash-empty       { font-size:.875rem; color:#9ca3af; padding:1rem 0; }
+.ivdash-live-dot    { font-size:0.6rem; vertical-align:middle; margin-left:3px; }
+.ivdash-sub         { font-size:0.65rem; color:#9ca3af; }
+.ivdash-tts         { background:none; border:none; cursor:pointer; padding:1px 2px; line-height:1;
+                      vertical-align:middle; display:inline-flex; align-items:center; }
+.ivdash-tts-male    { color:#3b82f6; }
+.ivdash-tts-female  { color:#ef4444; }
+.ivdash-spk-icon    { display:block; }
+
+/* ── Bull Call Spread 頁（bull_call_spreads/page_component.rb）──
+ * bcvs.md §視覺規範 v3 指定的固定色碼，原本寫在 inline style。
+ * 搬到這裡不改任何色值，只是換個承載方式（CSP style-src 收斂）。
+ *
+ * 註：這些是自訂 CSS 規則不是 Tailwind utility，所以元件端可以用
+ * "bcvs-card-#{slug}" 這種插值組名——Tailwind 掃描器的限制不適用。
+ */
+.bcvs-band-label { font-size:22px; font-weight:500; }
+.bcvs-body       { font-size:20px; color:#2A1A0E; }
+
+.bcvs-card-interval  { border-color:#97C459; }
+.bcvs-band-interval  { background:#3B6D11; color:#EAF3DE; }
+.bcvs-body-interval  { background:#EAF3DE; }
+
+.bcvs-card-naked     { border-color:#F0997B; }
+.bcvs-band-naked     { background:#993C1D; color:#FAECE7; }
+.bcvs-body-naked     { background:#FAECE7; }
+
+.bcvs-card-early-close { border-color:#EF9F27; }
+.bcvs-band-early-close { background:#854F0B; color:#FAEEDA; }
+.bcvs-body-early-close { background:#FAEEDA; }
+
+.bcvs-card-neutral   { border-color:#D1D5DB; }
+.bcvs-band-neutral   { background:#374151; color:#F3F4F6; }
+.bcvs-body-neutral   { background:#F9FAFB; }
+
+.bcvs-formula-green  { color:#3B6D11; }
+.bcvs-formula-rust   { color:#993C1D; }
+.bcvs-formula-amber  { color:#854F0B; }
+.bcvs-note           { color:#5F5E5A; font-size:20px; }
+
+/* ── 持股結構浮動面板（shared/ownership_panel_component.rb）── */
+.ownership-panel {
+  position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+  z-index:50; min-width:28rem; width:max-content;
+  max-width:min(56rem,92vw); max-height:82vh; overflow-y:auto;
+}
+/* ── IV 觀察清單的虛線分隔（iv_watchlists/index_view/symbol_row.rb）── */
+.ivw-divider { width:0; border-left:1px dashed rgba(255,255,255,0.4); }
+
+/* ── Chart.js 自訂 tooltip（behaviors/techDashOptionsCharts.ts、bullCallSpreads.ts）──
+ * 這些 tooltip 以 innerHTML 組字串再插入，其中的 style 屬性一樣會被 CSP 的
+ * style-src 擋（走的是 HTML 解析），所以改用 class。
+ */
+.tt-title      { font-weight:600; margin-bottom:2px; color:#111; }
+.tt-call       { color:#16a34a; }
+.tt-put        { color:#dc2626; }
+.tt-blue       { color:#2563eb; }
+.tt-orange     { color:#ea580c; }
+.tt-gold       { color:#ca8a04; }
+.tt-pink       { color:#db2777; }
+.tt-note-blue  { margin-top:4px; color:#2563eb; font-size:10px; }
+.tt-note-grey  { margin-top:4px; color:#6b7280; font-size:10px; }
+
+/* ── Bull Call Spread 的動態表格與說明（behaviors/bullCallSpreads.ts）── */
+.bcvs-k2-badge {
+  display:inline-block; border:1.5px solid #EF9F27; border-radius:8px;
+  background:#FDE8E8; color:#A32D2D; padding:4px 12px;
+  font-size:24px; font-weight:700;
+}
+.bcvs-note-inline { color:#5F5E5A; }
+.bcvs-loss     { color:#A32D2D; }
+.bcvs-win      { color:#3B6D11; }
+
+/* ── IV 教學的期權鏈 tooltip（behaviors/ivEducationChainTooltip.ts）── */
+.chaintip-line { display:flex; gap:4px; font-size:0.85rem; color:#6b7280; line-height:1.5; }
+.chaintip-mark { flex-shrink:0; }
+
+/* ── 歐歐分析面板標題（behaviors/momentumAnalysisPanel.ts）── */
+.ouou-h2 { font-size:1.2rem; margin-bottom:1.25rem; }
+
+/* ── 價差頁的表格 hover（bull_call_spreads / bull_put_spreads page_component）──
+ * 原本各自以 <style> 區塊內嵌。內容全是靜態 CSS、沒有任何 Ruby 插值，
+ * 沒有理由留在元件裡；搬到這裡後那兩個 <style> 區塊就不需要 nonce。
+ * bcvs.md §視覺規範 v3「表格」：資料列 hover 淡紫 #EEEDFE，transition 0.12s。
+ */
+#bcvs-chain-table tr:hover { background-color:#dbeafe; }
+.bcvs-v3-table tbody tr        { transition: background-color 0.12s ease; }
+.bcvs-v3-table tbody tr:hover  { background-color:#EEEDFE; }
+.bcvs-v3-table th {
+  border-bottom:1px solid rgba(0,0,0,0.15);
+  text-align:left; font-weight:500;
+}
+.bcvs-v3-table td, .bcvs-v3-table th { padding:4px 8px; }
+
+/* 選腳 hover/press 高亮：phase class 由 JS 依選取狀態切換——
+ * 選保護腳階段淺藍、選 CSP 腳階段淺紅，按下時加深；
+ * 已選定的列 (.bpus-selected) 不參與 hover。 */
+#bpus-chain-table.bpus-phase-protection tr[data-bpus-row]:not(.bpus-selected):hover  { background-color:#dbeafe; }
+#bpus-chain-table.bpus-phase-protection tr[data-bpus-row]:not(.bpus-selected):active { background-color:#93c5fd; }
+#bpus-chain-table.bpus-phase-csp        tr[data-bpus-row]:not(.bpus-selected):hover  { background-color:#fee2e2; }
+#bpus-chain-table.bpus-phase-csp        tr[data-bpus-row]:not(.bpus-selected):active { background-color:#fecaca; }

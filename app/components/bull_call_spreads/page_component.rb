@@ -40,7 +40,6 @@ class BullCallSpreads::PageComponent < ApplicationComponent
       render_repair_panel if @expiration && @chain_status
     end
     render_font_face_style
-    render_hover_style
     render_tooltips_script
     render_script
   end
@@ -171,12 +170,11 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   def render_underlying_summary_card
     return if @summary.blank?
 
-    div(class: "w-full sm:w-96 rounded-xl overflow-hidden border bcvs-notosans",
-        style: "border-color:#D1D5DB;") do
-      div(class: "flex items-center gap-2 px-4 py-2.5", style: "background:#374151;") do
-        span(style: "color:#F3F4F6; font-size:22px; font-weight:500;") { plain "標的摘要" }
+    div(class: "w-full sm:w-96 rounded-xl overflow-hidden border bcvs-notosans bcvs-card-neutral") do
+      div(class: "flex items-center gap-2 px-4 py-2.5 bcvs-band-neutral") do
+        span(class: "bcvs-band-label") { plain "標的摘要" }
       end
-      div(class: "p-4 space-y-1.5", style: "background:#F9FAFB; font-size:20px; color:#2A1A0E;") do
+      div(class: "p-4 space-y-1.5 bcvs-body bcvs-body-neutral") do
         render_summary_row("現價", price_change_text)
         render_summary_row("Latest Earnings", @summary[:latest_earnings] || "—", tip_key: "summary_earnings")
         render_summary_row("IV (ATM)", pct_text(@summary[:iv_atm]), tip_key: "summary_iv_atm")
@@ -400,18 +398,11 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # github.com/microsoft/fluentui-emoji），PNG 已下載進
   # app/assets/images/bcvs/，不熱連 CDN。
   CARD_SPECS = {
-    interval: {
-      band_bg: "#3B6D11", band_text: "#EAF3DE", body_bg: "#EAF3DE", border: "#97C459",
-      icon: "chart_increasing_3d.png", title: "損益區間表"
-    },
-    naked: {
-      band_bg: "#993C1D", band_text: "#FAECE7", body_bg: "#FAECE7", border: "#F0997B",
-      icon: "compass_3d.png", title: "為什麼不直接裸買 LEAPS Call？"
-    },
-    early_close: {
-      band_bg: "#854F0B", band_text: "#FAEEDA", body_bg: "#FAEEDA", border: "#EF9F27",
-      icon: "hourglass_not_done_3d.png", title: "提前平倉指引（不必等到期）"
-    }
+    # slug 對應 app/assets/tailwind/application.css 的 .bcvs-card-* / -band-* / -body-*，
+    # 色值原封不動搬過去（CSP style-src 收斂，色碼仍受 bcvs.md §視覺規範 v3 約束）。
+    interval:    { slug: "interval",    icon: "chart_increasing_3d.png",   title: "損益區間表" },
+    naked:       { slug: "naked",       icon: "compass_3d.png",            title: "為什麼不直接裸買 LEAPS Call？" },
+    early_close: { slug: "early-close", icon: "hourglass_not_done_3d.png", title: "提前平倉指引（不必等到期）" }
   }.freeze
 
   # bcvs.md §視覺規範 v3「卡片結構」：radius 12px、overflow hidden，頂部深色
@@ -420,12 +411,12 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   def render_v3_card(key, body_id:)
     spec = CARD_SPECS.fetch(key)
     div(id: "bcvs-#{key.to_s.tr("_", "-")}-card",
-        class: "rounded-xl overflow-hidden border bcvs-notosans", style: "border-color:#{spec[:border]}") do
-      div(class: "flex items-center gap-2 px-4 py-2.5", style: "background:#{spec[:band_bg]}") do
+        class: "rounded-xl overflow-hidden border bcvs-notosans bcvs-card-#{spec[:slug]}") do
+      div(class: "flex items-center gap-2 px-4 py-2.5 bcvs-band-#{spec[:slug]}") do
         img(src: helpers.asset_path("bcvs/#{spec[:icon]}"), class: "w-6 h-6", alt: "")
-        span(style: "color:#{spec[:band_text]}; font-size:22px; font-weight:500;") { plain spec[:title] }
+        span(class: "bcvs-band-label") { plain spec[:title] }
       end
-      div(id: body_id, class: "p-4 space-y-2", style: "background:#{spec[:body_bg]}; font-size:20px; color:#2A1A0E;") do
+      div(id: body_id, class: "p-4 space-y-2 bcvs-body bcvs-body-#{spec[:slug]}") do
         yield
       end
     end
@@ -436,8 +427,8 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # 虧損列紅字(#A32D2D)、損平列灰字(#5F5E5A)、獲利列綠字(#3B6D11)。
   def render_interval_table
     render_v3_card(:interval, body_id: "bcvs-interval-body") do
-      p(class: "font-mono font-semibold", style: "color:#3B6D11;") { plain "D = K1 ask − K2 bid" }
-      p(id: "bcvs-interval-formula-example", style: "color:#5F5E5A; font-size:20px;")
+      p(class: "font-mono font-semibold bcvs-formula-green") { plain "D = K1 ask − K2 bid" }
+      p(id: "bcvs-interval-formula-example", class: "bcvs-note")
       div(id: "bcvs-interval-table")
     end
   end
@@ -445,8 +436,8 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # bcvs.md §為什麼不直接裸買 LEAPS Call：對照表 + 到期損益交叉價 S*。
   def render_naked_comparison
     render_v3_card(:naked, body_id: "bcvs-naked-body") do
-      p(class: "font-mono font-semibold", style: "color:#993C1D;") { plain "S* = K2 + K2 bid" }
-      p(style: "color:#5F5E5A; font-size:20px;") { plain "到期價 < S* 時價差策略勝出，> S* 時裸買勝出" }
+      p(class: "font-mono font-semibold bcvs-formula-rust") { plain "S* = K2 + K2 bid" }
+      p(class: "bcvs-note") { plain "到期價 < S* 時價差策略勝出，> S* 時裸買勝出" }
       div(id: "bcvs-naked-comparison")
     end
   end
@@ -455,8 +446,8 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # 比例=(現值−成本)÷最大獲利。
   def render_early_close_panel
     render_v3_card(:early_close, body_id: "bcvs-early-close-body") do
-      p(class: "font-mono font-semibold", style: "color:#854F0B;") { plain "Y = (現值 − 成本) ÷ 最大獲利" }
-      p(style: "color:#5F5E5A; font-size:20px;") { plain "現值以快取 chain 保守估（K1 bid − K2 ask）；Y ≥ 80% 建議考慮獲利了結" }
+      p(class: "font-mono font-semibold bcvs-formula-amber") { plain "Y = (現值 − 成本) ÷ 最大獲利" }
+      p(class: "bcvs-note") { plain "現值以快取 chain 保守估（K1 bid − K2 ask）；Y ≥ 80% 建議考慮獲利了結" }
       div(id: "bcvs-early-close")
     end
   end
@@ -554,23 +545,23 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # （綠＝獲利類、金＝決策警示類）維持卡片視覺，但不強制 3D 圖示與嚴格結構。
   def render_notes
     div(class: "space-y-4") do
-      div(class: "rounded-xl overflow-hidden border bcvs-notosans", style: "border-color:#97C459;") do
-        div(class: "flex items-center gap-2 px-4 py-2.5", style: "background:#3B6D11;") do
+      div(class: "rounded-xl overflow-hidden border bcvs-notosans bcvs-card-interval") do
+        div(class: "flex items-center gap-2 px-4 py-2.5 bcvs-band-interval") do
           span(class: "text-[22px]") { plain "✅" }
-          span(style: "color:#EAF3DE; font-size:22px; font-weight:500;") { plain "好處" }
+          span(class: "bcvs-band-label") { plain "好處" }
         end
-        div(class: "p-4", style: "background:#EAF3DE; font-size:20px; color:#2A1A0E;") do
+        div(class: "p-4 bcvs-body bcvs-body-interval") do
           p do
             plain "成本低於裸買 call、最大損失封頂於淨成本、賣腳權利金部分對沖 theta、修復模式可壓縮虧損 LEAPS 在橫盤～小漲區間的損失。"
           end
         end
       end
-      div(class: "rounded-xl overflow-hidden border bcvs-notosans", style: "border-color:#EF9F27;") do
-        div(class: "flex items-center gap-2 px-4 py-2.5", style: "background:#854F0B;") do
+      div(class: "rounded-xl overflow-hidden border bcvs-notosans bcvs-card-early-close") do
+        div(class: "flex items-center gap-2 px-4 py-2.5 bcvs-band-early-close") do
           span(class: "text-[22px]") { plain "⚠️" }
-          span(style: "color:#FAEEDA; font-size:22px; font-weight:500;") { plain "注意事項" }
+          span(class: "bcvs-band-label") { plain "注意事項" }
         end
-        div(class: "p-4 space-y-1", style: "background:#FAEEDA; font-size:20px; color:#2A1A0E;") do
+        div(class: "p-4 space-y-1 bcvs-body bcvs-body-early-close") do
           NOTES.each { |n| p { plain n } }
         end
       end
@@ -592,7 +583,12 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # Ruby 端用 helpers.asset_path 產生，不能寫死在 Tailwind CLI 編譯的
   # application.css 裡（那份沒有 Rails asset pipeline 可用）。
   def render_font_face_style
-    style { raw <<~CSS.html_safe }
+    # 這一塊必須留在 Ruby 端：@font-face 的 src 需要 Propshaft 算出的 digest
+    # 路徑，Tailwind CLI 編譯的 application.css 沒有 Rails asset pipeline 可用。
+    #
+    # 加 nonce 讓它在 style-src 收緊後仍能套用——nonce 對 <style> 區塊有效，
+    # 對 style="..." 屬性無效，這是 style-src 收斂最容易誤解的一點。
+    style(nonce: helpers.content_security_policy_nonce) { raw <<~CSS.html_safe }
       @font-face {
         font-family: 'Noto Sans TC';
         src: url('#{helpers.asset_path("NotoSansTC-Regular-subset-v39.ttf")}') format('truetype');
@@ -608,28 +604,6 @@ class BullCallSpreads::PageComponent < ApplicationComponent
   # ---------------------------------------------------------------------------
   # 選 K1 hover 高亮（沿用 bpus 的 phase class 機制，這裡只有一個選取階段）
   # ---------------------------------------------------------------------------
-  def render_hover_style
-    style { raw <<~CSS.html_safe }
-      #bcvs-chain-table tr:hover {
-        background-color: #dbeafe;
-      }
-      /* bcvs.md §視覺規範 v3「表格」：資料列 hover 淡紫 #EEEDFE，transition 0.12s。 */
-      .bcvs-v3-table tbody tr {
-        transition: background-color 0.12s ease;
-      }
-      .bcvs-v3-table tbody tr:hover {
-        background-color: #EEEDFE;
-      }
-      .bcvs-v3-table th {
-        border-bottom: 1px solid rgba(0,0,0,0.15);
-        text-align: left;
-        font-weight: 500;
-      }
-      .bcvs-v3-table td, .bcvs-v3-table th {
-        padding: 4px 8px;
-      }
-    CSS
-  end
 
   def render_tooltips_script
     tooltips_script_js

@@ -234,7 +234,7 @@ export function init(): void {
       + '@media print{body{padding:0}}'
       + "</style>"
       + "</head><body>"
-      + `<h2 style="font-size:1.2rem;margin-bottom:1.25rem">🐱 ${symbol} 歐歐投資分析</h2>`
+      + `<h2 class="ouou-h2">🐱 ${symbol} 歐歐投資分析</h2>`
       + body.innerHTML
       + "</body></html>";
 

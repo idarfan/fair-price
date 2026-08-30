@@ -74,7 +74,7 @@ function fmtPct(val: number | null | undefined): string {
   if (val == null) return "—";
   const pct = val * 100;
   let s = `${pct.toFixed(2)}%`;
-  if (pct > 100) s += ` <span title="${SHORT_TOOLTIP}" style="cursor:help">⚠️</span>`;
+  if (pct > 100) s += ` <span title="${SHORT_TOOLTIP}" class="cursor-help">⚠️</span>`;
   return s;
 }
 
@@ -143,33 +143,35 @@ export function init(): void {
     titleEl.textContent = `${symbol} 持股結構`;
     logoImg.src = `https://assets.parqet.com/logos/symbol/${symbol}?format=jpg`;
     logoImg.alt = symbol;
-    loading.style.display = "block";
-    errorEl.style.display = "none";
-    bodyEl.style.display = "none";
-    panel.style.display = "block";
+    // 元件端改用 hidden class 表示初始隱藏（CSP style-src 收斂），
+    // 這裡跟著切 class——和 inline style 混用會讓層疊關係難判讀。
+    loading.classList.remove("hidden");
+    errorEl.classList.add("hidden");
+    bodyEl.classList.add("hidden");
+    panel.classList.remove("hidden");
 
     fetch(`/portfolio/ownership?symbol=${encodeURIComponent(symbol)}`)
       .then((r) => r.json())
       .then((raw: unknown) => {
         const data = parseOwnership(raw);
-        loading.style.display = "none";
+        loading.classList.add("hidden");
         if (data.error || (!data.summary && data.top_holders.length === 0)) {
           errorEl.textContent = "無法取得持股資料，請稍後再試";
-          errorEl.style.display = "block";
+          errorEl.classList.remove("hidden");
           return;
         }
         renderOwnershipData(data, symbol);
-        bodyEl.style.display = "block";
+        bodyEl.classList.remove("hidden");
       })
       .catch(() => {
-        loading.style.display = "none";
+        loading.classList.add("hidden");
         errorEl.textContent = "載入失敗，請檢查網路連線";
-        errorEl.style.display = "block";
+        errorEl.classList.remove("hidden");
       });
   }
 
   function closeOwnershipPanel(): void {
-    panel.style.display = "none";
+    panel.classList.add("hidden");
   }
 
   // ── 渲染 ───────────────────────────────────────────────────────

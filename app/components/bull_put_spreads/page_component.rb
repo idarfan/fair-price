@@ -30,7 +30,6 @@ class BullPutSpreads::PageComponent < ApplicationComponent
       render_chain_section if @expiration && @chain_status
       render_notes
     end
-    render_hover_style
     render_tooltips_script
     render_script
   end
@@ -399,22 +398,6 @@ class BullPutSpreads::PageComponent < ApplicationComponent
   # 哪一腳、也不知道列可以點。用 #bpus-chain-table 上的 phase class（JS 依選取
   # 狀態切換）決定 hover 顏色——選保護腳階段淺藍、選 CSP 腳階段淺紅，按下時加深；
   # 已選定的列(.bpus-selected)不參與 hover，避免選完後再滑過去顏色被蓋掉。
-  def render_hover_style
-    style { raw <<~CSS.html_safe }
-      #bpus-chain-table.bpus-phase-protection tr[data-bpus-row]:not(.bpus-selected):hover {
-        background-color: #dbeafe;
-      }
-      #bpus-chain-table.bpus-phase-protection tr[data-bpus-row]:not(.bpus-selected):active {
-        background-color: #93c5fd;
-      }
-      #bpus-chain-table.bpus-phase-csp tr[data-bpus-row]:not(.bpus-selected):hover {
-        background-color: #fee2e2;
-      }
-      #bpus-chain-table.bpus-phase-csp tr[data-bpus-row]:not(.bpus-selected):active {
-        background-color: #fecaca;
-      }
-    CSS
-  end
 
   # 欄位教學三層互動（沿用 LEAPS leaps-column-tooltips-spec.md 同一套 hover
   # tooltip + 點擊聚光 popover 機制，見 LeapsRecommendations::PageComponent

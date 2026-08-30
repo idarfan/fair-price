@@ -47,10 +47,10 @@ class IvWatchlists::IndexView::SymbolRow < ApplicationComponent
         end
         div(class: "text-gray-500 text-sm text-center py-4 hidden", data: { iv_chart_target: "loading-#{@item.id}" }) { "載入中..." }
         div(id: "charts-wrap-#{@item.id}", class: "relative") do
-          div(id: "ch-line-#{@item.id}", class: "absolute top-0 bottom-0 hidden pointer-events-none z-20",
-              style: "width:0; border-left:1px dashed rgba(255,255,255,0.4);")
-          div(class: "relative", style: "height:280px") { canvas(id: "chart-iv-#{@item.id}") }
-          div(class: "relative mt-3", style: "height:120px") { canvas(id: "chart-skew-#{@item.id}") }
+          div(id: "ch-line-#{@item.id}",
+              class: "absolute top-0 bottom-0 hidden pointer-events-none z-20 ivw-divider")
+          div(class: "relative h-[280px]") { canvas(id: "chart-iv-#{@item.id}") }
+          div(class: "relative mt-3 h-[120px]") { canvas(id: "chart-skew-#{@item.id}") }
         end
         div(class: "flex gap-4 mt-2 text-xs text-gray-500") do
           span { "🔴 Put IV" }

@@ -72,8 +72,8 @@ function setupImageColumnTooltip(opts: ImageTooltipOptions): void {
     if (sm) sm.textContent = col.summary;
     if (bl) {
       bl.innerHTML = col.bullets.map((b) =>
-        '<p style="display:flex;gap:4px;font-size:0.85rem;color:#6b7280;line-height:1.5">'
-        + `<span style="color:${col.color};flex-shrink:0">›</span>${b}</p>`,
+        '<p class="chaintip-line">'
+        + `<span class="chaintip-mark" data-accent-color="${col.color}">›</span>${b}</p>`,
       ).join("");
     }
   }

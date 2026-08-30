@@ -90,7 +90,7 @@ class FairValue::AnalystConsensusComponent < ApplicationComponent
     div(class: "space-y-1") do
       div(class: "flex h-3 rounded-full overflow-hidden gap-0.5") do
         segments.each do |seg|
-          div(class: "#{seg[:color]} rounded-sm", style: "width: #{seg[:pct]}%",
+          div(class: "#{seg[:color]} rounded-sm", data_bar_pct: seg[:pct],
               title: "#{seg[:label]}: #{seg[:count]}")
         end
       end

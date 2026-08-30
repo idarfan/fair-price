@@ -10,7 +10,7 @@ class IvAnalysis::WatchlistComponent < ApplicationComponent
           type:  "button",
           class: "inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg shadow-sm transition-colors"
         ) do
-          span(style: "font-size:1rem; line-height:1") { plain "↻" }
+          span(class: "text-[1rem] leading-none") { plain "↻" }
           plain "即時重新整理"
         end
       end

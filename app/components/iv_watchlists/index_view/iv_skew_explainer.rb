@@ -64,7 +64,7 @@ class IvWatchlists::IndexView::IvSkewExplainer < ApplicationComponent
           span(class: "text-[22px] font-semibold text-gray-800") { "IV Skew 完整說明" }
           span(class: "text-[22px] text-gray-400 font-normal ml-1") { "— 是什麼、如何解讀、CSP 開倉時機" }
         end
-        span(class: "text-gray-400 text-[22px] transition-transform duration-200 group-open/exp:rotate-180", style: "display:inline-block") { "▼" }
+        span(class: "text-gray-400 text-[22px] transition-transform duration-200 group-open/exp:rotate-180 inline-block") { "▼" }
       end
       div(class: "px-5 py-5 space-y-6 bg-white") do
         render_what_is_skew

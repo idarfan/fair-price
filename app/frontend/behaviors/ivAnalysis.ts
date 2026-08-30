@@ -4,6 +4,7 @@
  * 稽核 H-3：原本內嵌在 app/components/iv_analysis/page_component.rb 的 heredoc 裡。
  */
 
+import { applyDataStyles } from "./shared/dataStyles";
 import { closestFrom, csrfToken } from "./shared/dom";
 import { arr, isRecord, numeric, str } from "./shared/json";
 
@@ -125,10 +126,10 @@ function strategyInfo(ivr: number | null, skewRank: number | null): { text: stri
 }
 
 function ttsIcons(text: string): string {
-  const spk = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="11" height="11" style="display:block"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 1.414 3 3 0 010 4.243 1 1 0 01-1.414-1.414 1 1 0 000-1.415 1 1 0 010-1.414z"/></svg>';
-  const s = "background:none;border:none;cursor:pointer;padding:1px 2px;line-height:1;vertical-align:middle;display:inline-flex;align-items:center";
-  return `<button class="card-tts-btn" data-tts-text="${text}" data-tts-gender="male" style="color:#3b82f6;${s}" title="男聲朗讀">${spk}</button>`
-    + `<button class="card-tts-btn" data-tts-text="${text}" data-tts-gender="female" style="color:#ef4444;${s}" title="女聲朗讀">${spk}</button>`;
+  const spk = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="11" height="11" class="ivdash-spk-icon"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 1.414 3 3 0 010 4.243 1 1 0 01-1.414-1.414 1 1 0 000-1.415 1 1 0 010-1.414z"/></svg>';
+  // 樣式改走 class：innerHTML 裡的 style 屬性同樣受 CSP style-src 管轄。
+  return `<button class="card-tts-btn ivdash-tts ivdash-tts-male" data-tts-text="${text}" data-tts-gender="male" title="男聲朗讀">${spk}</button>`
+    + `<button class="card-tts-btn ivdash-tts ivdash-tts-female" data-tts-text="${text}" data-tts-gender="female" title="女聲朗讀">${spk}</button>`;
 }
 
 function pct1(v: number | undefined): string | null {
@@ -180,8 +181,8 @@ function buildGaugeCard(item: WatchlistItem, mode: string): string {
     + ` text-anchor="middle" font-size="15" font-weight="700" fill="${needleColor}">`
     + `${rank !== null ? rank.toFixed(1) : "—"}</text>`;
   const rankTipHtml = !isIvr
-    ? '<div style="text-align:center;margin-top:-12px;margin-bottom:2px">'
-      + '<span data-tip-key="rank" style="cursor:pointer;color:#94a3b8;font-size:9px;user-select:none">❓ Skew Rank</span>'
+    ? '<div class="ivdash-rank-tip">'
+      + '<span data-tip-key="rank" class="ivdash-tip-q">❓ Skew Rank</span>'
       + `${ttsIcons("Skew Rank")}</div>`
     : "";
 
@@ -195,36 +196,33 @@ function buildGaugeCard(item: WatchlistItem, mode: string): string {
   if (isIvr) {
     const atmPct = pct1(item.latest_atm_iv);
     const atmStr = atmPct !== null ? `ATM IV: ${atmPct}` : (rank === null ? "尚無資料" : "");
-    detailLine = `<div style="text-align:center;font-size:10px;color:#9ca3af;margin-top:-2px">${atmStr}${ttsIcons("ATM IV")}</div>`;
+    detailLine = `<div class="ivdash-detail">${atmStr}${ttsIcons("ATM IV")}</div>`;
   } else {
     const putStr = pct1(item.put_iv_025) ?? "—";
     const callStr = pct1(item.call_iv_025) ?? "—";
     const skewStr = item.skew_pts !== undefined
       ? `${item.skew_pts >= 0 ? "+" : ""}${item.skew_pts.toFixed(1)} pts` : "—";
-    const tipStyle = "cursor:pointer;color:#94a3b8;font-size:9px;vertical-align:middle;margin-left:2px;user-select:none";
     detailLine =
-      '<div style="text-align:center;font-size:10px;color:#9ca3af;margin-top:-2px">'
+      '<div class="ivdash-detail">'
         + `Put: ${putStr}`
-        + `<span data-tip-key="put" style="${tipStyle}">❓</span>${ttsIcons("Put")}`
+        + `<span data-tip-key="put" class="ivdash-tip-q-inline">❓</span>${ttsIcons("Put")}`
         + ` | Call: ${callStr}`
-        + `<span data-tip-key="call" style="${tipStyle}">❓</span>${ttsIcons("Call")}`
+        + `<span data-tip-key="call" class="ivdash-tip-q-inline">❓</span>${ttsIcons("Call")}`
       + "</div>"
-      + '<div style="text-align:center;font-size:10px;color:#9ca3af">'
+      + '<div class="ivdash-detail-flat">'
         + `Skew: ${skewStr}`
-        + `<span data-tip-key="skew" style="${tipStyle}">❓</span>${ttsIcons("Skew")}`
+        + `<span data-tip-key="skew" class="ivdash-tip-q-inline">❓</span>${ttsIcons("Skew")}`
       + "</div>";
   }
 
   // 策略標籤
   const strat = strategyInfo(item.ivr_1y ?? null, item.skew_rank ?? null);
-  const stratDiv = `<div style="text-align:center;font-size:11px;font-weight:700;color:${strat.color};margin-top:3px;padding-bottom:2px">${strat.text}</div>`;
+  // 策略色與邊框色由資料決定，走 data-accent-*，插入 DOM 後由 applyDataStyles()
+  // 以 CSSOM 套用（CSP 擋的是 HTML 的 style 屬性，不是 CSSOM 賦值）。
+  const stratDiv = `<div class="ivdash-strat" data-accent-color="${strat.color}">${strat.text}</div>`;
 
-  return `<div class="iv-dash-card" data-ticker="${item.ticker}" style="`
-    + `border:2px solid ${borderColor};border-radius:12px;padding:6px 4px 4px;`
-    + "background:#fff;width:128px;cursor:pointer;transition:box-shadow .15s,transform .15s;"
-    + 'box-sizing:border-box">'
-    + '<div style="font-size:0.75rem;font-weight:700;color:#374151;text-align:center;margin-bottom:1px">'
-    + `${item.ticker}</div>`
+  return `<div class="iv-dash-card ivdash-card" data-ticker="${item.ticker}" data-accent-border="${borderColor}">`
+    + `<div class="ivdash-ticker">${item.ticker}</div>`
     + `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${svg}</svg>`
     + rankTipHtml
     + detailLine
@@ -611,7 +609,7 @@ export function init(): void {
     }
 
     if (!list.length) {
-      cardsEl.innerHTML = '<span style="font-size:.875rem;color:#9ca3af;padding:1rem 0">查詢後自動加入 Watchlist</span>';
+      cardsEl.innerHTML = '<span class="ivdash-empty">查詢後自動加入 Watchlist</span>';
       summaryEl.classList.add("hidden");
       return;
     }
@@ -631,6 +629,8 @@ export function init(): void {
       (rankOf(b, isIvr) ?? -1) - (rankOf(a, isIvr) ?? -1));
 
     cardsEl.innerHTML = sorted.map((item) => buildGaugeCard(item, mode)).join("");
+    // 卡片是 innerHTML 產生的，data-accent-* 要在插入後才套得上。
+    applyDataStyles(cardsEl);
 
     cardsEl.querySelectorAll<HTMLElement>(".iv-dash-card").forEach((card) => {
       card.addEventListener("click", () => {
@@ -733,10 +733,10 @@ export function init(): void {
       let intrinsicCell: string, timeCell: string;
       if (item.intrinsic_value !== undefined) {
         const liveTag = item.is_live
-          ? '<span title="即時報價" style="font-size:0.6rem;vertical-align:middle;margin-left:3px">🟢</span>'
-          : '<span title="使用快取值，點重新整理取得即時數據" style="font-size:0.6rem;vertical-align:middle;margin-left:3px">⚪</span>';
+          ? '<span title="即時報價" class="ivdash-live-dot">🟢</span>'
+          : '<span title="使用快取值，點重新整理取得即時數據" class="ivdash-live-dot">⚪</span>';
         const sub = item.query_label
-          ? `<br><span style="font-size:0.65rem;color:#9ca3af">${item.query_label}${liveTag}</span>`
+          ? `<br><span class="ivdash-sub">${item.query_label}${liveTag}</span>`
           : "";
         intrinsicCell = '<td class="px-4 py-3 text-right">'
           + `<span class="wl-intrinsic-val font-mono text-sm ${item.intrinsic_value > 0 ? "text-blue-600" : "text-gray-400"}">`

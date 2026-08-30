@@ -8,6 +8,7 @@
  * 與 Bull Put 共用的小工具已抽到 shared/spreadHelpers（稽核 M-6）。
  */
 
+import { applyDataStyles } from "./shared/dataStyles";
 import { createSpreadHelpers } from "./shared/spreadHelpers";
 import { isRecord, num, str } from "./shared/json";
 
@@ -263,7 +264,7 @@ export function init(root: HTMLElement): void {
     // bcvs.md §字級鐵則 v4：Step 5 標籤 20px、主數字 24px 粗體。
     // K2 徽章（v4 待辦）：橘色邊框 #EF9F27 1.5px、圓角 8px、淡紅底
     // #FDE8E8、紅字 #A32D2D，內距 4px 12px，字級維持 24px 粗體。
-    const k2Badge = `<span style="display:inline-block; border:1.5px solid #EF9F27; border-radius:8px; background:#FDE8E8; color:#A32D2D; padding:4px 12px; font-size:24px; font-weight:700;">$${fmt(tab.k2)}</span>`;
+    const k2Badge = `<span class="bcvs-k2-badge">$${fmt(tab.k2)}</span>`;
     grid.innerHTML =
       `<div><dt class="text-[20px] text-gray-500">K2</dt><dd class="mt-1">${k2Badge}</dd></div>`
       + `<div><dt class="text-[20px] text-gray-500">淨成本 debit</dt><dd class="text-[24px] font-bold">$${fmt(tab.debit)}<span class="text-[20px] font-normal">${debitMidHtml}</span></dd></div>`
@@ -330,9 +331,11 @@ export function init(root: HTMLElement): void {
       + '<th>到期股價區間</th><th>結果</th><th class="text-right">金額（每口）</th>'
       + "</tr></thead><tbody>"
       + rows.map((r) =>
-        `<tr style="color:${r.color}"><td>${r.range}</td><td>${r.result}</td><td class="text-right">${r.amount}</td></tr>`,
+        `<tr data-accent-color="${r.color}"><td>${r.range}</td><td>${r.result}</td><td class="text-right">${r.amount}</td></tr>`,
       ).join("")
       + "</tbody></table>";
+    // 表格是 innerHTML 產生的，data-accent-* 要在插入後才套得上。
+    applyDataStyles(el);
   }
 
   // ── 裸買 LEAPS 對照表（bcvs.md §為什麼不直接裸買）─────────────────────
@@ -351,12 +354,14 @@ export function init(root: HTMLElement): void {
       '<table class="bcvs-v3-table w-full"><thead><tr>'
       + '<th>項目</th><th class="text-right">裸買 K1 Call</th><th class="text-right">價差（K1/K2）</th></tr></thead><tbody>'
       + `<tr><td>每口成本</td><td class="text-right">${fmtLots(tab.naked_cost, lots)}</td><td class="text-right">${fmtLots(tab.cost_per_contract, lots)}</td></tr>`
-      + `<tr><td>最大損失</td><td class="text-right" style="color:#A32D2D">${fmtLots(tab.naked_cost, lots)}</td><td class="text-right" style="color:#3B6D11">${fmtLots(tab.max_loss, lots)}（金額小得多）</td></tr>`
-      + `<tr><td>損益兩平</td><td class="text-right">$${fmt(tab.naked_breakeven)}</td><td class="text-right" style="color:#3B6D11">$${fmt(tab.breakeven)}（低得多）</td></tr>`
-      + `<tr><td>最大獲利</td><td class="text-right" style="color:#3B6D11">無上限</td><td class="text-right">${fmtLots(tab.max_profit, lots)}（封頂）</td></tr>`
+      + `<tr><td>最大損失</td><td class="text-right bcvs-loss">${fmtLots(tab.naked_cost, lots)}</td><td class="text-right bcvs-win">${fmtLots(tab.max_loss, lots)}（金額小得多）</td></tr>`
+      + `<tr><td>損益兩平</td><td class="text-right">$${fmt(tab.naked_breakeven)}</td><td class="text-right bcvs-win">$${fmt(tab.breakeven)}（低得多）</td></tr>`
+      + `<tr><td>最大獲利</td><td class="text-right bcvs-win">無上限</td><td class="text-right">${fmtLots(tab.max_profit, lots)}（封頂）</td></tr>`
       + "</tbody></table>"
-      + `<p class="mt-2" style="color:#5F5E5A; font-size:20px;">本次範例：S* = $${fmt(tab.k2)} + $${fmt(sub(tab.s_star, tab.k2))} = $${fmt(tab.s_star)}</p>`
+      + `<p class="mt-2 bcvs-note">本次範例：S* = $${fmt(tab.k2)} + $${fmt(sub(tab.s_star, tab.k2))} = $${fmt(tab.s_star)}</p>`
       + `<p class="mt-1">${priceNote}</p>`;
+    // 表格是 innerHTML 產生的，data-accent-* 要在插入後才套得上。
+    applyDataStyles(el);
   }
 
   // ── 提前平倉指引（bcvs.md §提前平倉指引）───────────────────────────────
@@ -367,24 +372,26 @@ export function init(root: HTMLElement): void {
     if (!el || tab.warning === "invalid_width") { if (el) el.innerHTML = ""; return; }
 
     if (tab.closeout_value === undefined) {
-      el.innerHTML = '<p style="color:#5F5E5A">需要 K1 現價 bid 才能估算平倉可收回金額。</p>';
+      el.innerHTML = '<p class="bcvs-note-inline">需要 K1 現價 bid 才能估算平倉可收回金額。</p>';
       return;
     }
 
     const pct = tab.realized_pct;
     const suggestHtml = (typeof pct === "number" && pct >= 80)
-      ? `<p class="font-semibold mt-2" style="color:#3B6D11">✅ 已實現 ${pct}%，達 80% 閾值，建議考慮獲利了結——剩餘部分要再抱數月，報酬/時間比會急遽變差，還多扛提前指派與回檔風險。</p>`
+      ? `<p class="font-semibold mt-2 bcvs-win">✅ 已實現 ${pct}%，達 80% 閾值，建議考慮獲利了結——剩餘部分要再抱數月，報酬/時間比會急遽變差，還多扛提前指派與回檔風險。</p>`
       : "";
     const profitColor = (typeof tab.closeout_profit === "number" && tab.closeout_profit >= 0)
       ? "#3B6D11" : "#A32D2D";
 
     el.innerHTML =
       `<p>現在平倉可收回（毛額） <strong>${fmtLots(tab.closeout_value, lots)}</strong>（收回上限 ${fmtLots(tab.spread_max_value, lots)}）</p>`
-      + `<p>等於獲利（淨額，收回−成本） <strong style="color:${profitColor}">${fmtLots(tab.closeout_profit, lots)}</strong>（獲利上限 ${fmtLots(tab.max_profit, lots)}）</p>`
+      + `<p>等於獲利（淨額，收回−成本） <strong data-accent-color="${profitColor}">${fmtLots(tab.closeout_profit, lots)}</strong>（獲利上限 ${fmtLots(tab.max_profit, lots)}）</p>`
       + `<p>已實現獲利比例 Y = <strong>${typeof pct === "number" ? `${pct}%` : "—"}</strong></p>`
-      + `<p class="mt-1" style="color:#5F5E5A; font-size:20px;">本次範例：Y = ($${fmt(tab.closeout_value)} − $${fmt(tab.cost_per_contract)}) ÷ $${fmt(tab.max_profit)} = ${typeof pct === "number" ? `${pct}%` : "—"}</p>`
+      + `<p class="mt-1 bcvs-note">本次範例：Y = ($${fmt(tab.closeout_value)} − $${fmt(tab.cost_per_contract)}) ÷ $${fmt(tab.max_profit)} = ${typeof pct === "number" ? `${pct}%` : "—"}</p>`
       + suggestHtml
-      + '<p class="mt-2" style="color:#5F5E5A">平倉一律組合單兩腳同出。</p>';
+      + '<p class="mt-2 bcvs-note-inline">平倉一律組合單兩腳同出。</p>';
+    // 表格是 innerHTML 產生的，data-accent-* 要在插入後才套得上。
+    applyDataStyles(el);
   }
 
   document.querySelectorAll("[data-bcvs-recommend-tab]").forEach((btn) => {

@@ -13,12 +13,11 @@ class Shared::OwnershipPanelComponent < ApplicationComponent
   private
 
   def render_panel
+    # 面板的定位與尺寸原本是 inline style，改用具名 class（CSP style-src 收斂）。
+    # 定義在 app/assets/tailwind/application.css 的 .ownership-panel。
+    # hidden 對應原本的 display:none，由 behavior 切換。
     div(id:    "ownership-panel",
-        style: "display:none; position:fixed; left:50%; top:50%; " \
-               "transform:translate(-50%,-50%); z-index:50; " \
-               "min-width:28rem; width:max-content; max-width:min(56rem,92vw); " \
-               "max-height:82vh; overflow-y:auto;",
-        class: "bg-white rounded-2xl shadow-2xl border-2 border-orange-200") do
+        class: "ownership-panel hidden bg-white rounded-2xl shadow-2xl border-2 border-orange-200") do
       div(id:    "ownership-titlebar",
           class: "flex items-center justify-between px-4 py-3 border-b border-gray-100 " \
                  "cursor-move select-none sticky top-0 bg-white rounded-t-2xl") do
@@ -37,11 +36,11 @@ class Shared::OwnershipPanelComponent < ApplicationComponent
       end
 
       div(class: "p-4") do
-        div(id: "ownership-loading", style: "display:none",
-            class: "py-6 text-center text-sm text-gray-400 animate-pulse") { plain("載入中…") }
-        div(id: "ownership-error", style: "display:none",
-            class: "py-4 text-center text-sm text-red-400")
-        div(id: "ownership-body", style: "display:none", class: "space-y-4") do
+        div(id: "ownership-loading",
+            class: "hidden py-6 text-center text-sm text-gray-400 animate-pulse") { plain("載入中…") }
+        div(id: "ownership-error",
+            class: "hidden py-4 text-center text-sm text-red-400")
+        div(id: "ownership-body", class: "hidden space-y-4") do
           div(id: "ownership-summary", class: "grid grid-cols-2 gap-2")
           div do
             p(class: "text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2") { plain("主要機構持有人") }

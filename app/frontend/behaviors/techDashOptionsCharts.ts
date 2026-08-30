@@ -232,11 +232,11 @@ export function init(root: HTMLElement): void {
               const fmt = (v: number | null): string =>
                 v != null ? `$${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "N/A";
               tipEl.innerHTML =
-                `<div style="font-weight:600;margin-bottom:2px;color:#111;">Strike: ${titleOf(tip)}</div>`
-                + `<div style="color:#16a34a;">Call: ${fmt(callVal)}</div>`
-                + `<div style="color:#dc2626;">Put: ${fmt(putVal)}</div>`
+                `<div class="tt-title">Strike: ${titleOf(tip)}</div>`
+                + `<div class="tt-call">Call: ${fmt(callVal)}</div>`
+                + `<div class="tt-put">Put: ${fmt(putVal)}</div>`
                 + (d.max_pain_strike !== undefined
-                  ? `<div style="margin-top:4px;color:#2563eb;font-size:10px;">Max Pain: $${d.max_pain_strike}</div>`
+                  ? `<div class="tt-note-blue">Max Pain: $${d.max_pain_strike}</div>`
                   : "");
             },
           },
@@ -291,9 +291,9 @@ export function init(root: HTMLElement): void {
               const fmt = (v: number | null): string =>
                 v != null ? Number(Math.abs(v)).toLocaleString("en-US") : "N/A";
               tipEl.innerHTML =
-                `<div style="font-weight:600;margin-bottom:2px;color:#111;">Strike: ${titleOf(tip)}</div>`
-                + `<div style="color:#2563eb;">${isVolume ? "Call Vol: " : "Call OI: "}${fmt(callOI)}</div>`
-                + `<div style="color:#ea580c;">${isVolume ? "Put Vol: " : "Put OI: "}${fmt(putOI)}</div>`;
+                `<div class="tt-title">Strike: ${titleOf(tip)}</div>`
+                + `<div class="tt-blue">${isVolume ? "Call Vol: " : "Call OI: "}${fmt(callOI)}</div>`
+                + `<div class="tt-orange">${isVolume ? "Put Vol: " : "Put OI: "}${fmt(putOI)}</div>`;
             },
           },
         },
@@ -347,10 +347,10 @@ export function init(root: HTMLElement): void {
               });
               const ivText = iv !== null ? `${(iv as number).toFixed(2)}%` : "N/A";
               tipEl.innerHTML =
-                `<div style="font-weight:600;margin-bottom:2px;color:#111;">Strike: ${titleOf(tip)}</div>`
-                + `<div style="color:#ca8a04;">IV: ${ivText}</div>`
+                `<div class="tt-title">Strike: ${titleOf(tip)}</div>`
+                + `<div class="tt-gold">IV: ${ivText}</div>`
                 + (d.last_price !== undefined
-                  ? `<div style="margin-top:4px;color:#6b7280;font-size:10px;">Last: $${d.last_price.toFixed(2)}</div>`
+                  ? `<div class="tt-note-grey">Last: $${d.last_price.toFixed(2)}</div>`
                   : "");
             },
           },
@@ -410,9 +410,9 @@ export function init(root: HTMLElement): void {
               const mpVal = rawWhereLabel(tip, "Max Pain");
               const lpVal = rawWhereLabel(tip, "Last");
               tipEl.innerHTML =
-                `<div style="font-weight:600;margin-bottom:2px;color:#111;">${titleOf(tip)}</div>`
-                + `<div style="color:#2563eb;">Max Pain: $${mpVal != null ? mpVal.toFixed(2) : "N/A"}</div>`
-                + (lpVal != null ? `<div style="color:#db2777;">Last Price: $${lpVal.toFixed(2)}</div>` : "");
+                `<div class="tt-title">${titleOf(tip)}</div>`
+                + `<div class="tt-blue">Max Pain: $${mpVal != null ? mpVal.toFixed(2) : "N/A"}</div>`
+                + (lpVal != null ? `<div class="tt-pink">Last Price: $${lpVal.toFixed(2)}</div>` : "");
             },
           },
         },

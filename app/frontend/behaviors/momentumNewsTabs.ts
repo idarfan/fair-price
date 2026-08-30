@@ -71,7 +71,7 @@ export function init(): void {
              + ` src="https://assets.parqet.com/logos/symbol/${symbol}?format=jpg"`
              + ` data-fallback="https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/${symbol}.png"`
              + ` alt="${symbol}">`
-        + `<span class="tab-logo-fallback absolute inset-0 rounded-full bg-gray-800 text-white text-[8px] font-bold items-center justify-center" style="display:none">${initials}</span>`
+        + `<span class="tab-logo-fallback hidden absolute inset-0 rounded-full bg-gray-800 text-white text-[8px] font-bold items-center justify-center">${initials}</span>`
       + "</span>"
       + `<span>${symbol}</span>`;
 
@@ -82,9 +82,13 @@ export function init(): void {
         if (fb && logo.src !== fb) {
           logo.src = fb;
         } else {
-          logo.style.display = "none";
+          // 與 shared/logoFallback 相同的做法：改切 class，不混用 inline style。
+          logo.classList.add("hidden");
           const next = logo.nextElementSibling;
-          if (next instanceof HTMLElement) next.style.display = "flex";
+          if (next instanceof HTMLElement) {
+            next.classList.remove("hidden");
+            next.classList.add("flex");
+          }
         }
       });
     }
