@@ -1,5 +1,88 @@
 # 專案教訓紀錄
 
+## 2026-08-30 — CSP style-src 收斂
+
+### 教訓 A：nonce 對 style 屬性無效，只對 `<style>` 區塊有效
+
+script-src 收斂時的做法（把唯一的內嵌 script 加 nonce）在 style-src **完全不適用**。
+`style="..."` 屬性沒有辦法用 nonce 放行，只能真的移除。
+
+三種替代承載：
+```
+靜態樣式  → CSS class
+動態數值  → data attribute + CSSOM（el.style.width = ...）
+            CSSOM 賦值不受 CSP 限制，被擋的只有「HTML 屬性」這個形式
+<style>   → nonce（有效）
+```
+
+innerHTML 組出來的字串裡的 `style="..."` **一樣會被擋**（走的是 HTML 解析），
+不要以為 JS 產生的就沒事。
+
+### 教訓 B：`after_action` 設 Report-Only 標頭會關掉主 CSP
+
+```ruby
+# ActionDispatch::ContentSecurityPolicy::Middleware
+return response if policy_present?(headers)
+
+def policy_present?(headers)
+  headers[CONTENT_SECURITY_POLICY] || headers[CONTENT_SECURITY_POLICY_REPORT_ONLY]
+end
+```
+
+判斷是「**或**」。controller 的 `after_action` 比 middleware 早跑，先放上
+Report-Only 標頭就會讓 middleware 認定政策已存在，**整個跳過主政策**——
+主 CSP 標頭直接消失，而且沒有任何錯誤訊息。
+
+要另外送 Report-Only 標頭，必須用 middleware 並 `insert_before` 掛在
+Rails CSP middleware 外層（回應階段才會在它之後執行）。
+
+也不要用 `config.content_security_policy_report_only`——那會讓**整份**政策
+變成報告模式，連已經收緊的指令也一起失去強制力。過渡期不該用安全倒退
+換取觀測能力。
+
+### 教訓 C：Playwright 的 console 抓不到 CSP 違規
+
+CSP 違規走 CDP 的 `Log.entryAdded`，Playwright 的 `page.on('console')` 只收
+`Runtime.consoleAPICalled`，**收不到瀏覽器產生的安全訊息**。
+
+可靠的量測方式（由好到差）：
+```
+1. 直接解析伺服器送出的 HTML —— 最精確，DOM 裡的 style 屬性有些是
+   JS 用 CSSOM 設的，那些 CSP 根本不管
+2. 在頁面載入「之前」掛 securitypolicyviolation 事件監聽
+   （注意：用 iframe 做這件事會被 frame-ancestors 擋掉）
+3. console —— 最不可靠
+```
+
+### 教訓 D：逐行的字串替換會製造重複的 hash key，而且是靜默的
+
+`class:` 與 `style:` 分屬不同行時，把 `style:` 換成 `class:` 會讓同一個呼叫
+有兩個 `class` 鍵。Ruby 的 hash 是後者覆蓋前者，**原本的 class 整串消失**，
+不會報錯——是截圖比對才發現卡片內距不見了。
+
+**定位重複 key 用 Ruby 自己的警告，不要自己寫正規式：**
+```bash
+ruby -w -c path/to/component.rb 2>&1 | grep duplicated
+# → "key :class is duplicated and overwritten on line N"
+```
+自己寫的括號深度追蹤會把相鄰的 span 誤判成同一個呼叫——我那次誤判
+還把某個 span 的 class 整個吃掉。
+
+改完 Phlex 元件後跑一次全掃描：
+```ruby
+Dir["app/components/**/*.rb"].each { |f| ... `ruby -w -c #{f}` ... }
+```
+
+### 教訓 E：Tailwind 掃描器的限制只適用於它產生的 utility
+
+`text-[#{px}px]` 這種插值組出來的 **Tailwind utility** 不會被編進 CSS
+（掃描器只認原始碼裡出現過的完整字串）。
+
+但**自己寫在 application.css 的 class 沒有這個問題**——
+`"bcvs-card-#{spec[:slug]}"` 完全沒問題，因為那條規則永遠存在於 CSS 裡。
+這個區別在決定「要用 Tailwind arbitrary value 還是自訂 class」時很關鍵。
+
+
 ## 2026-08-30 — 靜態稽核工具的「全部修掉」是錯誤目標
 
 ### 教訓 A：修之前先問「這個驗證會不會執行」

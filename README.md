@@ -1,5 +1,68 @@
 # FairPrice
 
+### 2026-08-30（六）— CSP style-src 收斂完成，內嵌樣式歸零
+
+`style-src` 拿掉 `'unsafe_inline'`。18 頁的伺服器 HTML 內嵌樣式從 **575 → 0**。
+
+#### 為什麼這條比 script-src 難
+
+**CSP nonce 對 `style="..."` 屬性無效，只對 `<style>` 區塊有效。**
+所以 script-src 用的那招（把唯一的內嵌 script 加 nonce）在這裡完全不管用，
+內嵌樣式必須真的移除。收斂後的三種承載方式：
+
+| 樣式類型 | 承載方式 |
+|---|---|
+| 靜態 | CSS class（Tailwind utility 或 `app/assets/tailwind/application.css`）|
+| 動態數值 | data attribute + CSSOM（`shared/dataStyles.ts`）—— **CSSOM 賦值不受 CSP 限制** |
+| `<style>` 區塊 | nonce（BCVS 的 `@font-face`，需要 Propshaft digest 路徑）|
+
+#### 範圍怎麼縮小的
+
+原本 1071 處。`CspLessonsController` 保留 `unsafe_inline`——期權小學堂是
+`send_file` 的靜態教材頁（約 840 處內嵌樣式），**零使用者輸入**，攻擊者無法注入。
+分區後只剩 219 處要處理。
+
+#### 量測方式
+
+一開始想靠 Playwright 的 console 抓 CSP 違規，**抓不到**——那些訊息走 CDP 的
+`Log.entryAdded`，不是 `Runtime.consoleAPICalled`。改成直接解析伺服器送出的
+HTML，反而更精確（DOM 裡的 `style` 屬性有些是 JS 用 CSSOM 設的，那些 CSP 不管）。
+
+過渡期用一份獨立的 report-only 標頭量測，主政策完全不動——
+**刻意不用 `config.content_security_policy_report_only`**，那會讓整份政策
+（含已收緊的 `script-src`）都失去強制力。
+
+#### 兩個踩過的坑
+
+**1. `after_action` 設 Report-Only 標頭會讓主 CSP 標頭整個消失**
+
+`ActionDispatch::ContentSecurityPolicy::Middleware` 開頭是
+`return response if policy_present?(headers)`，而 `policy_present?` 判斷的是
+「CSP **或** CSP-Report-Only 任一存在」。controller 的 `after_action` 比
+middleware 早跑，先放上 Report-Only 就讓它認定政策已存在而跳過主政策——
+為了量測反而把真正的 CSP 關掉，**而且沒有任何錯誤訊息**。
+改成 middleware 並 `insert_before`，回應階段才會在它之後執行。
+
+**2. 逐行替換腳本造成 `class:` 重複，靜默吃掉樣式**
+
+`class:` 與 `style:` 分屬不同行時，腳本把 `style:` 直接換成 `class:`，
+同一個呼叫就有兩個 `class` 鍵——Ruby 的 hash 後者覆蓋前者，`px-4 py-3`
+被靜默吃掉，兩張公式拆解卡的內距整個消失（截圖比對才發現）。
+
+修正後改用 **`ruby -w -c` 的 `key :class is duplicated` 警告**來定位，
+精確到行號。自己寫的正規式區塊偵測會把相鄰 span 誤判成同一個呼叫——
+那次誤判還一度把某個 span 的 class 整個吃掉。
+
+#### 驗證
+
+- 18 頁伺服器 HTML：style 屬性 **0**、`<style>` 區塊 1 且帶 nonce、未授權區塊 0
+- BCVS 的 `@font-face` 經 nonce 生效（`fontFaceRuleCount` 1、Noto Sans TC 已套用）
+- IV 教學面板逐一比對 computed style：`#e8f5a3` / `#7ecaf5` / `#b0bec5` /
+  `#ffb74d` / `#58a6ff` / `#112240`、TTS 藍紅與 `margin-left: 20px` 全部精確吻合
+- 字級按鈕改動前後 computed 值完全一致（10/12/14/16/18px、行高 1.2×）
+- 截圖確認 `/momentum`、`/iv_analysis`、`/bcvs` 版面無變化
+- 712 examples 全過、RuboCop 0 offense、console errors 0
+
 ### 2026-08-30（六）— database_consistency 40 項歸零
 
 「全部修掉」不是正確目標——其中 8 項若照做會產生**永遠不會執行的驗證器**。
