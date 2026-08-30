@@ -5,6 +5,7 @@
  * Sortable 由 layout 以獨立 <script> 從 CDN 載入（型別見 types/globals.d.ts）。
  */
 
+import { initLogoFallback } from "./shared/logoFallback";
 import { closestFrom, csrfToken } from "./shared/dom";
 import { isRecord, num } from "./shared/json";
 
@@ -45,19 +46,7 @@ export function init(): void {
     loading?.classList.remove("hidden");
   });
 
-  // ── 股票 logo fallback ─────────────────────────────────────────
-  document.querySelectorAll<HTMLImageElement>(".stock-logo").forEach((img) => {
-    img.addEventListener("error", () => {
-      const fb = img.dataset["fallback"];
-      if (fb && img.src !== fb) {
-        img.src = fb;
-      } else {
-        img.style.display = "none";
-        const span = img.nextElementSibling;
-        if (span instanceof HTMLElement) span.style.display = "flex";
-      }
-    });
-  });
+  initLogoFallback();
 
   // ── 拖曳排序 ───────────────────────────────────────────────────
   const tbody = document.getElementById("sortable-portfolio");

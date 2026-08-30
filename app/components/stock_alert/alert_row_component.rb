@@ -48,8 +48,10 @@ class StockAlert::AlertRowComponent < ApplicationComponent
             data_initials: @alert.symbol.first(2)
           )
           span(
-            class: "stock-logo-fallback absolute inset-0 rounded-full bg-gray-800 text-white items-center justify-center font-bold",
-            style: "display:none; font-size:9px"
+            # hidden + text-[9px] 取代 style="display:none; font-size:9px"
+            # （CSP style-src 收斂）。behavior 在圖片載入失敗時換成 flex。
+            class: "stock-logo-fallback hidden absolute inset-0 rounded-full bg-gray-800 " \
+                   "text-white items-center justify-center font-bold text-[9px]"
           ) { plain(@alert.symbol.first(2)) }
         end
         div do

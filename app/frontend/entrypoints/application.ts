@@ -1,6 +1,7 @@
 // 全站活躍度追蹤：頁面停留時間（sendBeacon）+ 指令使用（data-track-action 委派）。
 // auth-and-activity.md 階段 8/9。
 
+import { applyDataStyles } from "../behaviors/shared/dataStyles";
 import { isRecord } from "../behaviors/shared/json";
 
 function computeReferrerPath(): string | null {
@@ -90,3 +91,8 @@ window.FairPriceTrack = { command: trackCommand };
 
 initPageViewTracking();
 initCommandTracking();
+
+// 數值型樣式（進度條寬度、標記位置）由 data attribute 帶進來，在這裡經 CSSOM 套用。
+// 放在 entrypoint 而非個別 behavior：這些條狀圖出現在多個頁面的共用元件裡，
+// 綁在某一支 behavior 上會漏掉其他頁面。
+applyDataStyles();

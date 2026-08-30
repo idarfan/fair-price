@@ -5,27 +5,14 @@
 import { csrfHeaders } from "../lib/csrf";
 
 // Sortable 由 layout 以獨立 script 載入，不是 npm 相依，這裡只宣告用到的形狀。
+import { initLogoFallback } from "./shared/logoFallback";
+
 interface SortableOptions {
   handle: string;
   animation: number;
   onEnd: () => void;
 }
 declare const Sortable: { create(el: HTMLElement, options: SortableOptions): void } | undefined;
-
-function initLogoFallback(): void {
-  document.querySelectorAll<HTMLImageElement>(".stock-logo").forEach((img) => {
-    img.addEventListener("error", () => {
-      const fallback = img.dataset["fallback"];
-      if (fallback && img.src !== fallback) {
-        img.src = fallback;
-        return;
-      }
-      img.style.display = "none";
-      const span = img.nextElementSibling;
-      if (span instanceof HTMLElement) span.style.display = "flex";
-    });
-  });
-}
 
 function initSortable(): void {
   const tbody = document.getElementById("sortable-alerts");

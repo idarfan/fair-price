@@ -45,8 +45,10 @@ class DailyMomentum::WatchlistManagerRowComponent < ApplicationComponent
             data_initials: @item.symbol.first(2)
           )
           span(
-            class: "stock-logo-fallback w-8 h-8 rounded-full bg-gray-800 text-white text-xs font-bold items-center justify-center",
-            style: "display:none"
+            # hidden 取代 style="display:none"（CSP style-src 收斂）。
+            # 圖片載入失敗時由 behavior 拿掉 hidden、加上 flex。
+            class: "stock-logo-fallback hidden w-8 h-8 rounded-full bg-gray-800 " \
+                   "text-white text-xs font-bold items-center justify-center"
           ) { plain(@item.symbol.first(2)) }
         end
         button(
@@ -177,12 +179,15 @@ class DailyMomentum::WatchlistManagerRowComponent < ApplicationComponent
         span(class: "shrink-0 tabular-nums") { plain(fmt_currency(low)) }
         div(class: "relative flex-1 pb-2.5") do
           div(class: "h-1 bg-gray-200 rounded-full") do
-            div(class: "h-full #{fill_class} rounded-full", style: "width:#{pct || 0}%")
+            # 寬度與標記位置改由 data attribute 帶出，前端經 CSSOM 套用
+            # （CSP style-src 收斂；動態數值無法寫成 Tailwind 靜態 class）。
+            # 套用處：app/frontend/behaviors/shared/dataStyles.ts
+            div(class: "h-full #{fill_class} rounded-full", data_bar_pct: (pct || 0))
           end
           if pct
             div(
-              class: "absolute top-1.5 #{marker_class} leading-none",
-              style: "left:calc(#{pct}% - 4px); font-size:8px"
+              class: "absolute top-1.5 #{marker_class} leading-none text-[8px]",
+              data_marker_pct: pct
             ) { plain("▲") }
           end
         end

@@ -7,20 +7,10 @@
 
 import { closestFrom, csrfToken } from "./shared/dom";
 
+import { initLogoFallback } from "./shared/logoFallback";
+
 export function init(): void {
-  // ── 股票 logo fallback ─────────────────────────────────────────
-  document.querySelectorAll<HTMLImageElement>(".stock-logo").forEach((img) => {
-    img.addEventListener("error", () => {
-      const fallbackSrc = img.dataset["fallback"];
-      if (fallbackSrc && img.src !== fallbackSrc) {
-        img.src = fallbackSrc;
-      } else {
-        img.style.display = "none";
-        const span = img.nextElementSibling;
-        if (span instanceof HTMLElement) span.style.display = "flex";
-      }
-    });
-  });
+  initLogoFallback();
 
   // ── 拖曳排序 ───────────────────────────────────────────────────
   const el = document.getElementById("watchlist-sortable");

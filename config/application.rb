@@ -18,6 +18,10 @@ require "action_view/railtie"
 # you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)
 
+# middleware 要在 boot 階段就取得常數（insert_before 需要真正的 class，
+# Rails 8.1 起不接受字串），所以明確 require 並排除在 autoload 之外。
+require_relative "../lib/middleware/csp_style_src_report"
+
 module Fairprice
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
@@ -26,7 +30,7 @@ module Fairprice
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.
-    config.autoload_lib(ignore: %w[assets tasks])
+    config.autoload_lib(ignore: %w[assets tasks middleware])
 
     # Configuration for the application, engines, and railties goes here.
     #
@@ -37,6 +41,17 @@ module Fairprice
     # config.eager_load_paths << Rails.root.join("extras")
 
     config.generators.system_tests = nil
+
+    # style-src 收斂期間的量測標頭（暫時性，見 lib/middleware/csp_style_src_report.rb）。
+    #
+    # insert_before 是關鍵：這樣它在「請求」階段跑在 Rails CSP middleware 之前，
+    # 在「回應」階段就跑在它之後——那時主政策已經寫好了。若順序反過來，
+    # ActionDispatch 的 middleware 會因為看到 Report-Only 標頭而跳過主政策。
+    #
+    config.middleware.insert_before(
+      ActionDispatch::ContentSecurityPolicy::Middleware,
+      Middleware::CspStyleSrcReport
+    )
 
     # development 與 production 共用同一個資料庫（見 config/database.yml），
     # 而 Rails 的破壞性指令保險是看「資料庫裡存的環境標記」，那個標記會被

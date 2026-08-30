@@ -83,12 +83,15 @@ class DailyMomentum::WatchlistRowComponent < ApplicationComponent
         span(class: "shrink-0 tabular-nums") { plain(fmt_currency(low)) }
         div(class: "relative flex-1 pb-2.5") do
           div(class: "h-1 bg-gray-200 rounded-full") do
-            div(class: "h-full #{fill_class} rounded-full", style: "width:#{pct || 0}%")
+            # 寬度與標記位置改由 data attribute 帶出，前端經 CSSOM 套用
+            # （CSP style-src 收斂；動態數值無法寫成 Tailwind 靜態 class）。
+            # 套用處：app/frontend/behaviors/shared/dataStyles.ts
+            div(class: "h-full #{fill_class} rounded-full", data_bar_pct: (pct || 0))
           end
           if pct
             div(
-              class: "absolute top-1.5 #{marker_class} leading-none",
-              style: "left:calc(#{pct}% - 4px); font-size:8px"
+              class: "absolute top-1.5 #{marker_class} leading-none text-[8px]",
+              data_marker_pct: pct
             ) { plain("▲") }
           end
         end

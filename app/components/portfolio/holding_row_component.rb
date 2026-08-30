@@ -61,8 +61,10 @@ class Portfolio::HoldingRowComponent < ApplicationComponent
             data_initials: @holding.symbol.first(2)
           )
           span(
-            class: "stock-logo-fallback absolute inset-0 rounded-full bg-gray-800 text-white font-bold items-center justify-center",
-            style: "display:none; font-size:8px"
+            # hidden + text-[8px] 取代 style="display:none; font-size:8px"
+            # （CSP style-src 收斂）。behavior 在圖片載入失敗時換成 flex。
+            class: "stock-logo-fallback hidden absolute inset-0 rounded-full bg-gray-800 " \
+                   "text-white font-bold items-center justify-center text-[8px]"
           ) { plain(@holding.symbol.first(2)) }
         end
         span(class: "font-mono font-bold text-gray-900 text-xs") { plain(@holding.symbol) }
