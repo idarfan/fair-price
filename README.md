@@ -1,5 +1,46 @@
 # FairPrice
 
+### 2026-08-30（六）— tracked_tickers：修正錯誤盤點，補上閘門測試與 UI
+
+#### 先修正我自己的錯誤
+
+我把「`tracked_tickers` 沒有 per-user ownership」列為待辦，說要重新 key
+81 萬筆 `option_snapshots`。**查證後發現這個設計決定早就做完並記載在程式碼裡。**
+
+`Api::V1::TrackedTickersController` 開頭就寫著：
+
+> `tracked_tickers` 是共用的蒐集設定，不是個人清單：systemd 的
+> options-collector.timer 直接讀 `SELECT ... FROM tracked_tickers WHERE active = true`，
+> 蒐集結果 `option_snapshots` 綁的是 `tracked_ticker_id` 而非 symbol，
+> 所以沒辦法像觀察清單那樣簡單地分給每個使用者。
+> 折衷做法：讀取所有人都可以，但**只有 admin 能改動**。
+
+`before_action :require_admin!` 已在把關，`User` model 有對應說明，
+`watchlist_isolation_spec` 已覆蓋 destroy 的三種情況。
+
+背景佐證：6 個 tracked_tickers 全部建立於 2026-04-11～04-20，**早於使用者系統
+（2026-07-29）**，是單人時代留下的共用設定。
+
+#### 實際發現的兩個缺口
+
+**1. 閘門有四個 action，只測了一個**
+
+`only: %i[create update destroy collect]`，但只有 `destroy` 有測試——
+把 `create` 從清單拿掉不會有任何測試失敗。補上另外三個，四個突變全部驗證會被抓到。
+
+**2. 前端完全不知道 admin 的存在**
+
+非 admin 看得到「新增」「移除」按鈕，按下去只拿到一句「新增失敗」，
+**看起來像功能壞掉而不是權限限制**。已把 `@can_manage_tickers` 一路傳到
+`TickerSidebar`：非 admin 的新增表單換成說明文字，移除按鈕不渲染。
+
+這個旗標**不是安全邊界**——真正的把關仍在後端 `require_admin!`，
+註解裡寫明了，免得日後有人以為拿掉旗標就等於開放權限。
+
+新增 `spec/requests/option_price_tracker_spec.rb` 釘住旗標值（突變驗證過）。
+
+**719 examples 全過**（原 712）。
+
 ### 2026-08-30（六）— CSP style-src 收斂完成，內嵌樣式歸零
 
 `style-src` 拿掉 `'unsafe_inline'`。18 頁的伺服器 HTML 內嵌樣式從 **575 → 0**。
