@@ -1,5 +1,72 @@
 # 專案教訓紀錄
 
+## 2026-08-30 — 靜態稽核工具的「全部修掉」是錯誤目標
+
+### 教訓 A：修之前先問「這個驗證會不會執行」
+
+`database_consistency` 建議 8 張 snapshot 表加 uniqueness 驗證器。
+查證後發現這些表全部由 `upsert` / `insert_all` 寫入——**這兩個 API 完全跳過
+ActiveRecord 驗證**。照著加的結果是：永遠不執行的死碼、每次 `.create` 多一次
+SELECT、以及「這張表有唯一性驗證」的假象。
+
+**防治規則：**
+```
+稽核工具建議加驗證時，先確認該 model 的實際寫入路徑：
+  * upsert / insert_all / update_all / 直接 SQL → 驗證不會執行
+  * 成本不對稱：presence 驗證免費，uniqueness 每次存檔多一次 SELECT
+  * 決定不修的，理由要寫進工具的設定檔——不是寫在 commit message 裡
+    （下一個人跑報告時看到的是設定檔，不是 git log）
+```
+
+### 教訓 B：`case_sensitive: false` 讓唯一性驗證用不到索引
+
+```ruby
+validates :symbol, uniqueness: { scope: :user_id, case_sensitive: false }
+```
+產生的是 `LOWER(symbol) = LOWER($1)`，**用不到 `(user_id, symbol)` 這個 btree 索引**。
+若欄位本來就會 `upcase` 正規化，這個選項是純粹的浪費。
+
+同時它會讓 `database_consistency` 一次報兩項（索引沒驗證器 + 應建 `lower()` 索引）——
+看起來像兩個問題，其實是同一個。
+
+### 教訓 C：正規化必須在 `before_validation`，不是 `before_save`
+
+```ruby
+before_save { self.symbol = symbol.upcase }        # ← 驗證跑在未正規化的值上
+validates :symbol, uniqueness: true
+```
+使用者送 `aapl`：唯一性驗證比對 `'aapl'`（沒撞到）→ 通過 → 存檔時 upcase 成
+`AAPL` → 撞上唯一索引 → **使用者看到 500 而不是驗證錯誤**。
+
+format 驗證也一樣：`" aapl "` 會因為前後空白被 format 擋掉，
+因為 strip 發生在驗證之後。
+
+```
+正規化（upcase / strip / squish）一律放 before_validation。
+放 before_save 的唯一正當理由是「這個轉換不影響任何驗證」——
+而那幾乎不存在。
+```
+
+### 教訓 D：冗餘索引的判定要自己驗，工具不看 `WHERE`
+
+`RedundantIndexChecker` 報「A 被 B 涵蓋」時，只比對欄位順序，
+**不檢查 B 是不是 partial index**。帶 `WHERE` 條件的複合索引不能涵蓋單欄索引。
+
+刪索引前一律先查：
+```sql
+SELECT indexname, indexdef FROM pg_indexes WHERE indexname IN (...);
+```
+這次 7 個全部驗證屬實（沒有 partial），但那是查過才知道的。
+
+### 教訓 E：兩條 lint 規則可能互相牴觸，那是「檔案該拆」的訊號
+
+一支跨四個 model 的 spec 同時被 `RSpec/DescribeClass`（要類別不要字串）與
+`RSpec/MultipleDescribes`（要單一 top-level）夾住，怎麼寫都不對。
+
+這不是規則有問題，是**檔案結構有問題**——正解是拆進各自 model 的 spec。
+遇到互相牴觸的 lint 規則，先想「它們是不是在指同一件事」。
+
+
 ## 2026-08-30 — 停更的 gem 未必需要替代 gem
 
 ### 教訓 A：先問「這個功能是不是已經進了框架」

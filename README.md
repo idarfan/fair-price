@@ -1,5 +1,63 @@
 # FairPrice
 
+### 2026-08-30（六）— database_consistency 40 項歸零
+
+「全部修掉」不是正確目標——其中 8 項若照做會產生**永遠不會執行的驗證器**。
+最終：修 32 項、逐項註明理由忽略 8 項，`bin/audit schema` exit 0。
+
+#### `case_sensitive: false` 是 8 項發現的共同根因
+
+`UniqueIndexChecker`（索引沒有對應驗證器）與 `MissingUniqueIndexChecker`
+（應該建 `lower()` 索引）看似兩件事，其實是同一件事的兩面：
+`WatchlistItem` / `WatchedTicker` / `TrackedTicker` / `IvWatchlist` 都寫
+`uniqueness: { case_sensitive: false }`。
+
+正解不是加 `lower()` 索引，而是**拿掉那個選項**：這四張表存檔前一律 `upcase`，
+DB 裡只有大寫，比對大小寫毫無意義；而 `case_sensitive: false` 產生的
+`LOWER(symbol) = LOWER($1)` **用不到既有的 btree 唯一索引**。
+
+**連帶修掉一個潛在 500：** `TrackedTicker` 與 `IvWatchlist` 的正規化原本寫在
+`before_save`——也就是驗證「之後」。單獨拿掉 `case_sensitive: false` 會讓
+`aapl` 通過唯一性驗證、存檔時才 upcase 成 `AAPL` 撞上唯一索引，
+使用者看到的是 500 而不是驗證錯誤。正規化已移到 `before_validation`。
+順帶修正 `IvWatchlist` 的 format 驗證原本跑在未 strip 的值上（`" aapl "` 會被誤擋）。
+
+#### 三支 migration
+
+| migration | 內容 | 前置查證 |
+|---|---|---|
+| `DropRedundantIndexes` | 刪 7 個冗餘索引 | 逐一用 `pg_indexes` 確認是真的 leftmost-prefix 重複，**沒有 partial index**——工具不檢查 `WHERE` 條件 |
+| `AddNotNullConstraints` | 3 個 NOT NULL + `iv_queries.low_iv_signal` 補 default 後設 NOT NULL | 現有 NULL 筆數皆為 0 |
+| `AddNumericalityCheckConstraints` | 7 個 CHECK constraint | 違反筆數皆為 0 |
+
+金額與股數為負會直接汙染損益計算（`Portfolio#total_cost`、`MarginPosition#balance`
+都是直接相乘），所以這層防護值得放在 DB 而不只在 model。
+
+**三支的 `down` 都實測往返過**（索引 7 → 0 → 7 → 0）——
+memory `feedback_migration_rollback_risk` 記著 down 失敗可能連鎖回滾前一個 migration。
+
+#### 不修的 8 項
+
+8 張 snapshot 表全部由爬蟲以 `upsert` / `insert_all` 寫入
+（`barchart_scraper_service.rb:608/677/699` 等），**這兩個 API 完全跳過
+ActiveRecord 驗證**。加上去只會是死碼，還製造「這張表有唯一性驗證」的假象。
+
+`OptionSnapshot` 另有無解之處：索引是
+`(tracked_ticker_id, date_trunc('hour', snapped_at), contract_symbol)`，
+Rails 的 uniqueness 驗證器無法表達 `date_trunc` 這種運算式。
+
+理由逐項寫在 `.database_consistency.yml`（注意是**底線**不是連字號）。
+
+#### 其他
+
+`bin/audit schema` 從報告用升格為**閘門**，`config/ci.rb` 同步加上——
+既然歸零了，不設閘門就會慢慢漂回去。
+
+新增 9 個測試釘住正規化順序，**反向驗證過**：改回 `before_save` 立刻紅。
+順帶補上原本不存在的 `iv_watchlist_spec.rb` 與 `watched_ticker_spec.rb`。
+
+RSpec **712 examples / 0 failures**，`bin/audit all` exit 0。
+
 ### 2026-08-30（六）— traceroute 的替代方案：內建指令 + 一支 spec
 
 `traceroute` gem 停更於 2020-04-28 不予採用。它報兩件事，各自有更好的替代：
