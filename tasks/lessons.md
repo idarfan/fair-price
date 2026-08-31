@@ -1830,3 +1830,29 @@ mod.init();
 
 前提是**payload 形狀要有依據**——我先用 `rails runner` 確認 Finnhub 回的是
 `Float`，才敢用 number 型別餵進去。憑印象捏形狀等於沒驗。
+
+
+## 2026-08-31 — 測試數字對不上，就是有東西沒被執行
+
+補 `_confirm_empty` 的迴歸測試時，我在 `test_leaps_scraper.py` 新開了一個
+`TestConfirmEmpty` 類別，但檔案後面**早就有一個同名類別**。Python 後定義的
+會把前面整個蓋掉，那 3 則新測試一次都沒跑到。
+
+發現方式不是看程式碼，是**看數字**：原本 28 則，加 3 則之後應該是 33（含
+另外兩則），實際印出 `Ran 30 tests`。數字對不上就是有東西沒被執行。
+
+**規則**：加完測試看 `Ran N tests` 有沒有等於「原本 + 這次新增」。
+不相等就先查為什麼，不要因為 `OK` 就放行——**綠燈不代表跑到你寫的那幾則**。
+
+同一個檔案裡再開一個同名 TestCase 是最容易犯又最無聲的一種：沒有警告、
+沒有錯誤，只有數字默默少掉。
+
+## 2026-08-31 — 「優雅降級路徑」要確認它真的走得到
+
+`leaps_scraper._wait_for_grid` 的 docstring 白紙黑字寫著
+「timed out → 回 `None`，caller 檢查 session 是否過期」，但內層 `cdp_eval`
+是**會丟例外**的，那條 fallback 從實作出來到 2026-08-31 一次都沒被執行過。
+使用者看到的是原始的 `TimeoutError: CDP eval timed out`，整趟三到五分鐘的
+抓取直接丟掉。
+
+**寫了 fallback 不等於有 fallback。** 要嘛有測試打到它，要嘛就是紙上談兵。
