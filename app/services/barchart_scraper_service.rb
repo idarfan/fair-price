@@ -119,7 +119,7 @@ class BarchartScraperService
       when "session_expired"
                            "Session 已過期（抓取 #{location_label} 的 #{layer_label} 時格線出現登入提示），請重新登入 Barchart 後重試"
       when "page_load_timeout"
-                           "抓取 #{location_label} 的 #{layer_label} 時頁面 30 秒內未完成載入（非 Session 問題），請稍後重試"
+                           "抓取 #{location_label} 的 #{layer_label} 時頁面遲遲沒有載入完成（非 Session 問題），請稍後重試"
       else
                            "抓取 #{location_label} 的 #{layer_label} 時格線無回應，請確認 Barchart 仍在登入狀態後重試"
       end

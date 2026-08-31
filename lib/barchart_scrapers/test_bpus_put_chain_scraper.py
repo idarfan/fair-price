@@ -76,7 +76,7 @@ class TestSuccess(unittest.TestCase):
         scraper.cdp_navigate = AsyncMock(return_value=None)
         scraper.activate_target = AsyncMock(return_value=None)
 
-        async def fake_eval(ws_url, js_expr, timeout=25):
+        async def fake_eval(ws_url, js_expr, timeout=25, **_kw):
             if js_expr == scraper.PUT_CHAIN_JS:
                 return [ dict(r) for r in ROWS ]
             if js_expr == scraper.UNDERLYING_JS:
@@ -106,7 +106,7 @@ class TestNoCandidatesAfterStabilityCheck(unittest.TestCase):
         scraper.cdp_navigate = AsyncMock(return_value=None)
         scraper.activate_target = AsyncMock(return_value=None)
 
-        async def fake_eval(ws_url, js_expr, timeout=25):
+        async def fake_eval(ws_url, js_expr, timeout=25, **_kw):
             if js_expr == scraper.PUT_CHAIN_JS:
                 return []  # confirmed empty both times
             if js_expr == scraper.SESSION_EXPIRED_JS:
@@ -128,7 +128,7 @@ class TestSessionExpiredWhenGridNeverLoads(unittest.TestCase):
         self._orig_grid_max_wait_s = scraper.GRID_MAX_WAIT_S
         scraper.GRID_MAX_WAIT_S = 0  # force immediate timeout in test
 
-        async def fake_eval(ws_url, js_expr, timeout=25):
+        async def fake_eval(ws_url, js_expr, timeout=25, **_kw):
             if js_expr == scraper.PUT_CHAIN_JS:
                 return None  # grid never mounts
             if js_expr == scraper.SESSION_EXPIRED_JS:
@@ -153,7 +153,7 @@ class TestGridTimeoutNotSessionExpired(unittest.TestCase):
         self._orig_grid_max_wait_s = scraper.GRID_MAX_WAIT_S
         scraper.GRID_MAX_WAIT_S = 0
 
-        async def fake_eval(ws_url, js_expr, timeout=25):
+        async def fake_eval(ws_url, js_expr, timeout=25, **_kw):
             if js_expr == scraper.PUT_CHAIN_JS:
                 return None
             if js_expr == scraper.SESSION_EXPIRED_JS:

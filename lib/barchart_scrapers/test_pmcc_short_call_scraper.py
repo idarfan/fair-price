@@ -322,7 +322,7 @@ class TestConfirmedEmptySkip(unittest.TestCase):
                 return GOOD_VG
             return None
 
-        async def confirm_side(ws_url, js_expr, delay_s=1.5):
+        async def confirm_side(ws_url, js_expr, delay_s=1.5, **_kw):
             if "bidPrice" in js_expr:
                 return []       # still empty after stability check -> skip, non-fatal
             return GOOD_VG

@@ -231,7 +231,7 @@ def _finalize(rows, underlying_price):
     return result
 
 
-async def _wait_for_grid(ws_url, js_expr, max_wait_s=30, poll_s=0.5):
+async def _wait_for_grid(ws_url, js_expr, max_wait_s=30, poll_s=0.5, target_id=None):
     """Poll for bc-data-grid._data to be non-null after navigation.
 
     Returns:
@@ -240,17 +240,29 @@ async def _wait_for_grid(ws_url, js_expr, max_wait_s=30, poll_s=0.5):
     """
     deadline = asyncio.get_event_loop().time() + max_wait_s
     while asyncio.get_event_loop().time() < deadline:
-        result = await cdp_eval(ws_url, js_expr)
+        try:
+            result = await cdp_eval(ws_url, js_expr, target_id=target_id)
+        except (TimeoutError, asyncio.TimeoutError):
+            # 分頁被 Chrome 凍結時 eval 不會有回應。這跟「grid 還沒 mount」
+            # 對呼叫端是同一件事：還沒好，繼續等；等到 max_wait_s 用完才回
+            # None，讓 main 走既有的 partial／page_load_timeout 路徑，
+            # 不要讓單一次 eval 逾時炸掉整趟三到五分鐘的抓取。
+            result = None
         if result is not None:
             return result
         await asyncio.sleep(poll_s)
     return None
 
 
-async def _confirm_empty(ws_url, js_expr, delay_s=1.5):
+async def _confirm_empty(ws_url, js_expr, delay_s=1.5, target_id=None):
     """Stability check: re-evaluate after delay_s to confirm [] is real, not mid-load."""
     await asyncio.sleep(delay_s)
-    return await cdp_eval(ws_url, js_expr)
+    try:
+        return await cdp_eval(ws_url, js_expr, target_id=target_id)
+    except (TimeoutError, asyncio.TimeoutError):
+        # 與 _wait_for_grid 同一個理由：分頁凍結造成的逾時要走既有的
+        # None（視同 timeout）路徑，不能讓例外炸掉整趟抓取。
+        return None
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -267,7 +279,7 @@ async def main(symbol):
     await cdp_navigate(ws_url, options_url, settle_ms=STAGE1_SETTLE)
     await activate_target(target_id)
 
-    underlying_price = await cdp_eval(ws_url, UNDERLYING_JS)
+    underlying_price = await cdp_eval(ws_url, UNDERLYING_JS, target_id=target_id)
 
     # 原本是單次 cdp_eval，settle 時間到但 Angular dropdown 還沒 render 完就直接
     # 判定 no_candidates（實測 KLAC 案例：LEAPS 用同一個 selector 在同一輪抓取
@@ -278,7 +290,7 @@ async def main(symbol):
     expirations = None
     deadline = asyncio.get_event_loop().time() + EXPIRATIONS_MAX_WAIT_S
     while asyncio.get_event_loop().time() < deadline:
-        expirations = await cdp_eval(ws_url, EXPIRATIONS_JS)
+        expirations = await cdp_eval(ws_url, EXPIRATIONS_JS, target_id=target_id)
         if expirations:
             break
         await asyncio.sleep(0.5)
@@ -304,10 +316,10 @@ async def main(symbol):
         await cdp_navigate(ws_url, opts_url, settle_ms=OPTIONS_SETTLE)
         await activate_target(target_id)
 
-        opts_rows = await _wait_for_grid(ws_url, OPTIONS_PRICES_JS, max_wait_s=30)
+        opts_rows = await _wait_for_grid(ws_url, OPTIONS_PRICES_JS, max_wait_s=30, target_id=target_id)
 
         if opts_rows is None:
-            is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
+            is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS, target_id=target_id) or False
             print(json.dumps({
                 "status":                "partial",
                 "rows":                  _finalize(_merge_vg(all_opts_rows, all_vg_rows), underlying_price),
@@ -319,11 +331,11 @@ async def main(symbol):
             return
 
         if not opts_rows:
-            confirmed = await _confirm_empty(ws_url, OPTIONS_PRICES_JS)
+            confirmed = await _confirm_empty(ws_url, OPTIONS_PRICES_JS, target_id=target_id)
             if confirmed:
                 opts_rows = confirmed
             elif confirmed is None:
-                is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
+                is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS, target_id=target_id) or False
                 print(json.dumps({
                     "status":                "partial",
                     "rows":                  _finalize(_merge_vg(all_opts_rows, all_vg_rows), underlying_price),
@@ -354,10 +366,10 @@ async def main(symbol):
         await cdp_navigate(ws_url, vg_url, settle_ms=VG_SETTLE)
         await activate_target(target_id)
 
-        vg_rows = await _wait_for_grid(ws_url, VG_JS, max_wait_s=25)
+        vg_rows = await _wait_for_grid(ws_url, VG_JS, max_wait_s=25, target_id=target_id)
 
         if vg_rows is None:
-            is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
+            is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS, target_id=target_id) or False
             print(json.dumps({
                 "status":                "partial",
                 "rows":                  _finalize(_merge_vg(all_opts_rows, all_vg_rows), underlying_price),
@@ -369,11 +381,11 @@ async def main(symbol):
             return
 
         if not vg_rows:
-            confirmed_vg = await _confirm_empty(ws_url, VG_JS)
+            confirmed_vg = await _confirm_empty(ws_url, VG_JS, target_id=target_id)
             if confirmed_vg:
                 vg_rows = confirmed_vg
             elif confirmed_vg is None:
-                is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
+                is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS, target_id=target_id) or False
                 print(json.dumps({
                     "status":                "partial",
                     "rows":                  _finalize(_merge_vg(all_opts_rows, all_vg_rows), underlying_price),

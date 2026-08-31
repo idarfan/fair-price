@@ -112,13 +112,37 @@ class TestWaitForGrid(unittest.TestCase):
 
     def test_polls_until_data_arrives(self):
         responses = iter([None, None, [{"strike": 7}]])
-        mock = AsyncMock(side_effect=lambda *_: next(responses))
+        mock = AsyncMock(side_effect=lambda *_a, **_k: next(responses))
         with patch("leaps_scraper.cdp_eval", new=mock):
             result = _run(scraper._wait_for_grid("ws://", "JS", max_wait_s=5, poll_s=0.01))
         self.assertEqual(result, [{"strike": 7}])
 
     def test_returns_none_on_timeout(self):
         with patch("leaps_scraper.cdp_eval", new=AsyncMock(return_value=None)):
+            result = _run(scraper._wait_for_grid("ws://", "JS", max_wait_s=0.05, poll_s=0.01))
+        self.assertIsNone(result)
+
+    # 迴歸：2026-08-31 SONY 查詢整趟炸在 "TimeoutError: CDP eval timed out"。
+    # Windows Chrome 凍結背景分頁時 eval 不會有回應，那個例外原本會直接穿過
+    # _wait_for_grid 冒到 main 外面，把三到五分鐘的抓取整個丟掉。
+    def test_eval_timeout_is_treated_as_not_ready_and_keeps_polling(self):
+        responses = iter([TimeoutError("CDP eval timed out"), [{"strike": 7}]])
+
+        async def side(*_a, **_k):
+            nxt = next(responses)
+            if isinstance(nxt, Exception):
+                raise nxt
+            return nxt
+
+        with patch("leaps_scraper.cdp_eval", new=AsyncMock(side_effect=side)):
+            result = _run(scraper._wait_for_grid("ws://", "JS", max_wait_s=5, poll_s=0.01))
+        self.assertEqual(result, [{"strike": 7}])
+
+    def test_persistent_eval_timeout_ends_as_none_not_exception(self):
+        async def always_timeout(*_a, **_k):
+            raise TimeoutError("CDP eval timed out")
+
+        with patch("leaps_scraper.cdp_eval", new=AsyncMock(side_effect=always_timeout)):
             result = _run(scraper._wait_for_grid("ws://", "JS", max_wait_s=0.05, poll_s=0.01))
         self.assertIsNone(result)
 

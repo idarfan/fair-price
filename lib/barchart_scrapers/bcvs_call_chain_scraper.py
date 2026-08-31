@@ -104,21 +104,33 @@ UNDERLYING_JS = """
 """
 
 
-async def _wait_for_grid(ws_url, js_expr, max_wait_s=30, poll_s=0.5):
+async def _wait_for_grid(ws_url, js_expr, max_wait_s=30, poll_s=0.5, target_id=None):
     """Poll for bc-data-grid._data to be non-null after navigation."""
     deadline = asyncio.get_event_loop().time() + max_wait_s
     while asyncio.get_event_loop().time() < deadline:
-        result = await cdp_eval(ws_url, js_expr)
+        try:
+            result = await cdp_eval(ws_url, js_expr, target_id=target_id)
+        except (TimeoutError, asyncio.TimeoutError):
+            # 分頁被 Chrome 凍結時 eval 不會有回應。這跟「grid 還沒 mount」
+            # 對呼叫端是同一件事：還沒好，繼續等；等到 max_wait_s 用完才回
+            # None，讓 main 走既有的 partial／page_load_timeout 路徑，
+            # 不要讓單一次 eval 逾時炸掉整趟三到五分鐘的抓取。
+            result = None
         if result is not None:
             return result
         await asyncio.sleep(poll_s)
     return None
 
 
-async def _confirm_empty(ws_url, js_expr, delay_s=1.5):
+async def _confirm_empty(ws_url, js_expr, delay_s=1.5, target_id=None):
     """Stability check: re-evaluate after delay_s to confirm [] is real, not mid-load."""
     await asyncio.sleep(delay_s)
-    return await cdp_eval(ws_url, js_expr)
+    try:
+        return await cdp_eval(ws_url, js_expr, target_id=target_id)
+    except (TimeoutError, asyncio.TimeoutError):
+        # 與 _wait_for_grid 同一個理由：分頁凍結造成的逾時要走既有的
+        # None（視同 timeout）路徑，不能讓例外炸掉整趟抓取。
+        return None
 
 
 def _fill_exp_date(rows, exp_key):
@@ -154,7 +166,7 @@ async def main(symbol, expiration):
         return
 
     if not rows:
-        confirmed = await _confirm_empty(ws_url, CALL_CHAIN_JS)
+        confirmed = await _confirm_empty(ws_url, CALL_CHAIN_JS, target_id=target_id)
         if confirmed:
             rows = confirmed
         elif confirmed is None:

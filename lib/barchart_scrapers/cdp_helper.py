@@ -57,8 +57,32 @@ async def activate_target(target_id):
             pass  # activation is best-effort
 
 
-async def cdp_eval(ws_url, js_expr, timeout=25):
-    """Evaluate JavaScript in a CDP page and return the result value."""
+async def cdp_eval(ws_url, js_expr, timeout=25, target_id=None, attempts=2):
+    """
+    Evaluate JavaScript in a CDP page and return the result value.
+
+    Windows Chrome freezes background tabs: while frozen the renderer never
+    answers Runtime.evaluate, so a single eval can burn the whole timeout even
+    though CDP itself is healthy. When target_id is supplied we re-activate the
+    tab (which un-freezes the renderer) and try again before giving up — that
+    turns the common "tab went to sleep mid-scrape" case from a hard failure
+    into a 1-2 second hiccup.
+    """
+    last_error = None
+    for attempt in range(max(1, attempts)):
+        if attempt and target_id:
+            await activate_target(target_id)
+            await asyncio.sleep(1.0)
+        try:
+            return await _cdp_eval_once(ws_url, js_expr, timeout)
+        except (TimeoutError, asyncio.TimeoutError) as e:
+            last_error = e
+            if not target_id:
+                break
+    raise last_error
+
+
+async def _cdp_eval_once(ws_url, js_expr, timeout):
     async with websockets.connect(ws_url, open_timeout=10, max_size=10_000_000) as ws:
         msg_id = 1
         await ws.send(json.dumps({

@@ -40,8 +40,15 @@ from cdp_helper import prepare_page, cdp_eval, cdp_navigate, activate_target
 
 TARGET_PATH    = "options"
 STAGE1_SETTLE  = 5000   # Stage 1 (NTM) fixed sleep — no polling, must be long enough
-OPTIONS_SETTLE = 1500   # Stage 2 opts initial settle; _wait_for_grid polls up to 30 s
-VG_SETTLE      = 1500   # Stage 2 V&G initial settle; _wait_for_grid polls up to 25 s
+OPTIONS_SETTLE = 1500   # Stage 2 opts initial settle; _wait_for_grid polls up to GRID_MAX_WAIT_S
+VG_SETTLE      = 1500   # Stage 2 V&G initial settle; _wait_for_grid polls up to GRID_MAX_WAIT_S
+
+# Barchart 的 bc-data-grid 掛載時間跟標的與當下負載有關，不是固定的。
+# 2026-08-31 實測 SONY 的 volatility-greeks 頁需要 34.3 秒才把 _data 填好，
+# 舊上限（opts 30 秒／V&G 25 秒）直接判成 page_load_timeout，使用者只看到
+# 「頁面 30 秒內未完成載入，請稍後重試」，重試幾次也一樣——因為慢的是頁面
+# 本身，不是偶發。上限拉到 60 秒；真的掛掉時多等的那半分鐘遠比抓不到便宜。
+GRID_MAX_WAIT_S = 60
 LEAPS_MIN_DTE  = 364    # chain_snapshot must be built from a LEAPS-dated expiration (see fix below),
                         # matches LeapsRankingService::MIN_DTE
 
@@ -289,7 +296,7 @@ def _finalize(rows, underlying_price):
 
 
 
-async def _wait_for_grid(ws_url, js_expr, max_wait_s=30, poll_s=0.5):
+async def _wait_for_grid(ws_url, js_expr, max_wait_s=30, poll_s=0.5, target_id=None):
     """
     Poll for bc-data-grid._data to be non-null after navigation.
 
@@ -299,14 +306,21 @@ async def _wait_for_grid(ws_url, js_expr, max_wait_s=30, poll_s=0.5):
     """
     deadline = asyncio.get_event_loop().time() + max_wait_s
     while asyncio.get_event_loop().time() < deadline:
-        result = await cdp_eval(ws_url, js_expr)
+        try:
+            result = await cdp_eval(ws_url, js_expr, target_id=target_id)
+        except (TimeoutError, asyncio.TimeoutError):
+            # 分頁被 Chrome 凍結時 eval 不會有回應。這跟「grid 還沒 mount」
+            # 對呼叫端是同一件事：還沒好，繼續等；等到 max_wait_s 用完才回
+            # None，讓 main 走既有的 partial／page_load_timeout 路徑，
+            # 不要讓單一次 eval 逾時炸掉整趟三到五分鐘的抓取。
+            result = None
         if result is not None:
             return result
         await asyncio.sleep(poll_s)
     return None
 
 
-async def _confirm_empty(ws_url, js_expr, delay_s=1.5):
+async def _confirm_empty(ws_url, js_expr, delay_s=1.5, target_id=None):
     """
     Stability check: re-evaluate after delay_s to confirm [] is real, not mid-load.
 
@@ -316,7 +330,12 @@ async def _confirm_empty(ws_url, js_expr, delay_s=1.5):
       None            — grid unmounted (treat as timeout)
     """
     await asyncio.sleep(delay_s)
-    return await cdp_eval(ws_url, js_expr)
+    try:
+        return await cdp_eval(ws_url, js_expr, target_id=target_id)
+    except (TimeoutError, asyncio.TimeoutError):
+        # 與 _wait_for_grid 同一個理由：分頁凍結造成的逾時要走既有的
+        # None（視同 timeout）路徑，不能讓例外炸掉整趟抓取。
+        return None
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -338,15 +357,15 @@ async def main(symbol, user_strike=None):
     await activate_target(target_id)
 
     # Poll up to 30 s for the NTM grid to populate (page may take longer than fixed sleep)
-    near_money_rows = await _wait_for_grid(ws_url, NEAR_MONEY_JS, max_wait_s=30)
+    near_money_rows = await _wait_for_grid(ws_url, NEAR_MONEY_JS, max_wait_s=GRID_MAX_WAIT_S, target_id=target_id)
     if near_money_rows is None:
         print(json.dumps({"status": "barchart_session_expired"}))
         return
 
-    underlying_price = await cdp_eval(ws_url, UNDERLYING_JS)
+    underlying_price = await cdp_eval(ws_url, UNDERLYING_JS, target_id=target_id)
 
     # Expiration select — kept for V&G per-exp fallback if stacked V&G is not supported.
-    expirations = await cdp_eval(ws_url, EXPIRATIONS_JS) or []
+    expirations = await cdp_eval(ws_url, EXPIRATIONS_JS, target_id=target_id) or []
     # Maps "2027-01-15" -> "2027-01-15-m" (the select option value)
     exp_value_map = {e["value"][:10]: e["value"] for e in expirations}
     first_exp_value = next(iter(exp_value_map.values()), None)
@@ -384,7 +403,7 @@ async def main(symbol, user_strike=None):
         )
         await cdp_navigate(ws_url, leaps_chain_url, settle_ms=2000)
         await activate_target(target_id)
-        leaps_chain_rows = await _wait_for_grid(ws_url, NEAR_MONEY_JS, max_wait_s=30) or []
+        leaps_chain_rows = await _wait_for_grid(ws_url, NEAR_MONEY_JS, max_wait_s=GRID_MAX_WAIT_S, target_id=target_id) or []
         all_strikes = sorted({r["strike"] for r in leaps_chain_rows if r.get("strike") is not None})
     else:
         # No expiration far enough out for this symbol (rare) — fall back to
@@ -442,11 +461,11 @@ async def main(symbol, user_strike=None):
         await cdp_navigate(ws_url, opts_url, settle_ms=OPTIONS_SETTLE)
         await activate_target(target_id)
 
-        opts_rows = await _wait_for_grid(ws_url, STACKED_OPTIONS_JS, max_wait_s=30)
+        opts_rows = await _wait_for_grid(ws_url, STACKED_OPTIONS_JS, max_wait_s=GRID_MAX_WAIT_S, target_id=target_id)
 
         if opts_rows is None:
             # Grid not mounted after 30 s — classify: session expired vs page timeout
-            is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
+            is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS, target_id=target_id) or False
             print(json.dumps({
                 "status":            "partial",
                 "rows":              _finalize(all_opts_rows, underlying_price),
@@ -460,12 +479,12 @@ async def main(symbol, user_strike=None):
 
         if not opts_rows:
             # Grid mounted but zero Call rows — stability check before skipping
-            confirmed = await _confirm_empty(ws_url, STACKED_OPTIONS_JS)
+            confirmed = await _confirm_empty(ws_url, STACKED_OPTIONS_JS, target_id=target_id)
             if confirmed:
                 opts_rows = confirmed          # data appeared after 1.5 s, use it
             elif confirmed is None:
                 # Grid unmounted during stability check — treat as timeout
-                is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
+                is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS, target_id=target_id) or False
                 print(json.dumps({
                     "status":            "partial",
                     "rows":              _finalize(all_opts_rows, underlying_price),
@@ -488,14 +507,14 @@ async def main(symbol, user_strike=None):
                 # extra round trip to avoid.
                 await cdp_navigate(ws_url, opts_url, settle_ms=OPTIONS_SETTLE)
                 await activate_target(target_id)
-                retry_rows = await _wait_for_grid(ws_url, STACKED_OPTIONS_JS, max_wait_s=30)
+                retry_rows = await _wait_for_grid(ws_url, STACKED_OPTIONS_JS, max_wait_s=GRID_MAX_WAIT_S, target_id=target_id)
 
                 if retry_rows:
                     opts_rows = retry_rows
                 else:
                     import sys as _sys
                     if retry_rows is None:
-                        is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
+                        is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS, target_id=target_id) or False
                         print(json.dumps({
                             "status":            "partial",
                             "rows":              _finalize(all_opts_rows, underlying_price),
@@ -527,10 +546,10 @@ async def main(symbol, user_strike=None):
             await cdp_navigate(ws_url, vg_url, settle_ms=VG_SETTLE)
             await activate_target(target_id)
 
-            vg_rows = await _wait_for_grid(ws_url, LOCK_STRIKE_VG_JS, max_wait_s=25)
+            vg_rows = await _wait_for_grid(ws_url, LOCK_STRIKE_VG_JS, max_wait_s=GRID_MAX_WAIT_S, target_id=target_id)
 
             if vg_rows is None:
-                is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
+                is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS, target_id=target_id) or False
                 print(json.dumps({
                     "status":            "partial",
                     "rows":              _finalize(_merge_vg(all_opts_rows, all_vg_rows), underlying_price),
@@ -544,11 +563,11 @@ async def main(symbol, user_strike=None):
 
             if not vg_rows:
                 # Stability check for V&G empty
-                confirmed_vg = await _confirm_empty(ws_url, LOCK_STRIKE_VG_JS)
+                confirmed_vg = await _confirm_empty(ws_url, LOCK_STRIKE_VG_JS, target_id=target_id)
                 if confirmed_vg:
                     vg_rows = confirmed_vg
                 elif confirmed_vg is None:
-                    is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
+                    is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS, target_id=target_id) or False
                     print(json.dumps({
                         "status":            "partial",
                         "rows":              _finalize(_merge_vg(all_opts_rows, all_vg_rows), underlying_price),
