@@ -1,5 +1,37 @@
 # FairPrice
 
+### 2026-08-31（一）— LEAPS 排行表 IV 配色分級與欄位說明排版重整
+
+#### IV 欄位依水位上色
+
+`LeapsRecommendations::Formatting#iv_color_class`，門檻常數 `IV_GREEN_MAX = 0.30`／
+`IV_YELLOW_MAX = 0.50`（`row[:iv]` 是小數，0.634 代表 63.4%）：
+
+| IV | 顏色 | 判讀 |
+|---|---|---|
+| ≤ 30% | 綠色粗體 | 理想進場點，權利金相對便宜 |
+| 30%–50% | 黃色粗體 | 可接受，但非最佳時機 |
+| > 50% | 紅色粗體 | 不建議買進，IV 均值回歸會侵蝕獲利（vega 逆風）|
+
+`nil` 走 `text-gray-400` 顯示破折號。邊界以 rails runner 實測確認：
+0.30 → 綠、0.3001 → 黃、0.50 → 黃、0.5001 → 紅。
+
+#### 欄位說明改成結構化排版
+
+IV／內在價值／外在價值／Spread% 四個欄位補上判讀說明後，原本用 `\n` 串起來的
+多段文字擠成一團。改成 `TIP_H()` 小標題 ＋ `TIP_L()` 條列的 HTML 結構，
+四則統一為「定義句 → 小標題 → bullet」。
+
+hover 小提示原本是 `tB.textContent = d.desc`，改成 `innerHTML`，與 driver.js
+popover（本來就是 `description.innerHTML`）共用同一份文案；`.tip-h` / `.tip-l`
+在 `application.css` 一次定義、兩邊套用，tooltip 寬度 340 → 380px。
+
+#### Spread% 表頭註記不能併進欄名
+
+第一版把「（買賣差價比）」直接寫進 `TABLE_COLS`，結果 `th` 是 `whitespace-nowrap`，
+該欄被撐寬、把「流動性判斷」的標籤擠到換行。改用 `TABLE_COL_SUBLABELS`，
+在表頭下方多渲染一行 10px 灰字，欄寬不受影響。
+
 ### 2026-08-30（六）— 維運健檢：pm2 排程時區錯 8 小時、測試會打真實 API
 
 #### pm2 的 cron 走的是 daemon 時區
