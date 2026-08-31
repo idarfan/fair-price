@@ -1,5 +1,64 @@
 # FairPrice
 
+### 2026-08-30（六）— 維運健檢：pm2 排程時區錯 8 小時、測試會打真實 API
+
+#### pm2 的 cron 走的是 daemon 時區
+
+`pm2` 的 `cron_restart` 由 daemon 解讀，用的是 **daemon 自己的時區**。
+開機用的 `/etc/systemd/system/pm2-idarfan.service` 只設了 `PATH` 與 `PM2_HOME`，
+沒有 `TZ`，daemon 因此沿用 `/etc/localtime`（Asia/Taipei）——
+而 `bin/iv-*.sh` 的註解明確假設「pm2 daemon 必須以 `TZ=UTC` 啟動」。
+**這個前提從來沒有成立。**
+
+三個排程因此全部早 8 小時：
+
+| job | cron | 應該 | 實際 |
+|---|---|---|---|
+| `iv-skew-intraday` | `*/30 13-20 * * 1-5` | ET 09:00–16:00 盤中 | ET 01:00–08:00 盤前 |
+| `iv-daily-snapshot` | `30 20 * * 1-5` | ET 16:30 收盤後 | ET 08:30 開盤前 |
+| `iv-skew-snapshot` | `45 20 * * 1-5` | ET 16:45 收盤後 | ET 08:45 開盤前 |
+
+intraday 每次都落在非交易時段被跳過——`skew_rank_intradays` 從 2026-05-19 起
+就沒有新資料，**靜默了 3.5 個月**。另外兩個抓到的是前一日收盤。
+
+修法：`scripts/fix-pm2-timezone.sh`，用 systemd drop-in 加 `Environment=TZ=UTC`
+（附加式、可逆）。三種模式：套用 / `--check` 零改動診斷 / `--rollback`。
+已執行驗證：daemon TZ 從 `/proc` 讀出確認是 UTC、20 個 process 全數回復、
+手動執行 intraday 報出的 ET 時刻與真實 ET 一致。
+
+**防復發**：新增 `rake ops:freshness`（`bin/audit freshness`）主動比對五張排程表
+的最新時間與預期更新頻率。排程壞掉不會拋例外、不會有紅字，只會「沒有新資料」
+——這就是它能靜默 3.5 個月的原因。
+
+#### 測試套件會打真實外部 API
+
+沒有 WebMock/VCR。六支 request spec 會渲染 `/momentum` 這類真實頁面，
+而那條路徑會呼叫 `VixService`、`FinnhubService#quote`×N、`YahooFinanceService#chart`×N。
+這些包在 `Rails.cache.fetch` 裡，但 test 環境的 `cache_store` 是 **`:null_store`**
+——快取永遠不命中，每次都真的出網。
+
+`absolute_timeout_spec` 更是 `25.times { travel 1.hour; get "/momentum" }`，
+單支 138 秒，而且遇過一次偶發失敗。
+
+引入 WebMock 後：**3 分 03 秒 → 41.9 秒（4.4 倍）**，726 examples 全過。
+
+#### 查證後排除的（不是問題）
+
+| 現象 | 真相 |
+|---|---|
+| `technical_analyses` 停在 6/26 | **使用者觸發式**（技術面儀表板按「分析」），不是排程 |
+| `options-intraday.timer` 顯示「從未執行」 | 機器當天才開機，該 timer 只在週一~五觸發 |
+| systemd `options-*` 系列 | `OnCalendar` 明寫 `UTC`，時區無關 |
+| DB 備份 | 正常，21MB × 7 天輪替 |
+| 磁碟 / DB | 24% 已用、359MB、90 天清理排程正常 |
+
+#### 順帶
+
+npm 最後一個漏洞（esbuild、dev-server、Windows、low）藏在 storybook 巢狀相依，
+`npm audit fix` 宣稱有修法卻不套用，升到 storybook 最新版也沒解。
+改用 `overrides` 強制 `esbuild ^0.28.1`，Vite / tsc / eslint / vitest / Storybook
+五個建置全過，`npm audit` 歸零。
+
 ### 2026-08-30（六）— tracked_tickers：修正錯誤盤點，補上閘門測試與 UI
 
 #### 先修正我自己的錯誤
