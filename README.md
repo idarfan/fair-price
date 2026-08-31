@@ -1,5 +1,27 @@
 # FairPrice
 
+### 2026-08-31（一）— LEAPS 抓取的兩種逾時：分頁凍結 vs 頁面真的慢
+
+同一句「查詢失敗」底下其實是兩個獨立原因，分開處理才修得掉。
+
+#### 1. 一次 eval 逾時就毀掉整趟抓取
+
+Windows Chrome 凍結背景分頁時 `Runtime.evaluate` 不會有回應，`cdp_eval` 丟出的
+`TimeoutError` **直接穿過 `_wait_for_grid` 冒到 `main` 外面**——那支函式本來設計成
+「等不到就回 `None`，讓上層走 partial／`page_load_timeout`」，但那條優雅路徑從來
+沒被走到過，畫面吐的是原始 Python 例外 `TimeoutError: CDP eval timed out`。
+
+- `cdp_eval` 逾時後先重新 `activate_target`（解凍 renderer）再試一次
+- `_wait_for_grid` / `_confirm_empty` 把 eval 逾時視同「還沒好」繼續輪詢
+
+#### 2. Barchart 的 grid 掛載時間本來就會超過舊上限
+
+實測 SONY 的 `volatility-greeks?strike=20.5` 需要 **34.3 秒**才把 `_data` 填好，
+舊上限（opts 30 秒／V&G 25 秒）直接判逾時，重試幾次都一樣——慢的是頁面本身。
+統一為 `GRID_MAX_WAIT_S = 60`；Ruby 端錯誤訊息也不再寫死「30 秒內未完成載入」。
+
+同樣修正套用到 `pmcc_short_call` / `bcvs_call_chain` / `bpus_put_chain`。
+
 ### 2026-08-31（一）— LEAPS 排行表欄位可拖曳排序（admin 專屬，順序存 DB 全站套用）
 
 #### 為什麼順序要存 DB 而不是 localStorage
