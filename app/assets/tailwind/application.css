@@ -164,7 +164,7 @@
 #leaps-col-tip {
   position: fixed;
   z-index: 99999;
-  max-width: 340px;
+  max-width: 380px;
   background: #111827;
   color: #d1d5db;
   border: 1px solid #374151;
@@ -178,6 +178,18 @@
   box-shadow: 0 8px 24px rgba(0,0,0,.4);
 }
 #leaps-col-tip .tip-t { font-weight: 700; color: #f9fafb; margin-bottom: 4px; font-size: 15px; }
+/* 欄位說明的分級條列（tooltips.js 的 TIP_H／TIP_L），hover tooltip 與 driver.js
+   popover 共用同一份 HTML，樣式也一起定義，兩邊看起來才一致。 */
+#leaps-col-tip .tip-h,
+.driver-popover .driver-popover-description .tip-h {
+  margin-top: 8px; font-weight: 700; color: #f9fafb; font-size: 13px; letter-spacing: .02em;
+}
+#leaps-col-tip .tip-l,
+.driver-popover .driver-popover-description .tip-l {
+  margin: 4px 0 0; padding-left: 1.15em; list-style: disc; line-height: 1.65;
+}
+#leaps-col-tip .tip-l li,
+.driver-popover .driver-popover-description .tip-l li { margin-top: 3px; }
 
 /* 可點擊的欄位標題視覺提示 */
 th[data-tip-key] { cursor: help; }

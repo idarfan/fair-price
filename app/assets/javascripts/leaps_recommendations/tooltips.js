@@ -1,4 +1,10 @@
 (function () {
+  /* 欄位說明的排版助手：定義句之後接一個小標題＋條列，讓多段說明不會擠成一團。
+     hover tooltip 與 driver.js popover 都以 innerHTML 呈現，兩邊共用同一份字串。
+     內容全是本檔案寫死的靜態文案，不含任何使用者輸入。 */
+  function TIP_H(t) { return '<div class="tip-h">' + t + '</div>'; }
+  function TIP_L(items) { return '<ul class="tip-l"><li>' + items.join('</li><li>') + '</li></ul>'; }
+
   var LEAPS_COL_EXPLAIN = {
     expiration:     { el: '#leaps-th-expiration',     title: '📅 Expiration',           desc: '合約到期日。LEAPS 慣例為一年以上，本表只列 364 天以上。', side: 'bottom' },
     dte:            { el: '#leaps-th-dte',            title: '⏱ Days to Expiration',    desc: '距到期天數。364–550 近天期、550+ 遠天期；越長時間緩衝越大，Vega 曝險也越高。', side: 'bottom' },
@@ -10,12 +16,12 @@
     bid:            { el: '#leaps-th-bid',            title: '⬇️ Bid',                  desc: '市場最高買價（賣出時的底價參考）。', side: 'bottom' },
     ask:            { el: '#leaps-th-ask',            title: '⬆️ Ask',                  desc: '市場最低賣價（買入時的天花板參考）。', side: 'bottom' },
     mid:            { el: '#leaps-th-mid',            title: '⚖️ Mid',                  desc: '(Bid+Ask)/2，掛限價單參考價。本系統衍生欄位一律以 Mid 為權利金基準，不用可能過時的最後成交價。', side: 'bottom' },
-    spread:         { el: '#leaps-th-spread',         title: '↔️ Spread%',              desc: '(Ask−Bid)/Mid，一次進出的滑價成本。深價內常偏寬，>10% 要注意。', side: 'bottom' },
-    intrinsic:      { el: '#leaps-th-intrinsic',      title: '💎 Intrinsic Value',      desc: 'max(0, 現價−履約價)，權利金裡「已在錢裡」的部分，股價不動也不流失。', side: 'bottom' },
-    extrinsic:      { el: '#leaps-th-extrinsic',      title: '🎈 Extrinsic Value',      desc: 'Mid−內在價值，時間＋波動率溢價（保險費），隨時間與 IV 回落流失。', side: 'bottom' },
+    spread:         { el: '#leaps-th-spread',         title: '↔️ Spread%（買賣差價比）', desc: '(Ask−Bid)/Mid。你一次進出（買進＋賣出）要付出的滑價成本，%數越低代表流動性越好、成交價越接近理論中間價。' + TIP_H('經驗法則') + TIP_L(['&lt; 5%：流動性佳，正常交易沒問題','5%–10%：普通，大單要注意分批進出','&gt; 10%：要注意 — 深度價內（Deep ITM）的 LEAPS 常見這個問題，因為外在價值本身就小，Bid−Ask 的絕對價差在 Mid 中占比會被放大']), side: 'bottom' },
+    intrinsic:      { el: '#leaps-th-intrinsic',      title: '💎 Intrinsic Value',      desc: 'max(0, 現價−履約價)，權利金裡「已在錢裡」的部分，股價不動也不流失。' + TIP_H('為什麼越高越好') + TIP_L(['LEAPS Call 買方本質上是用選擇權替代股票（stock replacement），賺的就是股價上漲的內在價值','內在價值越高＝價內（ITM）越深，Delta 越接近 1，越貼近正股走勢，槓桿效果穩定','這部分價值不隨時間流逝而減損；只有外在價值（extrinsic value）才會隨到期日接近而衰減']), side: 'bottom' },
+    extrinsic:      { el: '#leaps-th-extrinsic',      title: '🎈 Extrinsic Value',      desc: 'Mid−內在價值，時間＋波動率溢價（保險費），隨時間與 IV 回落流失。' + TIP_H('買進當下：越低越好') + TIP_L(['付出去的溢價少，時間損耗（theta）風險也小','同樣的資金能買到更多內在價值，部位更接近正股']), side: 'bottom' },
     extrinsic_pct:  { el: '#leaps-th-extrinsic_pct',  title: '🧮 外在佔比',              desc: '外在÷Mid，「權利金裡幾 % 是保險費」。深 ITM LEAPS 核心指標：越低越接近持股替代，高 IV 環境尤其要壓低。', side: 'bottom' },
     time_value_pct: { el: '#leaps-th-time_value_pct', title: '📐 Time Value%',          desc: '外在÷股價，「相對直接持股多付幾 % 溢價」。與外在佔比分母不同，回答不同問題。', side: 'bottom' },
-    iv:             { el: '#leaps-th-iv',             title: '🌊 Implied Volatility',   desc: '該檔位隱含波動率。IV 越高權利金越貴；高 IV 買 LEAPS 要留意回落侵蝕（搭配 Vega）。', side: 'bottom' },
+    iv:             { el: '#leaps-th-iv',             title: '🌊 Implied Volatility',   desc: '該檔位隱含波動率。IV 越高權利金越貴；高 IV 買 LEAPS 要留意回落侵蝕（搭配 Vega）。' + TIP_H('IV Rank / IV Percentile') + TIP_L(['≤ 30%：理想進場點，權利金相對便宜，之後 IV 若回升對你的部位有利','30%–50%：可接受，但非最佳時機','&gt; 50%：不建議買進，權利金偏貴；長天期部位要持有數月甚至一兩年，IV 均值回歸會侵蝕獲利（vega 逆風）']), side: 'bottom' },
     vega:           { el: '#leaps-th-vega',           title: '🌀 Vega',                 desc: 'IV 每變 1% 權利金的理論變化。DTE 越長 Vega 越大；IV Crush 風險量化：IV 回落 10% ≈ 損失 Vega×10。', side: 'bottom' },
     itm_prob:       { el: '#leaps-th-itm_prob',       title: '🎲 ITM Probability',      desc: 'Barchart 估到期價內機率。買方視角＝到期仍有內在價值的機率，與 Delta 相關但獨立模型計算。', side: 'bottom' },
     f_type:         { el: '#leaps-th-f_type',         title: '🏷 Type',                 desc: 'Call（買權）或 Put（賣權）。搭配 Side 與方向欄一起判讀該筆大單的多空含義。', side: 'bottom' },
@@ -67,7 +73,7 @@
     if (el) {
       var d = LEAPS_COL_EXPLAIN[el.dataset.tipKey];
       if (!d) return;
-      tT.textContent = d.title; tB.textContent = d.desc;
+      tT.textContent = d.title; tB.innerHTML = d.desc;
       tip.style.opacity = '1'; posTip(e);
     } else { tip.style.opacity = '0'; }
   });

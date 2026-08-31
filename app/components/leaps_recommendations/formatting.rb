@@ -87,6 +87,27 @@ module LeapsRecommendations::Formatting
   end
 
 
+  # IV 顏色分級（LEAPS 排行表 IV 欄位）：IV 越高，權利金越貴、IV Crush 風險越大，
+  # 用顏色讓使用者一眼看出這口合約的波動率水位。
+  #   ≤ 30%：綠（波動率便宜）／ 30%–50%：黃（偏貴，留意）／ > 50%：紅（昂貴，IV Crush 風險高）
+  # val 與 fmt_pct 同樣是小數（0.30 代表 30%）。
+  IV_GREEN_MAX  = 0.30
+  IV_YELLOW_MAX = 0.50
+
+  def iv_color_class(val)
+    return "text-gray-400" if val.nil?
+
+    iv = val.to_f
+    if iv <= IV_GREEN_MAX
+      "text-green-600 font-bold"
+    elsif iv <= IV_YELLOW_MAX
+      "text-yellow-600 font-bold"
+    else
+      "text-red-600 font-bold"
+    end
+  end
+
+
   def fmt_premium(val)
     return "—" if val.nil?
     n = val.to_i

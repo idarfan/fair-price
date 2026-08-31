@@ -29,6 +29,10 @@ module LeapsRecommendations::RankingTable
 
   raise "TABLE_COL_KEYS 與 TABLE_COLS 長度不一致" unless TABLE_COL_KEYS.size == TABLE_COLS.size
 
+  # 表頭中文註記：只在 th 底下多一行小字，不併進 TABLE_COLS 的欄名。
+  # 併進欄名會讓該欄（th 是 whitespace-nowrap）被撐寬，把「流動性判斷」等欄擠到換行。
+  TABLE_COL_SUBLABELS = { "spread" => "買賣差價比" }.freeze
+
   # 欄位篩選面板：每欄一個 checkbox，預設勾選（DEFAULT_HIDDEN_COL_KEYS 除外），
   # 由 render_price_estimator_script 內的委派 click handler 監聽 change 事件切換
   # 對應 [data-col] 元素的 leaps-col-hidden class，讓表格不必整段重新渲染。
@@ -62,7 +66,12 @@ module LeapsRecommendations::RankingTable
               TABLE_COLS.each_with_index do |col, idx|
                 key = TABLE_COL_KEYS[idx]
                 th(id: "leaps-th-#{key}", data_tip_key: key, data_col: key,
-                   class: "px-3 py-2 text-center font-medium whitespace-nowrap#{hidden_col_class(key)}") { plain col }
+                   class: "px-3 py-2 text-center font-medium whitespace-nowrap#{hidden_col_class(key)}") do
+                  plain col
+                  if (sub = TABLE_COL_SUBLABELS[key])
+                    div(class: "text-[10px] font-normal text-gray-400") { plain sub }
+                  end
+                end
               end
             end
           end
@@ -163,7 +172,7 @@ module LeapsRecommendations::RankingTable
       td(class: "px-3 py-2 text-center", data_col: "extrinsic")      { plain fmt_price(row[:extrinsic_value]) }
       td(class: "px-3 py-2 text-center font-semibold", data_col: "extrinsic_pct") { plain fmt_pct(row[:extrinsic_pct]) }
       td(class: "px-3 py-2 text-center", data_col: "time_value_pct") { plain fmt_pct(row[:time_value_pct]) }
-      td(class: "px-3 py-2 text-center", data_col: "iv")             { plain fmt_pct(row[:iv]) }
+      td(class: "px-3 py-2 text-center #{iv_color_class(row[:iv])}", data_col: "iv") { plain fmt_pct(row[:iv]) }
       td(class: "px-3 py-2 text-center", data_col: "vega")           { plain fmt_decimal(row[:vega], 4) }
       td(class: "px-3 py-2 text-center#{hidden_col_class('itm_prob')}", data_col: "itm_prob") { plain fmt_pct(row[:itm_probability]) }
     end
