@@ -131,6 +131,44 @@ RSpec.describe "GET /leaps", type: :request do
       get "/leaps", params: { symbol: symbol }
       expect(response.body).to include("LEAPS 候選排行")
     end
+
+    # ── 欄位順序（ColumnOrder，admin 可拖曳調整，全站套用）─────────────────
+    def rendered_col_order(body)
+      body.scan(/id="leaps-th-([a-z_]+)"/).flatten
+    end
+
+    it "沒有存過順序時用預設欄位順序" do
+      get "/leaps", params: { symbol: symbol }
+
+      expect(rendered_col_order(response.body)).to eq(LeapsTableColumns::DEFAULT_KEYS)
+    end
+
+    it "存過順序時表頭依該順序渲染" do
+      custom = LeapsTableColumns::DEFAULT_KEYS.rotate(4)
+      ColumnOrder.replace!(ColumnOrder::LEAPS_RANKING, custom)
+
+      get "/leaps", params: { symbol: symbol }
+
+      expect(rendered_col_order(response.body)).to eq(custom)
+    end
+
+    # 表頭搬了、資料格沒跟著搬的話，整張表的數字就會對錯欄——這是這個功能
+    # 最容易出錯也最難用肉眼發現的地方，所以把它釘死。
+    it "資料列的 data-col 順序與表頭一致" do
+      custom = LeapsTableColumns::DEFAULT_KEYS.rotate(4)
+      ColumnOrder.replace!(ColumnOrder::LEAPS_RANKING, custom)
+
+      get "/leaps", params: { symbol: symbol }
+      first_row = response.body[/<tbody>.*?<tr.*?<\/tr>/m].to_s
+
+      expect(first_row.scan(/data-col="([a-z_]+)"/).flatten).to eq(custom)
+    end
+
+    it "非 admin 的頁面不掛拖曳掛勾" do
+      get "/leaps", params: { symbol: symbol }
+
+      expect(response.body).not_to include("data-col-reorder")
+    end
   end
 
   # ── PMCC v3 §8: pmcc_ranking_for wiring ──────────────────────────────────

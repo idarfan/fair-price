@@ -191,6 +191,20 @@
 #leaps-col-tip .tip-l li,
 .driver-popover .driver-popover-description .tip-l li { margin-top: 3px; }
 
+/* 欄位拖曳排序（column_reorder.js，僅 admin 的頁面會掛上）。
+   拖動中把整頁游標換成移動游標，被拖的整欄半透明，插入位置畫一條藍線。 */
+body.leaps-col-dragging,
+body.leaps-col-dragging * { cursor: move !important; user-select: none !important; }
+.leaps-col-drag-ghost { opacity: .4; background-color: rgb(219 234 254); }  /* blue-100 */
+.leaps-col-drop-line {
+  position: fixed;
+  display: none;
+  width: 2px;
+  background: #2563eb;                 /* blue-600 */
+  z-index: 99998;
+  pointer-events: none;
+}
+
 /* 可點擊的欄位標題視覺提示 */
 th[data-tip-key] { cursor: help; }
 th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */

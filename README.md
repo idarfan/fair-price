@@ -1,5 +1,41 @@
 # FairPrice
 
+### 2026-08-31（一）— LEAPS 排行表欄位可拖曳排序（admin 專屬，順序存 DB 全站套用）
+
+#### 為什麼順序要存 DB 而不是 localStorage
+
+欄位順序是**站台設定**不是個人偏好：只有 admin 能改，改完所有人看到同一個順序，
+換裝置、換瀏覽器都一致。新增 `column_orders` 表（`table_key` 唯一 + `column_keys` jsonb
++ `updated_by_id`），一個 table_key 一列，日後 PMCC 表要可拖曳只要多一列。
+
+#### 欄位定義與顯示順序拆開
+
+新增 `LeapsTableColumns`（PORO）持有 `DEFAULT_KEYS`／`LABELS`／`SUBLABELS`／
+`DEFAULT_HIDDEN_KEYS`／`PDF_EXCLUDED_KEYS`，component、PDF payload、API 驗證三邊
+共用同一份定義。`ColumnOrder.keys_for` 只負責「這次用什麼順序」。
+
+`LeapsTableColumns.sanitize` 是這組設計的關鍵：DB 存的是當下那批欄位的快照，
+日後程式加減欄位時舊快照會對不上——先丟掉不存在的 key，再把缺漏的 key 依
+`DEFAULT_KEYS` 的相對位置插回去，所以**新增欄位不需要動資料，也不會整欄消失**。
+
+#### `render_candidate_row` 從寫死順序改為 renderer hash
+
+欄位順序可變，td 就不能再是 19 段固定順序的呼叫。改成
+`candidate_cell_renderers` 回傳 `{ key => lambda }`，再依 `ordered_col_keys` 逐一
+`fetch(key).call`——少一個 key 會直接炸掉，比默默少渲染一欄好抓。
+
+#### 為什麼用 pointer events 而不是 HTML5 drag-and-drop
+
+兩個理由：HTML5 DnD 的游標由瀏覽器決定，做不到「按住拖動時變成 `move` 游標」；
+而且表頭的 click 已經被 tooltips.js 用來開欄位教學 popover，需要自己控制
+「位移超過 4px 才算拖曳」，並在拖曳結束後於 capture 階段吃掉那一次 click。
+
+#### 權限
+
+前端的 `data-col-reorder` 只是「要不要掛拖曳」的提示；真正的權限在
+`Api::V1::LeapsColumnOrdersController#require_admin!`。寫入只接受**完整排列**
+（不多、不少、不重複）——允許缺漏等於讓前端一個 bug 永久刪掉欄位。
+
 ### 2026-08-31（一）— LEAPS 排行表 IV 配色分級與欄位說明排版重整
 
 #### IV 欄位依水位上色

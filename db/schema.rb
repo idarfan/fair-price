@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_30_065800) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_31_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -38,6 +38,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_30_065800) do
     t.decimal "underlying_price", precision: 10, scale: 4
     t.datetime "updated_at", null: false
     t.index ["symbol"], name: "index_bcvs_expiration_snapshots_on_symbol", unique: true
+  end
+
+  create_table "column_orders", force: :cascade do |t|
+    t.jsonb "column_keys", default: [], null: false
+    t.datetime "created_at", null: false
+    t.string "table_key", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "updated_by_id"
+    t.index ["table_key"], name: "index_column_orders_on_table_key", unique: true
+    t.index ["updated_by_id"], name: "index_column_orders_on_updated_by_id"
   end
 
   create_table "fetch_logs", force: :cascade do |t|
@@ -608,6 +618,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_30_065800) do
     t.index ["user_id", "symbol"], name: "index_watchlist_items_on_user_id_and_symbol", unique: true
   end
 
+  add_foreign_key "column_orders", "users", column: "updated_by_id"
   add_foreign_key "iv_watchlists", "users"
   add_foreign_key "margin_positions", "users"
   add_foreign_key "option_snapshots", "tracked_tickers"

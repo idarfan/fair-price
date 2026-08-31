@@ -36,6 +36,9 @@ Rails.application.routes.draw do
       get "option_snapshots/:symbol/premium_trend", to: "option_snapshots#premium_trend",
           constraints: { symbol: TICKER_CONSTRAINT }
 
+      # LEAPS 排行表欄位順序（全站設定，只有 admin 能寫）
+      put "leaps/column_order", to: "leaps_column_orders#update", as: :leaps_column_order
+
       # Margin Trade Calculator
       get "iv_skew/:ticker/history", to: "iv_skew#history",
           constraints: { ticker: TICKER_CONSTRAINT }

@@ -16,6 +16,10 @@ module LeapsRecommendations::PdfExport
         far_term:  pdf_reco_group(@recommendation[:far_term])
       } : nil,
       candidates: @candidates.map { |row| pdf_candidate_row(row) },
+      # 欄位順序（admin 可拖曳調整）也要進 PDF，否則畫面與匯出檔會對不起來。
+      # 「價格預估」是試算按鈕，平面文件上沒有意義，不列入。
+      column_order: ordered_col_keys - LeapsTableColumns::PDF_EXCLUDED_KEYS,
+      column_labels: LeapsTableColumns::LABELS,
       # Options Flow 面板的完整內容，不只前 20 大成交列表：標題列的日期／Call
       # 、Put 總額，以及「排行候選 × 今日 Flow 重疊」提示，這三塊先前只有列表
       # 進了 PDF，總額與重疊提示遺漏（使用者實測發現），這裡一次補齊。

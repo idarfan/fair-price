@@ -245,15 +245,17 @@
     return y;
   }
 
-  function renderCandidatesTable(pdf, rows, margin, y) {
-    var head = [['到期日','DTE','履約價','Delta','OI','Volume','流動性判斷','Bid','Ask','Mid',
-                 'Spread%','內在價值','外在價值','外在佔比','Time Value%','IV','Vega','被指派機率']];
+  /* 欄位 key → pdf_candidate_row 的欄位名。只有到期日兩邊命名不同，
+     其餘同名；列在這裡是為了讓「順序由 column_order 決定」這件事成立。 */
+  var CAND_FIELDS = { expiration: 'expiration_date' };
+
+  function renderCandidatesTable(pdf, rows, margin, y, order, labels) {
+    var cols = (order && order.length) ? order : [];
+    var head = [cols.map(function (k) { return (labels && labels[k]) || k; })];
     var body = rows.map(function (r) {
-      return [r.expiration_date, r.dte, r.strike, r.delta, r.oi, r.volume, r.liquidity,
-              r.bid, r.ask, r.mid, r.spread, r.intrinsic, r.extrinsic, r.extrinsic_pct,
-              r.time_value_pct, r.iv, r.vega, r.itm_prob];
+      return cols.map(function (k) { return r[CAND_FIELDS[k] || k]; });
     });
-    var liqCol = 6;
+    var liqCol = cols.indexOf('liquidity');
     pdf.autoTable({
       head: head, body: body, startY: y,
       margin: { left: margin, right: margin },
@@ -368,7 +370,7 @@
 
     if (data.candidates && data.candidates.length) {
       if (y > pageH - 40) { pdf.addPage(); y = margin; }
-      y = renderCandidatesTable(pdf, data.candidates, margin, y);
+      y = renderCandidatesTable(pdf, data.candidates, margin, y, data.column_order, data.column_labels);
     }
 
     if (data.flow_rows && data.flow_rows.length) {
