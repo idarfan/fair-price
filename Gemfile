@@ -57,6 +57,11 @@ group :development, :test do
   gem "faker"
   gem "simplecov", require: false          # 覆蓋率（bin/audit coverage）
 
+  # 攔截測試中的對外 HTTP。沒有它時 request spec 會真的打 Finnhub / Yahoo：
+  # 慢、會因為 API 抖動偶發失敗、還吃掉 API 配額，而且測的是「外部服務還活著」
+  # 而不是我們的程式碼（見 spec/support/external_apis.rb）。
+  gem "webmock", require: false
+
   # 稽核工具
   # spec 本身的 lint（EmptyExampleGroup、重複 describe、未使用的 let…）
   gem "rubocop-rspec", require: false

@@ -37,6 +37,13 @@ RSpec/MessageChain:          { Enabled: false }   # TODO: 30 處
 RSpec/AnyInstance:           { Enabled: false }   # TODO: 21 處
 RSpec/MultipleMemoizedHelpers: { Enabled: false }
 
+# 有些 spec 測的是「設定」而不是某個類別（例如 spec/config/external_apis_spec.rb
+# 驗的是 WebMock 的攔截設定），字串描述比硬湊一個類別名更誠實。
+RSpec/DescribeClass:
+  Exclude:
+    - "spec/config/**/*_spec.rb"
+    - "spec/routing/**/*_spec.rb"
+
 # spec 檔名必須對應到被測方法。本專案刻意把大型 service 依「抓取目標」拆檔
 # （barchart_scraper_service_bpus / _leaps / _pmcc），改名反而失去這個分組。
 RSpec/SpecFilePathFormat:  { Enabled: false }
