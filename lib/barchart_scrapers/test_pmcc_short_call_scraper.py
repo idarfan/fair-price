@@ -161,6 +161,21 @@ class TestWaitForGrid(unittest.TestCase):
         self.assertIsNone(result)
 
 
+    # 迴歸（同 leaps_scraper）：分頁凍結時 eval 逾時要當成「還沒好」繼續輪詢，
+    # 不能讓例外穿過去炸掉整趟抓取。
+    def test_eval_timeout_is_treated_as_not_ready_and_keeps_polling(self):
+        responses = iter([TimeoutError("CDP eval timed out"), [{"strike": 7}]])
+
+        async def side(*_a, **_k):
+            nxt = next(responses)
+            if isinstance(nxt, Exception):
+                raise nxt
+            return nxt
+
+        with patch("pmcc_short_call_scraper.cdp_eval", new=AsyncMock(side_effect=side)):
+            result = _run(scraper._wait_for_grid("ws://", "JS", max_wait_s=5, poll_s=0.01))
+        self.assertEqual(result, [{"strike": 7}])
+
 class TestConfirmEmpty(unittest.TestCase):
 
     def test_still_empty_after_delay(self):
@@ -176,6 +191,14 @@ class TestConfirmEmpty(unittest.TestCase):
 
     def test_grid_unmounted_returns_none(self):
         with patch("pmcc_short_call_scraper.cdp_eval", new=AsyncMock(return_value=None)):
+            result = _run(scraper._confirm_empty("ws://", "JS", delay_s=0.001))
+        self.assertIsNone(result)
+
+    def test_eval_timeout_returns_none_instead_of_raising(self):
+        async def always_timeout(*_a, **_k):
+            raise TimeoutError("CDP eval timed out")
+
+        with patch("pmcc_short_call_scraper.cdp_eval", new=AsyncMock(side_effect=always_timeout)):
             result = _run(scraper._confirm_empty("ws://", "JS", delay_s=0.001))
         self.assertIsNone(result)
 

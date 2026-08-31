@@ -202,6 +202,80 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
     end
   end
 
+  # ── reason 分流：page_load_timeout 不能講成 Session 過期 ───────────────────
+  #
+  # 2026-08-31 SONY：頁面真的載入很慢（實測 V&G 34.3 秒），跟 Session 過期是
+  # 完全不同的處置（一個是稍後重試，一個是要重新登入 Barchart）。訊息講錯會
+  # 讓使用者跑去重新登入卻怎麼試都一樣。
+  describe "partial 的 reason 分流" do
+    let(:base_rows) do
+      [ {
+        "expiration_date" => "2027-01-15", "dte" => 365,
+        "strike" => 20.5, "option_type" => "Call",
+        "bid" => 3.1, "ask" => 3.3, "last_price" => 3.2,
+        "underlying_price" => 21.0,
+        "volume" => 100, "open_interest" => 41_000,
+        "delta" => 0.82, "iv" => 0.74,
+        "itm_probability" => nil, "vol_oi_ratio" => nil, "vega" => nil
+      } ]
+    end
+
+    def partial_with(reason)
+      {
+        "status"            => "partial",
+        "rows"              => base_rows,
+        "expired_at_strike" => 20.5,
+        "expired_layer"     => "volatility_greeks",
+        "reason"            => reason
+      }
+    end
+
+    before do
+      stub_cache(hit: false)
+      allow(service).to receive(:persist_leaps)
+      allow(service).to receive(:persist_chain_snapshot)
+    end
+
+    it "page_load_timeout 說的是載入沒完成、要稍後重試，不提 Session" do
+      allow(service).to receive(:run_scraper)
+        .and_return({ status: "partial", data: partial_with("page_load_timeout") })
+
+      error = service.fetch_leaps[:errors].first
+      expect(error).to include("Strike 20.5", "Volatility & Greeks", "稍後重試")
+      # 訊息會主動點名「非 Session 問題」，但絕不能叫使用者去重新登入
+      expect(error).to include("非 Session 問題")
+      expect(error).not_to include("重新登入")
+    end
+
+    # 訊息不該寫死秒數：GRID_MAX_WAIT_S 調過一次（25/30 → 60），
+    # 寫死的「30 秒」當場就變成錯誤資訊。
+    it "page_load_timeout 的訊息不寫死秒數" do
+      allow(service).to receive(:run_scraper)
+        .and_return({ status: "partial", data: partial_with("page_load_timeout") })
+
+      expect(service.fetch_leaps[:errors].first).not_to match(/\d+\s*秒/)
+    end
+
+    it "session_expired 才叫使用者重新登入 Barchart" do
+      allow(service).to receive(:run_scraper)
+        .and_return({ status: "partial", data: partial_with("session_expired") })
+
+      error = service.fetch_leaps[:errors].first
+      expect(error).to include("Session 已過期", "重新登入")
+    end
+
+    it "沒有 reason 時走第三種訊息，不冒充成前兩種" do
+      data = partial_with(nil).tap { |d| d.delete("reason") }
+      allow(service).to receive(:run_scraper).and_return({ status: "partial", data: data })
+
+      error = service.fetch_leaps[:errors].first
+      expect(error).to include("格線無回應")
+      expect(error).not_to include("Session 已過期")
+      expect(error).not_to include("稍後重試")
+    end
+  end
+
+
   # ── 4. Consecutive scrapes: second scrape replaces first entirely ─────────────
   #
   # persist_leaps runs delete_all + insert_all in one transaction, so only one

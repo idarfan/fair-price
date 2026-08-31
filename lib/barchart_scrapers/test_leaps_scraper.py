@@ -168,6 +168,16 @@ class TestConfirmEmpty(unittest.TestCase):
             result = _run(scraper._confirm_empty("ws://", "JS", delay_s=0.001))
         self.assertIsNone(result)
 
+    # 迴歸：穩定性檢查那一次 eval 一樣會撞到凍結分頁。例外冒出去會炸掉整趟抓取，
+    # 要退回 None（既有語意＝視同 timeout），讓 main 走 partial 路徑。
+    def test_eval_timeout_returns_none_instead_of_raising(self):
+        async def always_timeout(*_a, **_k):
+            raise TimeoutError("CDP eval timed out")
+
+        with patch("leaps_scraper.cdp_eval", new=AsyncMock(side_effect=always_timeout)):
+            result = _run(scraper._confirm_empty("ws://", "JS", delay_s=0.001))
+        self.assertIsNone(result)
+
 
 # ---------------------------------------------------------------------------
 # Stage 1 base: cdp_eval for NEAR_MONEY / UNDERLYING / EXPIRATIONS
