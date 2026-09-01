@@ -3,7 +3,7 @@
 ## 執行狀態表
 | 階段 | 狀態 | 驗證方式 |
 |---|---|---|
-| **Phase 0 長腳報價可行性** | 未開始 | 實跑 scraper 取得指定到期日+履約價的 mid/delta，與 Barchart 頁面人工比對 |
+| **Phase 0 長腳報價可行性** | **已完成（2026-09-01）** | 實跑 scraper 取得指定到期日+履約價的 mid/delta，與 Barchart 頁面人工比對 |
 | Phase 1 資料模型 | 未開始 | migration 執行成功 + schema.rb 含四張表（含 user_id / contracts / fees） |
 | Phase 2 滾倉觸發判斷 | 未開始 | RSpec：給定 4 組已知案例（深度ITM/價平/價外/近到期），觸發布林值正確 |
 | Phase 3 滾倉建議服務 | 未開始 | 給定真實 option chain fixture，輸出建議履約價與 Phase2 手算結果一致（誤差<$1） |
@@ -50,8 +50,43 @@
 
 **成本**：每個被追蹤的長腳到期日 = 抓取時多一輪導覽 ＋ 等表格（實測約數十秒）。
 
-**驗收**：實跑一檔真實長腳（**含 DTE < 364 的案例**）印出 mid/delta，與 Barchart
-頁面人工比對一致。
+**驗收**：實跑一檔真實長腳印出 mid/delta，與 Barchart 頁面人工比對一致。
+
+### 完成記錄（2026-09-01）
+
+用法：`python3 pmcc_short_call_scraper.py BE --expirations 2028-01-21`
+
+```
+BE 100 @ 2028-01-21 → dte 508, bid 128, ask 131.4, mid 129.7,
+                       delta 0.8978, iv 0.8885, OI 3893, 標的 206.3
+```
+
+- `select_expirations(expirations, today, extra)`：`extra` 指定的到期日不受
+  `MAX_SHORT_DTE`／`MAX_EXPIRATIONS` 限制，**也不佔用短腳的額度**
+- **長腳跳過 V&G**：只需要 mid/delta，兩者都在 Options Prices 頁上；
+  V&G 的 theta/gamma/rho 對「現在值多少」沒用途。長腳固定成本因此是
+  **一次頁面載入**（不是兩次）
+- 一次抓取只有一腳（使用者現況），所以增加的成本就是那一次載入
+
+### 同時修掉的既有 bug：V&G 少一個 URL 參數
+
+實跑才發現 DB 裡 BE 的 465 列只有 **140 列**有 theta/gamma/itm_probability。
+原因不是逾時——`skipped_expirations` 是空的，V&G 有讀到資料，只是**對不起來**：
+
+| 頁面 | 列數 | 履約價範圍 |
+|---|---|---|
+| V&G（原本，無 `moneyness`）| 20 | 160–255 |
+| V&G（加 `moneyness=100`）| 49 | 115–355 |
+| Options Prices（對照）| 49 | 115–355 |
+
+`_merge_vg` 用 `(strike, expiration_date)` 對接，兩邊範圍不同就只有交集拿得到
+greeks。補上 `&moneyness=100` 後：**theta/gamma/itm_prob 從 140/465 變成 465/465**。
+
+順帶把寫死的等待上限（opts 30 秒／V&G 25 秒）統一成 `GRID_MAX_WAIT_S = 60`，
+與 `leaps_scraper.py` 2026-08-31 的修正對齊（該次漏改這一支）。
+
+**這個 bug 直接影響 Phase 3**：滾倉建議需要短腳的 theta 與 itm_probability，
+修之前七成候選拿不到。
 
 ---
 
@@ -64,7 +99,6 @@
 ### `pmcc_positions`（一組 PMCC 部位 = 一筆長腳）
 | 欄位 | 型別 | 說明 |
 |---|---|---|
-| **user_id** | **FK, null: false, index** | **持倉是個人財務資料。本專案所有個人性資料表（margin_positions / portfolios / price_alerts / watchlist_items / iv_watchlists）都有 user_id，沒有等於全站共享。比照 `MarginPosition` 的 `belongs_to :user` 與 scope 寫法** |
 | ticker | string | |
 | **long_contracts** | **integer, null: false, > 0** | **口數。原 spec 通篇「每股 ×100」隱含只有 1 口** |
 | long_strike | decimal | 長腳履約價（固定） |
@@ -217,6 +251,12 @@ Playwright 截圖跑過以下完整流程，非僅 API 層測試：
 ---
 
 ## 已決事項（2026-09-01 檢討）
+- [x] **不做 per-user 隔離**（2026-09-01 決定）：三張表**不加 `user_id`**。
+      現況 5 個帳號全部 enabled、其中 4 個非 admin，`/leaps` 也沒有 admin 閘門，
+      所以**持倉數字對所有已登入使用者可見**——使用者已知悉並接受
+      （其他人沒有期權三期權限，不會使用此功能）。
+      **此設計假設「不介意其他已登入帳號看到持倉」**，哪天不成立就要補 `user_id`
+      加 backfill。
 - [x] **長腳現值**：首次由使用者手動輸入成本，**之後的現值從 Barchart 抓**
       （見 Phase 0，沿用 `pmcc_short_call_scraper.py` 的到期日全鏈讀取）
 - [x] **口數與手續費**：兩者都納入模型（`contracts` / `fees`）

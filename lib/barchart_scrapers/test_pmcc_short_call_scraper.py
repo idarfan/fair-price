@@ -100,6 +100,48 @@ class TestSelectExpirations(unittest.TestCase):
     def test_empty_dropdown_gives_empty(self):
         self.assertEqual(scraper.select_expirations([], today=self.TODAY), [])
 
+    # ── pmcc-tracker Phase 0：長腳到期日 ──────────────────────────────────
+    # 長腳是 DTE 數百天的 LEAPS，永遠不會被 60 天門檻選中，必須明確指定。
+    def test_extra_expiration_is_added_even_when_far_beyond_60_days(self):
+        vals = self._values(7, 14, 508)
+        picked = scraper.select_expirations(vals, today=self.TODAY, extra=[self._values(508)[0][:10]])
+
+        self.assertIn(self._values(508)[0], picked)
+        self.assertEqual(len(picked), 3)
+
+    def test_extra_expiration_keeps_ascending_order_of_the_dropdown(self):
+        vals = self._values(7, 14, 508)
+        picked = scraper.select_expirations(vals, today=self.TODAY, extra=[self._values(508)[0][:10]])
+
+        self.assertEqual(picked, vals)
+
+    def test_extra_expiration_already_selected_is_not_duplicated(self):
+        vals = self._values(7, 14)
+        picked = scraper.select_expirations(vals, today=self.TODAY, extra=[self._values(7)[0][:10]])
+
+        self.assertEqual(picked, vals)
+        self.assertEqual(len(picked), len(set(picked)))
+
+    def test_extra_expiration_not_in_the_dropdown_is_ignored(self):
+        vals = self._values(7, 14)
+        picked = scraper.select_expirations(vals, today=self.TODAY, extra=["2099-01-15"])
+
+        self.assertEqual(picked, vals)
+
+    # 額外到期日不佔 MAX_EXPIRATIONS 的額度，否則長腳會把短腳候選擠掉
+    def test_extra_expiration_does_not_consume_the_cap(self):
+        vals = self._values(3, 10, 17, 24, 31, 38, 45, 52, 508)
+        picked = scraper.select_expirations(vals, today=self.TODAY, extra=["2099-01-01", self._values(508)[0][:10]])
+
+        self.assertEqual(len(picked), scraper.MAX_EXPIRATIONS + 1)
+        self.assertIn(self._values(508)[0], picked)
+
+    def test_no_extra_behaves_exactly_as_before(self):
+        vals = self._values(7, 14, 508)
+
+        self.assertEqual(scraper.select_expirations(vals, today=self.TODAY),
+                         scraper.select_expirations(vals, today=self.TODAY, extra=[]))
+
     def test_unparsable_value_is_skipped_not_fatal(self):
         vals = ["not-a-date"] + self._values(7)
         picked = scraper.select_expirations(vals, today=self.TODAY)

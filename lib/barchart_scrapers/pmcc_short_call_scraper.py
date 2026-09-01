@@ -46,6 +46,12 @@ STAGE1_SETTLE  = 5000  # 對齊 leaps_scraper.py 的 5000ms——3000ms 太短�
                        # 兩者讀同一個 expiration dropdown，差異只在 settle 時間
 OPTIONS_SETTLE = 1500
 VG_SETTLE      = 1500
+
+# Barchart 的 bc-data-grid 掛載時間跟標的與當下負載有關，不是固定的。
+# 2026-08-31 實測 volatility-greeks 頁需要 34.3 秒；舊上限（opts 30 秒／V&G 25 秒）
+# 會讓 V&G 大量抓不到，實查 BE 465 列裡只有 140 列有 theta/gamma/itm_probability。
+# leaps_scraper.py 已於 2026-08-31 改成 60 秒，這支當時漏改。
+GRID_MAX_WAIT_S = 60
 # spec §3（2026-09-01 修訂）：不再固定取前三個到期日。
 # 舊做法常常整組落在 6–50 天，前一兩個還短於 lesson9 的 19–45 天建議區間，
 # 使用者真正要看的 45–60 天往往一個候選都沒有。改成依 DTE 選。
@@ -56,7 +62,7 @@ MAX_EXPIRATIONS = 8
 MAX_SHORT_DTE   = 60   # 涵蓋建議區間 19–45，並往上留到 60 天
 EXPIRATIONS_MAX_WAIT_S = 10  # dropdown 輪詢上限（見 _wait_for_grid 用法）
 
-def select_expirations(expirations, today=None):
+def select_expirations(expirations, today=None, extra=None):
     """
     從 Expiration 下拉挑出要抓的到期日。
 
@@ -66,6 +72,15 @@ def select_expirations(expirations, today=None):
     一個都不符合時（首個到期日就超過 60 天，例如只有月選且剛過期一輪的標的）
     退回取第一個——spec §3「若下拉僅 1–2 個，有幾個抓幾個」的精神是不要因為
     門檻而回傳空結果，讓整個 PMCC 區塊變成 no_candidates。
+
+    `extra`（pmcc-tracker Phase 0）：明確指定的到期日，用 "YYYY-MM-DD" 比對，
+    不受 MAX_SHORT_DTE 與 MAX_EXPIRATIONS 限制。用途是把 PMCC 部位的**長腳**
+    到期日一起帶進來抓報價——長腳是 DTE 數百天的 LEAPS，永遠不會被 60 天門檻選中。
+
+    這裡刻意不新增第二支爬蟲：下面的抓取迴圈本身完全不看 DTE，只是拿到什麼
+    到期日就讀 `?expiration=<值>&moneyness=100` 的全鏈，能力一直都在
+    （2026-09-01 實測 BE 2028-01-21／DTE 508 讀到 65 個履約價、greeks 齊全）。
+    差別只在沒人叫它去讀那個到期日。
     """
     today = today or _date.today()
     picked = []
@@ -80,6 +95,13 @@ def select_expirations(expirations, today=None):
             break
     if not picked and expirations:
         picked = [expirations[0]]
+
+    # 額外到期日接在後面，保持原本的日期升序不被打亂；已在清單裡就不重複加。
+    wanted = {str(e)[:10] for e in (extra or [])}
+    if wanted:
+        already = {str(v)[:10] for v in picked}
+        picked += [v for v in expirations
+                   if str(v)[:10] in wanted and str(v)[:10] not in already]
     return picked
 
 
@@ -302,7 +324,7 @@ async def _confirm_empty(ws_url, js_expr, delay_s=1.5, target_id=None):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-async def main(symbol):
+async def main(symbol, extra_expirations=None):
     symbol = symbol.upper()
 
     target_id, ws_url = await prepare_page(symbol, TARGET_PATH, settle_ms=500)
@@ -330,7 +352,9 @@ async def main(symbol):
             break
         await asyncio.sleep(0.5)
     expirations = expirations or []
-    selected_expirations = select_expirations(expirations)
+    selected_expirations = select_expirations(expirations, extra=extra_expirations)
+    # 哪些是「額外指定的長腳到期日」——用來決定要不要跳過 V&G（見迴圈內註解）
+    extra_keys = {str(e)[:10] for e in (extra_expirations or [])}
 
     if not selected_expirations:
         print(json.dumps({"status": "no_candidates"}))
@@ -351,7 +375,7 @@ async def main(symbol):
         await cdp_navigate(ws_url, opts_url, settle_ms=OPTIONS_SETTLE)
         await activate_target(target_id)
 
-        opts_rows = await _wait_for_grid(ws_url, OPTIONS_PRICES_JS, max_wait_s=30, target_id=target_id)
+        opts_rows = await _wait_for_grid(ws_url, OPTIONS_PRICES_JS, max_wait_s=GRID_MAX_WAIT_S, target_id=target_id)
 
         if opts_rows is None:
             is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS, target_id=target_id) or False
@@ -393,15 +417,28 @@ async def main(symbol):
         _fill_exp_date(opts_rows, exp_key)
         all_opts_rows.extend(opts_rows)
 
+        # 長腳到期日（--expirations 指定的）只需要 mid / delta 做現值估算，
+        # 兩者 Options Prices 頁上都有；V&G 提供的 theta/gamma/rho/theoretical
+        # 對「長腳現在值多少」沒有用途。跳過可省一次頁面載入（實測約十幾秒），
+        # 而長腳每次都要抓，這是穩定的固定成本，值得省。
+        if exp_key in extra_keys:
+            await asyncio.sleep(0.8)
+            continue
+
         # ── Volatility & Greeks ──────────────────────────────────────────────
+        # moneyness=100 必須跟 Options Prices 那頁一致：_merge_vg 是用
+        # (strike, expiration_date) 對接，兩邊履約價範圍不同就只有交集拿得到 greeks。
+        # 2026-09-01 實測 BE 2026-09-25：不帶此參數只回 20 列（160–255），
+        # 帶了是 49 列（115–355），與 Options Prices 完全一致。
+        # 這個缺漏造成 DB 裡 465 列只有 140 列有 theta/gamma/itm_probability。
         vg_url = (
             f"https://www.barchart.com/stocks/quotes/{symbol}/volatility-greeks"
-            f"?expiration={exp_value}"
+            f"?expiration={exp_value}&moneyness=100"
         )
         await cdp_navigate(ws_url, vg_url, settle_ms=VG_SETTLE)
         await activate_target(target_id)
 
-        vg_rows = await _wait_for_grid(ws_url, VG_JS, max_wait_s=25, target_id=target_id)
+        vg_rows = await _wait_for_grid(ws_url, VG_JS, max_wait_s=GRID_MAX_WAIT_S, target_id=target_id)
 
         if vg_rows is None:
             is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS, target_id=target_id) or False
@@ -458,5 +495,13 @@ async def main(symbol):
 
 
 if __name__ == "__main__":
-    sym = sys.argv[1] if len(sys.argv) > 1 else "NOK"
-    asyncio.run(main(sym))
+    # 用法：python3 pmcc_short_call_scraper.py BE [--expirations 2028-01-21,2027-06-17]
+    # --expirations 是 PMCC 部位長腳的到期日，不受 60 天門檻限制（見 select_expirations）
+    args = sys.argv[1:]
+    sym = args[0] if args and not args[0].startswith("--") else "NOK"
+    extra = []
+    if "--expirations" in args:
+        idx = args.index("--expirations")
+        if idx + 1 < len(args):
+            extra = [x.strip() for x in args[idx + 1].split(",") if x.strip()]
+    asyncio.run(main(sym, extra_expirations=extra))
