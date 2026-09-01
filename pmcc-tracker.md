@@ -7,7 +7,7 @@
 | Phase 1 資料模型 | **已完成（2026-09-01）** | migration 執行成功 + schema.rb 含四張表（含 user_id / contracts / fees） |
 | Phase 2 滾倉觸發判斷 | **已完成（2026-09-01）** | RSpec：給定 4 組已知案例（深度ITM/價平/價外/近到期），觸發布林值正確 |
 | Phase 3 滾倉建議服務 | **已完成（2026-09-01）** | 給定真實 option chain fixture，輸出建議履約價與 Phase2 手算結果一致（誤差<$1） |
-| Phase 4 損益帳本 | 未開始 | 建立3筆模擬 roll 事件後，累積已實現損益=手算值且**不含估算值**；未實現另外顯示 |
+| Phase 4 損益帳本 | **已完成（2026-09-01）** | 建立3筆模擬 roll 事件後，累積已實現損益=手算值且**不含估算值**；未實現另外顯示 |
 | Phase 5 前端整合 | 未開始 | `ApplicationController.render` 驗 HTML 結構 + 使用者人工視覺確認（見下方「驗收方式的現實限制」） |
 
 > **驗收方式的現實限制（2026-09-01 實測）**：Playwright MCP 控制的是 9224 那個 Chrome
@@ -278,6 +278,31 @@ PmccRollTriggerService.call(short_leg, quote: quote_row, manual: false)
 ```
 
 **驗收**：建立3筆模擬 roll 事件（含1筆 assigned）後，累積已實現損益與手算值一致；頁面同時顯示未實現長腳損益。
+
+### 完成記錄（2026-09-01）
+
+`app/services/pmcc_pnl_service.rb`，20 則 spec。
+
+**各事件類型的金額公式集中在一處**（class method，供 Phase 5 建立事件時呼叫，
+不要在表單裡各寫一份）：`short_expired_pnl` / `short_closed_pnl` /
+`short_assigned_pnl` / `long_closed_pnl`，一律 **× 口數 × 100 再扣手續費**。
+
+**三個「回 nil 而不是 0」的決定**——都是同一個理由：**沒有資料不等於沒有問題**，
+回 0 會讓使用者以為系統確認過了。
+
+| 情況 | 回傳 |
+|---|---|
+| 沒有長腳報價 | `unrealized` 與 `total` 皆 `nil`（不是 0）|
+| 未實現未知 | `annualized_return` 為 `nil` |
+| 資本已回收完（`capital_deployed <= 0`）| `annualized_return` 為 `nil`，不硬算 |
+
+**年化報酬率**：`total / capital_deployed / MAX(持有天數, 1) × 365`。
+分母用 `capital_deployed`（實付成本 − 累積已實現）而非原始成本——
+滾倉收租會持續降低實際投入，用原始成本會低估報酬。
+已平倉的部位持有天數算到 `closed_at`。
+
+**未實現不寫進 pnl_events**，有 spec 釘住（算了未實現之後 `PmccPnlEvent.count`
+不變），避免頻繁報價污染帳本。
 
 ---
 
