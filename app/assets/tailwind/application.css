@@ -225,7 +225,9 @@ body.leaps-col-dragging * { cursor: move !important; user-select: none !importan
   border-radius: 4px;
   background: #16a34a;                 /* green-600 */
   color: #fff;
-  font-size: 14px;
+  /* ▸ 這個字元的實際墨跡比字級小不少，14px 時三角形看起來偏小；
+     18px 在 24px 方框裡仍留有邊距，不會頂到框邊。 */
+  font-size: 18px;
   line-height: 1;
   transition: transform .15s ease;
 }
