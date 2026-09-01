@@ -8,7 +8,7 @@
 | Phase 2 滾倉觸發判斷 | **已完成（2026-09-01）** | RSpec：給定 4 組已知案例（深度ITM/價平/價外/近到期），觸發布林值正確 |
 | Phase 3 滾倉建議服務 | **已完成（2026-09-01）** | 給定真實 option chain fixture，輸出建議履約價與 Phase2 手算結果一致（誤差<$1） |
 | Phase 4 損益帳本 | **已完成（2026-09-01）** | 建立3筆模擬 roll 事件後，累積已實現損益=手算值且**不含估算值**；未實現另外顯示 |
-| Phase 5 前端整合 | **顯示層已完成（2026-09-01）；寫入表單進行中** | `ApplicationController.render` 驗 HTML 結構 + 使用者人工視覺確認（見下方「驗收方式的現實限制」） |
+| Phase 5 前端整合 | **已完成（2026-09-01）**；視覺確認待使用者（見驗收限制）| `ApplicationController.render` 驗 HTML 結構 + 使用者人工視覺確認（見下方「驗收方式的現實限制」） |
 
 > **驗收方式的現實限制（2026-09-01 實測）**：Playwright MCP 控制的是 9224 那個 Chrome
 > 實例，與使用者日常登入的瀏覽器不是同一個，`/leaps` 一律被踢回 `/login`，
@@ -349,11 +349,41 @@ KL/KS 與累積損益。無部位時整個區塊不渲染。
 - **滾倉操作**：使用者從建議清單點選一筆 → 表單預填 → 確認送出 → 建立 `pnl_event(short_closed)` + 新 `short_leg`
 - **整個部位平倉（新增）**：不透過履約交割，改「兩腳一起平倉」——Sell to Close 長腳 + Buy to Close 短腳，同組合單。表單輸入：長腳賣出價（每股）、短腳買回價（每股）→ 建立 `pnl_event(long_closed)` + `pnl_event(short_closed)`（若當時仍有 open short leg）→ `pmcc_position.status = closed`。此為結束部位的**預設建議路徑**，履約交割（`long_exercised`）僅在無法市場平倉時才使用，UI 上不做為主要按鈕
 
+### 寫入層完成記錄（2026-09-01）
+
+**API**：`Api::V1::PmccPositionsController`（`create` / `destroy` / `roll` /
+`expire` / `assign` / `close`），路由 `resources :pmcc_positions`。
+**不新開頁面**——畫面仍掛在 `/leaps` 內，只有寫入走 JSON API。
+
+- 一律 `current_user.pmcc_positions.find(...)`：別人的 id 直接 404，有 spec 釘住
+- **金額公式一律呼叫 `PmccPnlService` 的 class method**，controller 不重寫——
+  表單各寫一份是帳本對不起來的起點
+- **`roll` 整段包在 transaction**：中途失敗會留下「舊腳關了、新腳沒開」的破碎
+  狀態，帳本從此對不起來。有 spec 送不合法的 new_strike 驗整段回滾
+- `roll` 缺 `close_cost` 回 422，**不假設買回成本為 0**
+- 事件寫入時留存 `quote_snapshot`（覆蓋式快照事後查不到）
+
+**表單**：`pmcc_tracker.js` 委派監聽 `data-pmcc-action`，元件只放 data 標記
+（Phlex 2.x 封鎖 `on*`）。空欄位不送出——送空字串會讓「沒填」與「填 0」
+在後端變成同一件事。平倉與被指派會先 `confirm`。
+
+**與原 spec 的一處偏離**：原本寫「無部位時整個區塊不顯示」，但那樣**沒有入口
+建立第一筆部位**，功能無法啟用。改為無部位時只顯示一個精簡的
+「建立 PMCC 部位」收折列。
+
+**class 命名**：追蹤面板用 `.leaps-pmcc-panel` 而非共用 `.leaps-pmcc-bucket`——
+後者專指「一個到期日桶」，有 spec 靠它數桶數，共用會把桶數算多一個
+（實際被測試抓到）。兩者 CSS 樣式共用。
+
 ### 完成驗收
-Playwright 截圖跑過以下完整流程，非僅 API 層測試：
-1. `/leaps?symbol=XXX` 頁面建部位
-2. 觸發滾倉建議 → 確認滾倉 → 損益帳本更新
-3. 整個部位平倉（兩腳一起平倉）→ position 狀態變 closed、帳本寫入兩筆 pnl_event
+**已完成（伺服器端）**：19 則 API request spec 覆蓋建部位／滾倉／到期／指派／
+平倉／刪除與隔離，含 transaction 回滾；12 則頁面 request spec 覆蓋渲染、解耦、
+隔離與表單存在。
+
+**待使用者確認（視覺）**：Playwright MCP 控制的是 9224 那個 Chrome 實例，
+與使用者登入的瀏覽器不同，`/leaps` 一律被踢回 `/login`，**AI 無法截圖驗收
+需要登入的頁面**。實際操作流程（建部位 → 滾倉 → 帳本更新 → 兩腳平倉）
+需由使用者在自己的瀏覽器走一次。
 
 ---
 

@@ -36,6 +36,17 @@ Rails.application.routes.draw do
       get "option_snapshots/:symbol/premium_trend", to: "option_snapshots#premium_trend",
           constraints: { symbol: TICKER_CONSTRAINT }
 
+      # PMCC 部位追蹤（pmcc-tracker Phase 5）。畫面掛在 /leaps 內，不另開頁面；
+      # 寫入走 JSON API，一律從 current_user 出發（見 controller 註解）。
+      resources :pmcc_positions, only: [ :create, :destroy ] do
+        member do
+          post :roll     # 滾倉：買回目前短腳 + 賣出新短腳
+          post :expire   # 短腳到期歸零
+          post :assign   # 短腳被指派
+          post :close    # 整個部位平倉（兩腳一起）
+        end
+      end
+
       # LEAPS 排行表欄位順序（全站設定，只有 admin 能寫）
       put "leaps/column_order", to: "leaps_column_orders#update", as: :leaps_column_order
 

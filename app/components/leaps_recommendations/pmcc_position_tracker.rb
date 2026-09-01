@@ -3,19 +3,20 @@
 # pmcc-tracker Phase 5：部位追蹤區塊。
 #
 # 垂直堆疊在 pmcc_section（黃金法則排行表）下方，不並排——並排會讓版面壅擠。
-# 預設**收摺**，只顯示摘要列；沿用 pmcc_section 那套原生 details/summary
-# （`.leaps-pmcc-bucket`），零 JS，也避開 Phlex 2.x 封鎖 on* 屬性。
+# 預設**收摺**，只顯示摘要列；沿用 pmcc_section 那套原生 details/summary 樣式，
+# 但用自己的 class `.leaps-pmcc-panel`——`.leaps-pmcc-bucket` 專指「一個到期日桶」，
+# 有 spec 靠它數桶數，共用會把桶數算多一個。零 JS，也避開 Phlex 2.x 封鎖 on*。
 #
 # 無部位時整個區塊不渲染，不顯示空的收折列。
 module LeapsRecommendations::PmccPositionTracker
   def render_pmcc_position_tracker
-    return if @pmcc_tracker.blank?
+    return render_pmcc_create_form if @pmcc_tracker.blank?
 
     position = @pmcc_tracker[:position]
     pnl      = @pmcc_tracker[:pnl]
 
     div(class: "bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden") do
-      details(class: "leaps-pmcc-bucket") do
+      details(class: "leaps-pmcc-panel") do
         summary(class: "flex items-center gap-2 flex-wrap cursor-pointer select-none") do
           h2(class: "text-sm font-semibold text-gray-700") do
             plain "PMCC 部位追蹤 — #{position.ticker}"
@@ -29,6 +30,7 @@ module LeapsRecommendations::PmccPositionTracker
           render_tracker_trigger
           render_tracker_suggestions
           render_tracker_timeline(pnl)
+          render_tracker_actions(position)
         end
       end
     end
@@ -251,5 +253,88 @@ module LeapsRecommendations::PmccPositionTracker
     return "—" if val.nil?
 
     sprintf("%+.2f", val.to_f)
+  end
+
+
+  # ── 表單 ──────────────────────────────────────────────────────────────
+  #
+  # 沒有 on* 屬性（Phlex 2.x 封鎖），全部靠 pmcc_tracker.js 的委派監聽 +
+  # data-pmcc-action 觸發。表單本身只負責收集欄位。
+
+  # 無部位時只給一個精簡的「建立部位」收折列——不給入口就沒辦法建第一筆。
+  # （pmcc-tracker.md 原本寫「無部位時整個區塊不顯示」，那樣功能無法啟用。）
+  def render_pmcc_create_form
+    return if @symbol.blank?
+
+    div(class: "bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden",
+        data_export_exclude: "") do
+      details(class: "leaps-pmcc-panel") do
+        summary(class: "flex items-center gap-2 flex-wrap cursor-pointer select-none") do
+          h2(class: "text-sm font-semibold text-gray-700") { plain "建立 PMCC 部位 — #{@symbol}" }
+          span(class: "text-xs text-gray-400") { plain "記錄長腳後即可追蹤滾倉與損益" }
+        end
+        div(class: "mt-3", data_pmcc_form: "create", data_pmcc_symbol: @symbol) do
+          div(class: "flex flex-wrap gap-2 items-end") do
+            pmcc_field("long_strike", "長腳履約價", "number")
+            pmcc_field("long_expiration", "長腳到期日", "date")
+            pmcc_field("long_entry_cost", "實付成本／股", "number")
+            pmcc_field("long_entry_date", "買入日期", "date")
+            pmcc_field("long_contracts", "口數", "number", value: "1")
+            pmcc_button("建立部位", "create")
+          end
+        end
+      end
+    end
+  end
+
+
+  def render_tracker_actions(position)
+    leg = position.open_short_leg
+
+    div(class: "px-1 pt-2 border-t border-gray-100", data_export_exclude: "",
+        data_pmcc_position_id: position.id) do
+      h3(class: "text-xs font-semibold text-gray-600 mb-2") { plain "操作" }
+
+      if leg.present?
+        div(class: "flex flex-wrap gap-2 items-end mb-2", data_pmcc_form: "roll") do
+          pmcc_field("close_cost", "買回目前短腳／股", "number")
+          pmcc_field("new_strike", "新履約價", "number")
+          pmcc_field("new_expiration", "新到期日", "date")
+          pmcc_field("new_premium", "新收租／股", "number")
+          pmcc_field("fees", "手續費", "number", value: "0")
+          pmcc_button("滾倉", "roll")
+          pmcc_button("到期歸零", "expire", style: :secondary)
+          pmcc_button("被指派", "assign", style: :secondary)
+        end
+      end
+
+      div(class: "flex flex-wrap gap-2 items-end", data_pmcc_form: "close") do
+        pmcc_field("long_sell_price", "長腳賣出價／股", "number")
+        pmcc_field("short_close_cost", "短腳買回／股", "number", value: "0")
+        pmcc_field("fees", "手續費", "number", value: "0")
+        pmcc_button("整個部位平倉", "close", style: :danger)
+      end
+    end
+  end
+
+
+  def pmcc_field(name, label, type, value: nil)
+    label(class: "flex flex-col gap-0.5") do
+      span(class: "text-[10px] text-gray-400") { plain label }
+      input(type: type, step: "any", value: value, data_pmcc_field: name,
+            class: "px-2 py-1 rounded border border-gray-300 text-xs w-28")
+    end
+  end
+
+
+  def pmcc_button(text, action, style: :primary)
+    color = case style
+    when :danger    then "bg-red-600 hover:bg-red-700"
+    when :secondary then "bg-gray-500 hover:bg-gray-600"
+    else                 "bg-blue-600 hover:bg-blue-700"
+    end
+
+    button(type: "button", data_pmcc_action: action,
+           class: "px-3 py-1.5 rounded text-xs text-white #{color}") { plain text }
   end
 end

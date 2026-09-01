@@ -205,16 +205,21 @@ body.leaps-col-dragging * { cursor: move !important; user-select: none !importan
   pointer-events: none;
 }
 
-/* PMCC 到期日桶（pmcc_section.rb，原生 details/summary 收摺）。
+/* PMCC 到期日桶（pmcc_section.rb）與部位追蹤面板（pmcc_position_tracker.rb）
+   共用同一套 details/summary 樣式，但**class 分開**：.leaps-pmcc-bucket 專指
+   「一個到期日桶」，有 spec 靠它數桶數；追蹤面板混用會把桶數算多一個。
    預設只有第一桶展開，其餘收起，避免六個到期日把畫面撐得過長。 */
-.leaps-pmcc-bucket > summary { list-style: none; }
-.leaps-pmcc-bucket > summary::-webkit-details-marker { display: none; }
+.leaps-pmcc-bucket > summary,
+.leaps-pmcc-panel > summary { list-style: none; }
+.leaps-pmcc-bucket > summary::-webkit-details-marker,
+.leaps-pmcc-panel > summary::-webkit-details-marker { display: none; }
 /* 展開箭頭：24px 綠底方框 + 白色三角形。
    原本是裸的 ▸ 字元，沒有固定尺寸，會跟著頁首「字體調整」一起縮放，
    大小不可控；改成固定 24px 的方框後就與字級脫鉤。
    summary 本身是 flex 容器，::before 會成為 flex item，
    所以 width/height 直接生效，間距交給既有的 gap-2，不另加 margin。 */
-.leaps-pmcc-bucket > summary::before {
+.leaps-pmcc-bucket > summary::before,
+.leaps-pmcc-panel > summary::before {
   content: "\25B8";                    /* ▸ */
   flex: 0 0 24px;
   display: inline-flex;
@@ -231,8 +236,10 @@ body.leaps-col-dragging * { cursor: move !important; user-select: none !importan
   line-height: 1;
   transition: transform .15s ease;
 }
-.leaps-pmcc-bucket[open] > summary::before { transform: rotate(90deg); }
-.leaps-pmcc-bucket > summary:hover { background: rgba(0, 0, 0, .03); }
+.leaps-pmcc-bucket[open] > summary::before,
+.leaps-pmcc-panel[open] > summary::before { transform: rotate(90deg); }
+.leaps-pmcc-bucket > summary:hover,
+.leaps-pmcc-panel > summary:hover { background: rgba(0, 0, 0, .03); }
 
 /* 可點擊的欄位標題視覺提示 */
 th[data-tip-key] { cursor: help; }

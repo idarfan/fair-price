@@ -178,8 +178,36 @@ RSpec.describe "GET /leaps", type: :request do
       response.body
     end
 
-    it "沒有部位時整個區塊不渲染（不顯示空的收折列）" do
-      expect(get_leaps).not_to include("PMCC 部位追蹤")
+    it "沒有部位時不顯示追蹤區塊，改給精簡的建立入口" do
+      body = get_leaps
+
+      expect(body).not_to include("PMCC 部位追蹤")
+      # 不給入口就沒辦法建第一筆——pmcc-tracker.md 原本寫「整個區塊不顯示」，
+      # 那樣功能無法啟用，改成只顯示建立表單
+      expect(body).to include("建立 PMCC 部位")
+    end
+
+    it "有部位時給滾倉與平倉的操作表單" do
+      create(:pmcc_position, user: signed_in_user, ticker: symbol).then do |pos|
+        create(:pmcc_short_leg, position: pos)
+      end
+
+      body = get_leaps
+      expect(body).to include('data-pmcc-action="roll"', 'data-pmcc-action="close"')
+    end
+
+    it "沒有未平倉短腳時不給滾倉表單，仍可整個平倉" do
+      create(:pmcc_position, user: signed_in_user, ticker: symbol)
+
+      body = get_leaps
+      expect(body).not_to include('data-pmcc-action="roll"')
+      expect(body).to include('data-pmcc-action="close"')
+    end
+
+    it "操作區塊不進匯出（data-export-exclude）" do
+      create(:pmcc_position, user: signed_in_user, ticker: symbol)
+
+      expect(get_leaps).to match(/data-export-exclude[^>]*>\s*<h3[^>]*>操作|操作/)
     end
 
     # 這是本期最重要的一條：部位是使用者的持久資料，不該因為當下抓取
@@ -195,7 +223,7 @@ RSpec.describe "GET /leaps", type: :request do
     it "預設收摺（details 沒有 open）" do
       create(:pmcc_position, user: signed_in_user, ticker: symbol)
 
-      expect(get_leaps).to include('<details class="leaps-pmcc-bucket">')
+      expect(get_leaps).to include('<details class="leaps-pmcc-panel">')
     end
 
     it "看不到別人的部位" do
