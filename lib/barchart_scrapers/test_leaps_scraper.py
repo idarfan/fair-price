@@ -231,6 +231,37 @@ class TestOptsNone(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Stage 1 (Near the Money) 等不到 grid
+# ---------------------------------------------------------------------------
+class TestStage1GridTimeout(unittest.TestCase):
+    """
+    迴歸（2026-08-31 DG）：Stage 1 等不到 grid 時，原本**不檢查就直接**回報
+    barchart_session_expired，付費有效的帳號被叫去「請先登入 Barchart」。
+    其他 scraper 都是先問 SESSION_EXPIRED_JS 再下結論，只有這裡漏掉。
+    """
+
+    def _wait_always_none(self):
+        async def wait_side(ws, js, max_wait_s=30, **kw):
+            return None
+        return AsyncMock(side_effect=wait_side)
+
+    def test_not_expired_reports_page_load_problem_not_session(self):
+        result = _capture_main(_stage1_eval(session_expired=False),
+                               wait_mock=self._wait_always_none())
+
+        self.assertEqual(result["status"], "error")
+        self.assertIn("沒有載入完成", result["error"])
+        self.assertIn("非 Session 問題", result["error"])
+        self.assertNotIn("登入", result["error"].replace("非 Session 問題", ""))
+
+    def test_actually_expired_still_reports_session_expired(self):
+        result = _capture_main(_stage1_eval(session_expired=True),
+                               wait_mock=self._wait_always_none())
+
+        self.assertEqual(result["status"], "barchart_session_expired")
+
+
+# ---------------------------------------------------------------------------
 # opts [] paths
 # ---------------------------------------------------------------------------
 class TestOptsEmpty(unittest.TestCase):

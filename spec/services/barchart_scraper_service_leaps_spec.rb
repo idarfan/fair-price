@@ -276,6 +276,31 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
   end
 
 
+  # Stage 1 等不到 grid 時，scraper 會自己分流：真的過期才回
+  # barchart_session_expired，否則回 status=error 帶說明文字。Ruby 這端要把那句
+  # 說明原樣交到畫面上（page_header 的 :error 分支讀 @scrape_errors.first），
+  # 不能吞掉換成「未知錯誤」。
+  describe "scraper 回 status=error 時的訊息傳遞" do
+    let(:message) { "抓取 Near the Money 清單時頁面遲遲沒有載入完成（非 Session 問題），請稍後重試" }
+
+    before do
+      stub_cache(hit: false)
+      allow(service).to receive(:run_scraper)
+        .and_return({ status: "error", error: message })
+    end
+
+    it "status 是 error，不是 barchart_session_expired" do
+      result = service.fetch_leaps
+      expect(result[:status]).to eq("error")
+      expect(result[:status]).not_to eq("barchart_session_expired")
+    end
+
+    it "原樣把 scraper 的說明交出去" do
+      expect(service.fetch_leaps[:errors].first).to eq(message)
+    end
+  end
+
+
   # ── 4. Consecutive scrapes: second scrape replaces first entirely ─────────────
   #
   # persist_leaps runs delete_all + insert_all in one transaction, so only one

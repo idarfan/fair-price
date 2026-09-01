@@ -359,7 +359,19 @@ async def main(symbol, user_strike=None):
     # Poll up to 30 s for the NTM grid to populate (page may take longer than fixed sleep)
     near_money_rows = await _wait_for_grid(ws_url, NEAR_MONEY_JS, max_wait_s=GRID_MAX_WAIT_S, target_id=target_id)
     if near_money_rows is None:
-        print(json.dumps({"status": "barchart_session_expired"}))
+        # 等不到 grid 不等於 Session 過期——頁面單純載入很慢也會走到這裡
+        # （2026-08-31 DG：帳號是付費有效的，畫面卻叫使用者「請先登入 Barchart」）。
+        # 其他 scraper 都是先問 SESSION_EXPIRED_JS 再下結論，只有這裡漏掉，
+        # 導致「稍後重試就好」被誤報成「要重新登入」，處置方向完全相反。
+        is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS, target_id=target_id) or False
+        if is_expired:
+            print(json.dumps({"status": "barchart_session_expired"}))
+        else:
+            print(json.dumps({
+                "status": "error",
+                "error": "抓取 Near the Money 清單時頁面遲遲沒有載入完成"
+                         "（非 Session 問題），請稍後重試",
+            }))
         return
 
     underlying_price = await cdp_eval(ws_url, UNDERLYING_JS, target_id=target_id)
