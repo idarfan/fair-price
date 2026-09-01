@@ -5,7 +5,7 @@
 |---|---|---|
 | **Phase 0 長腳報價可行性** | **已完成（2026-09-01）** | 實跑 scraper 取得指定到期日+履約價的 mid/delta，與 Barchart 頁面人工比對 |
 | Phase 1 資料模型 | **已完成（2026-09-01）** | migration 執行成功 + schema.rb 含四張表（含 user_id / contracts / fees） |
-| Phase 2 滾倉觸發判斷 | 未開始 | RSpec：給定 4 組已知案例（深度ITM/價平/價外/近到期），觸發布林值正確 |
+| Phase 2 滾倉觸發判斷 | **已完成（2026-09-01）** | RSpec：給定 4 組已知案例（深度ITM/價平/價外/近到期），觸發布林值正確 |
 | Phase 3 滾倉建議服務 | 未開始 | 給定真實 option chain fixture，輸出建議履約價與 Phase2 手算結果一致（誤差<$1） |
 | Phase 4 損益帳本 | 未開始 | 建立3筆模擬 roll 事件後，累積已實現損益=手算值且**不含估算值**；未實現另外顯示 |
 | Phase 5 前端整合 | 未開始 | `ApplicationController.render` 驗 HTML 結構 + 使用者人工視覺確認（見下方「驗收方式的現實限制」） |
@@ -165,6 +165,27 @@ Migration `20260901090000_create_pmcc_tracker_tables.rb`，四張表 ＋ model �
 > 那是獨立的一件事，不藏在本 Phase 內。（2026-09-01 決定：先砍掉）
 
 **驗收**：4 組已知案例（深度ITM/價平/價外/近到期）跑過規則，觸發結果與手算一致。
+
+### 完成記錄（2026-09-01）
+
+`app/services/pmcc_roll_trigger_service.rb`，純計算層（不打 Barchart、不寫 DB、
+**不自動執行滾倉**），18 則 spec。
+
+```ruby
+PmccRollTriggerService.call(short_leg, quote: quote_row, manual: false)
+# => { should_roll: true, reasons: [Reason(code:, message:)], evaluated: {...} }
+```
+
+- **moneyness 慣例確認過再寫規則**：正 = 價內、負 = 價外
+  （既有測試：strike 13 / 現價 12.44 → −0.045；strike 10 → +0.245）。
+  規則 2 的 `>= -5%` 方向因此是對的。
+- **報價缺失回 `:no_quote`，不回「不需滾倉」**。沒有資料卻說「沒事」，
+  使用者會以為系統看過了；明確回報才說得出「報價缺失」。
+  但 `manual: true` 仍可觸發——使用者自己知道要滾。
+- **回傳 `evaluated`（判斷當下的 delta/dte/moneyness）**：畫面要能說明依據，
+  不是只丟一個布林值。
+- 多條規則同時成立會回傳**全部**原因，不是只回第一個。
+- quote 吃得下 `PmccShortCallSnapshot`、symbol key Hash、string key Hash。
 
 ---
 
