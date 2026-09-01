@@ -47,12 +47,9 @@ class BarchartScraperService
         else
           persist(type, fetch_result[:data])
         end
-        if type == "options_flow" && (csv_err = fetch_result[:data]["csv_error"])
-          result[:errors] << "options_flow csv: #{csv_err}"
-          log_fetch(type, "partial_error", "csv_error=#{csv_err}")
-        else
-          log_fetch(type, "success", nil)
-        end
+        # 2026-09-01：options_flow 不再下載 CSV（逐筆交易改由同一份 grid 資料轉出），
+        # 因此沒有 csv_error 這種「抓到了但明細缺一半」的中間狀態需要分流。
+        log_fetch(type, "success", nil)
       else
         result[:errors] << "#{type}: #{fetch_result[:error]}"
         log_fetch(type, "error", fetch_result[:error])

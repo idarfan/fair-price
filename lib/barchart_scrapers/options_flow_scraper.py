@@ -4,31 +4,28 @@ Output: JSON to stdout
 Usage: python3 options_flow_scraper.py MU
 
 Filters: Size >= 10, Premium >= $10 (as shown in filter UI)
-Reads per-trade rows from bc-data-grid._data using .raw sub-objects.
-Downloads CSV to csv_files/options_flow/{SYMBOL}_{YYYY-MM-DD}.csv,
-parses it, and returns both summary metrics + raw trades array.
+Reads per-trade rows from bc-data-grid._data using .raw sub-objects —
+the same rows feed both the summary metrics and the per-trade array.
+
+2026-09-01: 拿掉了「點下載鈕存 CSV 再解析」那條路。實測 `_data[*].raw` 是 CSV
+欄位的超集（volume / openInterest / volatility / label / tradeTime 都在），
+BE 當日兩邊都是 200 筆；而 CSV 末行是 Barchart 的頁尾字串，DictReader 沒過濾，
+每個快照都會多寫一列全 null 的假交易進 DB（清理前累積 67 列）。
 """
 import asyncio
-import csv
 import json
 import os
 import re
 import sys
-import subprocess
-import time
-from datetime import date
-from pathlib import Path
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
-import websockets
 
 sys.path.insert(0, os.path.dirname(__file__))
-from cdp_helper import prepare_page, cdp_eval, get_browser_ws
+from cdp_helper import prepare_page, cdp_eval
 
 TARGET_PATH = "options-flow"
 GRID_SETTLE_S = 2.5
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-CSV_DIR = PROJECT_ROOT / "csv_files" / "options_flow"
 
 # Exchange condition codes that correspond to block-style (auction-based) trades.
 BLOCK_CODES = {"ISOI", "MLAT"}
@@ -66,7 +63,12 @@ EXTRACT_ROWS_JS = """
                             : null,
             tradeCondition: tc,
             strikePrice:    r.strikePrice,
-            expiration:     r.expiration
+            expiration:     r.expiration,
+            volume:         typeof r.volume === 'number'       ? r.volume       : null,
+            openInterest:   typeof r.openInterest === 'number' ? r.openInterest : null,
+            volatility:     typeof r.volatility === 'number'   ? r.volatility   : null,
+            label:          r.label,
+            tradeTime:      typeof r.tradeTime === 'number'    ? r.tradeTime    : null
         };
     });
 })()
@@ -83,133 +85,64 @@ PAGINATION_JS = """
 
 
 # ---------------------------------------------------------------------------
-# CSV parse helpers
+# Grid rows -> trades
 # ---------------------------------------------------------------------------
 
-def _parse_num(s):
-    if not s:
+# Ruby 端（BarchartScraperService#classify_trade）依這組 key 取值，所以欄位名稱
+# 沿用原本 CSV 解析產出的那 15 個，不要改名——改名等於同時要動分類器與面板。
+def _et_time(epoch):
+    """Unix epoch -> "HH:MM:SS ET"，對齊 DB 既有的 trade_time 字串格式。"""
+    if not isinstance(epoch, (int, float)) or isinstance(epoch, bool):
         return None
     try:
-        return float(re.sub(r"[$,%\s]", "", str(s)))
-    except (ValueError, TypeError):
+        return datetime.fromtimestamp(epoch, ZoneInfo("America/New_York")).strftime("%H:%M:%S ET")
+    except (ValueError, OSError, OverflowError):
         return None
 
 
-def _parse_int(s):
-    v = _parse_num(s)
-    return int(v) if v is not None else None
+# grid 的 label 是長格式（"(S) - Sell To Open"），CSV 給的是短格式（"SellToOpen"），
+# 而 OptionsFlowClassifierService#derive_direction 是拿短格式做 pattern match
+# （"BuyToOpen" / "SellToOpen"，"ToOpen" 屬 AMBIGUOUS_OPEN_CLOSE）。
+# 不正規化的話方向判斷會全部落到 INDETERMINATE，而且不會有任何錯誤訊息。
+def _open_close(label):
+    if not label:
+        return "N/A"
+    text = str(label).split(" - ")[-1]          # "(S) - Sell To Open" -> "Sell To Open"
+    return text.replace(" ", "") or "N/A"       # -> "SellToOpen"
 
 
-def _parse_dollar(s):
-    if not s:
-        return None
-    try:
-        return int(float(re.sub(r"[$,\s]", "", str(s))))
-    except (ValueError, TypeError):
-        return None
-
-
-def _parse_pct(s):
-    """Parse "25.4%" -> 0.254 or "0.254" -> 0.254."""
-    if not s:
-        return None
-    s = str(s).strip()
-    try:
-        val = float(re.sub(r"[%\s]", "", s))
-        return round(val / 100, 6) if val > 1 else val
-    except (ValueError, TypeError):
-        return None
-
-
-def parse_csv_trades(csv_path):
-    trades = []
-    try:
-        with open(csv_path, newline="", encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                trades.append({
-                    "option_type":     (row.get("Type") or "").strip() or None,
-                    "strike":          _parse_num(row.get("Strike")),
-                    "expires_at":      (row.get("Expires") or "").strip() or None,
-                    "dte":             _parse_int(row.get("DTE")),
-                    "trade_price":     _parse_num(row.get("Trade")),
-                    "size":            _parse_int(row.get("Size")),
-                    "side":            (row.get("Side") or "").strip().lower() or None,
-                    "premium":         _parse_dollar(row.get("Premium")),
-                    "volume":          _parse_int(row.get("Volume")),
-                    "open_interest":   _parse_int(row.get("Open Int")),
-                    "iv":              _parse_pct(row.get("IV")),
-                    "delta":           _parse_num(row.get("Delta")),
-                    "trade_condition": (row.get("Code") or "").strip() or None,
-                    "open_close":      (row.get("*") or "").strip() or None,
-                    "trade_time":      (row.get("Time") or "").strip() or None,
-                })
-    except Exception as exc:
-        return {"error": str(exc)}
-    return trades
-
-
-# ---------------------------------------------------------------------------
-# CDP download helpers
-# ---------------------------------------------------------------------------
-
-def to_windows_path(linux_path: Path) -> str:
-    """Convert WSL2 Linux path to Windows UNC path for Chrome CDP.
-
-    Chrome runs on Windows, so it cannot resolve Linux paths like
-    /home/... — needs \\\\wsl.localhost\\Ubuntu\\home\\...
-    Falls back to Linux path string if wslpath is unavailable.
+def grid_rows_to_trades(rows):
     """
-    try:
-        result = subprocess.run(
-            ["wslpath", "-w", str(linux_path)],
-            capture_output=True, text=True, check=True,
-        )
-        return result.stdout.strip()
-    except Exception as e:
-        print(f"[warn] wslpath failed: {e}", file=sys.stderr)
-        return str(linux_path)
+    把 extract_all_rows() 的 grid 列轉成逐筆交易。
 
-
-async def set_download_path(download_dir):
-    """Use Browser.setDownloadBehavior (browser-level, persists across CDP sessions)."""
-    download_dir.mkdir(parents=True, exist_ok=True)
-    browser_ws = get_browser_ws()
-    async with websockets.connect(browser_ws, open_timeout=10) as ws:
-        await ws.send(json.dumps({
-            "id": 99,
-            "method": "Browser.setDownloadBehavior",
-            "params": {
-                "behavior": "allow",
-                "downloadPath": to_windows_path(download_dir),  # Windows UNC path for Chrome
-            },
-        }))
-        try:
-            resp = await asyncio.wait_for(ws.recv(), timeout=5)
-            import sys; print(f"[debug] Browser.setDownloadBehavior: {resp}", file=sys.stderr)
-        except asyncio.TimeoutError:
-            pass
-
-
-async def wait_for_csv(download_dir, timeout=30):
-    before = set(download_dir.glob("*.csv"))
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        await asyncio.sleep(0.8)
-        after = set(download_dir.glob("*.csv"))
-        new_files = after - before
-        if new_files:
-                return new_files.pop()
-    print(f"[debug] wait_for_csv TIMEOUT, after={set(download_dir.glob("*.csv"))}", file=sys.stderr)
-    return None
-
-
-def rename_to_convention(csv_path, symbol, today_str):
-    target = csv_path.parent / f"{symbol}_{today_str}.csv"
-    if target.exists():
-        target.unlink()
-    csv_path.rename(target)
-    return target
+    只有三個欄位需要轉換，其餘同名直取：
+      volatility  33.28 代表 33.28% -> 一律 ÷100（舊 CSV 的 _parse_pct 是「>1 才除」，
+                  對 0.8% 這種小值會算錯，改成無條件除，順帶修掉那個邊界 bug）
+      tradeTime   Unix epoch -> "HH:MM:SS ET"
+      label       "(S) - Sell To Open" -> "SellToOpen"、null -> "N/A"
+                  （見 _open_close：classifier 用短格式做 pattern match）
+    """
+    trades = []
+    for r in rows:
+        vol = r.get("volatility")
+        trades.append({
+            "option_type":     r.get("symbolType"),
+            "strike":          r.get("strikePrice"),
+            "expires_at":      r.get("expiration"),
+            "dte":             r.get("dte"),
+            "trade_price":     r.get("tradePrice"),
+            "size":            r.get("tradeSize"),
+            "side":            (r.get("side") or "").strip().lower() or None,
+            "premium":         r.get("premium"),
+            "volume":          r.get("volume"),
+            "open_interest":   r.get("openInterest"),
+            "iv":              round(vol / 100, 6) if isinstance(vol, (int, float)) else None,
+            "delta":           r.get("delta"),
+            "trade_condition": (r.get("tradeCondition") or "").strip() or None,
+            "open_close":      _open_close(r.get("label")),
+            "trade_time":      _et_time(r.get("tradeTime")),
+        })
+    return trades
 
 
 # ---------------------------------------------------------------------------
@@ -397,18 +330,6 @@ def compute_flow_metrics(rows):
     }
 
 
-async def trigger_csv_download(ws):
-    js = """
-    (() => {
-        // Real download button: toolbar-level [data-bc-download-button]
-        const btn = document.querySelector('[data-bc-download-button]');
-        if (btn) { btn.click(); return true; }
-        return false;
-    })()
-    """
-    return await cdp_eval(ws, js, timeout=5)
-
-
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -439,41 +360,9 @@ async def main(symbol):
     all_rows = await extract_all_rows(ws)
     flow_metrics = compute_flow_metrics(all_rows)
 
-    # Keep browser WS open for entire download sequence —
-    # Browser.setDownloadBehavior resets when the CDP session closes
-    trades = []
-    csv_error = None
-    CSV_DIR.mkdir(parents=True, exist_ok=True)
-    async with websockets.connect(get_browser_ws(), open_timeout=10) as bws:
-        await bws.send(json.dumps({
-            "id": 99,
-            "method": "Browser.setDownloadBehavior",
-            "params": {
-                "behavior": "allow",
-                "downloadPath": to_windows_path(CSV_DIR),
-            },
-        }))
-        try:
-            resp = await asyncio.wait_for(bws.recv(), timeout=5)
-            print(f"[debug] Browser.setDownloadBehavior: {resp}", file=sys.stderr)
-        except asyncio.TimeoutError:
-            pass
-
-        clicked = await trigger_csv_download(ws)
-    
-        if clicked:
-            csv_path = await wait_for_csv(CSV_DIR, timeout=30)
-            if csv_path:
-                final_path = rename_to_convention(csv_path, symbol, today_str)
-                result = parse_csv_trades(final_path)
-                if isinstance(result, list):
-                    trades = result
-                else:
-                    csv_error = result.get("error")
-            else:
-                csv_error = "csv_download_timeout"
-        else:
-            csv_error = "download_button_not_found"
+    # 逐筆交易與彙總指標同源：都來自上面 extract_all_rows() 抓到的 grid 列，
+    # 不再另外點下載鈕存 CSV（那條路的欄位是這裡的子集，還會多塞一列頁尾垃圾）。
+    trades = grid_rows_to_trades(all_rows)
 
     bearish_raw = parse_dollar(stats.get("Bearish Trade Sentiment"))
     data = {
@@ -485,7 +374,6 @@ async def main(symbol):
         "delta_imbalance":   parse_dollar(stats.get("Delta Imbalance")),
         **flow_metrics,
         "trades":            trades,
-        "csv_error":         csv_error,
         "status":            "success",
     }
     print(json.dumps(data))
