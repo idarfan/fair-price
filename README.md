@@ -1,5 +1,52 @@
 # FairPrice
 
+### 2026-09-01（二）— PMCC 部位追蹤 Phase 2–5 完成（滾倉判斷／建議／損益帳本／前端）
+
+#### Phase 2 滾倉觸發判斷
+
+`PmccRollTriggerService`：`delta >= 0.60`、`DTE <= 5 且 moneyness >= -5%`、手動觸發。
+除息日規則因 schema 沒有 ex-dividend date 而移除。
+
+- **寫規則前先確認 `moneyness` 慣例**（正=價內、負=價外，有既有測試佐證），
+  否則 `>= -5%` 的方向會寫反，而且測試也抓不到——因為測資是自己編的
+- **報價缺失回 `:no_quote` 而不是「不需滾倉」**：沒資料卻說沒事，
+  使用者會以為系統看過了
+
+#### Phase 3 滾倉建議
+
+`PmccRollSuggestionService`，與 `PmccRankingService` 平行（那支回答「現在建倉
+哪組最好」，這支回答「我手上這一腳該滾去哪」）。
+
+**修正 `pmcc-tracker.md` 的黃金法則方向**：文件原本寫 `PL >= Spread` 通過，
+與它自己引用的 `P_L < K_S − K_L` 相反，也與既有實作 `PmccRankingService:223`
+的 `pl < spread` 相反。統一成 **NetDebit < Spread 才通過**。
+
+**PL 基準用實付成本，市價只做顯示**：NetDebit／MaxProfit／黃金法則一律以
+長腳實付成本計算，與損益帳本同一把尺；目前市價由 `pmcc_leg_quotes` 查出並列，
+**不參與任何計算**（有 spec 釘住：市價從 129.7 改成 300，`net_debit` 一分不變）。
+
+#### Phase 4 損益帳本
+
+`PmccPnlService`。各事件類型的金額公式集中在 class method，Phase 5 直接呼叫，
+不在表單各寫一份。**三個「回 nil 而不是 0」**：沒有長腳報價、未實現未知、
+資本已回收完（`capital_deployed <= 0`）——理由都是「沒有資料不等於沒有問題」。
+
+年化報酬率分母用 `capital_deployed`（實付成本 − 累積已實現）而非原始成本，
+滾倉收租會持續降低實際投入。
+
+#### Phase 5 前端
+
+`pmcc_position_tracker.rb` ＋ `Api::V1::PmccPositionsController` ＋ `pmcc_tracker.js`。
+
+- **與 `@pmcc_ranking` 解耦**是本期最重要的一條：只看 `current_user + symbol`，
+  渲染放在 `if @candidates.any?` **外面**。部位是持久資料，抓取失敗不該消失
+- `roll` **整段 transaction**：中途失敗留下「舊腳關了、新腳沒開」會讓帳本
+  永遠對不起來，有 spec 驗整段回滾
+- **偏離原 spec 一處**：原本寫「無部位時整個區塊不顯示」，那樣沒有入口建立
+  第一筆部位、功能無法啟用，改為顯示精簡的「建立 PMCC 部位」收折列
+- **class 命名撞車被既有測試抓到**：追蹤面板一開始共用 `.leaps-pmcc-bucket`，
+  讓數到期日桶數的 spec 從 3 變 4。改用 `.leaps-pmcc-panel`，CSS 共用、語意分開
+
 ### 2026-09-01（二）— PMCC 部位追蹤 Phase 0–1，並修好 V&G 少帶 moneyness 的資料缺失
 
 #### 先做可行性驗證，才發現最大的坑不在原本以為的地方
