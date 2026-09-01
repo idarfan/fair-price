@@ -1,5 +1,31 @@
 # FairPrice
 
+### 2026-09-01（二）— 修正：job_status=success 被當成「未知錯誤」
+
+使用者實測 NOK 履約價 5：抓取其實**成功**（log 是 `job_status=success`、
+DB 有 25 筆 fresh 資料），畫面卻顯示「抓取時發生未知錯誤」。
+
+原因在 `LeapsRecommendationsController#index` 的「資料不 fresh」分支：
+`case params[:job_status]` 只列了 session_expired / cdp_offline /
+no_candidates / partial_error，**`success` 與 `invalid_strike` 直接掉進
+`else` 變成 `:error`**。
+
+這與 2026-07-04 那次 `invalid_strike` fallthrough 是**同一類錯誤、相反方向**
+——那次是失敗被當成成功，這次是成功被當成未知錯誤。
+**status 的 case 分派總共有三處**（`run_scraper` / `fetch_*` /
+controller 的 `job_status`），漏一處就出事；controller 那處特別容易漏，
+因為它吃的是 URL 參數而不是 scraper 輸出。
+
+修正後：`success` 有快取錯誤走 partial_error、否則 no_candidates；
+`invalid_strike` 走履約價訊息；真正未分類的才是未知錯誤（有 spec 確認
+沒有變成什麼都吞）。
+
+**測試環境的兩個坑**（寫這幾則迴歸 spec 時踩到）：`test.rb` 的
+`cache_store` 是 `:null_store`，`Rails.cache.write` 是空操作，錯誤訊息
+要用 stub 餵；斷言字串要避開 `&`，HTML 會轉義成 `&amp;`。
+
+順帶修掉 PMCC 追蹤面板漏掉 `px-4 py-4`、輸入框壓到卡片邊框的版面問題。
+
 ### 2026-09-01（二）— PMCC 部位追蹤 Phase 2–5 完成（滾倉判斷／建議／損益帳本／前端）
 
 #### Phase 2 滾倉觸發判斷
