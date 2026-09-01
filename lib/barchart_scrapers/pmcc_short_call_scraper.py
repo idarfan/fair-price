@@ -35,6 +35,7 @@ import asyncio
 import json
 import os
 import sys
+from datetime import date as _date
 
 sys.path.insert(0, os.path.dirname(__file__))
 from cdp_helper import prepare_page, cdp_eval, cdp_navigate, activate_target
@@ -45,8 +46,42 @@ STAGE1_SETTLE  = 5000  # 對齊 leaps_scraper.py 的 5000ms——3000ms 太短�
                        # 兩者讀同一個 expiration dropdown，差異只在 settle 時間
 OPTIONS_SETTLE = 1500
 VG_SETTLE      = 1500
-EXP_COUNT      = 3   # spec §3: 三時段 = 前三個到期日（DOM 順序，已按日期升序）
+# spec §3（2026-09-01 修訂）：不再固定取前三個到期日。
+# 舊做法常常整組落在 6–50 天，前一兩個還短於 lesson9 的 19–45 天建議區間，
+# 使用者真正要看的 45–60 天往往一個候選都沒有。改成依 DTE 選。
+# 上限 8：週選標的（如 BE）7 天一檔，前 6 個只到 DTE 38，會把 45–60 那段整個切掉
+# ——實測 BE 的 DTE≤60 共 7 個，落在 45–60 的只有 2026-10-16（DTE 45）那一個。
+# 每多一個到期日就多一輪導覽＋等表格，8 是「覆蓋得到 60 天」與「抓取時間」的取捨點。
+MAX_EXPIRATIONS = 8
+MAX_SHORT_DTE   = 60   # 涵蓋建議區間 19–45，並往上留到 60 天
 EXPIRATIONS_MAX_WAIT_S = 10  # dropdown 輪詢上限（見 _wait_for_grid 用法）
+
+def select_expirations(expirations, today=None):
+    """
+    從 Expiration 下拉挑出要抓的到期日。
+
+    下拉值形如 "2026-07-17-m" / "2026-07-24-w"，前 10 碼是日期，DOM 順序已按日期升序。
+    規則：DTE <= MAX_SHORT_DTE 的取前 MAX_EXPIRATIONS 個。
+
+    一個都不符合時（首個到期日就超過 60 天，例如只有月選且剛過期一輪的標的）
+    退回取第一個——spec §3「若下拉僅 1–2 個，有幾個抓幾個」的精神是不要因為
+    門檻而回傳空結果，讓整個 PMCC 區塊變成 no_candidates。
+    """
+    today = today or _date.today()
+    picked = []
+    for value in expirations:
+        try:
+            exp = _date.fromisoformat(str(value)[:10])
+        except ValueError:
+            continue
+        if (exp - today).days <= MAX_SHORT_DTE:
+            picked.append(value)
+        if len(picked) >= MAX_EXPIRATIONS:
+            break
+    if not picked and expirations:
+        picked = [expirations[0]]
+    return picked
+
 
 # ── Stage 1: expiration dropdown ──────────────────────────────────────────────
 # NOTE: spec §6 provided a `select[name="expiration"]` snippet flagged "需實測".
@@ -295,7 +330,7 @@ async def main(symbol):
             break
         await asyncio.sleep(0.5)
     expirations = expirations or []
-    selected_expirations = expirations[:EXP_COUNT]
+    selected_expirations = select_expirations(expirations)
 
     if not selected_expirations:
         print(json.dumps({"status": "no_candidates"}))

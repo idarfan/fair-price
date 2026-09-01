@@ -1,6 +1,6 @@
 # PMCC 黃金法則區塊規格 v3
 
-> 在 `/leaps` 的 Options Flow 區塊下方新增 PMCC 自動組合試算。使用者僅輸入 `symbol`，程式自動完成 LEAPS + 三到期日 Short Call 抓取、黃金法則組合、列出可做 PMCC 的組合與權利金細項。全程自動化，無手算。
+> 在 `/leaps` 的 Options Flow 區塊下方新增 PMCC 自動組合試算。使用者僅輸入 `symbol`，程式自動完成 LEAPS + Short Call（DTE≤60 的到期日）抓取、黃金法則組合、列出可做 PMCC 的組合與權利金細項。全程自動化，無手算。
 
 ## §0 前置閱讀
 
@@ -75,7 +75,8 @@ premium_yield     = PS / net_debit * 100%              # 收租相對實際投�
 premium_yield_ann = premium_yield / short.dte * 365    # ★年化，跨到期日比較唯一有意義的數字
 ```
 
-**前置 (b) 的理由**：`max_profit` 公式隱含假設「SC 到期時 LEAPS 仍保有時間價值可續持或轉倉」。兩腿到期日太近則此假設不成立，算出的獲利無法實現。目前 LEAPS DTE≥364、Short 取最近三到期日（6–50天）天然滿足，但必須釘死，不可依賴巧合。
+**前置 (b) 的理由**：`max_profit` 公式隱含假設「SC 到期時 LEAPS 仍保有時間價值可續持或轉倉」。兩腿到期日太近則此假設不成立，算出的獲利無法實現。目前 LEAPS DTE≥364、Short 取 DTE≤60 的到期日（見 §3），差距至少 364−60=304 天，
+天然滿足 180 天門檻，但必須釘死，不可依賴巧合。
 
 **命名**：`max_profit` = 含 SC 的真實上限（主排序、表格主欄）；`max_profit_no_sc` = 參考值，次要顯示。兩者都要顯示但不可混淆。
 
@@ -92,15 +93,23 @@ Long Delta 同理：粗篩沿用 LEAPS 既有 0.60–0.90；建議標記 `✅ if
 
 ---
 
-## §3 三時段定義
+## §3 到期日選取（2026-09-01 修訂，原為「三時段＝前三個」）
 
-- **三時段 = Barchart Options Prices 頁面 `Expiration:` 下拉的前三個到期日**（DOM 順序，已按日期升序），含 m/w 不區分，如 `["2026-07-17 (m)", "2026-07-24 (w)", "2026-07-31 (w)"]`。
-- 若下拉僅 1–2 個，有幾個抓幾個。
+- **選取規則 = Barchart Options Prices 頁面 `Expiration:` 下拉中，DTE ≤ 60 天的前 8 個到期日**
+  （DOM 順序，已按日期升序），含 m/w 不區分。實作：`pmcc_short_call_scraper.py` 的
+  `select_expirations()`，常數 `MAX_EXPIRATIONS = 8` / `MAX_SHORT_DTE = 60`；
+  Ruby 端 `PmccRankingService::SC_EXPIRATION_COUNT = 8` 要一起對齊。
+- 若下拉僅 1–2 個，有幾個抓幾個。**一個都不符合門檻時（首個到期日就 >60 天）退回取第一個**，
+  不要因為門檻讓整區變成 no_candidates。
+- **修訂理由**：舊的「固定前三個」通常整組落在 6–50 天，前一兩個還短於 lesson9 的
+  19–45 天建議區間，使用者真正要看的 45–60 天往往一個候選都沒有。
+- 上限 8 是抓取時間的取捨：每多一個到期日就多一輪導覽 ＋ 等表格。實測 BE（週選）
+  DTE≤60 共 7 個，落在 45–60 的只有一個（DTE 45），上限 6 會把它切掉。
 - PMCC 按**到期日字串**分桶，非 DTE 範圍。前端 label 顯示實際到期日字串 + 近/中/遠月 badge。
 
 ### DTE 警示（不過濾，只標示）
 
-最近三個到期日的 DTE 通常落在 6–50 天，**其中前一兩個往往短於 lesson9 建倉規範的 19–45 天建議區間**（例如 NOK 常見為 6 / 13 / 20 DTE，前兩個都不在建議區內）。
+選到的到期日 DTE 落在 0–60 天，**其中前一兩個往往短於 lesson9 建倉規範的 19–45 天建議區間**（例如 NOK 常見為 6 / 13 / 20 DTE，前兩個都不在建議區內）。
 
 **規則：不篩掉、不過濾——列出全部，但明確標示風險。** 這與本專案「列出全部候選、只標分級、不自動下結論」的一貫原則一致（同 LEAPS 排行表列出全部候選、只標流動性分級）。
 
@@ -200,7 +209,7 @@ add_index :pmcc_short_call_snapshots, [:symbol, :scraped_at], name: "idx_pmcc_sh
 
 | 項 | LEAPS | PMCC Short |
 |---|---|---|
-| 選時段 | Delta≥0.60 ITM strike 為中心，stacked 全到期日 | 讀 Expiration 下拉前3，每到期日 `?expiration=&moneyness=100` 全履約價 |
+| 選時段 | Delta≥0.60 ITM strike 為中心，stacked 全到期日 | 讀 Expiration 下拉中 DTE≤60 的前 8 個，每到期日 `?expiration=&moneyness=100` 全履約價 |
 | 請求數 | N strikes × 2頁 | 3 expirations × ~2頁 ≈ 6 次導航，20–40 秒 |
 | 最終篩選 | DTE≥364, Delta 0.60–0.90 | **不在 Python 硬濾**，交 Ruby 處理（避免誤刪） |
 

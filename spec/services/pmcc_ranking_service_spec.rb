@@ -141,6 +141,42 @@ RSpec.describe PmccRankingService do
     end
   end
 
+  # 2026-09-01：到期日上限從 3 提高到 6（scraper 端已用 DTE≤60 篩過），
+  # 讓 45–60 天那一段真的有候選可看。
+  describe "multi-expiration bucketing（上限 SC_EXPIRATION_COUNT）" do
+    before do
+      create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85)
+      [ 6, 13, 20, 27, 34, 41, 48, 55, 62 ].each_with_index do |dte, i|
+        create_short!(strike: 17.0 + i, mid_price: 0.42, bid: 0.40, ask: 0.44,
+                      dte: dte, delta: 0.30, expiration_date: Date.today + dte)
+      end
+    end
+
+    it "最多取 SC_EXPIRATION_COUNT 個到期日，依日期升序" do
+      keys = service.call[:summary][:expirations]
+
+      expect(keys.size).to eq(PmccRankingService::SC_EXPIRATION_COUNT)
+      expect(keys).to eq(keys.sort)
+    end
+
+    it "45–60 天那段的到期日會進桶（舊的固定三桶取不到）" do
+      result = service.call
+      dtes   = result[:summary][:expirations].map { |k| result[k][:short_dte] }
+
+      expect(dtes).to include(55)
+      expect(dtes.max).to be >= 45
+    end
+
+    it "near/mid/far_term 別名仍對應前三桶" do
+      result = service.call
+      keys   = result[:summary][:expirations]
+
+      expect(result[:near_term]).to eq(result[keys[0]])
+      expect(result[:mid_term]).to eq(result[keys[1]])
+      expect(result[:far_term]).to eq(result[keys[2]])
+    end
+  end
+
   describe "sort order within a bucket: passing first, then max_profit descending" do
     before do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85)   # PL=5.75

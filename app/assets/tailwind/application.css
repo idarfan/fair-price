@@ -205,6 +205,20 @@ body.leaps-col-dragging * { cursor: move !important; user-select: none !importan
   pointer-events: none;
 }
 
+/* PMCC 到期日桶（pmcc_section.rb，原生 details/summary 收摺）。
+   預設只有第一桶展開，其餘收起，避免六個到期日把畫面撐得過長。 */
+.leaps-pmcc-bucket > summary { list-style: none; }
+.leaps-pmcc-bucket > summary::-webkit-details-marker { display: none; }
+.leaps-pmcc-bucket > summary::before {
+  content: "\25B8";                    /* ▸ */
+  display: inline-block;
+  margin-right: 4px;
+  color: #9ca3af;                      /* gray-400 */
+  transition: transform .15s ease;
+}
+.leaps-pmcc-bucket[open] > summary::before { transform: rotate(90deg); }
+.leaps-pmcc-bucket > summary:hover { background: rgba(0, 0, 0, .03); }
+
 /* 可點擊的欄位標題視覺提示 */
 th[data-tip-key] { cursor: help; }
 th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */

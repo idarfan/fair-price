@@ -17,6 +17,7 @@ import json
 import sys
 import types
 import unittest
+from datetime import date, timedelta
 from unittest.mock import AsyncMock, patch
 import importlib.util
 
@@ -50,6 +51,61 @@ def _run(coro):
 # ---------------------------------------------------------------------------
 # Pure function tests: _finalize / _merge_vg / _fill_exp_date
 # ---------------------------------------------------------------------------
+class TestSelectExpirations(unittest.TestCase):
+    """
+    2026-09-01：從「固定前三個到期日」改成「DTE <= 60 的前 6 個」。
+    舊做法常常整組落在 6–50 天，使用者要看的 45–60 天一個候選都沒有。
+    """
+
+    TODAY = date(2026, 9, 1)
+
+    def _values(self, *dtes):
+        return [f"{(self.TODAY + timedelta(days=d)).isoformat()}-w" for d in dtes]
+
+    def test_keeps_only_expirations_within_60_days(self):
+        vals = self._values(7, 14, 35, 56, 91, 182)
+        picked = scraper.select_expirations(vals, today=self.TODAY)
+        self.assertEqual(picked, vals[:4])
+
+    def test_caps_at_max_even_when_all_within_60_days(self):
+        vals = self._values(3, 7, 10, 14, 21, 28, 35, 42, 49, 56)
+        picked = scraper.select_expirations(vals, today=self.TODAY)
+        self.assertEqual(len(picked), scraper.MAX_EXPIRATIONS)
+        self.assertEqual(picked, vals[:scraper.MAX_EXPIRATIONS])
+
+    # 迴歸（實測 BE）：週選 7 天一檔，上限 6 只到 DTE 38，會把 45–60 整段切掉。
+    def test_weekly_ladder_still_reaches_the_45_to_60_band(self):
+        vals = self._values(3, 10, 17, 24, 31, 38, 45, 80)
+        picked = scraper.select_expirations(vals, today=self.TODAY)
+        dtes = [(date.fromisoformat(v[:10]) - self.TODAY).days for v in picked]
+        self.assertIn(45, dtes)
+        self.assertLessEqual(max(dtes), scraper.MAX_SHORT_DTE)
+
+    def test_boundary_60_is_included_61_is_not(self):
+        vals = self._values(60, 61)
+        picked = scraper.select_expirations(vals, today=self.TODAY)
+        self.assertEqual(picked, vals[:1])
+
+    # 只有月選、且剛好過完一輪的標的，首個到期日就可能超過 60 天。
+    # 這時退回取第一個，不能讓整個 PMCC 區塊變成 no_candidates。
+    def test_falls_back_to_first_when_nothing_is_within_60_days(self):
+        vals = self._values(75, 110)
+        picked = scraper.select_expirations(vals, today=self.TODAY)
+        self.assertEqual(picked, vals[:1])
+
+    def test_fewer_than_six_gives_what_there_is(self):
+        vals = self._values(7, 14)
+        self.assertEqual(scraper.select_expirations(vals, today=self.TODAY), vals)
+
+    def test_empty_dropdown_gives_empty(self):
+        self.assertEqual(scraper.select_expirations([], today=self.TODAY), [])
+
+    def test_unparsable_value_is_skipped_not_fatal(self):
+        vals = ["not-a-date"] + self._values(7)
+        picked = scraper.select_expirations(vals, today=self.TODAY)
+        self.assertEqual(picked, self._values(7))
+
+
 class TestFillExpDate(unittest.TestCase):
 
     def test_fills_null_expiration_date_from_url_param(self):

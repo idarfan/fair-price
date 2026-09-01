@@ -88,7 +88,7 @@ module LeapsRecommendations::PmccEducation
         div(class: "text-[#D04040]") { plain "Short Delta 0.20–0.35" }
         div(class: "text-[#D04040]") { plain "Short DTE 19–45 天" }
       end
-      p(class: "text-[11px] text-[#7A6555] mt-2") { plain "本表抓最近三到期日，天然落在 6–50 天。" }
+      p(class: "text-[11px] text-[#7A6555] mt-2") { plain "本表抓 DTE 60 天以內的到期日（最多 8 個），涵蓋上面的建議區間。" }
     end
   end
 
@@ -116,12 +116,12 @@ module LeapsRecommendations::PmccEducation
 
           render_pmcc_bullet(1, "買100股成本 $#{fmt_int(cost_100_shares.round)}")
           render_pmcc_bullet(2, "LEAPS 成本 $#{fmt_int(leaps_cost.round)}")
-          render_pmcc_bullet(3, "短期虛值 SC：最近三到期日、Delta 0.20–0.35、收租 $#{fmt_int(short_premium.round)}")
+          render_pmcc_bullet(3, "短期虛值 SC：60 天內到期日、Delta 0.20–0.35、收租 $#{fmt_int(short_premium.round)}")
           render_pmcc_bullet(4, "資金比例 #{capital_ratio ? fmt_pmcc_pct(capital_ratio) : '—'}")
         else
           render_pmcc_bullet(1, "買100股成本 —")
           render_pmcc_bullet(2, "LEAPS 成本 —")
-          render_pmcc_bullet(3, "短期虛值 SC：最近三到期日、Delta 0.20–0.35、收租 —")
+          render_pmcc_bullet(3, "短期虛值 SC：60 天內到期日、Delta 0.20–0.35、收租 —")
           render_pmcc_bullet(4, "資金比例 —")
         end
       end

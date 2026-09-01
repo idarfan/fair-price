@@ -33,11 +33,19 @@
       expanded.push({ el: el, style: el.getAttribute('style') });
       el.style.display = 'none';
     });
+    // 收摺中的 <details>（PMCC 到期日桶預設只展開第一個）在截圖裡會整塊消失，
+    // 匯出前一律展開、匯出後還原成原本的開合狀態。
+    var reopened = [];
+    root.querySelectorAll('details:not([open])').forEach(function (el) {
+      reopened.push(el);
+      el.open = true;
+    });
     function restoreExpanded() {
       expanded.forEach(function (s) {
         if (s.style === null) s.el.removeAttribute('style');
         else s.el.setAttribute('style', s.style);
       });
+      reopened.forEach(function (el) { el.open = false; });
     }
 
     return htmlToImage.toPng(root, {

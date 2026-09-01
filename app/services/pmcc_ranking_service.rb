@@ -1,10 +1,13 @@
 # frozen_string_literal: true
 
 # PMCC v3 §7：純計算層，讀 DB 最新 batch（LEAPS + Short Call），套黃金法則排序，
-# 不打 Barchart、不寫 DB。三個到期日分桶（Short Call 到期日），每桶列出 LEAPS ×
+# 不打 Barchart、不寫 DB。依到期日分桶（Short Call 到期日，最多 8 個），每桶列出 LEAPS ×
 # Short Call 交叉組合，通過黃金法則的在前，同組依 max_profit（含收租）由高到低。
 class PmccRankingService
-  SC_EXPIRATION_COUNT       = 3
+  # 與 pmcc_short_call_scraper.py 的 MAX_EXPIRATIONS 對齊——兩邊要一起改。
+  # scraper 已經先用 DTE <= 60 篩過，這裡只是防止 DB 裡的舊快照（先前那幾輪
+  # 抓的其他到期日）混進來讓桶數超出預期。
+  SC_EXPIRATION_COUNT       = 8
   TOP_SHORT_PER_EXPIRATION  = 8
   TOP_COMBOS_PER_EXPIRATION = 5
   DELTA_SHORT_MIN           = 0.15

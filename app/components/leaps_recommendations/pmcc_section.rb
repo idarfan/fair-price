@@ -43,7 +43,7 @@ module LeapsRecommendations::PmccSection
       when :no_leaps, :no_short, :no_data
         div(class: "px-4 py-6 text-center text-sm text-gray-400") { plain "尚無 Short Call 資料，請重新查詢" }
       when :ok
-        # data-sort-scope 包住三個到期日桶，一排 toggle 同時控制底下全部
+        # data-sort-scope 包住所有到期日桶，一排 toggle 同時控制底下全部
         # table[data-sortable]（不是每桶各自一排——使用者要求共用一份）。
         div(data_sort_scope: "true") do
           render_pmcc_sort_toggles
@@ -58,17 +58,31 @@ module LeapsRecommendations::PmccSection
   end
 
 
-  PMCC_TERM_LABELS = [ "近月", "中月", "遠月" ].freeze
+  # 到期日桶從固定三個（近/中/遠月）改成最多六個之後，位置式標籤只標得到前三個，
+  # 第 4–6 桶會完全沒有標籤。改成依 DTE 給標籤，跟 lesson9 的建議區間對齊：
+  # < 19 天不另標（本來就有橘色警示 badge）、19–45 是建議區間、> 45 偏遠。
+  def pmcc_term_label(short_dte)
+    dte = short_dte.to_i
+    return nil unless dte.positive?
+    return nil if dte < 19
+    dte <= 45 ? "建議區間" : "偏遠"
+  end
 
 
+  # 每桶用原生 details/summary 收摺（沿用 concept_cards 的做法，零 JS，
+  # 也避開 Phlex 2.x 封鎖 on* 屬性的問題）。第一桶預設展開，其餘收起——
+  # 六個到期日全展開會把畫面撐得太長。
+  # 注意：收起來的表格仍在 DOM 裡，所以 data-sort-scope 的排序 toggle 照樣生效；
+  # 匯出 PNG 前由 export.js 統一強制展開，不會漏內容。
   def render_pmcc_bucket(exp_key, bucket, idx)
-    div(class: "px-4 py-4") do
-      div(class: "flex items-center gap-2 flex-wrap mb-2") do
+    details(class: "px-4 py-4 leaps-pmcc-bucket", open: idx.zero?) do
+      summary(class: "flex items-center gap-2 flex-wrap cursor-pointer select-none") do
         h3(class: "text-sm font-semibold text-gray-700") do
           plain "#{bucket[:expiration]} · #{bucket[:short_dte]} DTE"
         end
-        term = PMCC_TERM_LABELS[idx]
+        term = pmcc_term_label(bucket[:short_dte])
         span(class: "text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500") { plain term } if term
+        span(class: "text-xs text-gray-400") { plain "#{bucket[:combos].size} 組" }
         if bucket[:short_dte].to_i.positive? && bucket[:short_dte].to_i < 19
           span(class: "text-xs px-2 py-0.5 rounded-full bg-orange-50 text-orange-800 border border-orange-300") do
             plain "⚠️ 短於 lesson9 建議區間（19–45 天）：Gamma 風險高、被指派機率陡增、收租金額低"
@@ -76,10 +90,12 @@ module LeapsRecommendations::PmccSection
         end
       end
 
-      if bucket[:combos].empty?
-        div(class: "text-xs text-gray-400 py-2") { plain "此到期日無 KS>KL 組合" }
-      else
-        render_pmcc_table(bucket[:combos])
+      div(class: "mt-2") do
+        if bucket[:combos].empty?
+          div(class: "text-xs text-gray-400 py-2") { plain "此到期日無 KS>KL 組合" }
+        else
+          render_pmcc_table(bucket[:combos])
+        end
       end
     end
   end

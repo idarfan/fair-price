@@ -255,6 +255,55 @@ RSpec.describe "GET /leaps", type: :request do
         .and_return(instance_double(PmccRankingService, call: fake_pmcc_ranking))
     end
 
+    # 到期日桶從固定三個改成最多六個（DTE≤60）之後，全部展開會把畫面撐得太長，
+    # 所以改用原生 details/summary：第一桶展開、其餘收摺。
+    context "到期日桶的收摺" do
+      let(:fake_pmcc_ranking) do
+        {
+          status: :ok,
+          "2026-07-17" => { expiration: "2026-07-17", expiration_date: Date.new(2026, 7, 17),
+                            short_dte: 6,  combos: [ fake_combo ], has_passing: false },
+          "2026-08-21" => { expiration: "2026-08-21", expiration_date: Date.new(2026, 8, 21),
+                            short_dte: 41, combos: [ fake_combo ], has_passing: false },
+          "2026-09-18" => { expiration: "2026-09-18", expiration_date: Date.new(2026, 9, 18),
+                            short_dte: 55, combos: [ fake_combo ], has_passing: false },
+          summary: { total_combos: 3, passing_combos: 0,
+                     expirations: [ "2026-07-17", "2026-08-21", "2026-09-18" ] }
+        }
+      end
+
+      def bucket_tags(body)
+        body.scan(/<details[^>]*leaps-pmcc-bucket[^>]*>/)
+      end
+
+      it "每個到期日桶都是 details，只有第一個帶 open" do
+        get "/leaps", params: { symbol: symbol }
+        tags = bucket_tags(response.body)
+
+        expect(tags.size).to eq(3)
+        expect(tags.first).to include("open")
+        expect(tags[1]).not_to include("open")
+        expect(tags[2]).not_to include("open")
+      end
+
+      it "收起來的桶內容仍在 DOM 裡（排序 toggle 才會生效、匯出才抓得到）" do
+        get "/leaps", params: { symbol: symbol }
+
+        expect(response.body.scan(/data-sortable="true"/).size).to eq(3)
+      end
+
+      # 位置式標籤（近/中/遠月）在六桶下只標得到前三個，改成依 DTE 標示
+      it "標籤依 DTE 給：19–45 是建議區間、>45 偏遠、<19 不另標" do
+        get "/leaps", params: { symbol: symbol }
+        body = response.body
+
+        expect(body).to include("建議區間")
+        expect(body).to include("偏遠")
+        expect(body).to include("⚠️ 短於 lesson9 建議區間")
+        expect(body).not_to include("近月")
+      end
+    end
+
     it "renders one toggle per PMCC column, scoped with the table under data-sort-scope" do
       get "/leaps", params: { symbol: symbol }
       body = response.body
