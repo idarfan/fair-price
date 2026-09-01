@@ -6,7 +6,7 @@
 | **Phase 0 長腳報價可行性** | **已完成（2026-09-01）** | 實跑 scraper 取得指定到期日+履約價的 mid/delta，與 Barchart 頁面人工比對 |
 | Phase 1 資料模型 | **已完成（2026-09-01）** | migration 執行成功 + schema.rb 含四張表（含 user_id / contracts / fees） |
 | Phase 2 滾倉觸發判斷 | **已完成（2026-09-01）** | RSpec：給定 4 組已知案例（深度ITM/價平/價外/近到期），觸發布林值正確 |
-| Phase 3 滾倉建議服務 | 未開始 | 給定真實 option chain fixture，輸出建議履約價與 Phase2 手算結果一致（誤差<$1） |
+| Phase 3 滾倉建議服務 | **已完成（2026-09-01）** | 給定真實 option chain fixture，輸出建議履約價與 Phase2 手算結果一致（誤差<$1） |
 | Phase 4 損益帳本 | 未開始 | 建立3筆模擬 roll 事件後，累積已實現損益=手算值且**不含估算值**；未實現另外顯示 |
 | Phase 5 前端整合 | 未開始 | `ApplicationController.render` 驗 HTML 結構 + 使用者人工視覺確認（見下方「驗收方式的現實限制」） |
 
@@ -26,7 +26,11 @@
 ## 名詞定義
 - **長腳（Long Leg）**：一筆部位僅一組，履約價/到期日固定，僅在使用者手動平倉時才變動
 - **短腳（Short Leg）**：可有多筆歷史紀錄（每次 roll 產生一筆新紀錄，舊紀錄標記為 closed）
-- **黃金法則**：`PL(長腳現值) >= Spread(短腳履約價 − 長腳履約價)`，沿用既有 `P_L < K_S − K_L` 邏輯（見 fairprice.md screening 標準）
+- **黃金法則**：`NetDebit < Spread(短腳履約價 − 長腳履約價)` 才**通過**，
+  與既有 `PmccRankingService#evaluate_golden_rule`（`pl < spread`）及
+  `pmcc-golden-rule-spec-v3.md` 一致。
+  > **2026-09-01 修正**：本文件原本寫成 `PL >= Spread` 通過，方向與它自己
+  > 引用的 `P_L < K_S − K_L` 相反，也與既有實作相反。
 
 ---
 
@@ -210,13 +214,37 @@ PmccRollTriggerService.call(short_leg, quote: quote_row, manual: false)
 新短腳履約價 / 到期日 / DTE / Delta / Mid權利金
 新Spread = 新短腳履約價 − 長腳履約價
 滾動淨現金流 = 新短腳權利金 − 目前短腳買回成本(mid)
-新NetDebit = 長腳現值 − (原短腳累積淨收 + 本次滾動淨現金流)
+新NetDebit = 長腳**實付成本** − (原短腳累積淨收 + 本次滾動淨現金流)   ← 2026-09-01 決定
 新MaxProfit = 新Spread − 新NetDebit
-黃金法則 = 長腳現值 >= 新Spread ? 通過 : 不通過
+黃金法則 = 新NetDebit < 新Spread ? 通過 : 不通過   ← 2026-09-01 修正方向
 ```
 按「黃金法則通過 → 新MaxProfit 由高到低」排序，取前 5 筆。
 
-**驗收**：用一組真實 option chain fixture（可用本次對話 245 履約價那張截圖數據當測試資料），輸出的候選與手算結果一致（誤差 <$1，因報價可能有 bid/ask/mid 微差）。
+**驗收**：用一組真實 option chain fixture，輸出的候選與手算結果一致。
+
+### 完成記錄（2026-09-01）
+
+`app/services/pmcc_roll_suggestion_service.rb`，與 `PmccRankingService` 平行放置
+（那支回答「現在要建倉哪組最好」，這支回答「我手上這一腳該滾去哪」——
+輸入與基準都不同，刻意不合併）。23 則 spec。
+
+**兩個修正／決定**
+
+1. **黃金法則方向修正**：本文件原本寫 `PL >= Spread` 通過，與自己引用的
+   `P_L < K_S − K_L` 及既有實作 `PmccRankingService:223` 都相反。
+   改為 **NetDebit < Spread 才通過**。
+2. **PL 基準用實付成本**（不是目前市價）：回答「這筆交易到最後真的賺不賺錢」，
+   與損益帳本同一把尺。**目前市價另外並列顯示**（`long_leg.market_mid`，
+   來自 Phase 0 的 `pmcc_leg_quotes`），含 `unrealized_per_share` 與
+   `quoted_at`，但**不參與任何計算**——市價變動不影響黃金法則判定，有 spec 釘住。
+
+**其他實作決定**
+
+- 缺目前短腳報價回 `:no_buyback_quote`，**不假設買回成本為 0**——
+  硬給 0 會讓每個候選的滾動現金流都灌水
+- 天期不在 19–45 只標記 `in_suggested_dte`，不過濾（同本專案一貫原則）
+- Delta 用滾倉專用的 0.15–0.30
+- 只往上滾（strike > 目前短腳），不含 roll down
 
 ---
 
