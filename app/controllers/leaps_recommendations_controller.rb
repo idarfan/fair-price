@@ -74,6 +74,7 @@ class LeapsRecommendationsController < ApplicationController
       Fundamental.where(symbol: @symbol).order(:updated_at).last&.next_earnings_date : nil
 
     @pmcc_ranking = pmcc_ranking_for(@symbol, @candidates)
+    @pmcc_tracker = pmcc_tracker_for(@symbol)
 
     render LeapsRecommendations::PageComponent.new(
       symbol:         @symbol,
@@ -84,7 +85,8 @@ class LeapsRecommendationsController < ApplicationController
       scrape_errors:  @scrape_errors,
       user_strike:    @user_strike,
       next_earnings:  next_earnings,
-      pmcc_ranking:   @pmcc_ranking
+      pmcc_ranking:   @pmcc_ranking,
+      pmcc_tracker:   @pmcc_tracker
     )
   end
 
@@ -159,5 +161,41 @@ class LeapsRecommendationsController < ApplicationController
     return { status: :no_data } unless PmccShortCallSnapshot.for_symbol(symbol).exists?
 
     PmccRankingService.new(symbol).call
+  end
+
+  # 部位追蹤：**刻意不看 candidates**。這是使用者自己的持久資料，不該因為
+  # 當下抓取沒有候選（或 Barchart 掛了）就從畫面消失——這點與
+  # pmcc_ranking_for 的 `candidates.blank? -> :no_data` 是不同語意。
+  #
+  # 一律從 current_user 出發（比照 Api::V1::MarginPositionsController），
+  # 別人的部位查不到。
+  def pmcc_tracker_for(symbol)
+    return nil if symbol.blank? || current_user.blank?
+
+    position = current_user.pmcc_positions.active_positions.for_symbol(symbol).first
+    return nil if position.blank?
+
+    open_leg = position.open_short_leg
+    quote    = short_leg_quote(symbol, open_leg)
+
+    {
+      position:    position,
+      pnl:         PmccPnlService.call(position),
+      trigger:     open_leg && PmccRollTriggerService.call(open_leg, quote: quote),
+      suggestions: PmccRollSuggestionService.call(
+        position,
+        candidates:    PmccShortCallSnapshot.for_symbol(symbol).to_a,
+        current_quote: quote
+      )
+    }
+  end
+
+  # 目前這一腳短腳的最新報價（買回成本 + 觸發判斷都要用）
+  def short_leg_quote(symbol, open_leg)
+    return nil if open_leg.blank?
+
+    PmccShortCallSnapshot.for_symbol(symbol)
+                         .find_by(expiration_date: open_leg.short_expiration,
+                                  strike: open_leg.short_strike)
   end
 end

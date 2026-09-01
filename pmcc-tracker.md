@@ -8,7 +8,7 @@
 | Phase 2 滾倉觸發判斷 | **已完成（2026-09-01）** | RSpec：給定 4 組已知案例（深度ITM/價平/價外/近到期），觸發布林值正確 |
 | Phase 3 滾倉建議服務 | **已完成（2026-09-01）** | 給定真實 option chain fixture，輸出建議履約價與 Phase2 手算結果一致（誤差<$1） |
 | Phase 4 損益帳本 | **已完成（2026-09-01）** | 建立3筆模擬 roll 事件後，累積已實現損益=手算值且**不含估算值**；未實現另外顯示 |
-| Phase 5 前端整合 | 未開始 | `ApplicationController.render` 驗 HTML 結構 + 使用者人工視覺確認（見下方「驗收方式的現實限制」） |
+| Phase 5 前端整合 | **顯示層已完成（2026-09-01）；寫入表單進行中** | `ApplicationController.render` 驗 HTML 結構 + 使用者人工視覺確認（見下方「驗收方式的現實限制」） |
 
 > **驗收方式的現實限制（2026-09-01 實測）**：Playwright MCP 控制的是 9224 那個 Chrome
 > 實例，與使用者日常登入的瀏覽器不是同一個，`/leaps` 一律被踢回 `/login`，
@@ -322,6 +322,26 @@ PmccRollTriggerService.call(short_leg, quote: quote_row, manual: false)
   > 不該因為當下抓取沒有候選就從畫面消失。`pmcc_position_for` 只看
   > `user_id + symbol`，**不看 candidates**。
 - **計算服務**：Phase 3 滾倉建議服務新建 `app/services/pmcc_roll_suggestion_service.rb`，與既有 `app/services/pmcc_ranking_service.rb` 平行放置，不合併進同一服務（黃金法則排序 vs 滾倉建議是兩種不同查詢，避免職責混雜）
+
+### 顯示層完成記錄（2026-09-01）
+
+`app/components/leaps_recommendations/pmcc_position_tracker.rb`，
+由 `PageComponent` include，渲染在 `render_pmcc_section` 之後。
+
+**與 `@pmcc_ranking` 解耦是本期最重要的一條**：`pmcc_tracker_for` 只看
+`current_user + symbol`，**不看 candidates**，而且 `render_pmcc_position_tracker`
+放在 `if @candidates.any?` 區塊**外面**。部位是使用者的持久資料，抓取失敗
+或當天沒有候選時不該從畫面消失。有 request spec 釘住
+（「抓取沒有候選時仍然渲染」，同時斷言頁面確實沒有候選排行表）。
+
+區塊內容：長腳（實付成本／目前市價／未實現，分開標示）、目前短腳、
+滾倉判斷（含 `:no_quote` 明說「不是不需滾倉」）、滾倉候選表、損益帳本時間軸。
+
+沿用 `.leaps-pmcc-bucket` 的 details/summary，預設收摺；收起時摘要列仍顯示
+KL/KS 與累積損益。無部位時整個區塊不渲染。
+
+隔離：`current_user.pmcc_positions` 出發，別人的部位、別的代號、已平倉的
+都不顯示，各有 spec。
 
 ### 操作流程
 - 建部位表單：輸入長腳（履約價/到期日/成本）即建立 `pmcc_positions` 記錄，關聯到當前 `symbol`

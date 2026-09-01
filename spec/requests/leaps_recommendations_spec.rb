@@ -171,6 +171,69 @@ RSpec.describe "GET /leaps", type: :request do
     end
   end
 
+  # ── pmcc-tracker Phase 5：部位追蹤區塊 ────────────────────────────────────
+  describe "PMCC 部位追蹤" do
+    def get_leaps
+      get "/leaps", params: { symbol: symbol }
+      response.body
+    end
+
+    it "沒有部位時整個區塊不渲染（不顯示空的收折列）" do
+      expect(get_leaps).not_to include("PMCC 部位追蹤")
+    end
+
+    # 這是本期最重要的一條：部位是使用者的持久資料，不該因為當下抓取
+    # 沒有候選（或 Barchart 掛了）就從畫面消失
+    it "抓取沒有候選時仍然渲染（與 pmcc_ranking 解耦）" do
+      create(:pmcc_position, user: signed_in_user, ticker: symbol)
+
+      body = get_leaps
+      expect(body).to include("PMCC 部位追蹤")
+      expect(body).not_to include("LEAPS 候選排行")   # 確認這次真的沒有候選
+    end
+
+    it "預設收摺（details 沒有 open）" do
+      create(:pmcc_position, user: signed_in_user, ticker: symbol)
+
+      expect(get_leaps).to include('<details class="leaps-pmcc-bucket">')
+    end
+
+    it "看不到別人的部位" do
+      create(:pmcc_position, user: create(:user), ticker: symbol)
+
+      expect(get_leaps).not_to include("PMCC 部位追蹤")
+    end
+
+    it "只顯示這個代號的部位" do
+      create(:pmcc_position, user: signed_in_user, ticker: "OTHER")
+
+      expect(get_leaps).not_to include("PMCC 部位追蹤")
+    end
+
+    it "已平倉的部位不顯示" do
+      create(:pmcc_position, user: signed_in_user, ticker: symbol,
+                             status: "closed", closed_at: Time.current)
+
+      expect(get_leaps).not_to include("PMCC 部位追蹤")
+    end
+
+    it "同時顯示實付成本與目前市價，並標示未實現" do
+      position = create(:pmcc_position, user: signed_in_user, ticker: symbol,
+                                        long_strike: 100, long_entry_cost: 120.5)
+      create(:pmcc_leg_quote, symbol: symbol, strike: 100,
+                              expiration_date: position.long_expiration, mid: 129.7)
+
+      body = get_leaps
+      expect(body).to include("實付成本", "目前市價", "未實現")
+    end
+
+    it "沒有長腳報價時明說算不出未實現，不留白" do
+      create(:pmcc_position, user: signed_in_user, ticker: symbol)
+
+      expect(get_leaps).to include("尚無長腳報價")
+    end
+  end
+
   # ── PMCC v3 §8: pmcc_ranking_for wiring ──────────────────────────────────
 
   describe "with fresh LEAPS data but no PMCC Short Call data" do

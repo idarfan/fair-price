@@ -9,10 +9,11 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   include LeapsRecommendations::PriceEstimator
   include LeapsRecommendations::FlowPanel
   include LeapsRecommendations::PmccSection
+  include LeapsRecommendations::PmccPositionTracker
   include LeapsRecommendations::PmccEducation
   include LeapsRecommendations::VocabCards
 
-  def initialize(symbol: nil, candidates: [], recommendation: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil, next_earnings: nil, pmcc_ranking: nil)
+  def initialize(symbol: nil, candidates: [], recommendation: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil, next_earnings: nil, pmcc_ranking: nil, pmcc_tracker: nil)
     @symbol         = symbol
     @candidates     = Array(candidates)
     @recommendation = recommendation
@@ -24,6 +25,9 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     # PMCC v3 §9：render_pmcc_section／render_pmcc_edu_section 見 Step7；
     # 這裡先接住參數，讓 Step6 controller 改動不會因為未知 kwarg 直接炸掉。
     @pmcc_ranking   = pmcc_ranking
+    # 部位追蹤刻意放在 candidates 判斷之外：這是使用者的持久資料，
+    # 抓取失敗時不該跟著消失（見 controller 的 pmcc_tracker_for）。
+    @pmcc_tracker   = pmcc_tracker
   end
 
 
@@ -40,6 +44,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
         render_flow_panel if @flow_panel
         render_pmcc_section
       end
+      render_pmcc_position_tracker
       render_pmcc_edu_section
       render_vocab_cards
       render_price_estimator_modal
