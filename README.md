@@ -1,5 +1,34 @@
 # FairPrice
 
+### 2026-09-01（二）— Options Flow 拿掉 CSV 下載，逐筆交易改由 grid 轉出
+
+查 LEAPS 會連帶補抓 Options Flow（`refresh_options_flow_if_stale`），而那支 scraper
+除了用 CDP 讀 `bc-data-grid._data` 算彙總指標，還會**再去點 Barchart 的下載鈕存一份
+CSV** 來取得逐筆大單。實測後確認這條路多餘，而且正在污染資料。
+
+#### 三個實測依據
+
+1. **grid raw 是 CSV 的超集**：先前以為只有 CSV 有的 5 欄，對應
+   `volume` / `openInterest` / `volatility` / `label` / `tradeTime`，全都在 `_data[*].raw` 裡
+2. **筆數一致**：BE 當日 grid 翻頁 200 筆，CSV 扣掉表頭與頁尾也是 200 筆
+3. **CSV 每個快照塞一列垃圾**：末行是 `"Downloaded from Barchart.com as of ..."`，
+   `csv.DictReader` 沒過濾，於是產生一筆全 null 的假交易。DB 實查 67 列，
+   而快照組數也正好 67 —— 每個快照剛好一列（已清除，刪除前備份 `options_flow_trades`）
+
+#### label 要正規化，否則方向判斷會安靜失效
+
+grid 的 `label` 是長格式 `"(S) - Sell To Open"`，而
+`OptionsFlowClassifierService#derive_direction` 是拿短格式 `"SellToOpen"` 做 pattern
+match。不轉的話所有交易都會掉到 `INDETERMINATE`，**而且完全不報錯**。
+這是實跑才發現的——單元測試當初用了我自己假設的短格式樣本，測試全綠卻是假的綠燈。
+
+#### 其他
+
+- `iv` 改成無條件 ÷100，順帶修掉舊 `_parse_pct`「>1 才除」對小 IV（如 0.8%）算錯的邊界
+- 移除 `to_windows_path` / `Browser.setDownloadBehavior` / `wait_for_csv` 整條下載路徑，
+  以及 Ruby 端的 `csv_error` 分支；不再往工作目錄寫檔
+- 新增 `test_options_flow_scraper.py` 18 則（這支 scraper 原本零測試）
+
 ### 2026-08-31（一）— LEAPS 抓取的兩種逾時：分頁凍結 vs 頁面真的慢
 
 同一句「查詢失敗」底下其實是兩個獨立原因，分開處理才修得掉。
