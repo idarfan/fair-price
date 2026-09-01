@@ -4,7 +4,7 @@
 | 階段 | 狀態 | 驗證方式 |
 |---|---|---|
 | **Phase 0 長腳報價可行性** | **已完成（2026-09-01）** | 實跑 scraper 取得指定到期日+履約價的 mid/delta，與 Barchart 頁面人工比對 |
-| Phase 1 資料模型 | 未開始 | migration 執行成功 + schema.rb 含四張表（含 user_id / contracts / fees） |
+| Phase 1 資料模型 | **已完成（2026-09-01）** | migration 執行成功 + schema.rb 含四張表（含 user_id / contracts / fees） |
 | Phase 2 滾倉觸發判斷 | 未開始 | RSpec：給定 4 組已知案例（深度ITM/價平/價外/近到期），觸發布林值正確 |
 | Phase 3 滾倉建議服務 | 未開始 | 給定真實 option chain fixture，輸出建議履約價與 Phase2 手算結果一致（誤差<$1） |
 | Phase 4 損益帳本 | 未開始 | 建立3筆模擬 roll 事件後，累積已實現損益=手算值且**不含估算值**；未實現另外顯示 |
@@ -134,6 +134,19 @@ greeks。補上 `&moneyness=100` 後：**theta/gamma/itm_prob 從 140/465 變成
 | note | text | |
 
 **驗收**：四表 migration 跑通（含 `pmcc_leg_quotes`），`pmcc_position has_many short_legs has_many pnl_events`（透過 position）關聯可查。
+
+### 完成記錄（2026-09-01）
+
+Migration `20260901090000_create_pmcc_tracker_tables.rb`，四張表 ＋ model ＋ factory ＋ 22 則 spec。
+
+- **DB 層 check constraint 不只靠 model 驗證**：口數 > 0、履約價 > 0、
+  買回成本 ≥ 0（允許 NULL）、手續費 ≥ 0。繞過驗證的寫入路徑（`insert_all`／
+  直接 SQL）擋得住，比照 `margin_positions` 既有做法。
+- **`rolled_to` 是 self-reference**，migration 要明寫 `foreign_key: { to_table: :pmcc_short_legs }`，
+  用 `foreign_key: true` 的簡寫 Rails 會去找不存在的 `rolled_tos` 表。
+- `PmccPosition#capital_deployed` = 長腳成本 − 累積已實現，供 Phase 4 的年化報酬率當分母。
+- 實測驗證：ticker 自動大寫、roll 鏈雙向（`rolled_to` / `rolled_from`）、
+  口數換算（每股 ×100 ×口數）、`dependent: :destroy` 清乾淨。
 
 ---
 

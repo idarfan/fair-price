@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_31_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_01_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -354,6 +354,57 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_120000) do
     t.index ["ticker", "snapshot_date"], name: "index_ownership_snapshots_on_ticker_and_snapshot_date"
   end
 
+  create_table "pmcc_leg_quotes", force: :cascade do |t|
+    t.decimal "ask", precision: 10, scale: 4
+    t.decimal "bid", precision: 10, scale: 4
+    t.datetime "created_at", null: false
+    t.decimal "delta", precision: 8, scale: 6
+    t.integer "dte"
+    t.date "expiration_date", null: false
+    t.decimal "iv", precision: 8, scale: 6
+    t.decimal "mid", precision: 10, scale: 4
+    t.integer "open_interest"
+    t.string "option_type", default: "Call", null: false
+    t.datetime "scraped_at", null: false
+    t.decimal "strike", precision: 10, scale: 4, null: false
+    t.string "symbol", null: false
+    t.decimal "underlying_price", precision: 10, scale: 4
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "expiration_date", "strike"], name: "idx_pmcc_leg_quotes_unique", unique: true
+  end
+
+  create_table "pmcc_pnl_events", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "event_type", null: false
+    t.decimal "fees", precision: 15, scale: 4, default: "0.0", null: false
+    t.text "note"
+    t.datetime "occurred_at", null: false
+    t.bigint "pmcc_position_id", null: false
+    t.jsonb "quote_snapshot"
+    t.decimal "realized_pnl", precision: 15, scale: 4, null: false
+    t.datetime "updated_at", null: false
+    t.index ["pmcc_position_id", "occurred_at"], name: "index_pmcc_pnl_events_on_pmcc_position_id_and_occurred_at"
+    t.index ["pmcc_position_id"], name: "index_pmcc_pnl_events_on_pmcc_position_id"
+    t.check_constraint "fees >= 0::numeric", name: "pmcc_pnl_events_fees_non_negative"
+  end
+
+  create_table "pmcc_positions", force: :cascade do |t|
+    t.datetime "closed_at"
+    t.datetime "created_at", null: false
+    t.integer "long_contracts", default: 1, null: false
+    t.decimal "long_entry_cost", precision: 10, scale: 4, null: false
+    t.date "long_entry_date", null: false
+    t.date "long_expiration", null: false
+    t.decimal "long_strike", precision: 10, scale: 4, null: false
+    t.string "status", default: "active", null: false
+    t.string "ticker", null: false
+    t.datetime "updated_at", null: false
+    t.index ["ticker", "status"], name: "index_pmcc_positions_on_ticker_and_status"
+    t.check_constraint "long_contracts > 0", name: "pmcc_positions_contracts_positive"
+    t.check_constraint "long_entry_cost > 0::numeric", name: "pmcc_positions_entry_cost_positive"
+    t.check_constraint "long_strike > 0::numeric", name: "pmcc_positions_strike_positive"
+  end
+
   create_table "pmcc_short_call_snapshots", force: :cascade do |t|
     t.decimal "ask", precision: 10, scale: 4
     t.decimal "bid", precision: 10, scale: 4
@@ -388,6 +439,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_120000) do
     t.integer "volume"
     t.index ["symbol", "expiration_date", "strike"], name: "idx_pmcc_short_unique", unique: true
     t.index ["symbol", "scraped_at"], name: "idx_pmcc_short_symbol_scraped"
+  end
+
+  create_table "pmcc_short_legs", force: :cascade do |t|
+    t.decimal "close_cost", precision: 10, scale: 4
+    t.datetime "closed_at"
+    t.integer "contracts", default: 1, null: false
+    t.datetime "created_at", null: false
+    t.datetime "opened_at", null: false
+    t.bigint "pmcc_position_id", null: false
+    t.decimal "premium_collected", precision: 10, scale: 4, null: false
+    t.bigint "rolled_to_id"
+    t.date "short_expiration", null: false
+    t.decimal "short_strike", precision: 10, scale: 4, null: false
+    t.string "status", default: "open", null: false
+    t.datetime "updated_at", null: false
+    t.index ["pmcc_position_id", "status"], name: "index_pmcc_short_legs_on_pmcc_position_id_and_status"
+    t.index ["pmcc_position_id"], name: "index_pmcc_short_legs_on_pmcc_position_id"
+    t.index ["rolled_to_id"], name: "index_pmcc_short_legs_on_rolled_to_id"
+    t.check_constraint "close_cost IS NULL OR close_cost >= 0::numeric", name: "pmcc_short_legs_close_cost_non_negative"
+    t.check_constraint "contracts > 0", name: "pmcc_short_legs_contracts_positive"
+    t.check_constraint "short_strike > 0::numeric", name: "pmcc_short_legs_strike_positive"
   end
 
   create_table "portfolios", force: :cascade do |t|
@@ -623,6 +695,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_120000) do
   add_foreign_key "margin_positions", "users"
   add_foreign_key "option_snapshots", "tracked_tickers"
   add_foreign_key "ownership_holders", "ownership_snapshots"
+  add_foreign_key "pmcc_pnl_events", "pmcc_positions"
+  add_foreign_key "pmcc_short_legs", "pmcc_positions"
+  add_foreign_key "pmcc_short_legs", "pmcc_short_legs", column: "rolled_to_id"
   add_foreign_key "portfolios", "users"
   add_foreign_key "price_alerts", "users"
   add_foreign_key "user_activities", "users"
