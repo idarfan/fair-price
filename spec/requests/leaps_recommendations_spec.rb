@@ -171,6 +171,60 @@ RSpec.describe "GET /leaps", type: :request do
     end
   end
 
+  # 迴歸（2026-09-01 使用者實際踩到）：NOK 履約價 5 抓完之後畫面顯示
+  # 「抓取時發生未知錯誤」，但 job 回報的是 success。原因是 controller 的
+  # job_status case 沒有列 "success"，直接掉進 else 變成 :error。
+  # 同 feedback_scraper_status_case 的教訓，只是這次掉錯方向。
+  describe "資料不 fresh 時的 job_status 分流" do
+    before do
+      allow(LeapsOptionChainSnapshot)
+        .to receive_message_chain(:for_symbol, :fresh, :exists?).and_return(false)
+      allow(LeapsOptionChainSnapshot).to receive(:fresh_for?).and_return(false)
+    end
+
+    def body_for(status)
+      get "/leaps", params: { symbol: symbol, job_status: status }
+      response.body
+    end
+
+    it "success 不再顯示「未知錯誤」" do
+      body = body_for("success")
+
+      expect(body).not_to include("抓取時發生未知錯誤")
+      expect(body).to include("沒有符合篩選條件的候選")
+    end
+
+    # 測試環境的 cache_store 是 :null_store，Rails.cache.write 是空操作，
+    # 所以錯誤訊息要用 stub 餵進去，不能真的寫快取。
+    def stub_cached_errors(messages)
+      allow(Rails.cache).to receive(:read).and_call_original
+      allow(Rails.cache).to receive(:read).with("leaps_last_errors_#{symbol}").and_return(messages)
+    end
+
+    it "success 但有快取錯誤時走 partial_error" do
+      stub_cached_errors([ "抓取 Strike 5 的波動率頁面逾時" ])
+
+      expect(body_for("success")).to include("抓取 Strike 5 的波動率頁面逾時")
+    end
+
+    it "invalid_strike 顯示履約價訊息，不是未知錯誤" do
+      stub_cached_errors([ "Strike 999 不在 NOK 的履約價範圍" ])
+
+      body = body_for("invalid_strike")
+      expect(body).to include("Strike 999 不在")
+      expect(body).not_to include("抓取時發生未知錯誤")
+    end
+
+    it "真正未分類的狀態仍走未知錯誤" do
+      expect(body_for("something_new")).to include("抓取時發生未知錯誤")
+    end
+
+    it "session_expired 與 cdp_offline 維持原本分流" do
+      expect(body_for("session_expired")).to include("請先登入 Barchart")
+      expect(body_for("cdp_offline")).to include("CDP 未連線")
+    end
+  end
+
   # ── pmcc-tracker Phase 5：部位追蹤區塊 ────────────────────────────────────
   describe "PMCC 部位追蹤" do
     def get_leaps

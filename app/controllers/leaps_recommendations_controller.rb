@@ -59,6 +59,23 @@ class LeapsRecommendationsController < ApplicationController
         when "partial_error"
           @scrape_status = :partial_error
           @scrape_errors = cached_errors(@symbol)
+        when "invalid_strike"
+          @scrape_status = :invalid_strike
+          @scrape_errors = cached_errors(@symbol)
+        when "success", "cached"
+          # 工作回報成功、但資料不 fresh。可能是零候選，或這次抓的中心履約價
+          # 與網址上的 user_strike 對不上。**這不是「未知錯誤」**——
+          # 2026-09-01 使用者實際踩到：NOK 履約價 5 抓完之後畫面顯示
+          # 「抓取時發生未知錯誤」，其實 job 是 success。
+          # 同 feedback_scraper_status_case 的教訓：狀態沒列進 case 就會
+          # 掉到 else，只是這次掉錯方向（成功被當成錯誤）。
+          errors = cached_errors(@symbol)
+          if errors.any?
+            @scrape_status = :partial_error
+            @scrape_errors = errors
+          else
+            @scrape_status = :no_candidates
+          end
         else
           @scrape_status = :error
           @scrape_errors = cached_errors(@symbol)
