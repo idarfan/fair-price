@@ -1,5 +1,61 @@
 # FairPrice
 
+### 2026-09-01（二）— PMCC 部位追蹤 Phase 0–1，並修好 V&G 少帶 moneyness 的資料缺失
+
+#### 先做可行性驗證，才發現最大的坑不在原本以為的地方
+
+`pmcc-tracker.md` 的檢討結論是先加一個 **Phase 0**：證明長腳報價拿得到，
+再蓋依賴它的損益帳本。做法是讓 `pmcc_short_call_scraper.py` 的
+`select_expirations()` 接受 `extra` 參數，把長腳到期日一併帶進去抓——
+**不新增第二支爬蟲**，因為抓取迴圈本身完全不看 DTE，能力一直都在，
+差別只在沒人叫它去讀那個到期日。
+
+```
+python3 pmcc_short_call_scraper.py BE --expirations 2028-01-21
+→ BE 100 @2028-01-21：dte 508, mid 129.7, delta 0.8978, OI 3893
+```
+
+長腳只需要 mid/delta（兩者都在 Options Prices 頁上），所以**跳過 V&G**，
+固定成本從兩次頁面載入降到一次。
+
+#### 實跑挖出的既有 bug：V&G 的 URL 少一個參數
+
+DB 裡 BE 的 465 列**只有 140 列**有 theta/gamma/itm_probability。先猜是逾時
+（當天上午才修過同類問題），把上限拉到 60 秒——**沒用**，
+`skipped_expirations` 是空的，代表 V&G 有讀到資料只是對不起來。實測比對：
+
+| 頁面 | 列數 | 履約價範圍 |
+|---|---|---|
+| V&G（原本，無 `moneyness`）| 20 | 160–255 |
+| V&G（加 `moneyness=100`）| 49 | 115–355 |
+| Options Prices（對照）| 49 | 115–355 |
+
+`_merge_vg` 用 `(strike, expiration_date)` 對接，兩邊範圍不同就只有交集拿得到
+greeks。補上參數後 **140/465 → 465/465**。這個 bug 直接卡住滾倉建議
+（需要短腳的 theta 與 itm_probability），不做 Phase 0 會等到很後面才炸出來。
+
+#### Phase 1 資料模型
+
+`pmcc_positions` / `pmcc_short_legs` / `pmcc_pnl_events` / `pmcc_leg_quotes`。
+
+- `rolled_to` 是 self-reference，migration 必須明寫
+  `foreign_key: { to_table: :pmcc_short_legs }`，用簡寫 Rails 會去找不存在的
+  `rolled_tos` 表
+- DB 層 check constraint 不只靠 model 驗證（口數 > 0、履約價 > 0、
+  買回成本 ≥ 0 允許 NULL、手續費 ≥ 0），比照 `margin_positions`
+- `realized_pnl` **只記真實現金流**——已實現帳本的價值在於可稽核，
+  混進估算就跟券商對帳單永遠對不起來
+- `quote_snapshot`（jsonb）留存事件當下的報價，因為 `pmcc_leg_quotes`
+  是覆蓋式快照、事後查不到
+
+#### per-user 隔離：先決定不做，當天翻轉
+
+原本判斷「不介意其他帳號看到持倉」就不加 `user_id`。翻轉的理由**不是可見性
+而是寫入**：Phase 5 會做建部位／滾倉／平倉表單，沒有 `user_id` 的話其他 4 個
+enabled 帳號能新增假部位、把持倉標成已平倉、寫進損益帳本，而且事後查不出
+是誰做的。執行面照抄 `MarginPositionsController` 的 pattern，
+**只加欄位不 scope 等於白加**，spec 直接把這件事釘住。
+
 ### 2026-09-01（二）— PMCC 到期日涵蓋到 60 天，每個到期日表格可收摺
 
 #### 為什麼原本的「固定前三個到期日」不夠用
