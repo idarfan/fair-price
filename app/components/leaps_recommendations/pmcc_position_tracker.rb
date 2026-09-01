@@ -16,7 +16,7 @@ module LeapsRecommendations::PmccPositionTracker
     pnl      = @pmcc_tracker[:pnl]
 
     div(class: "bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden") do
-      details(class: "leaps-pmcc-panel") do
+      details(class: "px-4 py-4 leaps-pmcc-panel") do
         summary(class: "flex items-center gap-2 flex-wrap cursor-pointer select-none") do
           h2(class: "text-sm font-semibold text-gray-700") do
             plain "PMCC 部位追蹤 — #{position.ticker}"
@@ -268,7 +268,7 @@ module LeapsRecommendations::PmccPositionTracker
 
     div(class: "bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden",
         data_export_exclude: "") do
-      details(class: "leaps-pmcc-panel") do
+      details(class: "px-4 py-4 leaps-pmcc-panel") do
         summary(class: "flex items-center gap-2 flex-wrap cursor-pointer select-none") do
           h2(class: "text-sm font-semibold text-gray-700") { plain "建立 PMCC 部位 — #{@symbol}" }
           span(class: "text-xs text-gray-400") { plain "記錄長腳後即可追蹤滾倉與損益" }

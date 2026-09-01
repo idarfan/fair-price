@@ -223,7 +223,7 @@ RSpec.describe "GET /leaps", type: :request do
     it "預設收摺（details 沒有 open）" do
       create(:pmcc_position, user: signed_in_user, ticker: symbol)
 
-      expect(get_leaps).to include('<details class="leaps-pmcc-panel">')
+      expect(get_leaps).to include('<details class="px-4 py-4 leaps-pmcc-panel">')
     end
 
     it "看不到別人的部位" do
