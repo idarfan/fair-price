@@ -15,6 +15,7 @@ class User < ApplicationRecord
   has_many :price_alerts,     dependent: :destroy
   has_many :watchlist_items,  dependent: :destroy
   has_many :iv_watchlists,    dependent: :destroy
+  has_many :pmcc_positions,   dependent: :destroy
 
   validates :email,      presence: true, uniqueness: true
   validates :google_uid, presence: true, uniqueness: true

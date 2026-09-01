@@ -1,5 +1,6 @@
 FactoryBot.define do
   factory :pmcc_position do
+    user
     ticker          { "BE" }
     long_contracts  { 1 }
     long_strike     { 100.0 }

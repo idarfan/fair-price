@@ -16,6 +16,29 @@ RSpec.describe PmccPosition do
     expect(build(:pmcc_position, status: "half_closed")).not_to be_valid
   end
 
+  describe "per-user 隔離" do
+    # 真正的風險不是「被看到」而是「被寫入」：Phase 5 的表單若不 scope，
+    # 其他帳號能改你的持倉、寫進你的帳本，而且事後查不出是誰做的。
+    it "必須綁定 user" do
+      expect(build(:pmcc_position, user: nil)).not_to be_valid
+    end
+
+    it "從 current_user 出發查不到別人的部位（RecordNotFound，不是查得到但不能改）" do
+      mine     = create(:pmcc_position)
+      other    = create(:pmcc_position, user: create(:user))
+
+      expect(mine.user.pmcc_positions.find(mine.id)).to eq(mine)
+      expect { mine.user.pmcc_positions.find(other.id) }
+        .to raise_error(ActiveRecord::RecordNotFound)
+    end
+
+    it "刪除使用者會一併清掉他的部位" do
+      position = create(:pmcc_position)
+
+      expect { position.user.destroy! }.to change(described_class, :count).by(-1)
+    end
+  end
+
   describe "關聯" do
     let(:position) { create(:pmcc_position) }
 

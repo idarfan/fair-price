@@ -2,10 +2,9 @@
 
 # pmcc-tracker Phase 1：部位追蹤與損益帳本的資料模型。
 #
-# 刻意不加 user_id（2026-09-01 決定，見 pmcc-tracker.md 已決事項）：
-# 現況 5 個帳號全部 enabled、4 個非 admin，/leaps 也沒有 admin 閘門，
-# 所以持倉數字對所有已登入使用者可見，使用者已知悉並接受。
-# 這個設計假設哪天不成立，就要補 user_id 加 backfill。
+# user_id 由同日的 20260901093000_add_user_to_pmcc_positions 補上——
+# 當初決定不加，後來確認真正的風險是「被別人寫入」而非「被別人看到」，
+# 見該 migration 的註解。
 #
 # 精度沿用既有慣例，不另造：價格 decimal(10,4)（同 pmcc_short_call_snapshots）、
 # 金額 decimal(15,4)（同 margin_positions.buy_price）。

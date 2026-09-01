@@ -264,12 +264,15 @@ Playwright 截圖跑過以下完整流程，非僅 API 層測試：
 ---
 
 ## 已決事項（2026-09-01 檢討）
-- [x] **不做 per-user 隔離**（2026-09-01 決定）：三張表**不加 `user_id`**。
-      現況 5 個帳號全部 enabled、其中 4 個非 admin，`/leaps` 也沒有 admin 閘門，
-      所以**持倉數字對所有已登入使用者可見**——使用者已知悉並接受
-      （其他人沒有期權三期權限，不會使用此功能）。
-      **此設計假設「不介意其他已登入帳號看到持倉」**，哪天不成立就要補 `user_id`
-      加 backfill。
+- [x] **做 per-user 隔離**（2026-09-01，先決定不做、當天翻轉）：
+      `pmcc_positions` 加 `user_id`（`null: false` + FK + index），短腳與帳本
+      透過 position 關聯間接綁定。
+      **翻轉的理由是寫入而不是可見性**：Phase 5 會做建部位／滾倉／平倉表單，
+      沒有 `user_id` 的話其他 4 個 enabled 帳號不只看得到，還能新增假部位、
+      把持倉標成已平倉、寫進損益帳本，而且事後**查不出是誰做的**（資料裡沒有「誰」）。
+      執行面：所有進入點一律從 `current_user` 出發
+      （比照 `Api::V1::MarginPositionsController:89-92`，別人的 id 直接
+      `RecordNotFound`）。**只加欄位不 scope 等於白加。**
 - [x] **長腳現值**：首次由使用者手動輸入成本，**之後的現值從 Barchart 抓**
       （見 Phase 0，沿用 `pmcc_short_call_scraper.py` 的到期日全鏈讀取）
 - [x] **口數與手續費**：兩者都納入模型（`contracts` / `fees`）
