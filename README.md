@@ -1,5 +1,39 @@
 # FairPrice
 
+### 2026-09-01（二）— PMCC 到期日涵蓋到 60 天，每個到期日表格可收摺
+
+#### 為什麼原本的「固定前三個到期日」不夠用
+
+舊規則（spec §3）取 `Expiration` 下拉的前三個，DTE 通常整組落在 6–50 天，
+**前一兩個還短於 lesson9 的 19–45 天建議區間**，使用者真正要看的 45–60 天
+往往一個候選都沒有。改成 `select_expirations()`：**DTE ≤ 60 的前 8 個**。
+
+上限一開始設 6，**實跑 BE 才發現不夠**——週選標的 7 天一檔，前 6 個只到 DTE 38，
+把 45–60 整段切掉。實測 BE 的 DTE≤60 共 7 個，落在 45–60 的只有 `2026-10-16`
+（DTE 45）那一個。上限改 8 後重跑，BE 抓到 7 個到期日、最遠 DTE 46，
+排行服務算出 7 桶（總組合 159 / 通過 101）。
+
+`PmccRankingService::SC_EXPIRATION_COUNT` 要跟 scraper 的 `MAX_EXPIRATIONS`
+一起改——這是兩個各自獨立的常數，只改一邊會靜靜地少幾桶。
+
+#### 收摺
+
+每桶從 `div` 改成原生 `details/summary`（沿用 `concept_cards` 的做法，零 JS，
+也避開 Phlex 2.x 封鎖 `on*` 屬性），第一桶展開、其餘收起。
+
+- 收起的表格**仍在 DOM**，所以 `data-sort-scope` 的排序 toggle 照常生效
+- `export.js` 匯出 PNG 前強制展開所有 `details`、匯出後還原——不然收摺的桶
+  會整塊從截圖消失（向量 PDF 不受影響，PMCC 本來就不在 `pdf_export_payload`）
+- 位置式標籤（近/中/遠月）只標得到前三桶，改成依 DTE：19–45「建議區間」、
+  > 45「偏遠」、< 19 維持原本的橘色警示 badge
+
+#### 展開箭頭改成固定尺寸
+
+原本是裸的 `▸` 字元，沒有 `font-size`，會**跟著頁首「字體調整」一起縮放**，
+大小不可控。改成 24×24 px 綠底（green-600）方框 ＋ 白色三角形，與字級脫鉤。
+`summary` 是 flex 容器，`::before` 會成為 flex item，必須 `flex: 0 0 24px`
+鎖住，否則標題長時方框會被壓扁。
+
 ### 2026-09-01（二）— Options Flow 拿掉 CSV 下載，逐筆交易改由 grid 轉出
 
 查 LEAPS 會連帶補抓 Options Flow（`refresh_options_flow_if_stale`），而那支 scraper
