@@ -196,6 +196,36 @@ RSpec.describe PmccRankingService do
     end
   end
 
+  # 2026-09-03：粗篩放寬到 0.05–0.60 後，max_profit 排序天然偏袒極價外短腳
+  # （spread 越大 max_profit 越高），會把真正該賣的 Delta 擠出 TOP_COMBOS_PER_EXPIRATION。
+  describe "sort order within a bucket: short_delta_ok outranks max_profit" do
+    before do
+      create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85) # PL=5.75
+      # 極價外：spread 大 -> max_profit 高，但 Delta 0.07 不在 0.20-0.35 建議區間
+      create_short!(strike: 40.0, mid_price: 0.38, bid: 0.36, ask: 0.40, dte: 6, delta: 0.07,
+                    expiration_date: Date.today + 6)
+      # 建議區間內：spread 小 -> max_profit 低，但 Delta 0.30 合格
+      create_short!(strike: 17.0, mid_price: 2.03, bid: 2.00, ask: 2.06, dte: 6, delta: 0.30,
+                    expiration_date: Date.today + 6)
+    end
+
+    it "ranks the short_delta_ok combo first even though its max_profit is lower" do
+      combos = service.call.dig(service.call[:summary][:expirations].first, :combos)
+
+      expect(combos.first[:short_leg][:strike].to_f).to eq(17.0)
+      expect(combos.first[:short_delta_ok]).to be true
+      expect(combos.last[:short_leg][:strike].to_f).to eq(40.0)
+      expect(combos.last[:short_delta_ok]).to be false
+      # 確認這不是因為 max_profit 恰好也比較高——極價外那組的 max_profit 確實更大
+      expect(combos.last[:max_profit]).to be > combos.first[:max_profit]
+    end
+
+    it "still lists the out-of-band combo (標記不淘汰)" do
+      combos = service.call.dig(service.call[:summary][:expirations].first, :combos)
+      expect(combos.size).to eq(2)
+    end
+  end
+
   describe "Delta two-band coexistence (§2.3): 0.17 is listed but not flagged ✅" do
     before do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85)

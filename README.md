@@ -1,5 +1,31 @@
 # FairPrice
 
+### 2026-09-03（三）— 調整：PMCC 桶內排序改為 short_delta_ok 優先
+
+接續同日的粗篩放寬。放寬後 BTI 的候選從 4 組變 28 組，但畫面反而更難用：
+桶內排序原本是「通過黃金法則 → max_profit 高到低」，而
+`max_profit = spread - net_debit`，KS 拉得越遠 spread 越大、max_profit 就越高
+——排序天然偏袒極價外短腳。
+
+實測 BTI 前 5 名全被 Delta 0.06–0.09（權利金 0.38、OI=0，實務上賣不掉）佔滿。
+
+`bucket_and_sort` 加入 §2.3 的建議標記為第二排序鍵：
+
+```
+通過黃金法則 → short_delta_ok（0.20–0.35）→ max_profit 高到低
+```
+
+不合格的仍然列出，只是沉底，維持「標記不淘汰」的原則。
+
+**已知限制**：這個修正對 BTI 目前這批快照沒有作用。BTI 的 7 檔候選短腳
+Delta 分別是 0.056 / 0.064 / 0.065 / 0.072 / 0.087 / 0.180 / 0.566，
+**沒有任何一檔落在 0.20–0.35**，第二排序鍵全數 tie，排序與修正前完全相同。
+對寬階梯標的要讓「該賣的」浮上來，需要改用連續型的排序鍵（例如年化收租率
+`premium_yield_ann`，或 Delta 與建議區間的距離），而非布林標記。
+
+涉及檔案：`app/services/pmcc_ranking_service.rb`、
+`spec/services/pmcc_ranking_service_spec.rb`。測試：PMCC 相關 122 examples 全數通過。
+
 ### 2026-09-03（三）— 調整：PMCC Short Call 粗篩 Delta 放寬為 0.05–0.60
 
 使用者回報 BTI 的「PMCC 黃金法則組合」只列得出 KS=60 一種短腳。追查後確認

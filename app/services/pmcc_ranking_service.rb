@@ -237,8 +237,22 @@ class PmccRankingService
     format("%.2f", val).sub(/\.?0+$/, "")
   end
 
-  # 每桶排序：通過黃金法則的在前，同組依 max_profit（含 SC）高到低。
+  # 每桶排序：通過黃金法則 → short_delta_ok → max_profit（含 SC）高到低。
+  #
+  # 中間這層 short_delta_ok 是 2026-09-03 加的。max_profit = spread - net_debit，
+  # KS 拉得越遠 spread 越大、max_profit 就越高，所以純用 max_profit 排序天然偏袒
+  # 極價外短腳。粗篩放寬到 0.05–0.60 之後這件事變得致命：BTI 實測前 5 名被
+  # Delta 0.06–0.09（權利金 0.38、OI=0，實務上賣不掉）整排佔滿，真正合格的
+  # KS=55（Delta 0.566、權利金 2.03）反而被 TOP_COMBOS_PER_EXPIRATION 擠掉。
+  # 把 §2.3 的建議標記（0.20–0.35）升為第二排序鍵，讓「該賣的」浮上來；
+  # 不合格的仍然列出（只是沉底），維持「標記不淘汰」的原則。
   def bucket_and_sort(combos)
-    combos.sort_by { |c| [ c[:passes_golden_rule] ? 0 : 1, -(c[:max_profit] || -Float::INFINITY) ] }
+    combos.sort_by do |c|
+      [
+        c[:passes_golden_rule] ? 0 : 1,
+        c[:short_delta_ok] ? 0 : 1,
+        -(c[:max_profit] || -Float::INFINITY)
+      ]
+    end
   end
 end
