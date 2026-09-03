@@ -204,7 +204,7 @@ PmccRollTriggerService.call(short_leg, quote: quote_row, manual: false)
 - Delta 落在 **0.15–0.30**（**滾倉專用區間**，2026-09-01 決定）
 
   > **與建倉區間刻意不同，不要「統一」**：`PmccRankingService::DELTA_SHORT_MIN/MAX`
-  > 是 0.15–0.40（建倉粗篩），`pmcc-golden-rule-spec-v3.md` 的建倉規範標記區間是
+  > 是 0.05–0.60（建倉粗篩，2026-09-03 由 0.15–0.40 放寬），`pmcc-golden-rule-spec-v3.md` 的建倉規範標記區間是
   > 0.20–0.35。滾倉取 0.15–0.30 偏保守，因為滾倉時長腳已有既有成本，
   > 目標是穩定收租而非最大化權利金。**三組數字各有用途，建倉端維持原樣。**
 - Strike > 目前短腳履約價（僅列 roll up，不含 roll down）

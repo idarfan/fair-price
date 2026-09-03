@@ -1,5 +1,36 @@
 # FairPrice
 
+### 2026-09-03（三）— 調整：PMCC Short Call 粗篩 Delta 放寬為 0.05–0.60
+
+使用者回報 BTI 的「PMCC 黃金法則組合」只列得出 KS=60 一種短腳。追查後確認
+不是抓取或計算出錯，而是粗篩區間對寬階梯標的太窄。
+
+BTI 現價約 55.6，履約價 5 美元一檔，Delta 在價平附近跳得極陡：
+
+```
+2026-10-16 到期：K=55 → 0.566   K=60 → 0.180   K=65 → 0.048
+2026-09-18 到期：K=55 → 0.605   K=60 → 0.064   K=65 → 0.018
+```
+
+`PmccRankingService::DELTA_SHORT_MIN/MAX` 原本是 0.15–0.40，最新快照裡
+10-16 只夾到 K=60 一檔，09-18 一檔都沒夾到——整個到期日桶被 `fetch_short_candidates`
+丟掉，畫面上只剩一組到期日。
+
+改為 **0.05–0.60**（僅粗篩，決定哪些短腳進入組合運算）。同一份快照重算：
+
+| 到期日 | DTE | 舊區間 | 新區間 |
+|---|---|---|---|
+| 2026-09-18 | 16 | 0 檔 | 2 檔 |
+| 2026-10-16 | 44 | 1 檔 | 5 檔 |
+
+`SHORT_DELTA_OK_MIN/MAX`（0.20–0.35 的 ✅ 建議標記）**維持不變**——粗篩與建議
+標記本來就是兩條互不取代的規則，放寬只讓候選列得出來，是否「建議」照舊由標記
+判定。`PmccRollSuggestionService` 的滾倉專用區間 0.15–0.30 也維持不變。
+
+涉及檔案：`app/services/pmcc_ranking_service.rb`、
+`spec/services/pmcc_ranking_service_spec.rb`、`pmcc-golden-rule-spec-v3.md`、
+`pmcc-tracker.md`。測試：PMCC 相關 101 examples 全數通過。
+
 ### 2026-09-01（二）— 修正：job_status=success 被當成「未知錯誤」
 
 使用者實測 NOK 履約價 5：抓取其實**成功**（log 是 `job_status=success`、

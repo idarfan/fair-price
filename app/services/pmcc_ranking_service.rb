@@ -10,8 +10,12 @@ class PmccRankingService
   SC_EXPIRATION_COUNT       = 8
   TOP_SHORT_PER_EXPIRATION  = 8
   TOP_COMBOS_PER_EXPIRATION = 5
-  DELTA_SHORT_MIN           = 0.15
-  DELTA_SHORT_MAX           = 0.40
+  # 粗篩區間刻意放寬（2026-09-03）：BTI 這類 5 美元一檔的寬階梯標的，Delta 在價平
+  # 附近跳得極陡（10-16 到期：K=55→0.566、K=60→0.180、K=65→0.048），舊的
+  # 0.15–0.40 每個到期日最多只夾得到一檔，甚至整桶 0 檔被丟掉。0.05–0.60 讓這些
+  # 標的仍有候選可列，是否「建議」交給下面 SHORT_DELTA_OK_* 標記，不在這裡淘汰。
+  DELTA_SHORT_MIN           = 0.05
+  DELTA_SHORT_MAX           = 0.60
   TOP_LEAPS_PER_GROUP       = 3
   MIN_DTE_GAP               = 180
 

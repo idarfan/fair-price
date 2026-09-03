@@ -84,8 +84,8 @@ premium_yield_ann = premium_yield / short.dte * 365    # ★年化，跨到期�
 
 | 用途 | 區間 | 說明 |
 |---|---|---|
-| **粗篩**（`DELTA_SHORT_MIN/MAX`，決定哪些 SC 進入組合運算） | **0.15 – 0.40** | 寬鬆，避免誤刪邊緣候選。錯誤訊息「無 Delta 0.15-0.40 的 Short Call」用此區間 |
-| **建議標記**（表格 ✅／⚠️ 顯示判定） | **0.20 – 0.35** | lesson9 建倉規範理想區間。落在 0.15–0.20 或 0.35–0.40 的候選**仍列出**，只是不打 ✅ |
+| **粗篩**（`DELTA_SHORT_MIN/MAX`，決定哪些 SC 進入組合運算） | **0.05 – 0.60**（2026-09-03 放寬，原 0.15–0.40） | 寬鬆，避免誤刪邊緣候選。5 美元一檔的寬階梯標的（如 BTI）Delta 在價平附近跳得極陡，舊區間常常整個到期日一檔都夾不到 |
+| **建議標記**（表格 ✅／⚠️ 顯示判定） | **0.20 – 0.35** | lesson9 建倉規範理想區間。落在 0.05–0.20 或 0.35–0.60 的候選**仍列出**，只是不打 ✅ |
 
 Long Delta 同理：粗篩沿用 LEAPS 既有 0.60–0.90；建議標記 `✅ if ≥ 0.80`。
 
@@ -333,15 +333,15 @@ end
 SC_EXPIRATION_COUNT       = 3
 TOP_SHORT_PER_EXPIRATION  = 8
 TOP_COMBOS_PER_EXPIRATION = 5
-DELTA_SHORT_MIN = 0.15
-DELTA_SHORT_MAX = 0.40
+DELTA_SHORT_MIN = 0.05
+DELTA_SHORT_MAX = 0.60
 TOP_LEAPS_PER_GROUP = 3
 ```
 
 步驟：
 
 1. `fetch_leaps_candidates`：`LeapsRankingService.new(symbol).call` 取已含 liquidity tier 的候選，近天期(364–550)／遠天期(550+)各取前 3。
-2. `fetch_short_candidates`：`PmccShortCallSnapshot` 最新 batch，按 `expiration_date` 分組取前 3 到期日（日期升序），每桶 Delta 0.15–0.40 粗篩後 OI 降序取前 8。
+2. `fetch_short_candidates`：`PmccShortCallSnapshot` 最新 batch，按 `expiration_date` 分組取前 3 到期日（日期升序），每桶 Delta 0.05–0.60 粗篩後 OI 降序取前 8。
 3. `cross_and_filter`：LEAPS(≤6) × SC(≤24) ≤ 144 組合。依 §2.2 前置檢查順序：**(a) KS≤KL → (b) long.dte < short.dte+180 → (c) mid 缺值**。(a)(b) 未過仍保留並記 `fail_reason`；(c) 直接不列入。
 4. `enrich_combo`：`net_debit, max_profit_no_sc, max_profit, premium_yield, premium_yield_ann`（命名依 §2.2，**`max_profit` 是含 SC 的那個**）；`leaps_delta_ok(≥0.80)` / `short_delta_ok(0.20–0.35)` 供 ✅/⚠️ 標記，**僅標記不淘汰**。
 5. `bucket_and_sort`：按到期日分桶，每桶 passes 在前，同組依 **`max_profit`（含SC）** 高→低，取前 5。
@@ -480,7 +480,7 @@ end
 | 狀態 | 顯示 |
 |---|---|
 | Short `partial` | 黃 alert「Short Call 在 Strike X 時 V&G 中斷，已抓部分用於組合」 |
-| `no_short_candidates` | 藍提示「近三到期日無 Delta 0.15–0.40 的 Short Call，可能流動性不足」 |
+| `no_short_candidates` | 藍提示「近三到期日無 Delta 0.05–0.60 的 Short Call，可能流動性不足」 |
 | 全組 KS≤KL | bucket 顯示「無 KS>KL 組合」，**不算後端錯誤** |
 
 Fresh：`PmccShortCallSnapshot.fresh` 引用 `LeapsOptionChainSnapshot::FRESH_WINDOW`。
@@ -499,7 +499,7 @@ Fresh：`PmccShortCallSnapshot.fresh` 引用 `LeapsOptionChainSnapshot::FRESH_WI
 - [ ] **LEAPS 回歸**：`derived_values` 改為接收 mid 參數後，用 Phase H 的 NVTS fixture 重跑，LEAPS 既有 intrinsic/extrinsic 數值**完全未變**
 - [ ] `PmccRankingService` RSpec ≥7 case：KS≤KL 淘汰 / **long.dte < short.dte+180 淘汰** / PL≥spread 標 fail 且 fail_reason 含數值 / PL<spread 標 pass / mid 缺值跳過不以 0 代 / 三到期日分桶正確 / 排序依 `max_profit`(含SC) 高→低每桶前 5
 - [ ] **年化收租率**有計算且顯示：同 symbol 的 6 DTE 與 45 DTE 候選，未年化收益率相近但年化後差異顯著
-- [ ] **Delta 兩區間並存**：Delta 0.17 的 Short Call **有列出**（0.15–0.40 粗篩內）但**未打 ✅**（不在 0.20–0.35）
+- [ ] **Delta 兩區間並存**：Delta 0.17 的 Short Call **有列出**（0.05–0.60 粗篩內）但**未打 ✅**（不在 0.20–0.35）
 - [ ] Python：`py_compile` 過；單測涵蓋 Delta 篩選、`oi_change` unch→null、moneyness 正負、theoretical_price
 - [ ] `fetch_pmcc_short_calls` spec：mock `run_scraper` success → assert delete_all + insert_all
 - [ ] Controller：有 LEAPS+Short 資料時 `@pmcc_ranking` 非 nil，PageComponent 渲染不拋

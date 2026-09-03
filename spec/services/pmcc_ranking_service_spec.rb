@@ -202,7 +202,7 @@ RSpec.describe PmccRankingService do
       create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.17)
     end
 
-    it "is included in the combo list (within 0.15-0.40 coarse filter)" do
+    it "is included in the combo list (within 0.05-0.60 coarse filter)" do
       result = service.call
       combos = result.dig(result[:summary][:expirations].first, :combos)
       expect(combos.size).to eq(1)
@@ -218,7 +218,7 @@ RSpec.describe PmccRankingService do
   describe "Short Call Delta grade filter excludes out-of-range rows entirely" do
     before do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85)
-      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.05) # below 0.15
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.02) # below 0.05
     end
 
     it "never reaches cross_and_filter, so no combos exist for this expiration" do
