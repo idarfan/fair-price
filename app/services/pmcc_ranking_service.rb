@@ -237,20 +237,28 @@ class PmccRankingService
     format("%.2f", val).sub(/\.?0+$/, "")
   end
 
-  # 每桶排序：通過黃金法則 → short_delta_ok → max_profit（含 SC）高到低。
+  # 每桶排序（2026-09-03 定案）：
+  #   通過黃金法則 → short_delta_ok → 年化收租率 → max_profit（含 SC）
   #
-  # 中間這層 short_delta_ok 是 2026-09-03 加的。max_profit = spread - net_debit，
-  # KS 拉得越遠 spread 越大、max_profit 就越高，所以純用 max_profit 排序天然偏袒
-  # 極價外短腳。粗篩放寬到 0.05–0.60 之後這件事變得致命：BTI 實測前 5 名被
-  # Delta 0.06–0.09（權利金 0.38、OI=0，實務上賣不掉）整排佔滿，真正合格的
-  # KS=55（Delta 0.566、權利金 2.03）反而被 TOP_COMBOS_PER_EXPIRATION 擠掉。
-  # 把 §2.3 的建議標記（0.20–0.35）升為第二排序鍵，讓「該賣的」浮上來；
-  # 不合格的仍然列出（只是沉底），維持「標記不淘汰」的原則。
+  # 為什麼 max_profit 不能當主鍵：max_profit = spread - net_debit，KS 拉得越遠
+  # spread 越大、max_profit 就越高，排序天然偏袒極價外短腳。粗篩放寬到 0.05–0.60
+  # 之後這件事變致命——BTI 實測前 5 名被 Delta 0.06–0.09（權利金 0.38、OI=0，
+  # 實務上賣不掉）整排佔滿。max_profit 對 PMCC 本來就只是理論上限，不是決策依據。
+  #
+  # 為什麼光有 short_delta_ok 不夠：布林標記在 Delta 分佈偏斜的標的上會整排 tie。
+  # BTI 那 7 檔候選（0.056/0.064/0.065/0.072/0.087/0.180/0.566）**沒有一檔**落在
+  # 0.20–0.35，第二鍵全 false，排序等於沒改。
+  #
+  # 所以再插一層年化收租率（premium_yield_ann，畫面上本來就有這一欄，使用者看得
+  # 懂排序依據）：它是連續值，切得出高下，且正是收租策略真正在意的量。BTI 10-16
+  # 桶因此變成 KS=55（權利金 2.03、年化約 122%）排第一，KS=80/85（0.38、OI=0、
+  # 年化約 23%）沉底。nil 一律排最後。
   def bucket_and_sort(combos)
     combos.sort_by do |c|
       [
         c[:passes_golden_rule] ? 0 : 1,
         c[:short_delta_ok] ? 0 : 1,
+        -(c[:premium_yield_ann] || -Float::INFINITY),
         -(c[:max_profit] || -Float::INFINITY)
       ]
     end

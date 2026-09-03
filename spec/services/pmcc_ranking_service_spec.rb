@@ -177,22 +177,27 @@ RSpec.describe PmccRankingService do
     end
   end
 
-  describe "sort order within a bucket: passing first, then max_profit descending" do
+  # 2026-09-03：年化收租率插在 max_profit 之前，所以同一短腳配不同長腳時，
+  # 排序看的是「投入多少資本收到這筆租」，不再是 spread 撐出來的理論上限。
+  describe "sort order within a bucket: passing first, then annualized premium yield" do
     before do
-      create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85)   # PL=5.75
-      create_leaps!(strike: 9.0,  bid: 6.70, ask: 6.80, dte: 570, delta: 0.88)   # PL=6.75, KL=9 -> spread vs KS=17 => 8, max_profit higher
-      # short leg that makes the KL=10 combo fail (KS<=KL) to verify it sorts after passing ones
+      create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85) # PL=5.75, net_debit=5.33
+      create_leaps!(strike: 9.0,  bid: 5.95, ask: 6.05, dte: 570, delta: 0.88) # PL=6.00, net_debit=5.58, spread=8 -> max_profit 2.42（高於 KL=10 的 1.67）
       create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.30)
     end
 
-    it "puts passing combos before failing ones, and higher max_profit first among passes" do
+    it "ranks by annualized premium yield, not by the spread-inflated max_profit" do
       result = service.call
       combos = result.dig(result[:summary][:expirations].first, :combos)
+
       expect(combos.size).to eq(2)
-      expect(combos.first[:passes_golden_rule]).to be true
-      # KL=9 combo (spread=8, PL=6.75) has a higher max_profit than KL=10 (spread=7, PL=5.75)
-      expect(combos.first[:long_leg][:strike].to_f).to eq(9.0)
-      expect(combos.last[:long_leg][:strike].to_f).to eq(10.0)
+      expect(combos.all? { |c| c[:passes_golden_rule] }).to be true
+
+      # KL=10 投入較少（net_debit 5.33 vs 5.58）收同一筆 0.42 權利金 -> 年化收租率較高
+      expect(combos.first[:long_leg][:strike].to_f).to eq(10.0)
+      expect(combos.first[:premium_yield_ann]).to be > combos.last[:premium_yield_ann]
+      # 而 max_profit 的高低恰好相反，證明排序不是被 max_profit 主導
+      expect(combos.first[:max_profit]).to be < combos.last[:max_profit]
     end
   end
 

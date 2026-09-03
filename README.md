@@ -1,5 +1,33 @@
 # FairPrice
 
+### 2026-09-03（三）— 調整：PMCC 桶內排序插入年化收租率
+
+接續同日兩次調整。`short_delta_ok` 當第二排序鍵對 BTI 無效——那批快照的候選
+短腳 Delta 沒有一檔落在 0.20–0.35，布林鍵整排 tie，排序等於沒改。
+
+改用連續值當排序鍵，最終順序：
+
+```
+通過黃金法則 → short_delta_ok → 年化收租率 → max_profit
+```
+
+年化收租率（`premium_yield_ann`）是收租策略真正在意的量，畫面上本來就有這一欄，
+使用者看得懂排序依據；max_profit 對 PMCC 只是理論上限，降為最後的 tie-break。
+
+`short_delta_ok` 保留在第二層：Delta 分佈正常的標的照樣讓建議區間優先，
+BTI 這種整排 tie 的情況才輪到年化收租率決勝。兩層不衝突。
+
+**行為改變**：同一短腳配不同長腳時，排序改看「投入多少資本收到這筆租」。
+既有測試 `sort order within a bucket` 原本斷言 max_profit 較高的長腳在前，
+已改寫為驗證年化收租率決定順序（並刻意讓兩者高低相反，證明排序不被
+max_profit 主導）。
+
+BTI 實測（2026-09-03 15:54 批次）：2026-10-16 桶的 KS=60（Delta 0.216、
+權利金 0.53、年化 28.4%）排第一，KS=80/85（Delta 0.08–0.09、OI=0）沉底。
+
+涉及檔案：`app/services/pmcc_ranking_service.rb`、
+`spec/services/pmcc_ranking_service_spec.rb`。測試：PMCC 相關 122 examples 全數通過。
+
 ### 2026-09-03（三）— 調整：PMCC 桶內排序改為 short_delta_ok 優先
 
 接續同日的粗篩放寬。放寬後 BTI 的候選從 4 組變 28 組，但畫面反而更難用：
