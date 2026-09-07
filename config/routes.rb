@@ -191,6 +191,11 @@ Rails.application.routes.draw do
   post "bcvs/recommend",         to: "bull_call_spreads#recommend",         as: :bull_call_spreads_recommend
   post "bcvs/calculate",         to: "bull_call_spreads#calculate",         as: :bull_call_spreads_calculate
 
+  # Price-In 反推工具（反推所需 EPS ／ 買入價報酬對照）
+  # 同類工具（margin／leaps／bpus／bcvs）皆為頂層路由，本工具比照，不另開命名空間。
+  get "price_in",       to: "price_in#index", as: :price_in
+  get "price_in/quote", to: "price_in#quote", as: :price_in_quote
+
   # 期權小學堂（原 public/csp/ 靜態檔案，改走 controller 以套用登入驗證與瀏覽記錄）
   get "csp",       to: redirect("/csp/index.html")
   get "csp/*path", to: "csp_lessons#show", as: :csp_lesson, format: false, constraints: { path: /.*/ }
