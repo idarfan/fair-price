@@ -28,6 +28,8 @@ declare global {
     overlayOpacity?: number;
     showProgress?: boolean;
     steps: DriverStep[];
+    // price-in 用它在導覽走到某步時展開對應的說明卡（說明卡預設收摺）。
+    onHighlightStarted?: (element: Element | undefined) => void;
   }
 
   interface DriverInstance {
@@ -41,6 +43,9 @@ declare global {
     ttsSpeak?: (text: string, gender: string) => void;
     // IV 分析頁的儀表板模式切換（behaviors/ivAnalysis.ts 掛上，Phlex 端也會呼叫）
     switchDashMode?: (mode: string) => void;
+    // chartjs-plugin-annotation 3.x（CDN UMD）。UMD build 把自己掛在這個 key 上，
+    // 必須手動 Chart.register 才會生效——price-in 圖 A 的 EPS 預測色帶要用。
+    "chartjs-plugin-annotation"?: unknown;
     // 註：window.mountTechChart 由 entrypoints/technicals.tsx 自行宣告（實作也在那），
     // 這裡不重複宣告，否則兩份簽名不一致會觸發 TS2717。
   }
@@ -49,6 +54,8 @@ declare global {
   // 刻意不抄一份會過期的完整定義。
   interface ChartScaleInstance {
     width: number;
+    // price-in 圖 B 要算「零軸在哪個像素」才能判斷長條放不放得下數值標籤。
+    getPixelForValue(value: number): number;
   }
 
   interface ChartDatasetMeta {
@@ -74,6 +81,7 @@ declare global {
       config: unknown,
     ): ChartInstance;
     getChart(el: HTMLCanvasElement | string): ChartInstance | undefined;
+    register(...plugins: unknown[]): void;
   };
 
   // SortableJS 1.15（CDN）

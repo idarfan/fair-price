@@ -656,3 +656,18 @@ th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 #bpus-chain-table.bpus-phase-protection tr[data-bpus-row]:not(.bpus-selected):active { background-color:#93c5fd; }
 #bpus-chain-table.bpus-phase-csp        tr[data-bpus-row]:not(.bpus-selected):hover  { background-color:#fee2e2; }
 #bpus-chain-table.bpus-phase-csp        tr[data-bpus-row]:not(.bpus-selected):active { background-color:#fecaca; }
+
+/* Price-In 說明卡：收摺箭頭方向。details[open] 是結構選擇器，
+   Tailwind v4 的掃描器產不出來，寫在這裡。 */
+.pi-card > summary .pi-chevron { transition: transform .2s ease; }
+.pi-card[open] > summary .pi-chevron { transform: rotate(180deg); }
+.pi-card > summary::-webkit-details-marker { display: none; }
+.pi-card > summary { list-style: none; }
+
+/* Price-In 說明卡／判讀卡的顯示開關。
+   預設隱藏，讓實際填表的畫面淨空；由頁首兩個開關按鈕打開。
+   用 CSS 屬性選擇器而非 Tailwind class——切換時只要動 root 上一個屬性，
+   不必逐一走訪九張卡加減 class。 */
+.pi-help, .pi-reading { display: none; }
+[data-help-visible="true"] .pi-help { display: block; }
+[data-reading-visible="true"] .pi-reading { display: block; }

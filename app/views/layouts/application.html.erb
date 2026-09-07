@@ -22,6 +22,10 @@
     <%= csp_meta_tag %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <%# price-in 圖 A 的 EPS 預測色帶用 annotation plugin。跟隨 Chart.js 一起走 CDN：
+        本體既然已經是 CDN，只把 plugin 單獨 vendor 會變成同一套庫一半 CDN 一半
+        本地，版本對不上時難查。plugin 3.x 對應 Chart.js 4.x。 %>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
     <%# Phase I：html-to-image 改 vendor 本地檔（版本釘死），daily_momentum 匯出與 LEAPS 匯出共用 %>
     <%= javascript_include_tag "html-to-image-1.11.11" %>
@@ -35,11 +39,16 @@
         該頁真正用到的模組。取代原本散在各 Phlex 元件裡的 inline <script>。
         新增 behavior 不需要動這個 layout。 %>
     <%= vite_typescript_tag 'behaviors.ts' %>
+    <%# driver.js 導覽：LEAPS 與 Price-In 兩頁都用。原本只掛在 leaps 的條件裡，
+        price_in 加導覽時漏了這一行，畫面上按鈕有反應但什麼都不會發生
+        （程式碼 if (!window.driver) return 靜靜略過）。 %>
+    <% if %w[leaps_recommendations price_in].include?(controller_name) %>
+      <%= javascript_include_tag "driver-1.6.0.iife" %>
+      <%= stylesheet_link_tag "driver-1.6.0" %>
+    <% end %>
     <% if controller_name == 'leaps_recommendations' %>
       <%= javascript_include_tag "jspdf-2.5.2.umd.min" %>
       <%= javascript_include_tag "jspdf-autotable-3.8.4" %>
-      <%= javascript_include_tag "driver-1.6.0.iife" %>
-      <%= stylesheet_link_tag "driver-1.6.0" %>
       <%# 原本內嵌於 page_component.rb 的靜態 JS（零 Ruby 插值）拆成獨立 asset 檔，
           defer 讓執行時機等效於原本「放在 body 尾端」（元素查找是立即執行、非包在
           DOMContentLoaded 裡），搬進 head 若不加 defer 會抓不到還沒渲染的 DOM 元素。 %>
