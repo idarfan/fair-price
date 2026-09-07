@@ -110,7 +110,62 @@ class YahooFinanceService
     nil
   end
 
+  # 分析師 EPS 預測（年度），供 Price-In 工具帶入預測區間。
+  #
+  # 為什麼走 Yahoo 而不是 Finnhub：Finnhub 的 /stock/eps-estimate 需要付費方案
+  # （免費金鑰回 "You don't have access to this resource."）。Yahoo 的 earningsTrend
+  # 免費且不需憑證，crumb 流程與 #holders 共用，不新增任何依賴或金鑰。
+  #
+  # 回傳 { current_year:, next_year: } 各為 { low:, high:, avg:, analysts:, end_date: }，
+  # 抓不到就是 nil——這是選填欄位的輔助，不該讓任何流程卡住。
+  def eps_estimates(symbol)
+    crumb, cookie = fetch_crumb
+    return nil unless crumb
+
+    response = HTTParty.get(
+      "#{SUMMARY_URL}/#{CGI.escape(symbol.upcase)}",
+      query:   { modules: "earningsTrend", crumb: crumb },
+      headers: HOLDER_HEADERS.merge("Cookie" => cookie),
+      timeout: 10
+    )
+    unless response.success?
+      Rails.logger.warn("[YahooFinance] eps_estimates #{symbol} HTTP #{response.code}")
+      return nil
+    end
+
+    trends = response.parsed_response.dig("quoteSummary", "result", 0, "earningsTrend", "trend")
+    return nil unless trends.is_a?(Array)
+
+    {
+      current_year: estimate_for(trends, "0y"),
+      next_year:    estimate_for(trends, "+1y")
+    }
+  rescue *HTTP_ERRORS => e
+    Rails.logger.warn("[YahooFinance] eps_estimates #{symbol}: #{e.class} #{e.message}")
+    nil
+  end
+
   private
+
+  # Yahoo 的 period 代碼：0y 是本財政年度、+1y 是下一年。
+  # low／high 是分析師預測的分歧範圍，不是平均值——Price-In 的色帶要的正是分歧程度。
+  def estimate_for(trends, period)
+    trend = trends.find { |t| t["period"] == period }
+    return nil unless trend
+
+    est = trend["earningsEstimate"] || {}
+    low  = est.dig("low",  "raw")&.to_f
+    high = est.dig("high", "raw")&.to_f
+    return nil if low.nil? || high.nil?
+
+    {
+      low:      low,
+      high:     high,
+      avg:      est.dig("avg", "raw")&.to_f,
+      analysts: est.dig("numberOfAnalysts", "raw"),
+      end_date: trend["endDate"]
+    }
+  end
 
   def compute_change_pct(meta)
     pct = meta["regularMarketChangePercent"]&.to_f

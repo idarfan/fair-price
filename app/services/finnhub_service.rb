@@ -15,6 +15,13 @@ class FinnhubService
     get("/quote", symbol: symbol.upcase)
   end
 
+  # 回傳 [parsed_body, http_status]。給需要區分「404 查無代號」與「其他上游錯誤」
+  # 的呼叫端用（PriceIn::QuoteFetcher）——`get` 對兩者都回 nil，資訊在那裡就掉了。
+  # `quote` 的行為完全不變。
+  def quote_with_status(symbol)
+    get_with_status("/quote", symbol: symbol.upcase)
+  end
+
   def market_news(count: 5)
     items = get("/news", category: "general") || []
     items.first(count)
@@ -34,6 +41,11 @@ class FinnhubService
     get("/stock/profile2", symbol: symbol.upcase)
   end
 
+  # 同業清單。用於 PriceIn::PeerMultipleService 計算同業本益比區間。
+  def peers(symbol)
+    get("/stock/peers", symbol: symbol.upcase)
+  end
+
   def basic_metrics(symbol)
     get("/stock/metric", symbol: symbol.upcase, metric: "all")
   end
@@ -48,6 +60,11 @@ class FinnhubService
   MAX_RETRIES = 2
 
   def get(path, params = {})
+    body, = get_with_status(path, params)
+    body
+  end
+
+  def get_with_status(path, params = {})
     retries = 0
     begin
       response = HTTParty.get(
@@ -55,9 +72,9 @@ class FinnhubService
         query: params.merge(token: @api_key),
         timeout: 10
       )
-      return nil unless response.success?
+      return [ nil, response.code ] unless response.success?
 
-      response.parsed_response
+      [ response.parsed_response, response.code ]
     rescue HTTParty::Error, Net::ReadTimeout, Errno::ECONNRESET,
            OpenSSL::SSL::SSLError, SocketError => e
       if retries < MAX_RETRIES
@@ -67,7 +84,7 @@ class FinnhubService
         retry
       end
       Rails.logger.warn("[FinnhubService] #{path} failed after #{MAX_RETRIES} retries: #{e.message}")
-      nil
+      [ nil, nil ]
     end
   end
 end
