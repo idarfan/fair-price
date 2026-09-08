@@ -13,7 +13,10 @@ class PriceIn::ExportButtonsComponent < ApplicationComponent
   end
 
   def view_template
-    div(class: "flex items-center gap-2 shrink-0", data: { export_exclude: "true" }) do
+    # tour_step 14 是導覽最後一步。錨點要到 S8 做出匯出按鈕才存在，
+    # 在那之前導覽會自動略過該步（不中斷、不報錯）。
+    div(class: "flex items-center gap-2 shrink-0",
+        data: { export_exclude: "true", tour_step: (14 if @key == "chart_a") }.compact) do
       export_button("png")
       export_button("pdf")
     end
