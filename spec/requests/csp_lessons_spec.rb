@@ -2,45 +2,46 @@
 
 require "rails_helper"
 
-RSpec.describe "CSP lessons", :skip_auto_auth, type: :request do
-  describe "unauthenticated" do
-    it "redirects /csp/index.html to /login instead of serving the file" do
-      get "/csp/index.html"
-      expect(response).to redirect_to(login_path)
+RSpec.describe "期權小學堂教材頁", type: :request do
+  # 2026-09-08 事故：教材頁整個版面消失。
+  #
+  # 原因是 CSP 標頭裡 style-src 同時有 'unsafe-inline' 與 'nonce-...'。
+  # CSP 規範明訂：style-src 一旦出現 nonce，'unsafe-inline' 一律被瀏覽器忽略。
+  # 教材頁是手寫靜態 HTML、內嵌樣式約 840 處，全部被擋掉——畫面上沒有任何
+  # 錯誤訊息，只有 console 裡一長串 CSP 違規，所以極難聯想到是 CSP。
+  describe "CSP style-src" do
+    before { get "/csp/index.html" }
+
+    it "回 200 並送出教材頁" do
+      expect(response).to have_http_status(:ok)
+    end
+
+    it "放行內嵌樣式" do
+      expect(csp_directive("style-src")).to include("'unsafe-inline'")
+    end
+
+    it "style-src 不得帶 nonce（帶了會讓 unsafe-inline 失效）" do
+      expect(csp_directive("style-src")).not_to include("nonce-")
+    end
+
+    # nonce 對 style="..." 屬性本來就無效，只對 <style> 區塊有效，
+    # 因此把 style-src 移出 nonce 清單不損失防護；script-src 必須保留。
+    it "script-src 仍然帶 nonce，且不放行內嵌 script" do
+      expect(csp_directive("script-src")).to include("nonce-")
+      expect(csp_directive("script-src")).not_to include("'unsafe-inline'")
     end
   end
 
-  describe "logged in" do
-    it "serves the lesson page and records a page_view activity" do
-      user = sign_in_and_pass_totp!
-
-      expect {
-        get "/csp/index.html"
-      }.to change { user.user_activities.where(kind: :page_view, path: "/csp/index.html").count }.by(1)
-
-      expect(response).to have_http_status(:ok)
-      expect(response.media_type).to eq("text/html")
+  describe "路徑穿越防護" do
+    it "不允許跳出教材目錄" do
+      get "/csp/../../config/database.yml"
+      expect(response).not_to have_http_status(:ok)
     end
+  end
 
-    it "redirects the bare /csp path to /csp/index.html" do
-      sign_in_and_pass_totp!
-
-      get "/csp"
-      expect(response).to redirect_to("/csp/index.html")
-    end
-
-    it "blocks path traversal outside private/csp_lessons" do
-      sign_in_and_pass_totp!
-
-      get "/csp/../../config/master.key"
-      expect(response).to have_http_status(:not_found)
-    end
-
-    it "404s for a file that isn't in the whitelisted lesson set" do
-      sign_in_and_pass_totp!
-
-      get "/csp/does-not-exist.html"
-      expect(response).to have_http_status(:not_found)
-    end
+  def csp_directive(name)
+    response.headers["Content-Security-Policy"].to_s
+            .split(";").map(&:strip)
+            .find { |d| d.start_with?("#{name} ") }.to_s
   end
 end

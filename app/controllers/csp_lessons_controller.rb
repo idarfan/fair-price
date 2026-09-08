@@ -18,6 +18,18 @@ class CspLessonsController < ApplicationController
     policy.style_src :self, :unsafe_inline, "https://cdn.jsdelivr.net"
   end
 
+  # 光是上面那行不夠。全域設定把 style-src 列進 nonce_directives，
+  # 中介層會再附加一個 'nonce-...'，而 CSP 規範明訂：**style-src 一旦出現
+  # nonce，'unsafe-inline' 就會被瀏覽器忽略**。結果是這裡宣告了 unsafe_inline，
+  # 送出的標頭兩者並存，教材頁那 840 處內嵌樣式仍然全部被擋——整頁沒有樣式，
+  # 而且不會有任何錯誤，只有 console 裡一長串 CSP 違規。
+  #
+  # nonce 對 style="..." 屬性本來就無效（只對 <style> 區塊有效），
+  # 所以這裡把 style-src 移出 nonce 清單不會損失任何防護。
+  before_action do
+    request.content_security_policy_nonce_directives = %w[script-src]
+  end
+
   def show
     relative_path = params[:path].presence || "index.html"
     file_path = ROOT.join(relative_path).expand_path
