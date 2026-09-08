@@ -24,17 +24,37 @@ class PriceIn::ChartACardComponent < ApplicationComponent
         end
         band_note
       end
+      render PriceIn::ExportCardComponent.new(
+        key: "chart_a", form: @form, title: title, subtitle: SUBTITLE,
+        source_canvas_id: CANVAS_ID, eps_banner: export_banner
+      )
     end
   end
 
   private
 
+  TITLE_SUFFIX = "，需要多少盈利？"
+  SUBTITLE     = "Fixed share price. Different earnings requirements."
+
+  def title = "#{PriceIn::Formatter.money(@result.price)}#{TITLE_SUFFIX}"
+
+  # 匯出版的 EPS 橫幅：把年度與色帶來源寫進圖裡。缺年度的圖會誤導，
+  # 而匯出的圖脫離頁面之後沒有任何其他線索可以補回這個資訊。
+  def export_banner
+    base = "#{@form.fiscal_year_label} 需要的 EPS"
+    return base unless @result.band?
+
+    "#{base}｜色帶 #{PriceIn::Formatter.money(@result.band_low)}–" \
+      "#{PriceIn::Formatter.money(@result.band_high)}（#{@form.eps_band_label}）"
+  end
+
   def header
-    div(class: "px-5 py-3 bg-indigo-800") do
-      p(class: "text-[22px] font-medium text-white") do
-        plain("#{PriceIn::Formatter.money(@result.price)}，需要多少盈利？")
+    div(class: "px-5 py-3 bg-indigo-800 flex items-center justify-between gap-4") do
+      div do
+        p(class: "text-[22px] font-medium text-white") { plain(title) }
+        p(class: "text-[16px] text-indigo-200") { plain(SUBTITLE) }
       end
-      p(class: "text-[16px] text-indigo-200") { plain("Fixed share price. Different earnings requirements.") }
+      render PriceIn::ExportButtonsComponent.new(key: "chart_a")
     end
   end
 

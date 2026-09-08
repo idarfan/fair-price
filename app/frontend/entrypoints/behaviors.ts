@@ -28,6 +28,7 @@ const REGISTRY: Record<string, Loader> = {
   "alert-dismiss": () => import("../behaviors/alertDismiss"),
   "price-in-chart-a": () => import("../behaviors/priceInCharts"),
   "price-in-chart-b": () => import("../behaviors/priceInCharts"),
+  "price-in-export": () => import("../behaviors/priceInExport"),
   "price-in-tour": () => import("../behaviors/priceInTour"),
   "price-in-ticker": () => import("../behaviors/priceInTicker"),
   "alert-list": () => import("../behaviors/alertList"),

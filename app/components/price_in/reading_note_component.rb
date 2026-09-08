@@ -40,8 +40,8 @@ class PriceIn::ReadingNoteComponent < ApplicationComponent
         p(class: "flex-1 text-[20px] font-medium text-white") { plain(@note[:title]) }
         span(class: "pi-chevron text-white/70 text-[16px] shrink-0") { plain("▾") }
       end
-      ol(class: "px-5 py-4 #{@tone[:body]} border-t #{@tone[:border]} space-y-4 list-decimal list-inside") do
-        Array(@note[:items]).each { |item| render_item(item) }
+      ol(class: "px-4 py-4 #{@tone[:body]} border-t #{@tone[:border]} space-y-3 list-none") do
+        Array(@note[:items]).each_with_index { |item, i| render_item(item, i) }
       end
       worked_example if @example.present?
     end
@@ -65,7 +65,7 @@ class PriceIn::ReadingNoteComponent < ApplicationComponent
   end
 
   def example_row(row)
-    tr(class: "border-b border-gray-100 align-top") do
+    tr(class: "border-b border-gray-200 align-top transition-colors hover:bg-yellow-100") do
       td(class: "py-2 pr-3") { plain(row[:multiple]) }
       td(class: "py-2 pr-3 font-bold") { plain(row[:required_eps]) }
       td(class: "py-2 #{row[:circular] ? 'text-red-700' : 'text-gray-700'} leading-[1.6]") do
@@ -76,12 +76,24 @@ class PriceIn::ReadingNoteComponent < ApplicationComponent
 
   private
 
-  def render_item(item)
-    li(class: "text-[20px] #{@tone[:head]} font-medium leading-[1.6]") do
-      plain(item[:head])
+  # 奇偶段落交替底色，讓段落之間一眼分得開；段落內每一句是獨立的一行，
+  # 游標懸停時整行變淺黃——長段說明最容易發生的是「讀到一半跳行」，
+  # 交替底色管段落、hover 管行，兩個層級各自解決一個問題。
+  ITEM_TONES = [
+    "bg-emerald-50 border-emerald-200",
+    "bg-violet-50 border-violet-200"
+  ].freeze
+
+  ROW_HOVER = "px-2 py-1 rounded transition-colors hover:bg-yellow-100"
+
+  def render_item(item, index)
+    li(class: "rounded-lg border #{ITEM_TONES[index % 2]} px-3 py-2") do
+      div(class: "text-[20px] #{@tone[:head]} font-medium leading-[1.6] #{ROW_HOVER}") do
+        plain("#{index + 1}. #{item[:head]}")
+      end
       div(class: "mt-1 font-normal text-gray-700") do
         # 一句一行（§S4 斷句規則）：locale 已切好，這裡只負責包 block。
-        Array(item[:body]).each { |s| div(class: "leading-[1.6]") { plain(s) } }
+        Array(item[:body]).each { |line| div(class: "leading-[1.6] #{ROW_HOVER}") { plain(line) } }
         render_bullets(item[:bullets]) if item[:bullets].present?
       end
     end
@@ -90,7 +102,7 @@ class PriceIn::ReadingNoteComponent < ApplicationComponent
   def render_bullets(bullets)
     ul(class: "mt-2 space-y-1") do
       bullets.each do |b|
-        li(class: "leading-[1.6] pl-4 border-l-2 border-black/10") { plain(b) }
+        li(class: "leading-[1.6] pl-3 border-l-2 border-black/20 #{ROW_HOVER}") { plain(b) }
       end
     end
   end

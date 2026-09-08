@@ -10,10 +10,11 @@ class PriceIn::PageComponent < ApplicationComponent
   NARROW = "w-[96%] mx-auto"
   WIDE   = "w-[96%] mx-auto"
 
-  def initialize(form:, chart_a: nil, chart_b: nil)
+  def initialize(form:, chart_a: nil, chart_b: nil, audit: {})
     @form    = form
     @chart_a = chart_a
     @chart_b = chart_b
+    @audit   = audit || {}
   end
 
   # 說明卡的實例表格。用使用者當前的股價與倍數算，不用寫死的範例——
@@ -33,7 +34,7 @@ class PriceIn::PageComponent < ApplicationComponent
     div(
       id: "price-in-root",
       class: "flex-1 min-w-0 bg-gray-50 py-8 text-[20px] text-gray-800",
-      data: { help_visible: "false", reading_visible: "false" }
+      data: { behavior: "price-in-export", help_visible: "false", reading_visible: "false" }
     ) do
       render_header
       render_errors if @form.errors.any?
@@ -42,6 +43,7 @@ class PriceIn::PageComponent < ApplicationComponent
       render PriceIn::InputFormComponent.new(form: @form)
       render_charts
       tour_data_island
+      export_islands
     end
   end
 
@@ -104,6 +106,23 @@ class PriceIn::PageComponent < ApplicationComponent
 
   # 導覽文案走資料島而不是 data attribute：13 步的文字塞進屬性會讓 DOM 難以閱讀。
   # json_escape 防止文案中的 < 提前關閉標籤。
+  # 匯出用的文案與稽核結果。走資料島而非 data attribute：文案有十幾條，
+  # 塞進屬性會讓 DOM 難以閱讀，而稽核結果是結構化的陣列。
+  def export_islands
+    json_island("price-in-export-i18n", I18n.t("price_in.export", locale: LOCALE_KEY))
+    @audit.each do |key, hits|
+      json_island("price-in-audit-#{key}", hits.map(&:to_h))
+    end
+  end
+
+  def json_island(dom_id, payload)
+    script(type: "application/json", id: dom_id) do
+      raw(ERB::Util.json_escape(payload.to_json).html_safe)
+    end
+  end
+
+  LOCALE_KEY = PriceIn::FieldHelpCardComponent::LOCALE
+
   def tour_data_island
     steps = I18n.t("price_in.tour.steps", locale: PriceIn::FieldHelpCardComponent::LOCALE)
     script(type: "application/json", id: "price-in-tour-data") do

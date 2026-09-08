@@ -57,6 +57,103 @@ RSpec.describe "Price-In 反推工具", type: :request do
     end
   end
 
+  describe "匯出（S8）" do
+    it "離屏匯出卡存在，且不是用 display:none 藏起來的" do
+      get "/price_in", params: { eps: 11.02 }
+
+      expect(response.body).to include(%(id="price-in-export-chart_a"))
+      expect(response.body).to include(%(id="price-in-export-chart_b"))
+      expect(response.body).to include("pi-export-stage")
+    end
+
+    it "匯出卡含品牌字串與代號（換股票頁首必須跟著變）" do
+      get "/price_in", params: { ticker: "AVGO" }
+
+      expect(response.body).to include("老衲敝人在下我 / AVGO")
+      expect(response.body).not_to include("老衲敝人在下我 / MRVL")
+    end
+
+    it "匯出卡含署名與 PRICE IN 標記" do
+      get "/price_in"
+
+      expect(response.body).to include("@ohmy48915286")
+      expect(response.body).to include("PRICE IN")
+    end
+
+    it "頁尾在沒有報價時顯示手動輸入" do
+      get "/price_in"
+      expect(response.body).to include("價格為手動輸入")
+    end
+
+    it "頁尾在有報價時顯示報價基準" do
+      get "/price_in", params: { price_as_of: "2026-09-07T13:45:00+08:00" }
+      expect(response.body).to include("報價基準 2026-09-07 13:45")
+    end
+
+    it "PNG 與 PDF 兩個按鈕都在" do
+      get "/price_in", params: { eps: 11.02 }
+
+      expect(response.body).to include(%(id="price-in-export-chart_a-png"))
+      expect(response.body).to include(%(id="price-in-export-chart_a-pdf"))
+      expect(response.body).to include(%(id="price-in-export-chart_b-pdf"))
+    end
+
+    it "圖 B 空狀態時不產生匯出卡（沒有圖可匯）" do
+      get "/price_in"
+
+      expect(response.body).to include(%(id="price-in-export-chart_a"))
+      expect(response.body).not_to include(%(id="price-in-export-chart_b"))
+    end
+
+    it "匯出卡帶年度（缺年度的圖會誤導）" do
+      get "/price_in", params: { fiscal_year_label: "FY2031" }
+      expect(response.body).to include("FY2031 需要的 EPS")
+    end
+  end
+
+  describe "歸屬稽核（S8.3）" do
+    it "來源欄位提到機構名但未列入白名單 → 稽核島列出命中" do
+      get "/price_in", params: { eps_band_low: 6.6, eps_band_high: 7.24, eps_band_label: "美銀預估" }
+
+      island = response.body[/<script type="application\/json" id="price-in-audit-chart_a">(.*?)<\/script>/m, 1]
+      expect(island).to include("美銀")
+      expect(island).to include("null")   # allowed_by 為 null＝未放行
+    end
+
+    it "白名單含該機構 → 標記為已放行" do
+      get "/price_in", params: {
+        eps_band_low: 6.6, eps_band_high: 7.24, eps_band_label: "美銀預估",
+        attribution_sources: "美銀 2026/09 研報"
+      }
+
+      island = response.body[/<script type="application\/json" id="price-in-audit-chart_a">(.*?)<\/script>/m, 1]
+      expect(island).to include("2026/09")
+    end
+
+    it "乾淨文案時稽核島為空陣列" do
+      get "/price_in"
+
+      island = response.body[/<script type="application\/json" id="price-in-audit-chart_a">(.*?)<\/script>/m, 1]
+      expect(island).to eq("[]")
+    end
+
+    # locale 與元件內不得出現任何機構名——寫進文案等於在還沒填來源時
+    # 就先替使用者掛上一個歸屬。
+    it "locale 與元件檔案內不含機構名" do
+      files = Dir[Rails.root.join("app/components/price_in/*.rb")] +
+              [ Rails.root.join("config/locales/price_in.zh-TW.yml").to_s ]
+      pattern = /美銀|美银|BofA|高盛|Goldman|摩根|Morgan|巴克萊|巴克莱|Barclays|UBS|花旗|Citi|Stifel|Cantor/
+
+      offenders = files.select { |f| File.read(f).match?(pattern) }
+      expect(offenders).to be_empty
+    end
+
+    it "只有繁中 locale，不建其他語系檔" do
+      expect(Dir[Rails.root.join("config/locales/price_in.*")].map { |f| File.basename(f) })
+        .to eq([ "price_in.zh-TW.yml" ])
+    end
+  end
+
   # 案例 5
   describe "sidebar 入口" do
     it "含新入口的 href，且該 href 可被路由解析" do

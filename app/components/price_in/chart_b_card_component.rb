@@ -20,16 +20,35 @@ class PriceIn::ChartBCardComponent < ApplicationComponent
         header
         @result.nil? ? empty_state : filled_state
       end
+      if @result
+        render PriceIn::ExportCardComponent.new(
+          key: "chart_b", form: @form, title: TITLE, subtitle: SUBTITLE,
+          source_canvas_id: CANVAS_ID, eps_banner: export_banner
+        )
+      end
     end
   end
 
   private
 
+  TITLE    = "同樣兌現盈利，報酬為什麼不同？"
+  SUBTITLE = "Same earnings. Different entry prices."
+
   def header
-    div(class: "px-5 py-3 bg-teal-800") do
-      p(class: "text-[22px] font-medium text-white") { plain("同樣兌現盈利，報酬為什麼不同？") }
-      p(class: "text-[16px] text-teal-200") { plain("Same earnings. Different entry prices.") }
+    div(class: "px-5 py-3 bg-teal-800 flex items-center justify-between gap-4") do
+      div do
+        p(class: "text-[22px] font-medium text-white") { plain(TITLE) }
+        p(class: "text-[16px] text-teal-200") { plain(SUBTITLE) }
+      end
+      render PriceIn::ExportButtonsComponent.new(key: "chart_b") if @result
     end
+  end
+
+  # 匯出版的 EPS 橫幅（規格 §S6）。統一假設的年度與 EPS 必須寫在圖上，
+  # 否則成品圖脫離頁面後就看不出這個報酬是在假設誰賺多少。
+  def export_banner
+    "未來估值時點：統一假設 #{@form.chart_b_fiscal_year_label} 調整後 EPS = " \
+      "#{PriceIn::Formatter.money(@result.eps)}"
   end
 
   def empty_state

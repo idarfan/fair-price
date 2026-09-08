@@ -671,3 +671,59 @@ th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 .pi-help, .pi-reading { display: none; }
 [data-help-visible="true"] .pi-help { display: block; }
 [data-reading-visible="true"] .pi-reading { display: block; }
+
+/* ── Price-In 匯出卡（規格 §S8.1）────────────────────────────
+   匯出與畫面完全脫鉤：固定 960×540 CSS px，以 pixelRatio 2 捕捉 → 恆為
+   1920×1080。同一組參數在任何機器上匯出都必須得到同一張圖，因此這裡一律
+   用絕對像素，不能用會隨視窗變動的 Tailwind 響應式 class。
+
+   離屏方式是 position:absolute + left:-99999px，**不可用 display:none**
+   ——html-to-image 量不到尺寸，會產出空白圖。 */
+.pi-export-stage {
+  position: absolute;
+  left: -99999px;
+  top: 0;
+  width: 960px;
+  height: 540px;
+  overflow: hidden;
+  background: #FFFFFF;
+  font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  color: #26333C;
+}
+
+/* 內容超出 540px 時整張等比縮到 fit（transform-origin: top center），
+   不裁切、不改字級、不改行距——寧可整體小一點，也不能讓判讀重點被切掉半句。 */
+.pi-export-fit {
+  width: 960px;
+  padding: 28px 36px;
+  transform-origin: top center;
+}
+
+.pi-export-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 2px solid #26333C;
+  padding-bottom: 8px;
+}
+.pi-export-brand  { font-size: 20px; font-weight: 500; }
+.pi-export-badge  { font-size: 16px; letter-spacing: .28em; color: #7A8891; }
+
+.pi-export-title    { font-size: 22px; font-weight: 500; margin-top: 16px; }
+.pi-export-subtitle { font-size: 20px; color: #7A8891; margin-top: 2px; }
+.pi-export-banner   { font-size: 20px; margin-top: 8px; color: #1F5673; }
+
+.pi-export-chart { margin-top: 12px; }
+.pi-export-img   { display: block; width: 100%; height: auto; }
+
+.pi-export-highlight { font-size: 20px; margin-top: 12px; line-height: 1.6; }
+
+.pi-export-foot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 16px;
+  color: #7A8891;
+  border-top: 1px solid #D6DDE2;
+  margin-top: 16px;
+  padding-top: 8px;
+}

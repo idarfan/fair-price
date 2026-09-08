@@ -63,13 +63,17 @@ class PriceIn::FieldHelpCardComponent < ApplicationComponent
         end
       end
       tbody do
-        Array(@card[:rows]).each { |row| render_row(row) }
+        Array(@card[:rows]).each_with_index { |row, i| render_row(row, i) }
       end
     end
   end
 
-  def render_row(row)
-    tr(class: "border-b border-black/5 hover:bg-black/[0.03]") do
+  # 奇偶列交替底色 + 淺黃 hover，與判讀說明卡同一套規則：
+  # 交替底色讓列與列分得開，hover 標出你正在看的那一列。
+  ROW_TONES = [ "bg-emerald-50/70", "bg-violet-50/70" ].freeze
+
+  def render_row(row, index)
+    tr(class: "border-b border-black/10 #{ROW_TONES[index % 2]} transition-colors hover:bg-yellow-100") do
       td(class: "py-2 pr-4 align-top #{@tone[:label]} font-medium") { plain(row[:label]) }
       td(class: "py-2 align-top text-gray-700") do
         # 句號斷行：locale 已經一句一個元素，這裡每句一個 block，line-height 1.6。

@@ -13,7 +13,9 @@ class PriceInController < ApplicationController
     @chart_a = build_chart_a if @form.valid?
     @chart_b = build_chart_b if @form.valid? && @form.chart_b_ready?
 
-    render PriceIn::PageComponent.new(form: @form, chart_a: @chart_a, chart_b: @chart_b)
+    render PriceIn::PageComponent.new(
+      form: @form, chart_a: @chart_a, chart_b: @chart_b, audit: build_audit
+    )
   end
 
   # 帶入現價。頁面載入時不自動抓價，一律由使用者主動觸發——
@@ -51,6 +53,21 @@ class PriceInController < ApplicationController
   end
 
   private
+
+  # 匯出前的歸屬稽核（§S8.3）。掃描的是「會被寫進成品圖」的使用者輸入——
+  # 年度標籤、色帶來源、買入價標籤。機構名一旦標錯，看圖的人沒有辦法從圖上
+  # 察覺，所以在按下匯出之前先問一次。
+  def build_audit
+    return {} unless @form.valid?
+
+    text = [
+      @form.fiscal_year_label, @form.chart_b_fiscal_year_label,
+      @form.eps_band_label, @form.entry_a_label, @form.entry_b_label
+    ].compact.join(" ")
+
+    hits = PriceIn::AttributionAuditor.new(text: text, sources: @form.attribution_sources).hits
+    { "chart_a" => hits, "chart_b" => hits }
+  end
 
   def build_chart_a
     PriceIn::RequiredEpsCalculator.call(

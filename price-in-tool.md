@@ -13,14 +13,14 @@
 |---|---|---|---|---|
 | S0 | 路徑勘查與規格對齊 | ✅ 已驗證通過 | 見 §S0 | 2026-09-07 |
 | S1 | 計算 Service + 定值測試 | ✅ 已驗證通過 | `bundle exec rspec spec/services/price_in/` | 2026-09-07（33 examples, 0 failures）|
-| S2 | Form Object 與參數驗證 | 🟡 進行中 | `bundle exec rspec spec/forms/price_in/` | — |
-| S2B | 股票代號與現價帶入 | ⬜ 未開始 | 見 §S2B | — |
-| S3 | 路由・控制器・sidebar 入口 | ⬜ 未開始 | `bundle exec rspec spec/requests/price_in_spec.rb` | — |
-| S4 | 輸入介面（含欄位用途說明卡） | ⬜ 未開始 | 見 §S4 | — |
-| S5 | 圖 A 渲染與判讀說明 | ⬜ 未開始 | 見 §S5 | — |
-| S6 | 圖 B 渲染與判讀說明 | ⬜ 未開始 | 見 §S6 | — |
-| S7 | driver.js 導覽 | ⬜ 未開始 | 見 §S7 | — |
-| S8 | PNG 匯出與歸屬稽核 | ⬜ 未開始 | 見 §S8 | — |
+| S2 | Form Object 與參數驗證 | ✅ 已驗證通過 | `bundle exec rspec spec/forms/price_in/` | 2026-09-07（25 examples） |
+| S2B | 股票代號與現價帶入 | ✅ 已驗證通過 | 見 §S2B | 2026-09-07（16 examples） |
+| S3 | 路由・控制器・sidebar 入口 | ✅ 已驗證通過 | `bundle exec rspec spec/requests/price_in_spec.rb` | 2026-09-07（25 examples） |
+| S4 | 輸入介面（含欄位用途說明卡） | ✅ 已驗證通過 | 見 §S4 | 2026-09-07 |
+| S5 | 圖 A 渲染與判讀說明 | ✅ 已驗證通過 | 見 §S5 | 2026-09-07 |
+| S6 | 圖 B 渲染與判讀說明 | ✅ 已驗證通過 | 見 §S6 | 2026-09-07 |
+| S7 | driver.js 導覽 | ✅ 已驗證通過 | 見 §S7 | 2026-09-07 |
+| S8 | PNG 匯出與歸屬稽核 | ✅ 已驗證通過 | 見 §S8 | 2026-09-08（＋PDF 匯出） |
 | S9 | 端到端驗收 | ⬜ 未開始 | 見 §S9 | — |
 
 狀態值：⬜ 未開始 / 🟡 進行中 / ✅ 已驗證通過 / ❌ 驗證失敗
@@ -943,7 +943,9 @@ grep -rn "/home/idarfan/csp" app/ && echo "FAIL: 仍指向 repo 外路徑" || ec
 **匯出與畫面完全脫鉤。** 不截取畫面上那張卡片，而是另建一個離屏容器渲染匯出版本：
 
 - 離屏容器固定 **960×540 CSS px**，用 `position: absolute; left: -99999px` 移出視野（**不可用 `display: none`** —— html2canvas 量不到尺寸）
-- html2canvas `scale: 2` → 產出**恆為 1920×1080**
+- html-to-image `pixelRatio: 2` → 產出**恆為 1920×1080**
+  （2026-09-08：規格原寫 html2canvas，實際沿用 repo 既有的 html-to-image——
+   本專案 Tailwind v4 用 oklch 色彩，html2canvas 不支援）
 - 為什麼是 960×540 而不是直接開 1920×1080：容器若真的用 1920 寬，20px 的字只佔畫面寬度的百分之一，成品圖上小到看不清。在 960 寬用 20px 排版、再以 2 倍捕捉，字才有正確的相對大小
 - 匯出結果**不受瀏覽器視窗寬度、頁面縮放、裝置 DPR 影響**。同一組參數在任何機器上匯出，PNG 必須尺寸一致
 
@@ -956,6 +958,13 @@ grep -rn "/home/idarfan/csp" app/ && echo "FAIL: 仍指向 repo 外路徑" || ec
 **內容超出 540px 的處理**：整張卡片等比縮放至 fit（`transform: scale(k)`，`transform-origin: top center`），**不裁切、不改字級、不改行距**。`k` 低於 0.75 時，畫面顯示提示「內容過多，建議減少倍數檔數或縮短判讀文字」，但仍照常匯出。理由：寧可整體小一點，也不能讓判讀重點被切掉半句。
 
 - 檔名：`price-in-{TICKER}-chart-a-YYYYMMDD.png` / `price-in-{TICKER}-chart-b-YYYYMMDD.png`。**必須含代號**，否則連續匯出多檔股票會難以分辨甚至覆蓋
+
+> **2026-09-08 追加：PDF 匯出。** 依使用者要求，PNG 之外再給一顆 PDF 按鈕。
+> PDF 用與 PNG **完全相同的點陣圖**，頁面尺寸設成 1920×1080 pt，成品與 PNG
+> 逐像素一致——兩種格式給出不同版面會讓人以為其中一個壞了。
+> jsPDF 的 `addImage(..., undefined, "FAST")` 壓縮參數不可省：LEAPS 實測
+> 未壓縮的 2850×3160 PNG 嵌入後是 48MB，壓縮後 550KB。
+> 檔名同上，副檔名為 `.pdf`。
 - **頁尾署名固定為 `@ohmy48915286`**，置於 locale 檔，不硬編在元件裡
 - **品牌字串為 `老衲敝人在下我 / {ticker}`**，由 locale 模板 ＋ 表單 `ticker` 組出。代號部分**禁止硬編**，換一檔股票頁首必須跟著變
 - 頁尾右側顯示規則：`price_as_of` 有值時顯示「報價基準 YYYY-MM-DD HH:MM」；為 nil 時顯示「價格為手動輸入」

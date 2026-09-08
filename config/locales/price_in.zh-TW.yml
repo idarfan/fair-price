@@ -411,3 +411,25 @@ zh-TW:
               - 安全邊際講的是價值與價格的差距，前提是你有一個站得住的價值估計。
               - 這張圖只告訴你「這個價格在要求什麼」，不告訴你那個要求合不合理。
               - 合不合理，取決於你填的倍數說不說得出理由。
+
+    export:
+      # 品牌字串的代號由表單當前 ticker 代入，禁止硬編——換一檔股票頁首必須跟著變。
+      brand: "老衲敝人在下我 / %{ticker}"
+      badge: PRICE IN
+      signature: "@ohmy48915286"
+      quote_basis: "報價基準 %{time}"
+      manual_price: 價格為手動輸入
+      png: 匯出 PNG
+      pdf: 匯出 PDF
+      exporting: 匯出中…
+      too_small: 內容過多，建議減少倍數檔數或縮短判讀文字
+      missing_lib: 匯出元件未載入，請重新整理頁面
+      audit_title: 匯出前確認來源
+      audit_intro: 圖上文字提到了以下機構，但它們不在你填的來源清單裡。
+      audit_hint: 請確認歸屬正確，或把來源填進「區間來源」欄位後再匯出。
+      audit_allowed: 已由來源清單放行
+      audit_from_url: 來源由網址帶入，請確認
+      audit_cancel: 取消
+      audit_proceed: 仍要匯出
+      chart_a_highlight: 圓點落在色帶左側，代表現有預測撐得住這個倍數。
+      chart_b_highlight: 同一列兩條長條的落差，完全來自買入價的不同。
