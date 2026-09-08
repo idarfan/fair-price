@@ -23,39 +23,39 @@ RSpec.describe "期權小學堂教材頁", type: :request do
     it "style-src 不得帶 nonce（帶了會讓 unsafe-inline 失效）" do
       expect(csp_directive("style-src")).not_to include("nonce-")
     end
+  end
 
-    # nonce 對 style="..." 屬性本來就無效，只對 <style> 區塊有效，
-    # 因此把 style-src 移出 nonce 清單不損失防護；script-src 必須保留。
-    it "script-src 仍然帶 nonce，且不放行內嵌 script" do
-      expect(csp_directive("script-src")).to include("nonce-")
-      expect(csp_directive("script-src")).not_to include("'unsafe-inline'")
+  # 這 12 頁共有 350 個內嵌事件屬性（onclick／oninput／onchange），
+  # 朗讀、字級調整、名詞說明全靠它們。CSP 擋內嵌事件屬性，而 nonce 對它們
+  # 無效（只對 <script> 區塊有效），所以只能靠 unsafe-inline。
+  describe "CSP script-src" do
+    before { get "/csp/option-basics-lesson9.html" }
+
+    it "放行內嵌 script 與事件屬性" do
+      expect(csp_directive("script-src")).to include("'unsafe-inline'")
+    end
+
+    it "script-src 不得帶 nonce（帶了會讓 unsafe-inline 失效）" do
+      expect(csp_directive("script-src")).not_to include("nonce-")
+    end
+
+    it "教材頁確實含有內嵌事件屬性（回歸哨兵）" do
+      expect(response.body).to match(/\son(?:click|input|change)="/)
     end
   end
 
-  # 課程清單、拖曳排序、可編輯筆記全在內嵌 <script> 裡。script-src 不放行
-  # unsafe_inline，不注入 nonce 的話畫面有樣式卻整片空白，而且不會報錯。
-  describe "內嵌 script 的 nonce 注入" do
-    before { get "/csp/index.html" }
-
-    it "每個內嵌 script 都被加上 nonce" do
-      inline = response.body.scan(/<script(?![^>]*\bsrc=)[^>]*>/i)
-      expect(inline).not_to be_empty
-      expect(inline).to all(match(/nonce="/))
+  describe "應用程式本體不受影響" do
+    # 分區的意義在於只放寬教材頁。本體一旦跟著鬆掉，這個例外就白開了。
+    it "一般頁面的 script-src 仍不放行內嵌 script" do
+      get "/price_in"
+      directive = csp_directive("script-src")
+      expect(directive).to include("nonce-")
+      expect(directive).not_to include("'unsafe-inline'")
     end
 
-    it "注入的 nonce 與回應標頭中的一致" do
-      nonce = response.body[/<script[^>]*nonce="([^"]+)"/i, 1]
-      expect(csp_directive("script-src")).to include("'nonce-#{nonce}'")
-    end
-
-    it "課程資料仍在頁面上（沒有被改壞）" do
-      expect(response.body).to include("DEFAULT_COURSES")
-    end
-
-    it "非 HTML 檔案照舊直接送出，不進 nonce 注入" do
-      get "/csp/diagrams/csp/csp-flow.svg"
-      expect(response).to have_http_status(:ok)
-      expect(response.media_type).to eq("image/svg+xml")
+    it "一般頁面的 style-src 仍不放行內嵌樣式" do
+      get "/price_in"
+      expect(csp_directive("style-src")).not_to include("'unsafe-inline'")
     end
   end
 
