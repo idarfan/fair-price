@@ -1,5 +1,97 @@
 # FairPrice
 
+### 2026-09-08（二）— 修正：期權小學堂 CSP 三層破壞
+
+`refactor: CSP style-src 收斂完成`（2026-08-30）把全站的內嵌樣式與內嵌 script
+收緊，但 `CspLessonsController` 只補了 `style_src` 的分區例外。12 頁教材從那天起
+三層全壞，直到今日才被發現——三層都不會產生任何錯誤畫面，只有 console 裡的違規。
+
+| 層 | 被擋的 | 症狀 | 修法 |
+|---|---|---|---|
+| 1 | 約 840 處內嵌樣式 | 整頁無樣式 | `style-src` 移出 nonce 清單 |
+| 2 | 內嵌 `<script>` 區塊 | 有樣式但課程清單空白 | （一度注入 nonce，後被第 3 層取代）|
+| 3 | 350 個 `onclick`／`oninput`／`onchange` | 按鈕全無反應 | `script-src` 補 `unsafe_inline` |
+
+**根因是 CSP 規範的一條規則**：同一 directive 一旦出現 `nonce-...`，
+`'unsafe-inline'` 就會被瀏覽器忽略。controller 宣告了 `unsafe_inline`，
+但全域 `content_security_policy_nonce_directives` 含 `script-src style-src`，
+中介層又附加 nonce，兩者相殺。因此這個 controller 改為完全不帶 nonce
+（`request.content_security_policy_nonce_directives = []`）。
+
+**為什麼不改成 `addEventListener`**：350 處、12 個檔案，風險遠高於在這個
+零使用者輸入、`send_file` 原樣送出的分區開一個例外。nonce 對事件屬性本來就
+無效（跟 `style="..."` 一樣，只對區塊有效），所以「注入 nonce」救得了
+`<script>` 卻救不了 `onclick`。
+
+新增 `spec/requests/csp_lessons_spec.rb`（9 條），其中兩條專門盯著分區不外溢：
+一般頁面（`/price_in`）的 `script-src` 與 `style-src` 仍帶 nonce、不放行
+`unsafe-inline`。
+
+涉及檔案：`app/controllers/csp_lessons_controller.rb`、`spec/requests/csp_lessons_spec.rb`
+
+---
+
+### 2026-09-07（一）— 新增：Price-In 反推工具（`/price_in`）
+
+把「這檔已經 price in 太多了」拆成三個可填欄位（哪一年的 EPS、給幾倍、
+從什麼價格買進），用兩張成組的圖把結論畫出來。規格見 `price-in-tool.md`。
+
+**架構**
+
+```
+PriceInController#index
+  └── PriceIn::ScenarioForm.from_params（情境全走 query string，不建資料表）
+        ├── RequiredEpsCalculator  → 圖 A：price / multiple
+        └── EntryReturnCalculator  → 圖 B：eps * multiple / entry - 1
+PriceInController#quote
+  └── PriceIn::QuoteFetcher → FinnhubService#quote_with_status
+                            → PeerMultipleService（同業四分位）
+                            → YahooFinanceService#eps_estimates
+```
+
+**估值對照一律是區間**。本益比 = 股價 ÷ EPS，而股價當天一直在動：
+MRVL 實測當日 210.87–223.67，同一個 EPS 除下去就是 69.59–73.82 倍。
+三個數字（現價、當日低、當日高）全部由同一個 `epsTTM` 算出，內部一致且
+使用者可以自己驗算——刻意不直接用上游的 `peTTM`，否則會出現「現價本益比
+落在當日區間之外」的怪象。
+
+**產業平均本益比是自己算的**。Finnhub 沒有這個欄位，改用 `/stock/peers`
+取同業、逐檔抓 `peTTM`、取四分位區間。半導體同業分散極大（AVGO 44 倍、
+MRVL 74 倍），算術平均會被極端值拉走，四分位距比較誠實。
+
+**分析師 EPS 預測走 Yahoo 而非 Finnhub**。Finnhub 的 `/stock/eps-estimate`
+需要付費方案（免費金鑰回 `You don't have access to this resource.`）。
+改用 Yahoo `earningsTrend`，crumb 流程沿用既有的 `YahooFinanceService#holders`，
+不新增任何 gem 或金鑰。取 low/high 兩端而非平均值——圖 A 的色帶要畫的是
+分歧程度，拿平均值色帶會縮成一條線。
+
+**循環論證偵測**。`LogicExampleBuilder` 會標紅「使用者填的倍數等於現價
+反推出來的那一個」：用現價 ÷ TTM EPS 得到 73.8 倍再填回去，算出的
+「需要的 EPS」必然等於 TTM EPS，拿它跟明年預測比毫無意義。
+
+**規格勘誤兩處**（原值與規格自己的 target 欄位矛盾）：
+圖 B 33 倍 entry 223.55 由 `0.6267949` 改為 `0.6267502`；
+`implied_rate(466.24, 365, 2)` 由 `0.13003` 改為 `0.1302079`。
+
+**共用服務的異動**：`FinnhubService#quote_with_status` 回傳
+`[body, status]`，讓呼叫端能區分 404（查無代號）與其他上游錯誤——
+既有的 `get` 對兩者都回 `nil`，狀態碼在那裡就掉了。`quote` / `profile` /
+`basic_metrics` 等既有方法行為完全不變。
+
+**開發過程中的四個教訓**（細節見 Obsidian 工作日誌）：
+`compact_blank` 把 `""` 與 `false` 當空值吃掉；快取存 `Data` 物件在改欄位後
+反序列化 `TypeError`；`Data#to_h` 是淺層的；`if (!window.driver) return`
+靜靜失敗最難查。
+
+測試：118 examples（services 64、form 25、requests 12、logic 13 等）。
+
+涉及檔案：`app/services/price_in/`、`app/forms/price_in/`、
+`app/controllers/price_in_controller.rb`、`app/components/price_in/`、
+`app/frontend/behaviors/priceIn{Charts,Ticker,Tour}.ts`、
+`config/locales/price_in.zh-TW.yml`、`price-in-tool.md`
+
+---
+
 ### 2026-09-03（三）— 調整：PMCC 桶內排序插入年化收租率
 
 接續同日兩次調整。`short_delta_ok` 當第二排序鍵對 BTI 無效——那批快照的候選
