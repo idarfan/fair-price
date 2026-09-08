@@ -40,10 +40,34 @@ class CspLessonsController < ApplicationController
 
     log_page_view(relative_path)
 
-    send_file file_path, disposition: "inline", type: content_type_for(file_path)
+    # HTML 要先注入 nonce 才送出（見 nonce_for_inline_scripts）；
+    # 圖片、SVG 等其餘檔案照舊走 send_file，不進記憶體。
+    if file_path.extname.casecmp(".html").zero?
+      render html: nonce_for_inline_scripts(file_path.read).html_safe, layout: false
+    else
+      send_file file_path, disposition: "inline", type: content_type_for(file_path)
+    end
   end
 
   private
+
+  # 這些教材頁的課程資料與互動邏輯都在內嵌 <script> 裡，而全域 script-src
+  # 不放行 :unsafe_inline——不處理的話課程清單整片空白，畫面有樣式卻沒有內容。
+  #
+  # 這裡不學 style-src 那樣開 :unsafe_inline，而是把當次請求的 nonce 注入進去：
+  # nonce 對 <script> 區塊是有效的（無效的只有 style="..." 屬性），
+  # 因此可以在維持嚴格政策的前提下只放行這幾段自家的靜態程式碼。
+  #
+  # 只處理沒有 src 的 <script>：有 src 的走 script-src 的來源白名單，不需要 nonce。
+  def nonce_for_inline_scripts(html)
+    nonce = content_security_policy_nonce
+    return html if nonce.blank?
+
+    html.gsub(/<script(?![^>]*\bsrc=)([^>]*)>/i) do
+      attrs = Regexp.last_match(1)
+      attrs.match?(/\bnonce=/i) ? "<script#{attrs}>" : %(<script nonce="#{nonce}"#{attrs}>)
+    end
+  end
 
   def content_type_for(file_path)
     Rack::Mime.mime_type(file_path.extname, "application/octet-stream")
