@@ -11,12 +11,12 @@ import { isRecord } from "./shared/json";
 
 const FONT_TITLE = 22;
 const FONT_VALUE = 24;
-const FONT_AXIS  = 20;
+const FONT_AXIS = 20;
 
 // 圖 A
-const BAR_A_FILL   = "#C5D2DB";
-const DOT_A_FILL   = "#1F5673";
-const BAND_FILL    = "#CDE3D2";
+const BAR_A_FILL = "#C5D2DB";
+const DOT_A_FILL = "#1F5673";
+const BAND_FILL = "#CDE3D2";
 // 目前實際 EPS：橘色，刻意與假設用的灰藍分開——上面幾條是「你給的倍數
 // 需要賺多少」，這一條是「現在真的賺多少」，同色會讓人以為都是假設。
 const CURRENT_FILL = "#E8A33D";
@@ -26,7 +26,7 @@ const CURRENT_TEXT = "#8A5A12";
 // 而變色，讀者會誤以為顏色代表盈虧而非入場價，整張圖的對照邏輯就毀了。
 const ENTRY_A_FILL = "#2E6C8E";
 const ENTRY_B_FILL = "#B5654A";
-const ZERO_LINE    = "#26333C";
+const ZERO_LINE = "#26333C";
 
 let annotationRegistered = false;
 
@@ -41,7 +41,11 @@ function registerAnnotation(): void {
 function parsePayload(raw: string | undefined): Record<string, unknown> | null {
   if (!raw) return null;
   let parsed: unknown;
-  try { parsed = JSON.parse(raw); } catch { return null; }
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
   return isRecord(parsed) ? parsed : null;
 }
 
@@ -78,7 +82,10 @@ function money(value: number): string {
  * 色帶也要一起算進去：帶高於所有長條時（現有預測遠超需求就會這樣），
  * 只看長條會把色帶切掉一半。
  */
-export function axisMax(values: number[], bandHigh: number | null = null): number {
+export function axisMax(
+  values: number[],
+  bandHigh: number | null = null,
+): number {
   const dataMax = Math.max(...values);
   // 長條留 15% 餘裕給右側的數值標籤；色帶只需要一點點，它沒有標籤。
   const raw = Math.max(dataMax * 1.15, bandHigh !== null ? bandHigh * 1.08 : 0);
@@ -86,7 +93,8 @@ export function axisMax(values: number[], bandHigh: number | null = null): numbe
   if (raw > 5) {
     // 規格原文的行為：取最接近的 5 的倍數，不足以容納資料就往上加。
     let bound = Math.round(raw / 5) * 5;
-    while (bound < dataMax || (bandHigh !== null && bound < bandHigh)) bound += 5;
+    while (bound < dataMax || (bandHigh !== null && bound < bandHigh))
+      bound += 5;
     return bound;
   }
 
@@ -100,10 +108,13 @@ function hasBandValue(payload: Record<string, unknown>): number | null {
   return typeof payload.bandHigh === "number" ? payload.bandHigh : null;
 }
 
-function renderChartA(canvas: HTMLCanvasElement, payload: Record<string, unknown>): void {
+function renderChartA(
+  canvas: HTMLCanvasElement,
+  payload: Record<string, unknown>,
+): void {
   const rows = Array.isArray(payload.rows) ? payload.rows : [];
   const multiples = numbersOf(rows, "multiple");
-  const required  = numbersOf(rows, "requiredEps");
+  const required = numbersOf(rows, "requiredEps");
   if (required.length === 0) return;
 
   // 由上而下依 multiple 由大到小。
@@ -114,9 +125,10 @@ function renderChartA(canvas: HTMLCanvasElement, payload: Record<string, unknown
     .filter((o): o is { m: number; eps: number } => typeof o.eps === "number")
     .sort((x, y) => y.m - x.m);
 
-  const currentEps = typeof payload.currentEps === "number" && payload.currentEps > 0
-    ? payload.currentEps
-    : null;
+  const currentEps =
+    typeof payload.currentEps === "number" && payload.currentEps > 0
+      ? payload.currentEps
+      : null;
 
   const labels = order.map((o) => `${o.m} 倍`);
   const values = order.map((o) => o.eps);
@@ -128,16 +140,31 @@ function renderChartA(canvas: HTMLCanvasElement, payload: Record<string, unknown
   }
   const max = axisMax(values, hasBandValue(payload));
   const barColors = values.map((_, i) =>
-    currentEps !== null && i === values.length - 1 ? CURRENT_FILL : BAR_A_FILL);
+    currentEps !== null && i === values.length - 1 ? CURRENT_FILL : BAR_A_FILL,
+  );
   const dotColors = values.map((_, i) =>
-    currentEps !== null && i === values.length - 1 ? CURRENT_TEXT : DOT_A_FILL);
+    currentEps !== null && i === values.length - 1 ? CURRENT_TEXT : DOT_A_FILL,
+  );
 
-  const bandLow  = typeof payload.bandLow === "number" ? payload.bandLow : null;
-  const bandHigh = typeof payload.bandHigh === "number" ? payload.bandHigh : null;
-  const hasBand  = bandLow !== null && bandHigh !== null;
+  const bandLow = typeof payload.bandLow === "number" ? payload.bandLow : null;
+  const bandHigh =
+    typeof payload.bandHigh === "number" ? payload.bandHigh : null;
+  const hasBand = bandLow !== null && bandHigh !== null;
   if (hasBand) registerAnnotation();
 
-  const fiscalYear = typeof payload.fiscalYear === "string" ? payload.fiscalYear : "";
+  const fiscalYear =
+    typeof payload.fiscalYear === "string" ? payload.fiscalYear : "";
+  const bandLabel =
+    typeof payload.bandLabel === "string" ? payload.bandLabel : "";
+
+  // 圖上有兩個年度：長條與標題是「本財政年度的門檻」，綠帶是「下一財政
+  // 年度的預測」。標題只寫其中一個，看的人會把整張圖都當成那一年。
+  // 綠帶的年度從它自己的來源標籤取，不是從標題年度推——兩者本來就不同。
+  const bandYear = bandLabel.match(/\d{4}/)?.[0] ?? null;
+  const chartTitle =
+    hasBand && bandYear !== null
+      ? `${fiscalYear} 需要的 EPS　｜　綠帶＝FY${bandYear} 分析師預測`
+      : `${fiscalYear} 需要的 EPS`;
 
   new Chart(canvas, {
     type: "bar",
@@ -163,7 +190,7 @@ function renderChartA(canvas: HTMLCanvasElement, payload: Record<string, unknown
         legend: { display: false },
         title: {
           display: true,
-          text: `${fiscalYear} 需要的 EPS`,
+          text: chartTitle,
           font: { size: FONT_TITLE, weight: "500" },
         },
         tooltip: { enabled: false },
@@ -173,7 +200,8 @@ function renderChartA(canvas: HTMLCanvasElement, payload: Record<string, unknown
               annotations: {
                 band: {
                   type: "box",
-                  xMin: bandLow, xMax: bandHigh,
+                  xMin: bandLow,
+                  xMax: bandHigh,
                   backgroundColor: BAND_FILL,
                   borderWidth: 0,
                   drawTime: "afterDatasetsDraw",
@@ -185,7 +213,8 @@ function renderChartA(canvas: HTMLCanvasElement, payload: Record<string, unknown
       },
       scales: {
         x: {
-          min: 0, max,
+          min: 0,
+          max,
           ticks: {
             font: { size: FONT_AXIS },
             // 0.1 一格：格線畫得細，標籤由 autoSkip 依可用寬度自行疏化，
@@ -194,17 +223,24 @@ function renderChartA(canvas: HTMLCanvasElement, payload: Record<string, unknown
             autoSkip: true,
             maxRotation: 0,
           },
-          title: { display: true, text: "所需 EPS（美元）", font: { size: FONT_AXIS } },
+          title: {
+            display: true,
+            text: "所需 EPS（美元）",
+            font: { size: FONT_AXIS },
+          },
         },
         y: { ticks: { font: { size: FONT_AXIS } } },
       },
     },
-    plugins: [ valueLabelPlugin(values.map(money), dotColors) ],
+    plugins: [valueLabelPlugin(values.map(money), dotColors)],
   });
 }
 
 /** 圓點右側標數值。Chart.js 沒有內建 datalabels，用 afterDatasetsDraw 自己畫。 */
-function valueLabelPlugin(labels: string[], colors: string[]): Record<string, unknown> {
+function valueLabelPlugin(
+  labels: string[],
+  colors: string[],
+): Record<string, unknown> {
   return {
     id: "priceInValueLabels",
     afterDatasetsDraw(chart: ChartInstance): void {
@@ -227,7 +263,10 @@ function valueLabelPlugin(labels: string[], colors: string[]): Record<string, un
 
 // ── 圖 B ────────────────────────────────────────────────
 
-function renderChartB(canvas: HTMLCanvasElement, payload: Record<string, unknown>): void {
+function renderChartB(
+  canvas: HTMLCanvasElement,
+  payload: Record<string, unknown>,
+): void {
   const rows = Array.isArray(payload.rows) ? payload.rows : [];
   if (rows.length === 0) return;
 
@@ -236,10 +275,13 @@ function renderChartB(canvas: HTMLCanvasElement, payload: Record<string, unknown
   const labelA = typeof entryA.label === "string" ? entryA.label : "買入基準";
   const labelB = typeof entryB.label === "string" ? entryB.label : "假設買入價";
 
-  const ordered = [...rows].filter(isRecord).sort((a, b) => Number(b.multiple) - Number(a.multiple));
+  const ordered = [...rows]
+    .filter(isRecord)
+    .sort((a, b) => Number(b.multiple) - Number(a.multiple));
 
   const labels = ordered.map((r) => {
-    const target = typeof r.targetPrice === "number" ? money(r.targetPrice) : "";
+    const target =
+      typeof r.targetPrice === "number" ? money(r.targetPrice) : "";
     return [`${String(r.multiple)} 倍`, `對應 ${target}`];
   });
 
@@ -247,7 +289,9 @@ function renderChartB(canvas: HTMLCanvasElement, payload: Record<string, unknown
     ordered.map((r) => {
       const returns = Array.isArray(r.returns) ? r.returns : [];
       const cell = returns[idx];
-      return isRecord(cell) && typeof cell.totalReturn === "number" ? cell.totalReturn : 0;
+      return isRecord(cell) && typeof cell.totalReturn === "number"
+        ? cell.totalReturn
+        : 0;
     });
 
   const a = seriesFor(0);
@@ -259,8 +303,20 @@ function renderChartB(canvas: HTMLCanvasElement, payload: Record<string, unknown
     data: {
       labels,
       datasets: [
-        { label: labelA, data: a, backgroundColor: ENTRY_A_FILL, borderWidth: 0, minBarLength: 3 },
-        { label: labelB, data: b, backgroundColor: ENTRY_B_FILL, borderWidth: 0, minBarLength: 3 },
+        {
+          label: labelA,
+          data: a,
+          backgroundColor: ENTRY_A_FILL,
+          borderWidth: 0,
+          minBarLength: 3,
+        },
+        {
+          label: labelB,
+          data: b,
+          backgroundColor: ENTRY_B_FILL,
+          borderWidth: 0,
+          minBarLength: 3,
+        },
       ],
     },
     options: {
@@ -278,29 +334,38 @@ function renderChartB(canvas: HTMLCanvasElement, payload: Record<string, unknown
       },
       scales: {
         x: {
-          min: -span, max: span,
+          min: -span,
+          max: span,
           ticks: {
             font: { size: FONT_AXIS },
-            callback: (value: number | undefined) => (typeof value === "number" ? pct(value) : ""),
+            callback: (value: number | undefined) =>
+              typeof value === "number" ? pct(value) : "",
           },
           grid: {
             color: (ctx: { tick?: { value: number } }) =>
               ctx.tick?.value === 0 ? ZERO_LINE : "rgba(0,0,0,0.06)",
-            lineWidth: (ctx: { tick?: { value: number } }) => (ctx.tick?.value === 0 ? 1.5 : 1),
+            lineWidth: (ctx: { tick?: { value: number } }) =>
+              ctx.tick?.value === 0 ? 1.5 : 1,
           },
-          title: { display: true, text: xAxisTitle(payload), font: { size: FONT_AXIS } },
+          title: {
+            display: true,
+            text: xAxisTitle(payload),
+            font: { size: FONT_AXIS },
+          },
         },
         y: { ticks: { font: { size: FONT_AXIS } } },
       },
     },
-    plugins: [ groupedLabelPlugin([ a, b ]) ],
+    plugins: [groupedLabelPlugin([a, b])],
   });
 }
 
 function xAxisTitle(payload: Record<string, unknown>): string {
   const years = payload.holdingYears;
-  const base  = "總報酬";
-  return typeof years === "number" && years > 0 ? `${base}（持有 ${years} 年）` : base;
+  const base = "總報酬";
+  return typeof years === "number" && years > 0
+    ? `${base}（持有 ${years} 年）`
+    : base;
 }
 
 /**
@@ -329,11 +394,11 @@ function groupedLabelPlugin(series: number[][]): Record<string, unknown> {
           const value = values[i];
           if (typeof value !== "number") return;
 
-          const text     = pct(value);
-          const textW    = ctx.measureText(text).width;
-          const barLen   = Math.abs(bar.x - zeroX);
+          const text = pct(value);
+          const textW = ctx.measureText(text).width;
+          const barLen = Math.abs(bar.x - zeroX);
           const positive = value >= 0;
-          const inside   = barLen > textW + PADDING * 2;
+          const inside = barLen > textW + PADDING * 2;
 
           ctx.fillStyle = inside ? "#FFFFFF" : ZERO_LINE;
           if (inside) {
@@ -356,8 +421,13 @@ export function init(root: HTMLElement): void {
   if (!(root instanceof HTMLCanvasElement)) return;
 
   const a = parsePayload(root.dataset.chartAPayload);
-  if (a) { renderChartA(root, a); return; }
+  if (a) {
+    renderChartA(root, a);
+    return;
+  }
 
   const b = parsePayload(root.dataset.chartBPayload);
-  if (b) { renderChartB(root, b); }
+  if (b) {
+    renderChartB(root, b);
+  }
 }

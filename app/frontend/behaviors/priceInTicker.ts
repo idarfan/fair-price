@@ -15,7 +15,11 @@ import { isRecord } from "./shared/json";
 /** 與 PriceIn::ScenarioForm::MAX_MULTIPLES 對齊。 */
 const MAX_MULTIPLES = 5;
 
-interface PeRange { low: number | null; high: number | null; current: number | null }
+interface PeRange {
+  low: number | null;
+  high: number | null;
+  current: number | null;
+}
 
 interface Estimate {
   low: number | null;
@@ -38,16 +42,28 @@ interface QuoteOk {
   eps_estimate: Estimate;
   eps_estimate_next: Estimate;
 }
-interface QuoteErr { ok: false; error_code: string; message: string }
+interface QuoteErr {
+  ok: false;
+  error_code: string;
+  message: string;
+}
 
 function parseQuote(raw: unknown): QuoteOk | QuoteErr | null {
   if (!isRecord(raw)) return null;
   if (raw.ok === true) {
     const { ticker, price, as_of: asOf } = raw;
-    if (typeof ticker !== "string" || typeof price !== "number" || typeof asOf !== "string") return null;
+    if (
+      typeof ticker !== "string" ||
+      typeof price !== "number" ||
+      typeof asOf !== "string"
+    )
+      return null;
     // 估值欄位缺值是正常情況（虧損公司、上游沒給、同業樣本不足），不是解析失敗。
     return {
-      ok: true, ticker, price, as_of: asOf,
+      ok: true,
+      ticker,
+      price,
+      as_of: asOf,
       eps_ttm: num(raw.eps_ttm),
       pe: range(raw.pe),
       forward_pe: range(raw.forward_pe),
@@ -71,7 +87,11 @@ function num(value: unknown): number | null {
 
 function range(value: unknown): PeRange {
   if (!isRecord(value)) return { low: null, high: null, current: null };
-  return { low: num(value.low), high: num(value.high), current: num(value.current) };
+  return {
+    low: num(value.low),
+    high: num(value.high),
+    current: num(value.current),
+  };
 }
 
 /**
@@ -79,16 +99,20 @@ function range(value: unknown): PeRange {
  * 得到的倍數可以差好幾倍。只報一個數字等於把那一瞬間的成交價講成公司的估值。
  */
 function formatRange(r: PeRange): string {
-  if (r.low !== null && r.high !== null) return `${r.low.toFixed(2)} - ${r.high.toFixed(2)}x`;
+  if (r.low !== null && r.high !== null)
+    return `${r.low.toFixed(2)} - ${r.high.toFixed(2)}x`;
   if (r.current !== null) return `${r.current.toFixed(2)}x`;
   return "—";
 }
 
 function estimate(value: unknown): Estimate {
-  if (!isRecord(value)) return { low: null, high: null, avg: null, analysts: null, end_date: null };
+  if (!isRecord(value))
+    return { low: null, high: null, avg: null, analysts: null, end_date: null };
   const end = value.end_date;
   return {
-    low: num(value.low), high: num(value.high), avg: num(value.avg),
+    low: num(value.low),
+    high: num(value.high),
+    avg: num(value.avg),
     analysts: num(value.analysts),
     end_date: typeof end === "string" ? end : null,
   };
@@ -96,7 +120,8 @@ function estimate(value: unknown): Estimate {
 
 /** 帶入時要塞進倍數欄位的值。小數位與畫面顯示一致，使用者才對得起來。 */
 function applyValues(r: PeRange): string[] {
-  if (r.low !== null && r.high !== null) return [r.low.toFixed(2), r.high.toFixed(2)];
+  if (r.low !== null && r.high !== null)
+    return [r.low.toFixed(2), r.high.toFixed(2)];
   if (r.current !== null) return [r.current.toFixed(2)];
   return [];
 }
@@ -135,9 +160,11 @@ export function init(root: HTMLElement): void {
     if (!(status instanceof HTMLElement)) return;
     status.textContent = text;
     status.className =
-      tone === "muted" ? "mt-2 text-[16px] text-gray-500"
-      : tone === "warn" ? "mt-2 text-[16px] text-amber-700"
-      : "mt-2 text-[16px] text-red-600";
+      tone === "muted"
+        ? "mt-2 text-[16px] text-gray-500"
+        : tone === "warn"
+          ? "mt-2 text-[16px] text-amber-700"
+          : "mt-2 text-[16px] text-red-600";
   };
 
   /** 買入基準恆等於股價，鏡射欄位是唯讀顯示，改價時要跟著動。 */
@@ -149,7 +176,12 @@ export function init(root: HTMLElement): void {
   };
 
   /** 對照值抓不到就顯示破折號並收起「帶入」按鈕，不顯示錯誤。 */
-  const showValue = (valueId: string, applyId: string | null, text: string, source: PeRange): void => {
+  const showValue = (
+    valueId: string,
+    applyId: string | null,
+    text: string,
+    source: PeRange,
+  ): void => {
     const display = document.getElementById(valueId);
     if (display) display.textContent = text;
     if (!applyId) return;
@@ -165,13 +197,23 @@ export function init(root: HTMLElement): void {
   };
 
   const blank: PeRange = { low: null, high: null, current: null };
-  const blankEstimate: Estimate = { low: null, high: null, avg: null, analysts: null, end_date: null };
+  const blankEstimate: Estimate = {
+    low: null,
+    high: null,
+    avg: null,
+    analysts: null,
+    end_date: null,
+  };
 
   /**
    * 分析師 EPS 預測。帶入的是 low／high 兩端而不是平均值——
    * 色帶要畫的是分歧程度，拿平均值會讓色帶縮成一條線。
    */
-  const showEstimate = (key: string, est: Estimate, fallbackLabel: string): void => {
+  const showEstimate = (
+    key: string,
+    est: Estimate,
+    fallbackLabel: string,
+  ): void => {
     const display = document.getElementById(`price-in-estimate-${key}`);
     const apply = document.getElementById(`price-in-apply-estimate-${key}`);
     const label = document.getElementById(`price-in-estimate-${key}-label`);
@@ -197,7 +239,8 @@ export function init(root: HTMLElement): void {
         apply.dataset.low = est.low!.toFixed(2);
         apply.dataset.high = est.high!.toFixed(2);
         apply.dataset.endDate = est.end_date ?? "";
-        apply.dataset.analysts = est.analysts !== null ? String(est.analysts) : "";
+        apply.dataset.analysts =
+          est.analysts !== null ? String(est.analysts) : "";
       }
     }
   };
@@ -217,7 +260,8 @@ export function init(root: HTMLElement): void {
    *   上面那顆 → 圖 A 的預測區間與年度（把綠帶換成本財政年度）
    *   下面那顆 → 圖 B 的未來 EPS 與年度
    */
-  const yearLabel = (est: Estimate): string => (est.end_date ? est.end_date.slice(0, 4) : "");
+  const yearLabel = (est: Estimate): string =>
+    est.end_date ? est.end_date.slice(0, 4) : "";
 
   const sourceLabel = (est: Estimate): string => {
     const year = yearLabel(est);
@@ -248,17 +292,15 @@ export function init(root: HTMLElement): void {
   const applyBand = (est: Estimate, force: boolean): void => {
     if (est.low === null || est.high === null) return;
     // force=false 時只在欄位還空著才填：使用者自己查來的數字不該被覆寫。
-    if (!force && !(isBlank("price-in-eps_band_low") && isBlank("price-in-eps_band_high"))) return;
+    if (
+      !force &&
+      !(isBlank("price-in-eps_band_low") && isBlank("price-in-eps_band_high"))
+    )
+      return;
 
     setField("price-in-eps_band_low", est.low.toFixed(2));
     setField("price-in-eps_band_high", est.high.toFixed(2));
     setField("price-in-eps_band_label", sourceLabel(est));
-  };
-
-  /** 上面那顆手動帶入 → 圖 A 的年度與綠帶都換成該年度。 */
-  const applyToChartA = (est: Estimate, force: boolean): void => {
-    applyTitleYear(est, force);
-    applyBand(est, force);
   };
 
   /**
@@ -269,7 +311,9 @@ export function init(root: HTMLElement): void {
    * 填進來的數字看得到出處。
    */
   const applyToChartB = (est: Estimate, force: boolean): void => {
-    const value = est.avg ?? (est.low !== null && est.high !== null ? (est.low + est.high) / 2 : null);
+    const value =
+      est.avg ??
+      (est.low !== null && est.high !== null ? (est.low + est.high) / 2 : null);
     if (value === null) return;
     if (!force && !isBlank("price-in-eps")) return;
 
@@ -287,9 +331,20 @@ export function init(root: HTMLElement): void {
     // 「帶入」帶的是現價對應的那一個倍數，不是區間端點——
     // 帶端點等於替使用者選了當天最貴或最便宜的那一刻。
     showValue("price-in-current-pe", "price-in-apply-pe", formatRange(pe), pe);
-    showValue("price-in-forward-pe", "price-in-apply-forward-pe", formatRange(fwd), fwd);
-    showValue("price-in-peer-pe", null,
-      low === null || high === null ? "—" : `${low.toFixed(2)} - ${high.toFixed(2)}x`, blank);
+    showValue(
+      "price-in-forward-pe",
+      "price-in-apply-forward-pe",
+      formatRange(fwd),
+      fwd,
+    );
+    showValue(
+      "price-in-peer-pe",
+      null,
+      low === null || high === null
+        ? "—"
+        : `${low.toFixed(2)} - ${high.toFixed(2)}x`,
+      blank,
+    );
 
     const panel = document.getElementById("price-in-estimate-panel");
     const est = q?.eps_estimate ?? blankEstimate;
@@ -300,13 +355,15 @@ export function init(root: HTMLElement): void {
 
     // 記下 TTM EPS，送出後伺服器才判定得出「你填的倍數是不是現價反推的那一個」。
     const hint = document.getElementById("price-in-eps-ttm-hint");
-    if (hint instanceof HTMLInputElement) hint.value = q?.eps_ttm != null ? String(q.eps_ttm) : "";
+    if (hint instanceof HTMLInputElement)
+      hint.value = q?.eps_ttm != null ? String(q.eps_ttm) : "";
 
     const epsNote = document.getElementById("price-in-eps-basis");
     if (epsNote) {
-      epsNote.textContent = q?.eps_ttm != null
-        ? `以 TTM EPS $${q.eps_ttm.toFixed(2)} 換算當日價格區間．上游未標示 GAAP 或非 GAAP`
-        : "上游未標示 GAAP 或非 GAAP，僅供對照";
+      epsNote.textContent =
+        q?.eps_ttm != null
+          ? `以 TTM EPS $${q.eps_ttm.toFixed(2)} 換算當日價格區間．上游未標示 GAAP 或非 GAAP`
+          : "上游未標示 GAAP 或非 GAAP，僅供對照";
     }
   };
 
@@ -318,18 +375,27 @@ export function init(root: HTMLElement): void {
 
   const fetchQuote = async (): Promise<void> => {
     const ticker = tickerField.value.trim().toUpperCase();
-    if (ticker === "") { setStatus("請先填入股票代號", "error"); return; }
+    if (ticker === "") {
+      setStatus("請先填入股票代號", "error");
+      return;
+    }
 
     button.disabled = true;
     setStatus("查詢中…", "muted");
     try {
-      const res = await fetch(`${quoteUrl}?ticker=${encodeURIComponent(ticker)}`, {
-        headers: { Accept: "application/json" },
-        credentials: "same-origin",
-      });
+      const res = await fetch(
+        `${quoteUrl}?ticker=${encodeURIComponent(ticker)}`,
+        {
+          headers: { Accept: "application/json" },
+          credentials: "same-origin",
+        },
+      );
       const parsed = parseQuote(await res.json());
 
-      if (!parsed) { setStatus("報價格式無法解析，請手動輸入", "error"); return; }
+      if (!parsed) {
+        setStatus("報價格式無法解析，請手動輸入", "error");
+        return;
+      }
       if (!parsed.ok) {
         // 任何失敗都不動價格欄位，圖表照常以現有價格重繪。
         setStatus(parsed.message, "error");
@@ -337,18 +403,34 @@ export function init(root: HTMLElement): void {
       }
 
       priceField.value = String(parsed.price);
-      if (stampField instanceof HTMLInputElement) stampField.value = parsed.as_of;
+      if (stampField instanceof HTMLInputElement)
+        stampField.value = parsed.as_of;
       tickerAtLastQuote = parsed.ticker;
       syncMirror();
       showValuation(parsed);
 
-      // 預設配置，只在欄位空著時填，不覆寫使用者自己查來的數字：
+      // 一律覆寫（force=true）。
+      //
+      // 原本這裡是「只在欄位空著時才填」，想保護使用者自己查來的數字，
+      // 結果是按「帶入現價」什麼都不會變——欄位早就有上一次的值，程式
+      // 直接跳過。使用者按下這顆按鈕就是在要求重抓，不覆寫等於按了沒反應。
+      //
       //   標題／長條年度 ← 本財政年度      綠帶 ← 下一財政年度
       //   圖 B           ← 下一財政年度
-      applyTitleYear(parsed.eps_estimate, false);
-      applyBand(parsed.eps_estimate_next, false);
-      applyToChartB(parsed.eps_estimate_next, false);
+      applyTitleYear(parsed.eps_estimate, true);
+      applyBand(parsed.eps_estimate_next, true);
+      applyToChartB(parsed.eps_estimate_next, true);
+
+      // 填完直接送出表單，讓圖表跟著重畫。
+      //
+      // 圖表是伺服器端渲染的：JS 只改得動輸入欄位，圖要等表單送出後由
+      // Rails 重新算過才會變。少了這一步，使用者按「帶入現價」會看到欄位
+      // 變了、圖卻還是舊的，而畫面上沒有任何東西告訴他還得再按一次
+      // 「重新出圖」——這正是先前綠帶怎麼按都停在舊年度的原因。
+      //
+      // GET 表單，送出後網址帶著完整情境，仍然可分享。
       setStatus(`報價時間 ${formatStamp(parsed.as_of)}`, "muted");
+      if (root instanceof HTMLFormElement) root.requestSubmit();
     } catch {
       setStatus("暫時取不到報價，請手動輸入", "error");
     } finally {
@@ -356,7 +438,9 @@ export function init(root: HTMLElement): void {
     }
   };
 
-  button.addEventListener("click", () => { void fetchQuote(); });
+  button.addEventListener("click", () => {
+    void fetchQuote();
+  });
   priceField.addEventListener("input", markManual);
 
   // 「帶入」是使用者明確按下的動作，不是自動填入——規格 §S4 禁止的是
@@ -366,14 +450,21 @@ export function init(root: HTMLElement): void {
     document.getElementById(id)?.addEventListener("click", (event) => {
       if (!(multiplesField instanceof HTMLInputElement)) return;
       const target = event.currentTarget;
-      const incoming = (target instanceof HTMLElement ? target.dataset.pe : "")?.split(",") ?? [];
+      const incoming =
+        (target instanceof HTMLElement ? target.dataset.pe : "")?.split(",") ??
+        [];
       if (incoming.length === 0) return;
 
-      const current = multiplesField.value.split(",").map((v) => v.trim()).filter((v) => v !== "");
+      const current = multiplesField.value
+        .split(",")
+        .map((v) => v.trim())
+        .filter((v) => v !== "");
       // Form 層上限 5 個，先擋在這裡免得送出才報錯。裝得下幾個就加幾個，
       // 而不是整批放棄——使用者按了按鈕卻什麼都沒發生，比只加到一半更費解。
       const room = MAX_MULTIPLES - current.length;
-      const additions = incoming.filter((v) => v !== "" && !current.includes(v)).slice(0, Math.max(room, 0));
+      const additions = incoming
+        .filter((v) => v !== "" && !current.includes(v))
+        .slice(0, Math.max(room, 0));
       if (additions.length === 0) return;
 
       multiplesField.value = [...current, ...additions].join(",");
@@ -385,26 +476,48 @@ export function init(root: HTMLElement): void {
 
   // 手動「帶入」force=true 直接覆寫，那是使用者明確要求換成這一組。
   // 資料從按鈕的 data-* 讀回來，不重新打上游。
-  const wireEstimate = (key: string, apply: (est: Estimate, force: boolean) => void): void => {
-    document.getElementById(`price-in-apply-estimate-${key}`)?.addEventListener("click", (event) => {
-      const target = event.currentTarget;
-      if (!(target instanceof HTMLElement)) return;
+  const wireEstimate = (
+    key: string,
+    apply: (est: Estimate, force: boolean) => void,
+  ): void => {
+    document
+      .getElementById(`price-in-apply-estimate-${key}`)
+      ?.addEventListener("click", (event) => {
+        const target = event.currentTarget;
+        if (!(target instanceof HTMLElement)) return;
 
-      const low = num(Number.parseFloat(target.dataset.low ?? ""));
-      const high = num(Number.parseFloat(target.dataset.high ?? ""));
-      const avg = num(Number.parseFloat(target.dataset.avg ?? ""));
-      if (low === null || high === null) return;
+        const low = num(Number.parseFloat(target.dataset.low ?? ""));
+        const high = num(Number.parseFloat(target.dataset.high ?? ""));
+        const avg = num(Number.parseFloat(target.dataset.avg ?? ""));
+        if (low === null || high === null) return;
 
-      apply({
-        low, high, avg,
-        analysts: num(Number.parseInt(target.dataset.analysts ?? "", 10)),
-        end_date: target.dataset.endDate ?? null,
-      }, true);
-    });
+        apply(
+          {
+            low,
+            high,
+            avg,
+            analysts: num(Number.parseInt(target.dataset.analysts ?? "", 10)),
+            end_date: target.dataset.endDate ?? null,
+          },
+          true,
+        );
+      });
   };
 
-  wireEstimate("current", applyToChartA);   // 上面那顆 → 圖 A
-  wireEstimate("next", applyToChartB);      // 下面那顆 → 圖 B
+  // 上面那顆（本財政年度）→ 只寫圖 A 的「哪一年的 EPS」。
+  //   它代表「這個門檻要檢驗哪一年」，不該去動綠帶——綠帶畫的是未來的預測，
+  //   被寫成本年度就變成「今年 vs 今年」，看不出還有多少空間。
+  //
+  //   先前它會連綠帶一起寫成本年度：使用者按一下就把 2027 的綠帶洗成 2026，
+  //   之後怎麼按「重新出圖」都是 2026——因為值早就被改掉了，而「重新出圖」
+  //   只是把現有欄位原樣送出。
+  //
+  // 下面那顆（下一財政年度）→ 綠帶 ＋ 圖 B，兩者都是「未來」的東西。
+  wireEstimate("current", applyTitleYear);
+  wireEstimate("next", (est, force) => {
+    applyBand(est, force);
+    applyToChartB(est, force);
+  });
 
   tickerField.addEventListener("input", () => {
     const now = tickerField.value.trim().toUpperCase();

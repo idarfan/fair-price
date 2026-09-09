@@ -109,10 +109,10 @@ class PriceIn::InputFormComponent < ApplicationComponent
       p(class: "text-[16px] font-medium text-emerald-900 mb-1") { plain("分析師 EPS 預測") }
       # 兩顆各管一半，互不越界：上面那顆只動圖 A，下面那顆只動圖 B。
       # 標籤寫出去向——兩顆長得一樣的按鈕擺在一起，使用者沒有理由猜得到。
-      estimate_row("本財政年度", "current", @valuation&.eps_estimate, target: "圖 A")
-      estimate_row("下一財政年度", "next", @valuation&.eps_estimate_next, target: "圖 B")
+      estimate_row("本財政年度", "current", @valuation&.eps_estimate, target: "圖 A 年度")
+      estimate_row("下一財政年度", "next", @valuation&.eps_estimate_next, target: "綠帶＋圖 B")
       p(class: "mt-1 text-[16px] text-gray-400 leading-[1.4]") do
-        plain("來源 Yahoo Finance．上面那顆只動圖 A 的預測區間與年度，下面那顆只動圖 B 的未來 EPS 與年度")
+        plain("來源 Yahoo Finance．上面那顆只改圖 A 的年度標示；下面那顆填綠帶（分歧範圍）與圖 B 的未來 EPS")
       end
     end
   end
