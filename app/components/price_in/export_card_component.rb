@@ -20,29 +20,49 @@ class PriceIn::ExportCardComponent < ApplicationComponent
   HEIGHT = 540
 
   # key: "chart_a" / "chart_b"
-  def initialize(key:, form:, title:, subtitle:, source_canvas_id:, band: nil, eps_banner: nil)
-    @key      = key
-    @form     = form
-    @title    = title
-    @subtitle = subtitle
-    @canvas   = source_canvas_id
-    @band     = band
-    @banner   = eps_banner
+  #
+  # table_headers／table_rows／legend／note 讓匯出圖帶上與畫面相同的完整資訊。
+  # 只有一張圖的匯出品脫離頁面後就沒有任何線索：看的人不知道那些倍數對應
+  # 多少 EPS、綠帶是哪一年、圓點該怎麼讀。
+  def initialize(key:, form:, title:, subtitle:, source_canvas_id:,
+                 eps_banner: nil, table_headers: [], table_rows: [], legend: [], note: nil)
+    @key           = key
+    @form          = form
+    @title         = title
+    @subtitle      = subtitle
+    @canvas        = source_canvas_id
+    @banner        = eps_banner
+    @table_headers = table_headers
+    @table_rows    = table_rows
+    @legend        = legend
+    @note          = note
   end
 
   def view_template
-    div(
-      id: "price-in-export-#{@key}",
-      class: "pi-export-stage",
-      data: { export_card: @key, source_canvas: @canvas }
-    ) do
-      div(id: "price-in-export-#{@key}-fit", class: "pi-export-fit") do
-        header_row
-        titles
-        banner if @banner.present?
-        chart_slot
-        highlight
-        footer_row
+    # 外層負責「移出視野」，內層才是被拍的元素。
+    #
+    # 不能把 position:absolute; left:-99999px 放在被拍的元素本身——
+    # html-to-image 會把節點的 computed style 一併複製到 clone 上，clone 在
+    # SVG foreignObject 裡就被推到 -99999px 外面，拍出來整片空白（PNG 與 PDF
+    # 都是，因為 PDF 用的就是 PNG 的點陣圖）。
+    #
+    # 仍然不可改用 display:none：那樣 html-to-image 量不到尺寸，同樣是空白。
+    div(class: "pi-export-offscreen") do
+      div(
+        id: "price-in-export-#{@key}",
+        class: "pi-export-stage",
+        data: { export_card: @key, source_canvas: @canvas }
+      ) do
+        div(id: "price-in-export-#{@key}-fit", class: "pi-export-fit") do
+          header_row
+          titles
+          banner if @banner.present?
+          chart_slot
+          data_table if @table_rows.any?
+          legend_row if @legend.any?
+          highlight
+          footer_row
+        end
       end
     end
   end
@@ -74,8 +94,30 @@ class PriceIn::ExportCardComponent < ApplicationComponent
     end
   end
 
+  # 數值表：圖上只看得出長短，實際數字要靠這張表。
+  def data_table
+    table(class: "pi-export-table") do
+      thead do
+        tr { @table_headers.each { |h| th { plain(h) } } }
+      end
+      tbody do
+        @table_rows.each do |cells|
+          tr { cells.each { |cell| td { plain(cell) } } }
+        end
+      end
+    end
+  end
+
+  # 圖例：色塊在匯出圖裡沒辦法用 CSS class 重現顏色對應，改用文字前綴，
+  # 例如「灰藍橫條＝…」。顏色本身圖上看得到，缺的是名稱。
+  def legend_row
+    div(class: "pi-export-legend") do
+      @legend.each { |item| span { plain(item) } }
+    end
+  end
+
   def highlight
-    p(class: "pi-export-highlight") { plain(t_export(:"#{@key}_highlight")) }
+    p(class: "pi-export-highlight") { plain(@note.presence || t_export(:"#{@key}_highlight")) }
   end
 
   def footer_row

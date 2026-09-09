@@ -27,7 +27,11 @@ class PriceIn::ChartACardComponent < ApplicationComponent
       end
       render PriceIn::ExportCardComponent.new(
         key: "chart_a", form: @form, title: title, subtitle: SUBTITLE,
-        source_canvas_id: CANVAS_ID, eps_banner: export_banner
+        source_canvas_id: CANVAS_ID, eps_banner: export_banner,
+        table_headers: [ "本益比假設", "#{@form.fiscal_year_label} 需要的 EPS" ],
+        table_rows: export_table_rows,
+        legend: export_legend,
+        note: band_sentence
       )
     end
   end
@@ -38,6 +42,22 @@ class PriceIn::ChartACardComponent < ApplicationComponent
   SUBTITLE     = "Fixed share price. Different earnings requirements."
 
   def title = "#{PriceIn::Formatter.money(@result.price)}#{TITLE_SUFFIX}"
+
+  # 匯出用的數值表：與畫面上那張同一份資料，含「目前 TTM EPS（實際）」那列。
+  def export_table_rows
+    rows = @result.rows.map { |r| [ r.formatted_multiple, r.formatted_eps ] }
+    eps = @form.eps_ttm_hint
+    rows << [ "目前 TTM EPS（實際）", PriceIn::Formatter.money(eps) ] if eps.present? && eps.to_f.positive?
+    rows
+  end
+
+  # 匯出用的圖例：畫面上靠色塊對應，匯出圖裡改成文字說明顏色。
+  def export_legend
+    items = [ "灰藍橫條＝這個倍數需要公司賺到的 EPS", "深藍圓點＝該 EPS 的位置" ]
+    items << band_legend_label if @result.band?
+    items << current_legend_label if @form.eps_ttm_hint.present?
+    items
+  end
 
   # 匯出版的 EPS 橫幅：把年度與色帶來源寫進圖裡。缺年度的圖會誤導，
   # 而匯出的圖脫離頁面之後沒有任何其他線索可以補回這個資訊。

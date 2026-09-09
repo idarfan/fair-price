@@ -14,7 +14,10 @@ const STAGE_W = 960;
 const STAGE_H = 540;
 const MIN_SCALE_WARNING = 0.75;
 
-interface AuditHit { keyword: string; allowed_by: string | null }
+interface AuditHit {
+  keyword: string;
+  allowed_by: string | null;
+}
 
 function t(key: string): string {
   const el = document.getElementById("price-in-export-i18n");
@@ -25,7 +28,9 @@ function t(key: string): string {
       const value = (bag as Record<string, unknown>)[key];
       if (typeof value === "string") return value;
     }
-  } catch { /* 文案島壞掉不該擋住匯出，退回 key */ }
+  } catch {
+    /* 文案島壞掉不該擋住匯出，退回 key */
+  }
   return key;
 }
 
@@ -45,7 +50,11 @@ function copyChart(stage: HTMLElement, key: string): boolean {
   if (!canvasId) return false;
   const canvas = document.getElementById(canvasId);
   const img = document.getElementById(`price-in-export-${key}-img`);
-  if (!(canvas instanceof HTMLCanvasElement) || !(img instanceof HTMLImageElement)) return false;
+  if (
+    !(canvas instanceof HTMLCanvasElement) ||
+    !(img instanceof HTMLImageElement)
+  )
+    return false;
 
   img.src = canvas.toDataURL("image/png");
   return true;
@@ -68,17 +77,22 @@ function fitToStage(key: string): number {
 
 async function renderStage(stage: HTMLElement, key: string): Promise<string> {
   copyChart(stage, key);
-  const scale = fitToStage(key);
-  if (scale < MIN_SCALE_WARNING) {
-    // 仍照常匯出，只是告訴使用者為什麼字看起來偏小。
-    // eslint-disable-next-line no-console
-    console.warn(`[price-in] ${t("too_small")}（縮放 ${scale.toFixed(2)}）`);
-  }
 
-  // 等圖片實際解碼完成再截圖，否則會拍到還沒載入的空白區塊。
+  // 必須先等圖片解碼完成再量高度。
+  //
+  // 順序寫反的後果：img.src 才剛設好、還沒完成版面配置，fitToStage 量到的
+  // 高度不含圖表，算出 scale = 1（不縮放）；等圖片載入後內容變高，超出
+  // stage 的 540px 就被 overflow:hidden 裁掉——成品只有上半截。
   const img = document.getElementById(`price-in-export-${key}-img`);
   if (img instanceof HTMLImageElement && !img.complete) {
     await img.decode().catch(() => undefined);
+  }
+
+  const scale = fitToStage(key);
+  if (scale < MIN_SCALE_WARNING) {
+    // 仍照常匯出，只是告訴使用者為什麼字看起來偏小。
+
+    console.warn(`[price-in] ${t("too_small")}（縮放 ${scale.toFixed(2)}）`);
   }
 
   return htmlToImage.toPng(stage, {
@@ -106,7 +120,11 @@ function downloadPng(dataUrl: string, filename: string): void {
  * 壓縮後 550KB。
  */
 function downloadPdf(dataUrl: string, filename: string): void {
-  const doc = new jspdf.jsPDF({ orientation: "landscape", unit: "pt", format: [ 1920, 1080 ] });
+  const doc = new jspdf.jsPDF({
+    orientation: "landscape",
+    unit: "pt",
+    format: [1920, 1080],
+  });
   doc.addImage(dataUrl, "PNG", 0, 0, 1920, 1080, undefined, "FAST");
   doc.save(`${filename}.pdf`);
 }
@@ -122,7 +140,7 @@ function downloadPdf(dataUrl: string, filename: string): void {
  */
 function auditHits(key: string): AuditHit[] {
   const el = document.getElementById(`price-in-audit-${key}`);
-    if (!el?.textContent) return [];
+  if (!el?.textContent) return [];
   try {
     const parsed: unknown = JSON.parse(el.textContent);
     if (!Array.isArray(parsed)) return [];
@@ -130,9 +148,17 @@ function auditHits(key: string): AuditHit[] {
       if (!h || typeof h !== "object") return [];
       const rec = h as Record<string, unknown>;
       if (typeof rec.keyword !== "string") return [];
-      return [ { keyword: rec.keyword, allowed_by: typeof rec.allowed_by === "string" ? rec.allowed_by : null } ];
+      return [
+        {
+          keyword: rec.keyword,
+          allowed_by:
+            typeof rec.allowed_by === "string" ? rec.allowed_by : null,
+        },
+      ];
     });
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 function confirmAttribution(key: string): boolean {
@@ -140,7 +166,9 @@ function confirmAttribution(key: string): boolean {
   if (blocked.length === 0) return true;
 
   const lines = blocked.map((h) => `　· ${h.keyword}`).join("\n");
-  return window.confirm(`${t("audit_title")}\n\n${t("audit_intro")}\n\n${lines}\n\n${t("audit_hint")}`);
+  return window.confirm(
+    `${t("audit_title")}\n\n${t("audit_intro")}\n\n${lines}\n\n${t("audit_hint")}`,
+  );
 }
 
 // ── 掛載 ────────────────────────────────────────────────
@@ -158,15 +186,23 @@ export function init(root: HTMLElement): void {
     const key = button.dataset.exportKey;
     if (!kind || !key) return;
 
-    if (typeof htmlToImage === "undefined") { window.alert(t("missing_lib")); return; }
-    if (kind === "pdf" && typeof jspdf === "undefined") { window.alert(t("missing_lib")); return; }
+    if (typeof htmlToImage === "undefined") {
+      window.alert(t("missing_lib"));
+      return;
+    }
+    if (kind === "pdf" && typeof jspdf === "undefined") {
+      window.alert(t("missing_lib"));
+      return;
+    }
     if (!confirmAttribution(key)) return;
 
     const stage = document.getElementById(`price-in-export-${key}`);
     if (!stage) return;
 
     // 檔名必須含代號，否則連續匯出多檔股票會難以分辨甚至覆蓋。
-    const ticker = (document.getElementById("price-in-ticker") as HTMLInputElement | null)?.value || "UNKNOWN";
+    const ticker =
+      (document.getElementById("price-in-ticker") as HTMLInputElement | null)
+        ?.value || "UNKNOWN";
     const suffix = key.replace("_", "-");
     const filename = `price-in-${ticker.toUpperCase()}-${suffix}-${stamp()}`;
 
@@ -181,7 +217,9 @@ export function init(root: HTMLElement): void {
         else downloadPng(dataUrl, filename);
       })
       .catch((err: unknown) => {
-        window.alert(`匯出失敗：${err instanceof Error ? err.message : String(err)}`);
+        window.alert(
+          `匯出失敗：${err instanceof Error ? err.message : String(err)}`,
+        );
       })
       .finally(() => {
         busy = false;

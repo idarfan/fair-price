@@ -23,7 +23,10 @@ class PriceIn::ChartBCardComponent < ApplicationComponent
       if @result
         render PriceIn::ExportCardComponent.new(
           key: "chart_b", form: @form, title: TITLE, subtitle: SUBTITLE,
-          source_canvas_id: CANVAS_ID, eps_banner: export_banner
+          source_canvas_id: CANVAS_ID, eps_banner: export_banner,
+          table_headers: [ "本益比", "目標價", @form.entry_a_label, @form.entry_b_label ],
+          table_rows: export_table_rows,
+          legend: [ "深藍＝#{@form.entry_a_label}", "磚紅＝#{@form.entry_b_label}" ]
         )
       end
     end
@@ -41,6 +44,13 @@ class PriceIn::ChartBCardComponent < ApplicationComponent
         p(class: "text-[16px] text-teal-200") { plain(SUBTITLE) }
       end
       render PriceIn::ExportButtonsComponent.new(key: "chart_b") if @result
+    end
+  end
+
+  # 匯出用的數值表：與畫面上那張同一份資料。
+  def export_table_rows
+    @result.rows.map do |row|
+      [ row.formatted_multiple, row.formatted_target, *row.cells.map(&:formatted_return) ]
     end
   end
 

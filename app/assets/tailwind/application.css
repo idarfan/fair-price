@@ -741,10 +741,18 @@ th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 
    離屏方式是 position:absolute + left:-99999px，**不可用 display:none**
    ——html-to-image 量不到尺寸，會產出空白圖。 */
-.pi-export-stage {
+/* 外層負責移出視野。定位不能放在被拍的元素上——html-to-image 會把 computed
+   style 複製到 clone，clone 在 SVG foreignObject 裡就被推到 -99999px 外面，
+   拍出來整片空白（2026-09-09 PNG/PDF 全白的原因）。
+   仍不可用 display:none：那樣量不到尺寸，一樣空白。 */
+.pi-export-offscreen {
   position: absolute;
   left: -99999px;
   top: 0;
+}
+
+.pi-export-stage {
+  position: relative;
   width: 960px;
   height: 540px;
   overflow: hidden;
@@ -778,7 +786,38 @@ th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 .pi-export-chart { margin-top: 12px; }
 .pi-export-img   { display: block; width: 100%; height: auto; }
 
-.pi-export-highlight { font-size: 20px; margin-top: 12px; line-height: 1.6; }
+/* 匯出圖裡的數值表與圖例：圖上只看得出長短，實際數字與顏色對應要靠這兩塊。
+   字級比畫面小一級——匯出卡固定 540px 高，塞得下才有意義；
+   內容仍超出時由 fitToStage 整張等比縮小，不裁切。 */
+.pi-export-table {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+  font-size: 17px;
+}
+.pi-export-table th {
+  text-align: left;
+  font-weight: 500;
+  color: #7A8891;
+  border-bottom: 1px solid #D6DDE2;
+  padding: 3px 8px 3px 0;
+}
+.pi-export-table td {
+  padding: 3px 8px 3px 0;
+  border-bottom: 1px solid #EDF1F3;
+}
+.pi-export-table td:not(:first-child) { font-weight: 700; }
+
+.pi-export-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-top: 8px;
+  font-size: 15px;
+  color: #5A6872;
+}
+
+.pi-export-highlight { font-size: 17px; margin-top: 8px; line-height: 1.5; }
 
 .pi-export-foot {
   display: flex;
