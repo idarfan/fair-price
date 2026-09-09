@@ -8,8 +8,11 @@ module LeapsRecommendations::PriceEstimator
     div(id: "leaps-price-estimator-overlay", class: "leaps-pe-overlay hidden") do
       div(id: "leaps-price-estimator-panel", class: "leaps-pe-panel") do
         div(class: "leaps-pe-header") do
+          # 標題列同時是拖動把手：淺綠色帶 ＋ cursor: grab 已經把這件事講清楚，
+          # 不在標題文字裡加註「可拖動」——需要用文字解釋的介面，通常是視覺沒做到位。
           h3(class: "leaps-pe-title") { plain "LEAPS Call 價格預估試算" }
-          button(type: "button", id: "leaps-pe-close", class: "leaps-pe-close", aria_label: "關閉") { plain "✕" }
+          button(type: "button", id: "leaps-pe-close", class: "leaps-pe-close",
+                 aria_label: "關閉", title: "關閉（Esc）") { plain "✕" }
         end
 
         div(id: "leaps-pe-contract-info", class: "leaps-pe-contract-info")
@@ -24,7 +27,14 @@ module LeapsRecommendations::PriceEstimator
             plain "IV% "
             span(id: "leaps-pe-iv-value")
           end
-          input(type: "range", id: "leaps-pe-iv", class: "leaps-pe-slider", min: "10", max: "50", step: "0.1")
+          # 0–100：原本上限 50 會把高 IV 合約夾住——SHOP 的 57.3% 開起來
+          # 滑桿頂在最右、顯示 50.0%，看起來像是「這檔 IV 只有 50」。
+          # sigma 為 0 時 bsCall 回 nil，結果顯示破折號，不會拋錯。
+          #
+          # value 只是 JS 還沒接手前的佔位：開啟試算時會被該列合約的原始 IV
+          # 覆寫（見 price_estimator.js 的 openModal）。
+          input(type: "range", id: "leaps-pe-iv", class: "leaps-pe-slider",
+                min: "0", max: "100", step: "0.1", value: "50")
         end
 
         div(class: "leaps-pe-results") do
