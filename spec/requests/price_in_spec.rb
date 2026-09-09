@@ -57,6 +57,56 @@ RSpec.describe "Price-In 反推工具", type: :request do
     end
   end
 
+  # 2026-09-09 回歸：按「重新出圖」是一次整頁 GET，估值數字原本只活在 JS
+  # 記憶體裡，重載就全變成破折號。改由伺服器端從快取還原。
+  describe "重新出圖後保留估值對照" do
+    around do |example|
+      original    = Rails.cache
+      Rails.cache = ActiveSupport::Cache::MemoryStore.new
+      example.run
+      Rails.cache = original
+    end
+
+    def stub_upstream(symbol = "MRVL")
+      stub_request(:get, "https://finnhub.io/api/v1/quote")
+        .with(query: hash_including(symbol: symbol))
+        .to_return(status: 200, body: { c: 223.59, l: 210.87, h: 223.67, t: 1_757_251_800 }.to_json,
+                   headers: { "Content-Type" => "application/json" })
+      stub_request(:get, "https://finnhub.io/api/v1/stock/metric")
+        .with(query: hash_including(symbol: symbol))
+        .to_return(status: 200, body: { metric: { "epsTTM" => 3.03, "forwardPE" => 35.87 } }.to_json,
+                   headers: { "Content-Type" => "application/json" })
+      stub_request(:get, "https://finnhub.io/api/v1/stock/peers")
+        .with(query: hash_including(symbol: symbol)).to_return(status: 200, body: "[]")
+      allow_any_instance_of(YahooFinanceService).to receive(:eps_estimates).and_return(nil)
+    end
+
+    it "帶入現價後重載（帶 price_as_of）仍顯示本益比區間" do
+      stub_upstream
+      get "/price_in/quote", params: { ticker: "MRVL" }   # 暖快取
+
+      get "/price_in", params: { price_as_of: "2026-09-09T10:00:00+08:00" }
+      expect(response.body).to include("69.59 - 73.82x")
+      expect(response.body).to include("以 TTM EPS $3.03")
+    end
+
+    it "沒按過帶入現價（無 price_as_of）時不從快取還原，也不打上游" do
+      stub_upstream
+      get "/price_in/quote", params: { ticker: "MRVL" }
+
+      get "/price_in"
+      expect(response.body).to include(%(id="price-in-current-pe" class="text-[20px] font-bold text-gray-900">—<))
+    end
+
+    # 只讀快取、不打上游——「重新出圖」不該變成一次隱形的報價請求。
+    it "快取沒命中時顯示破折號，不觸發任何上游請求" do
+      get "/price_in", params: { price_as_of: "2026-09-09T10:00:00+08:00", ticker: "NOPE" }
+
+      expect(response).to have_http_status(:ok)
+      expect(a_request(:get, /finnhub/)).not_to have_been_made
+    end
+  end
+
   describe "匯出（S8）" do
     it "離屏匯出卡存在，且不是用 display:none 藏起來的" do
       get "/price_in", params: { eps: 11.02 }

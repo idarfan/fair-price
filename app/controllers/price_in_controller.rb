@@ -14,7 +14,8 @@ class PriceInController < ApplicationController
     @chart_b = build_chart_b if @form.valid? && @form.chart_b_ready?
 
     render PriceIn::PageComponent.new(
-      form: @form, chart_a: @chart_a, chart_b: @chart_b, audit: build_audit
+      form: @form, chart_a: @chart_a, chart_b: @chart_b,
+      audit: build_audit, valuation: cached_valuation
     )
   end
 
@@ -53,6 +54,14 @@ class PriceInController < ApplicationController
   end
 
   private
+
+  # 使用者按過「帶入現價」（price_as_of 有值）才嘗試從快取還原估值對照。
+  # 只讀快取、不打上游——「重新出圖」不該變成一次隱形的報價請求。
+  def cached_valuation
+    return nil if @form.price_as_of.blank?
+
+    PriceIn::QuoteFetcher.cached(@form.ticker)
+  end
 
   # 匯出前的歸屬稽核（§S8.3）。掃描的是「會被寫進成品圖」的使用者輸入——
   # 年度標籤、色帶來源、買入價標籤。機構名一旦標錯，看圖的人沒有辦法從圖上

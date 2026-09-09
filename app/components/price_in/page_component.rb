@@ -10,11 +10,12 @@ class PriceIn::PageComponent < ApplicationComponent
   NARROW = "w-[96%] mx-auto"
   WIDE   = "w-[96%] mx-auto"
 
-  def initialize(form:, chart_a: nil, chart_b: nil, audit: {})
-    @form    = form
-    @chart_a = chart_a
-    @chart_b = chart_b
-    @audit   = audit || {}
+  def initialize(form:, chart_a: nil, chart_b: nil, audit: {}, valuation: nil)
+    @form      = form
+    @chart_a   = chart_a
+    @chart_b   = chart_b
+    @audit     = audit || {}
+    @valuation = valuation
   end
 
   # 說明卡的實例表格。用使用者當前的股價與倍數算，不用寫死的範例——
@@ -40,7 +41,7 @@ class PriceIn::PageComponent < ApplicationComponent
       render_errors if @form.errors.any?
       render_warnings if @form.warnings.any?
       render PriceIn::ReadingNoteComponent.new(key: "price_in_logic", worked_example: logic_example)
-      render PriceIn::InputFormComponent.new(form: @form)
+      render PriceIn::InputFormComponent.new(form: @form, valuation: @valuation)
       render_charts
       tour_data_island
       export_islands

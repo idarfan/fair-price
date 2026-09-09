@@ -7,8 +7,12 @@
 class PriceIn::InputFormComponent < ApplicationComponent
   NARROW = PriceIn::PageComponent::NARROW
 
-  def initialize(form:)
-    @form = form
+  # valuation 為 PriceIn::QuoteFetcher::Result 或 nil。有值代表使用者按過
+  # 「帶入現價」且快取還在，估值對照就能在伺服器端直接渲染——否則按一次
+  # 「重新出圖」（整頁 GET）就會把 JS 記憶體裡的數字全變成破折號。
+  def initialize(form:, valuation: nil)
+    @form      = form
+    @valuation = valuation
   end
 
   def view_template
@@ -100,28 +104,57 @@ class PriceIn::InputFormComponent < ApplicationComponent
   # 帶入的是 low／high 兩端而不是平均值：色帶要畫的是分歧程度，
   # 拿平均值會讓色帶縮成一條線，圖 A 就看不出「難不難」。
   def estimate_panel
-    div(id: "price-in-estimate-panel", hidden: true,
+    div(id: "price-in-estimate-panel", hidden: estimates_blank?,
         class: "mt-4 rounded-lg border border-emerald-300 bg-emerald-50/60 px-4 py-3") do
       p(class: "text-[16px] font-medium text-emerald-900 mb-1") { plain("分析師 EPS 預測") }
-      estimate_row("本財政年度", "current")
-      estimate_row("下一財政年度", "next")
+      estimate_row("本財政年度", "current", @valuation&.eps_estimate)
+      estimate_row("下一財政年度", "next", @valuation&.eps_estimate_next)
       p(class: "mt-1 text-[16px] text-gray-400 leading-[1.4]") do
         plain("來源 Yahoo Finance．低／高標為分析師分歧範圍，非平均值")
       end
     end
   end
 
-  def estimate_row(label_text, key)
+  def estimates_blank?
+    @valuation.nil? ||
+      (!@valuation.eps_estimate.available? && !@valuation.eps_estimate_next.available?)
+  end
+
+  def estimate_row(label_text, key, est = nil)
+    usable = est&.available?
+
     div(class: "flex items-baseline justify-between gap-3 py-0.5") do
-      span(id: "price-in-estimate-#{key}-label", class: "text-[16px] text-gray-600 shrink-0") { plain(label_text) }
+      span(id: "price-in-estimate-#{key}-label", class: "text-[16px] text-gray-600 shrink-0") do
+        plain(usable ? estimate_label(label_text, est) : label_text)
+      end
       div(class: "flex items-center gap-2") do
-        span(id: "price-in-estimate-#{key}", class: "text-[20px] font-bold text-gray-900") { plain("—") }
+        span(id: "price-in-estimate-#{key}", class: "text-[20px] font-bold text-gray-900") do
+          plain(usable ? "#{PriceIn::Formatter.money(est.low)} - #{PriceIn::Formatter.money(est.high)}" : "—")
+        end
         button(
-          type: "button", id: "price-in-apply-estimate-#{key}", hidden: true,
+          type: "button", id: "price-in-apply-estimate-#{key}", hidden: !usable,
+          data: estimate_data(est, usable),
           class: "px-2 py-0.5 rounded border border-emerald-400 bg-white text-[16px] text-emerald-800 hover:bg-emerald-100"
         ) { plain("帶入") }
       end
     end
+  end
+
+  # 標題補上年度與分析師家數：光看「本財政年度」對不出是哪一年，
+  # 而年度對不上正是最常見的 Price-in 誤判來源。
+  def estimate_label(label_text, est)
+    year = est.end_date.to_s[0, 4]
+    return label_text if year.blank?
+
+    analysts = est.analysts.present? ? "，#{est.analysts} 位分析師" : ""
+    "#{label_text}（截至 #{year}#{analysts}）"
+  end
+
+  def estimate_data(est, usable)
+    return {} unless usable
+
+    { low: fmt2(est.low), high: fmt2(est.high),
+      end_date: est.end_date.to_s, analysts: est.analysts.to_s }
   end
 
   def eps_group
@@ -172,11 +205,15 @@ class PriceIn::InputFormComponent < ApplicationComponent
   def current_pe_panel
     div(class: "rounded-lg border border-amber-300 bg-amber-50/60 px-4 py-3 min-w-[22rem]") do
       p(class: "text-[16px] font-medium text-amber-900 mb-1") { plain("估值對照") }
-      pe_row("本益比 (P/E)", "price-in-current-pe", apply_id: "price-in-apply-pe")
-      pe_row("預估本益比 (Forward P/E)", "price-in-forward-pe", apply_id: "price-in-apply-forward-pe")
-      pe_row("產業平均本益比", "price-in-peer-pe")
+      pe_row("本益比 (P/E)", "price-in-current-pe",
+             apply_id: "price-in-apply-pe", value: range_text(@valuation&.pe),
+             apply_values: apply_values(@valuation&.pe))
+      pe_row("預估本益比 (Forward P/E)", "price-in-forward-pe",
+             apply_id: "price-in-apply-forward-pe", value: range_text(@valuation&.forward_pe),
+             apply_values: apply_values(@valuation&.forward_pe))
+      pe_row("產業平均本益比", "price-in-peer-pe", value: peer_text)
       p(id: "price-in-eps-basis", class: "mt-1 text-[16px] text-gray-400 leading-[1.4]") do
-        plain("上游未標示 GAAP 或非 GAAP，僅供對照")
+        plain(basis_text)
       end
     end
   end
@@ -186,20 +223,56 @@ class PriceIn::InputFormComponent < ApplicationComponent
   #
   # 產業平均不給按鈕：它是「別人給的倍數」，不是「這檔股票現在的倍數」，
   # 拿來當自己的出價假設是另一回事。它的用途是讓你知道自己填的偏高還是偏低。
-  def pe_row(label_text, value_id, apply_id: nil)
+  def pe_row(label_text, value_id, apply_id: nil, value: "—", apply_values: nil)
     div(class: "flex items-baseline justify-between gap-3 py-0.5") do
       span(class: "text-[16px] text-gray-600 shrink-0") { plain(label_text) }
       div(class: "flex items-center gap-2") do
-        span(id: value_id, class: "text-[20px] font-bold text-gray-900") { plain("—") }
+        span(id: value_id, class: "text-[20px] font-bold text-gray-900") { plain(value) }
         if apply_id
           button(
-            type: "button", id: apply_id, hidden: true,
+            type: "button", id: apply_id, hidden: apply_values.blank?,
+            data: { pe: apply_values }.compact,
             class: "px-2 py-0.5 rounded border border-amber-400 bg-white text-[16px] text-amber-800 hover:bg-amber-100"
           ) { plain("帶入") }
         end
       end
     end
   end
+
+  # 區間文字。伺服器端與 JS 端（priceInTicker.ts 的 formatRange）必須給出
+  # 同樣的格式，否則「重新出圖」前後同一個數字會換一種寫法。
+  def range_text(range)
+    return "—" if range.nil?
+    return "#{fmt2(range.low)} - #{fmt2(range.high)}x" if range.low && range.high
+    return "#{fmt2(range.current)}x" if range.current
+
+    "—"
+  end
+
+  def apply_values(range)
+    return nil if range.nil?
+    return [ fmt2(range.low), fmt2(range.high) ].join(",") if range.low && range.high
+    return fmt2(range.current) if range.current
+
+    nil
+  end
+
+  def peer_text
+    low  = @valuation&.peer_low
+    high = @valuation&.peer_high
+    return "—" if low.nil? || high.nil?
+
+    "#{fmt2(low)} - #{fmt2(high)}x"
+  end
+
+  def basis_text
+    eps = @valuation&.eps_ttm
+    return "上游未標示 GAAP 或非 GAAP，僅供對照" if eps.nil?
+
+    "以 TTM EPS #{PriceIn::Formatter.money(eps)} 換算當日價格區間．上游未標示 GAAP 或非 GAAP"
+  end
+
+  def fmt2(value) = Kernel.format("%.2f", value.to_f)
 
   # ── 參考倍數（唯讀，嚴禁自動填入輸入框）────────────────
 

@@ -51,6 +51,25 @@ module PriceIn
 
     def self.call(ticker) = new(ticker).call
 
+    # 只讀快取，絕不打上游。
+    #
+    # 用途：使用者按過「帶入現價」之後再按「重新出圖」，那是一次整頁 GET 重載，
+    # 估值數字原本只活在 JS 記憶體裡，重載就全變成破折號。把十幾個數字塞進
+    # query string 會讓網址爆長，所以改由伺服器端從快取還原。
+    #
+    # 這不違反「頁面載入時不自動抓價」：cache_read 不會產生任何上游請求，
+    # 快取沒命中就回 nil，畫面照舊顯示破折號並提示重新帶入。
+    def self.cached(ticker)
+      fetcher = new(ticker)
+      fetcher.cached_result
+    end
+
+    def cached_result
+      return nil if @ticker.blank?
+
+      read_cache
+    end
+
     def initialize(ticker)
       @ticker = ticker.to_s.strip.upcase
     end
