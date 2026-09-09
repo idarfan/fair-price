@@ -236,6 +236,11 @@ class PriceIn::InputFormComponent < ApplicationComponent
              apply_id: "price-in-apply-forward-pe", value: range_text(@valuation&.forward_pe),
              apply_values: apply_values(@valuation&.forward_pe))
       pe_row("產業平均本益比", "price-in-peer-pe", value: peer_text)
+      pe_row(implied_forward_label, "price-in-implied-forward-pe",
+             label_id: "price-in-implied-forward-label", value: implied_forward_text)
+      p(class: "mt-1 text-[16px] text-gray-500 leading-[1.4]") do
+        plain("隱含倍數＝現價 ÷ 分析師預測 EPS，不需要任何假設；判斷貴賤從這個數字開始。")
+      end
       p(id: "price-in-eps-basis", class: "mt-1 text-[16px] text-gray-400 leading-[1.4]") do
         plain(basis_text)
       end
@@ -247,9 +252,9 @@ class PriceIn::InputFormComponent < ApplicationComponent
   #
   # 產業平均不給按鈕：它是「別人給的倍數」，不是「這檔股票現在的倍數」，
   # 拿來當自己的出價假設是另一回事。它的用途是讓你知道自己填的偏高還是偏低。
-  def pe_row(label_text, value_id, apply_id: nil, value: "—", apply_values: nil)
+  def pe_row(label_text, value_id, apply_id: nil, value: "—", apply_values: nil, label_id: nil)
     div(class: "flex items-baseline justify-between gap-3 py-0.5") do
-      span(class: "text-[16px] text-gray-600 shrink-0") { plain(label_text) }
+      span(id: label_id, class: "text-[16px] text-gray-600 shrink-0") { plain(label_text) }
       div(class: "flex items-center gap-2") do
         span(id: value_id, class: "text-[20px] font-bold text-gray-900") { plain(value) }
         if apply_id
@@ -297,6 +302,46 @@ class PriceIn::InputFormComponent < ApplicationComponent
   end
 
   def fmt2(value) = Kernel.format("%.2f", value.to_f)
+
+  def fmt1(value) = Kernel.format("%.1f", value.to_f)
+
+  # ── 隱含倍數（現價 ÷ 分析師預測 EPS）────────────────────
+  #
+  # 這一列是判斷貴賤唯一不需要任何假設的入口：股價與分析師預測都是抓回來的，
+  # 使用者一個數字都不用填。
+  #
+  # 為什麼它非有不可：上面的「本益比 (P/E)」用的是 TTM EPS，盈利被壓縮時
+  # 會算出 80 倍這種數字，看起來像「市場願意給 80 倍」，其實只是分母太小。
+  # 換成分析師預測的 EPS 當分母，同一個 NOK 就從 86 倍變成 18–25 倍——
+  # 市場真正的定價基準是後者。
+  #
+  # 刻意不給「帶入」按鈕，理由同產業平均：把它填進圖 A 的倍數，反推出來的
+  # 所需 EPS 必然等於分析師預測本身，又是一次循環論證。它是對照，不是假設。
+  #
+  # 優先取下一財政年度：本財政年度通常已過大半，剩餘變數少，對「現在買貴不貴」
+  # 的解釋力低。取不到才退回本財政年度，年度標籤會跟著換，不會對不上。
+  def implied_forward_estimate
+    [ @valuation&.eps_estimate_next, @valuation&.eps_estimate ].compact.find(&:available?)
+  end
+
+  def implied_forward_label
+    year = implied_forward_estimate&.end_date.to_s[0, 4]
+    year.present? ? "隱含倍數（分析師預測 FY#{year}）" : "隱含倍數（分析師預測）"
+  end
+
+  # 高 EPS 對應低倍數，所以 low 端要用 est.high 去除——寫反了會得到一個
+  # 上下顛倒的區間，而且因為兩個數字都「看起來合理」，不會有人發現。
+  def implied_forward_text
+    est   = implied_forward_estimate
+    price = @valuation&.price
+    return "—" if est.nil? || price.nil?
+
+    low  = PriceIn::RequiredEpsCalculator.implied_multiple(price, est.high)
+    high = PriceIn::RequiredEpsCalculator.implied_multiple(price, est.low)
+    return "—" if low.nil? || high.nil?
+
+    "#{fmt1(low)} - #{fmt1(high)} 倍"
+  end
 
   # ── 參考倍數（唯讀，嚴禁自動填入輸入框）────────────────
 

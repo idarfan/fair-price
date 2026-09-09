@@ -322,6 +322,40 @@ export function init(root: HTMLElement): void {
     if (year) setField("price-in-chart_b_fiscal_year_label", `FY${year}`);
   };
 
+  /**
+   * 隱含倍數 = 現價 ÷ 分析師預測 EPS。伺服器端在 InputFormComponent 也算一次，
+   * 兩邊必須同義：這裡負責「按下帶入現價之後立刻更新」，那邊負責「重新出圖
+   * 整頁重載之後仍然在」。少了任何一邊，這個數字都會在某個操作後憑空消失。
+   *
+   * 高 EPS 對應低倍數，所以區間低端要用 est.high 去除。
+   * 優先取下一財政年度，與伺服器端的 implied_forward_estimate 同一套規則。
+   */
+  const showImpliedForward = (q: QuoteOk | null): void => {
+    const est = [q?.eps_estimate_next, q?.eps_estimate].find(
+      (e): e is Estimate => e != null && e.low !== null && e.high !== null,
+    );
+    const price = q?.price ?? null;
+
+    const label = document.getElementById("price-in-implied-forward-label");
+    const value = document.getElementById("price-in-implied-forward-pe");
+    if (!label || !value) return;
+
+    if (!est || est.low === null || est.high === null || price === null) {
+      label.textContent = "隱含倍數（分析師預測）";
+      value.textContent = "—";
+      return;
+    }
+
+    const year = yearLabel(est);
+    label.textContent = year
+      ? `隱含倍數（分析師預測 FY${year}）`
+      : "隱含倍數（分析師預測）";
+    value.textContent =
+      est.low === 0 || est.high === 0
+        ? "—"
+        : `${(price / est.high).toFixed(1)} - ${(price / est.low).toFixed(1)} 倍`;
+  };
+
   const showValuation = (q: QuoteOk | null): void => {
     const pe = q?.pe ?? blank;
     const fwd = q?.forward_pe ?? blank;
@@ -345,6 +379,8 @@ export function init(root: HTMLElement): void {
         : `${low.toFixed(2)} - ${high.toFixed(2)}x`,
       blank,
     );
+
+    showImpliedForward(q);
 
     const panel = document.getElementById("price-in-estimate-panel");
     const est = q?.eps_estimate ?? blankEstimate;

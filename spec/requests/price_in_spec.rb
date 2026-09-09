@@ -292,4 +292,108 @@ RSpec.describe "Price-In 反推工具", type: :request do
       expect(response.parsed_body["message"]).to eq("查無此代號")
     end
   end
+
+  # 2026-09-09 新增：判斷貴賤唯一不需要使用者填任何假設的數字。
+  #
+  # 案例用 NOK 的真實數字：現價 $10.93、TTM EPS $0.1267、FY2027 預測 $0.44–$0.60。
+  # 本益比 (P/E) 那一列會算出 86 倍，看起來像「市場願意給 86 倍」，
+  # 換成預測 EPS 當分母就變成 18.2–24.8 倍——後者才是市場真正的定價基準。
+  describe "隱含倍數（現價 ÷ 分析師預測 EPS）" do
+    around do |example|
+      original    = Rails.cache
+      Rails.cache = ActiveSupport::Cache::MemoryStore.new
+      example.run
+      Rails.cache = original
+    end
+
+    def stub_nok(estimates)
+      stub_request(:get, "https://finnhub.io/api/v1/quote")
+        .with(query: hash_including(symbol: "NOK"))
+        .to_return(status: 200, body: { c: 10.93, l: 10.80, h: 11.02, t: 1_757_251_800 }.to_json,
+                   headers: { "Content-Type" => "application/json" })
+      stub_request(:get, "https://finnhub.io/api/v1/stock/metric")
+        .with(query: hash_including(symbol: "NOK"))
+        .to_return(status: 200, body: { metric: { "epsTTM" => 0.1267 } }.to_json,
+                   headers: { "Content-Type" => "application/json" })
+      stub_request(:get, "https://finnhub.io/api/v1/stock/peers")
+        .with(query: hash_including(symbol: "NOK")).to_return(status: 200, body: "[]")
+      allow_any_instance_of(YahooFinanceService).to receive(:eps_estimates).and_return(estimates)
+    end
+
+    let(:both_years) do
+      {
+        current_year: { low: 0.38, high: 0.45, avg: 0.41, analysts: 9,  end_date: "2026-12-31" },
+        next_year:    { low: 0.44, high: 0.60, avg: 0.50, analysts: 11, end_date: "2027-12-31" }
+      }
+    end
+
+    def render_after_quote
+      get "/price_in/quote", params: { ticker: "NOK" }
+      get "/price_in", params: { ticker: "NOK", price: 10.93,
+                                 price_as_of: "2026-09-09T10:00:00+08:00" }
+    end
+
+    # 高 EPS 對應低倍數：區間低端必須用 est.high 去除。寫反會得到一個上下顛倒
+    # 但兩端都「看起來合理」的區間，沒有人會發現。
+    it "取下一財政年度，且區間低端由預測高標算出" do
+      stub_nok(both_years)
+      render_after_quote
+
+      expect(response.body).to include("隱含倍數（分析師預測 FY2027）")
+      expect(response.body).to include("18.2 - 24.8 倍")   # 10.93/0.60, 10.93/0.44
+    end
+
+    it "下一財政年度缺漏時退回本財政年度，年度標籤跟著換" do
+      stub_nok(both_years.merge(next_year: nil))
+      render_after_quote
+
+      expect(response.body).to include("隱含倍數（分析師預測 FY2026）")
+      expect(response.body).to include("24.3 - 28.8 倍")   # 10.93/0.45, 10.93/0.38
+    end
+
+    it "完全沒有分析師預測時顯示破折號，不顯示年度" do
+      stub_nok(nil)
+      render_after_quote
+
+      expect(response.body).to include("隱含倍數（分析師預測）")
+      expect(response.body).to include(
+        %(id="price-in-implied-forward-pe" class="text-[20px] font-bold text-gray-900">—<)
+      )
+    end
+
+    # 這一列刻意不給「帶入」：把它填進圖 A 的倍數，反推出來的所需 EPS
+    # 必然等於分析師預測本身，又是一次循環論證。
+    it "不提供「帶入」按鈕" do
+      stub_nok(both_years)
+      render_after_quote
+
+      expect(response.body).not_to include("price-in-apply-implied-forward")
+    end
+  end
+
+  describe "教學說明（頁面最底）" do
+    it "預設收摺，且不含 open 屬性" do
+      get "/price_in"
+
+      expect(response.body).to include("Price-In 工具教學：這張圖真正在說什麼")
+      expect(response.body).to include("圓點在色帶左側不等於便宜")
+    end
+
+    # 表格的數字是這份說明的重點，缺了就只剩抽象規則。
+    it "含「倍數的權重不比盈利低」的完整對照表" do
+      get "/price_in"
+
+      expect(response.body).to include("+266.0%")   # 80 倍
+      expect(response.body).to include("-31.4%")    # 15 倍，達標仍虧損
+      expect(response.body).to include("+37.5%")    # 進場價 $8.00
+    end
+
+    # 參數錯誤時不出圖，但教學說明照樣要在——那正是使用者最需要它的時候。
+    it "參數錯誤而不出圖時仍然顯示" do
+      get "/price_in", params: { price: -1 }
+
+      expect(response.body).to include("這些欄位需要修正")
+      expect(response.body).to include("Price-In 工具教學：這張圖真正在說什麼")
+    end
+  end
 end

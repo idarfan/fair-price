@@ -44,6 +44,9 @@ class PriceIn::PageComponent < ApplicationComponent
       render PriceIn::ReadingNoteComponent.new(key: "price_in_logic", worked_example: logic_example)
       render PriceIn::InputFormComponent.new(form: @form, valuation: @valuation)
       render_charts
+      # 教學說明放最底：它回答的是「這個工具在說什麼」，屬於看完圖之後
+      # 才會想追問的層次，擺在圖表之前會擋住主要工作區。
+      render PriceIn::TutorialComponent.new
       tour_data_island
       export_islands
     end
