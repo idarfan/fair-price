@@ -107,10 +107,12 @@ class PriceIn::InputFormComponent < ApplicationComponent
     div(id: "price-in-estimate-panel", hidden: estimates_blank?,
         class: "mt-4 rounded-lg border border-emerald-300 bg-emerald-50/60 px-4 py-3") do
       p(class: "text-[16px] font-medium text-emerald-900 mb-1") { plain("分析師 EPS 預測") }
-      estimate_row("本財政年度", "current", @valuation&.eps_estimate)
-      estimate_row("下一財政年度", "next", @valuation&.eps_estimate_next)
+      # 兩顆各管一半，互不越界：上面那顆只動圖 A，下面那顆只動圖 B。
+      # 標籤寫出去向——兩顆長得一樣的按鈕擺在一起，使用者沒有理由猜得到。
+      estimate_row("本財政年度", "current", @valuation&.eps_estimate, target: "圖 A")
+      estimate_row("下一財政年度", "next", @valuation&.eps_estimate_next, target: "圖 B")
       p(class: "mt-1 text-[16px] text-gray-400 leading-[1.4]") do
-        plain("來源 Yahoo Finance．低／高標為分析師分歧範圍，非平均值")
+        plain("來源 Yahoo Finance．上面那顆只動圖 A 的預測區間與年度，下面那顆只動圖 B 的未來 EPS 與年度")
       end
     end
   end
@@ -120,16 +122,21 @@ class PriceIn::InputFormComponent < ApplicationComponent
       (!@valuation.eps_estimate.available? && !@valuation.eps_estimate_next.available?)
   end
 
-  def estimate_row(label_text, key, est = nil)
+  def estimate_row(label_text, key, est = nil, target: nil)
     usable = est&.available?
 
     div(class: "flex items-baseline justify-between gap-3 py-0.5") do
       span(id: "price-in-estimate-#{key}-label", class: "text-[16px] text-gray-600 shrink-0") do
         plain(usable ? estimate_label(label_text, est) : label_text)
+        if target
+          span(class: "ml-2 text-[16px] px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-900") do
+            plain("→ #{target}")
+          end
+        end
       end
       div(class: "flex items-center gap-2") do
         span(id: "price-in-estimate-#{key}", class: "text-[20px] font-bold text-gray-900") do
-          plain(usable ? "#{PriceIn::Formatter.money(est.low)} - #{PriceIn::Formatter.money(est.high)}" : "—")
+          plain(usable ? estimate_value_text(est, key) : "—")
         end
         button(
           type: "button", id: "price-in-apply-estimate-#{key}", hidden: !usable,
@@ -138,6 +145,15 @@ class PriceIn::InputFormComponent < ApplicationComponent
         ) { plain("帶入") }
       end
     end
+  end
+
+  # 圖 B 那列多顯示平均值：按下去填進未來 EPS 的就是它，
+  # 只顯示區間卻填一個沒出現過的數字，使用者會以為填錯了。
+  def estimate_value_text(est, key)
+    range = "#{PriceIn::Formatter.money(est.low)} - #{PriceIn::Formatter.money(est.high)}"
+    return range unless key == "next" && est.avg.present?
+
+    "#{range}（平均 #{PriceIn::Formatter.money(est.avg)}）"
   end
 
   # 標題補上年度與分析師家數：光看「本財政年度」對不出是哪一年，
@@ -153,8 +169,10 @@ class PriceIn::InputFormComponent < ApplicationComponent
   def estimate_data(est, usable)
     return {} unless usable
 
-    { low: fmt2(est.low), high: fmt2(est.high),
-      end_date: est.end_date.to_s, analysts: est.analysts.to_s }
+    # avg 給圖 B 用：它要的是單一盈利假設，取一致預期的平均值，
+    # 用區間端點等於替使用者選了最樂觀或最悲觀的情境。
+    { low: fmt2(est.low), high: fmt2(est.high), avg: est.avg.present? ? fmt2(est.avg) : nil,
+      end_date: est.end_date.to_s, analysts: est.analysts.to_s }.compact
   end
 
   def eps_group

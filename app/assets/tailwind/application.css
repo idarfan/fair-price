@@ -793,14 +793,17 @@ th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 /* 圖 A 圖例色塊。用 class 而非 style 屬性：全站 style-src 不放行 unsafe-inline，
    內嵌 style="background:#..." 會被 CSP 擋掉而完全沒有顏色（教材頁那次的同一個坑）。
    色值必須與 priceInCharts.ts 的常數一致，改一邊要記得改另一邊。 */
+/* 色塊尺寸跟著 20px 字級放大，否則 18×12 的小方塊在 20px 文字旁邊像雜訊。 */
 .pi-swatch {
   display: inline-block;
-  width: 18px;
-  height: 12px;
+  width: 24px;
+  height: 14px;
   border-radius: 2px;
   vertical-align: -1px;
-  margin-right: 4px;
+  margin-right: 6px;
+  flex-shrink: 0;
 }
 .pi-swatch-bar  { background: #C5D2DB; }                    /* 橫條 BAR_A_FILL */
 .pi-swatch-band { background: #CDE3D2; border: 1px solid #9dc3a8; } /* 色帶 BAND_FILL */
-.pi-swatch-dot  { background: #1F5673; border-radius: 50%; width: 12px; } /* 圓點 DOT_A_FILL */
+.pi-swatch-dot  { background: #1F5673; border-radius: 50%; width: 14px; } /* 圓點 DOT_A_FILL */
+.pi-swatch-current { background: #E8A33D; }                 /* 目前實際 EPS CURRENT_FILL */

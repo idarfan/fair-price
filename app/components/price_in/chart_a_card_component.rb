@@ -6,9 +6,10 @@ class PriceIn::ChartACardComponent < ApplicationComponent
   CANVAS_ID = "price-in-chart-a"
   WIDE      = PriceIn::PageComponent::WIDE
 
-  def initialize(form:, result:)
+  def initialize(form:, result:, logo: nil)
     @form   = form
     @result = result
+    @logo   = logo
   end
 
   def view_template
@@ -50,11 +51,31 @@ class PriceIn::ChartACardComponent < ApplicationComponent
 
   def header
     div(class: "px-5 py-3 bg-indigo-800 flex items-center justify-between gap-4") do
-      div do
-        p(class: "text-[22px] font-medium text-white") { plain(title) }
-        p(class: "text-[16px] text-indigo-200") { plain(SUBTITLE) }
+      div(class: "flex items-center gap-3 min-w-0") do
+        ticker_badge
+        div(class: "min-w-0") do
+          p(class: "text-[22px] font-medium text-white") { plain(title) }
+          p(class: "text-[16px] text-indigo-200") { plain(SUBTITLE) }
+        end
       end
       render PriceIn::ExportButtonsComponent.new(key: "chart_a")
+    end
+  end
+
+  # 代號徽章。標題只有「$134.10，需要多少盈利？」時，看的人得往上捲到表單
+  # 才知道是哪一檔——而這張圖的每個數字都只對那一檔成立。
+  def ticker_badge
+    span(class: "shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg " \
+                "bg-white/15 border border-white/30") do
+      if @logo&.logo?
+        # loading=lazy + 固定尺寸：logo 來自外部網域，載入失敗或變慢時
+        # 不該讓標題列跳版。alt 用代號，圖破了仍看得出是哪一檔。
+        img(src: @logo.logo_url, alt: @form.ticker, width: "22", height: "22", loading: "lazy",
+            class: "w-[22px] h-[22px] rounded bg-white object-contain")
+      else
+        span(class: "text-[20px] leading-none") { plain("📈") }
+      end
+      span(class: "text-[20px] font-bold text-white tracking-wide") { plain(@form.ticker) }
     end
   end
 
@@ -81,6 +102,9 @@ class PriceIn::ChartACardComponent < ApplicationComponent
       bandLow:    @result.band_low,
       bandHigh:   @result.band_high,
       bandLabel:  @form.eps_band_label,
+      # 目前實際 EPS 畫成獨立一條，直接與「這些倍數需要多少」並排比較。
+      # 沒有它的話，圓點只能跟未來預測比，看不出「現在賺的撐不撐得住」。
+      currentEps: @form.eps_ttm_hint,
       rows:       @result.rows.map { |r| { multiple: r.multiple, requiredEps: r.required_eps } }
     }
   end
@@ -103,7 +127,24 @@ class PriceIn::ChartACardComponent < ApplicationComponent
             td(class: "py-2 text-[24px] font-bold text-gray-900") { plain(row.formatted_eps) }
           end
         end
+        current_eps_row
       end
+    end
+  end
+
+  # 目前實際 EPS 那一列。用不同底色與「實際」標記與上面的假設分開——
+  # 上面幾列是「你給的倍數需要賺多少」，這一列是「現在真的賺多少」，
+  # 混在一起會讓人以為都是同一種東西。
+  def current_eps_row
+    eps = @form.eps_ttm_hint
+    return if eps.blank? || eps.to_f <= 0
+
+    tr(class: "border-t-2 border-amber-300 bg-amber-50") do
+      td(class: "py-2 text-amber-900") do
+        plain("目前 TTM EPS")
+        span(class: "ml-2 text-[16px] px-1.5 py-0.5 rounded bg-amber-200 text-amber-900") { plain("實際") }
+      end
+      td(class: "py-2 text-[24px] font-bold text-amber-900") { plain(PriceIn::Formatter.money(eps)) }
     end
   end
 
@@ -120,10 +161,13 @@ class PriceIn::ChartACardComponent < ApplicationComponent
   end
 
   def legend
-    div(class: "flex flex-wrap items-center gap-x-6 gap-y-1 text-[16px] text-gray-600") do
+    # 與下方判讀句同為 20px：圖例和它解釋的那句話字級不同，讀起來像
+    # 「註腳＋正文」兩個層級，但它們其實是同一件事的兩半。
+    div(class: "flex flex-wrap items-center gap-x-6 gap-y-1 text-[20px] text-gray-700") do
       legend_item("pi-swatch-bar", "橫條＝這個倍數需要公司賺到的 EPS")
       legend_item("pi-swatch-dot", "圓點＝該 EPS 的位置")
       legend_item("pi-swatch-band", band_legend_label) if @result.band?
+      legend_item("pi-swatch-current", current_legend_label) if @form.eps_ttm_hint.present?
     end
   end
 
@@ -134,8 +178,17 @@ class PriceIn::ChartACardComponent < ApplicationComponent
     end
   end
 
+  def current_legend_label
+    "橘色橫條＝目前實際 TTM EPS #{PriceIn::Formatter.money(@form.eps_ttm_hint)}"
+  end
+
+  # 圖例標出色帶自己的年度（取自來源標籤裡的西元年），不是圖表標題的年度——
+  # 兩者對不上時，寫標題的年度等於幫錯誤背書。對不上會另有橘色警告。
   def band_legend_label
-    "綠色直帶＝分析師預測區間 #{PriceIn::Formatter.money(@result.band_low)}–" \
+    year = @form.eps_band_label.to_s[/\d{4}/]
+    scope = year.present? ? "（#{year} 年度）" : ""
+
+    "綠色直帶＝分析師預測區間#{scope} #{PriceIn::Formatter.money(@result.band_low)}–" \
       "#{PriceIn::Formatter.money(@result.band_high)}"
   end
 

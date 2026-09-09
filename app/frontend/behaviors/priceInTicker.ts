@@ -202,6 +202,82 @@ export function init(root: HTMLElement): void {
     }
   };
 
+  /**
+   * 圖 A 刻意混用兩個年度，這是它的設計而不是錯誤：
+   *
+   *   灰藍橫條、橘色橫條、標題年度 → 本財政年度（FY2026）
+   *     「以現價和你給的倍數，今年要賺到多少」以及「今年實際賺多少」。
+   *   綠色直帶                     → 下一財政年度（FY2027）
+   *     「分析師認為明年賺得到多少」。
+   *
+   * 兩者並排才看得出「今年的門檻」與「明年的預期」之間還有多少空間。
+   * 圖例會分別標出各自的年度，不會讓人誤以為是同一年。
+   *
+   * 手動的兩顆「帶入」各管一半，互不越界（見畫面上的 → 圖 A ／ → 圖 B 標記）：
+   *   上面那顆 → 圖 A 的預測區間與年度（把綠帶換成本財政年度）
+   *   下面那顆 → 圖 B 的未來 EPS 與年度
+   */
+  const yearLabel = (est: Estimate): string => (est.end_date ? est.end_date.slice(0, 4) : "");
+
+  const sourceLabel = (est: Estimate): string => {
+    const year = yearLabel(est);
+    const n = est.analysts !== null ? `，${est.analysts} 位` : "";
+    return `Yahoo Finance 分析師預測${year ? `（截至 ${year}${n}）` : ""}`;
+  };
+
+  const setField = (id: string, value: string): void => {
+    const el = document.getElementById(id);
+    if (el instanceof HTMLInputElement) el.value = value;
+  };
+
+  const isBlank = (id: string): boolean => {
+    const el = document.getElementById(id);
+    return !(el instanceof HTMLInputElement) || el.value.trim() === "";
+  };
+
+  /** 標題與長條的年度（上方「哪一年的 EPS」）。 */
+  const applyTitleYear = (est: Estimate, force: boolean): void => {
+    const year = yearLabel(est);
+    if (!year) return;
+    if (!force && !isBlank("price-in-fiscal_year_label")) return;
+
+    setField("price-in-fiscal_year_label", `FY${year}`);
+  };
+
+  /** 綠色直帶（分歧範圍，不是平均值）。 */
+  const applyBand = (est: Estimate, force: boolean): void => {
+    if (est.low === null || est.high === null) return;
+    // force=false 時只在欄位還空著才填：使用者自己查來的數字不該被覆寫。
+    if (!force && !(isBlank("price-in-eps_band_low") && isBlank("price-in-eps_band_high"))) return;
+
+    setField("price-in-eps_band_low", est.low.toFixed(2));
+    setField("price-in-eps_band_high", est.high.toFixed(2));
+    setField("price-in-eps_band_label", sourceLabel(est));
+  };
+
+  /** 上面那顆手動帶入 → 圖 A 的年度與綠帶都換成該年度。 */
+  const applyToChartA = (est: Estimate, force: boolean): void => {
+    applyTitleYear(est, force);
+    applyBand(est, force);
+  };
+
+  /**
+   * 下面那顆 → 只動圖 B：未來 EPS ＋ 下方年度。**不碰上方任何欄位。**
+   *
+   * 取一致預期的平均值：圖 B 問的是「假設兌現這個盈利」，用區間端點等於
+   * 替使用者選了最樂觀或最悲觀的情境。平均值也顯示在面板上，按下去
+   * 填進來的數字看得到出處。
+   */
+  const applyToChartB = (est: Estimate, force: boolean): void => {
+    const value = est.avg ?? (est.low !== null && est.high !== null ? (est.low + est.high) / 2 : null);
+    if (value === null) return;
+    if (!force && !isBlank("price-in-eps")) return;
+
+    setField("price-in-eps", value.toFixed(2));
+    const year = yearLabel(est);
+    if (year) setField("price-in-chart_b_fiscal_year_label", `FY${year}`);
+  };
+
   const showValuation = (q: QuoteOk | null): void => {
     const pe = q?.pe ?? blank;
     const fwd = q?.forward_pe ?? blank;
@@ -265,6 +341,13 @@ export function init(root: HTMLElement): void {
       tickerAtLastQuote = parsed.ticker;
       syncMirror();
       showValuation(parsed);
+
+      // 預設配置，只在欄位空著時填，不覆寫使用者自己查來的數字：
+      //   標題／長條年度 ← 本財政年度      綠帶 ← 下一財政年度
+      //   圖 B           ← 下一財政年度
+      applyTitleYear(parsed.eps_estimate, false);
+      applyBand(parsed.eps_estimate_next, false);
+      applyToChartB(parsed.eps_estimate_next, false);
       setStatus(`報價時間 ${formatStamp(parsed.as_of)}`, "muted");
     } catch {
       setStatus("暫時取不到報價，請手動輸入", "error");
@@ -300,33 +383,28 @@ export function init(root: HTMLElement): void {
   wireApply("price-in-apply-pe");
   wireApply("price-in-apply-forward-pe");
 
-  // EPS 預測區間直接填進上下限兩個欄位，並自動補上來源說明——
-  // 有 band 卻沒寫來源，Form 層會擋下來（規格要求區間必須說明出處）。
-  const wireEstimate = (key: string): void => {
+  // 手動「帶入」force=true 直接覆寫，那是使用者明確要求換成這一組。
+  // 資料從按鈕的 data-* 讀回來，不重新打上游。
+  const wireEstimate = (key: string, apply: (est: Estimate, force: boolean) => void): void => {
     document.getElementById(`price-in-apply-estimate-${key}`)?.addEventListener("click", (event) => {
       const target = event.currentTarget;
       if (!(target instanceof HTMLElement)) return;
 
-      const low = target.dataset.low;
-      const high = target.dataset.high;
-      if (!low || !high) return;
+      const low = num(Number.parseFloat(target.dataset.low ?? ""));
+      const high = num(Number.parseFloat(target.dataset.high ?? ""));
+      const avg = num(Number.parseFloat(target.dataset.avg ?? ""));
+      if (low === null || high === null) return;
 
-      const lowField = document.getElementById("price-in-eps_band_low");
-      const highField = document.getElementById("price-in-eps_band_high");
-      const labelField = document.getElementById("price-in-eps_band_label");
-      if (lowField instanceof HTMLInputElement) lowField.value = low;
-      if (highField instanceof HTMLInputElement) highField.value = high;
-
-      if (labelField instanceof HTMLInputElement) {
-        const year = target.dataset.endDate ? target.dataset.endDate.slice(0, 4) : "";
-        const n = target.dataset.analysts;
-        labelField.value = `Yahoo Finance 分析師預測${year ? `（截至 ${year}` : ""}${n ? `，${n} 位` : ""}${year ? "）" : ""}`;
-      }
+      apply({
+        low, high, avg,
+        analysts: num(Number.parseInt(target.dataset.analysts ?? "", 10)),
+        end_date: target.dataset.endDate ?? null,
+      }, true);
     });
   };
 
-  wireEstimate("current");
-  wireEstimate("next");
+  wireEstimate("current", applyToChartA);   // 上面那顆 → 圖 A
+  wireEstimate("next", applyToChartB);      // 下面那顆 → 圖 B
 
   tickerField.addEventListener("input", () => {
     const now = tickerField.value.trim().toUpperCase();

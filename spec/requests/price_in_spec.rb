@@ -98,6 +98,28 @@ RSpec.describe "Price-In 反推工具", type: :request do
       expect(response.body).to include(%(id="price-in-current-pe" class="text-[20px] font-bold text-gray-900">—<))
     end
 
+    it "帶入現價時順便暖 logo 快取，之後開圖不再打上游" do
+      stub_upstream
+      stub_request(:get, "https://finnhub.io/api/v1/stock/profile2")
+        .with(query: hash_including(symbol: "MRVL"))
+        .to_return(status: 200, body: { logo: "https://example.test/MRVL.png", name: "Marvell" }.to_json,
+                   headers: { "Content-Type" => "application/json" })
+
+      get "/price_in/quote", params: { ticker: "MRVL" }
+      WebMock.reset_executed_requests!
+
+      get "/price_in"
+      expect(response.body).to include("https://example.test/MRVL.png")
+      expect(a_request(:get, /finnhub/)).not_to have_been_made
+    end
+
+    it "沒有 logo 快取時退回 emoji，不打上游" do
+      get "/price_in"
+
+      expect(response.body).to include("📈")
+      expect(a_request(:get, /finnhub/)).not_to have_been_made
+    end
+
     # 只讀快取、不打上游——「重新出圖」不該變成一次隱形的報價請求。
     it "快取沒命中時顯示破折號，不觸發任何上游請求" do
       get "/price_in", params: { price_as_of: "2026-09-09T10:00:00+08:00", ticker: "NOPE" }

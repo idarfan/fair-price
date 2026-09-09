@@ -17,6 +17,10 @@ const FONT_AXIS  = 20;
 const BAR_A_FILL   = "#C5D2DB";
 const DOT_A_FILL   = "#1F5673";
 const BAND_FILL    = "#CDE3D2";
+// 目前實際 EPS：橘色，刻意與假設用的灰藍分開——上面幾條是「你給的倍數
+// 需要賺多少」，這一條是「現在真的賺多少」，同色會讓人以為都是假設。
+const CURRENT_FILL = "#E8A33D";
+const CURRENT_TEXT = "#8A5A12";
 // 圖 B：顏色編碼的是「買入價」，不是損益方向。
 // 刻意不套用專案語意色（虧損紅／獲利綠）——若套用，同一買入價的三條長條會因正負
 // 而變色，讀者會誤以為顏色代表盈虧而非入場價，整張圖的對照邏輯就毀了。
@@ -61,20 +65,39 @@ function money(value: number): string {
 // ── 圖 A ────────────────────────────────────────────────
 
 /**
- * x 軸上限：max(required_eps) * 1.15，取到最接近的 5 的倍數。
+ * x 軸上限。
  *
- * 規格的例子是 8.94 → 10.28 → 10，所以是「取最接近」而不是字面上的無條件進位
- * （無條件進位會得到 15）。取到偶數會得到 12，刻度變成 0/3/6/9/12，色帶擠到
- * 左半邊、圓點的分辨度變差——這是規格明列要避開的。
+ * 規格 §S5 訂的是「max(required_eps) * 1.15，取最接近的 5 的倍數」，
+ * 那條規則是照 EPS 約 7–9 的預設情境寫的：8.94 → 10.28 → 10，剛好。
+ * 但 EPS 小的股票會被它毀掉——SHOP 的 EPS 約 1.5，同一條規則得到軸上限 5，
+ * 資料只佔軸的 41%，長條全擠在左邊。
  *
- * 取整後若反而小於資料最大值就往上加 5，避免長條被切掉。
+ * 改成刻度單位隨數量級縮放：> 5 沿用規格的 5 的倍數（預設情境行為不變），
+ * ≤ 5 改用 0.5、≤ 1 改用 0.1。
+ *
+ * 色帶也要一起算進去：帶高於所有長條時（現有預測遠超需求就會這樣），
+ * 只看長條會把色帶切掉一半。
  */
-export function axisMax(values: number[]): number {
+export function axisMax(values: number[], bandHigh: number | null = null): number {
   const dataMax = Math.max(...values);
-  let bound = Math.round((dataMax * 1.15) / 5) * 5;
-  if (bound <= 0) bound = 5;
-  while (bound < dataMax) bound += 5;
-  return bound;
+  // 長條留 15% 餘裕給右側的數值標籤；色帶只需要一點點，它沒有標籤。
+  const raw = Math.max(dataMax * 1.15, bandHigh !== null ? bandHigh * 1.08 : 0);
+
+  if (raw > 5) {
+    // 規格原文的行為：取最接近的 5 的倍數，不足以容納資料就往上加。
+    let bound = Math.round(raw / 5) * 5;
+    while (bound < dataMax || (bandHigh !== null && bound < bandHigh)) bound += 5;
+    return bound;
+  }
+
+  const unit = raw > 1 ? 0.5 : 0.1;
+  const bound = Math.ceil(raw / unit) * unit;
+  // 浮點誤差會讓 2.5 變成 2.5000000000000004，進到 Chart.js 的刻度計算會很難看。
+  return Math.round(bound * 100) / 100;
+}
+
+function hasBandValue(payload: Record<string, unknown>): number | null {
+  return typeof payload.bandHigh === "number" ? payload.bandHigh : null;
 }
 
 function renderChartA(canvas: HTMLCanvasElement, payload: Record<string, unknown>): void {
@@ -91,9 +114,23 @@ function renderChartA(canvas: HTMLCanvasElement, payload: Record<string, unknown
     .filter((o): o is { m: number; eps: number } => typeof o.eps === "number")
     .sort((x, y) => y.m - x.m);
 
+  const currentEps = typeof payload.currentEps === "number" && payload.currentEps > 0
+    ? payload.currentEps
+    : null;
+
   const labels = order.map((o) => `${o.m} 倍`);
   const values = order.map((o) => o.eps);
-  const max    = axisMax(values);
+  // 目前 EPS 排在最後一列，與假設分開；軸上限要把它一起算進去，
+  // 否則實際 EPS 高於所有假設時那條會被切掉。
+  if (currentEps !== null) {
+    labels.push("目前 TTM EPS（實際）");
+    values.push(currentEps);
+  }
+  const max = axisMax(values, hasBandValue(payload));
+  const barColors = values.map((_, i) =>
+    currentEps !== null && i === values.length - 1 ? CURRENT_FILL : BAR_A_FILL);
+  const dotColors = values.map((_, i) =>
+    currentEps !== null && i === values.length - 1 ? CURRENT_TEXT : DOT_A_FILL);
 
   const bandLow  = typeof payload.bandLow === "number" ? payload.bandLow : null;
   const bandHigh = typeof payload.bandHigh === "number" ? payload.bandHigh : null;
@@ -107,11 +144,11 @@ function renderChartA(canvas: HTMLCanvasElement, payload: Record<string, unknown
     data: {
       labels,
       datasets: [
-        { data: values, backgroundColor: BAR_A_FILL, borderWidth: 0, order: 2 },
+        { data: values, backgroundColor: barColors, borderWidth: 0, order: 2 },
         {
           type: "scatter",
           data: values.map((v, i) => ({ x: v, y: i })),
-          backgroundColor: DOT_A_FILL,
+          backgroundColor: dotColors,
           pointRadius: 7,
           order: 1,
         },
@@ -149,18 +186,25 @@ function renderChartA(canvas: HTMLCanvasElement, payload: Record<string, unknown
       scales: {
         x: {
           min: 0, max,
-          ticks: { font: { size: FONT_AXIS } },
+          ticks: {
+            font: { size: FONT_AXIS },
+            // 0.1 一格：格線畫得細，標籤由 autoSkip 依可用寬度自行疏化，
+            // 不會在 0–10 的軸上硬印一百個數字。
+            stepSize: 0.1,
+            autoSkip: true,
+            maxRotation: 0,
+          },
           title: { display: true, text: "所需 EPS（美元）", font: { size: FONT_AXIS } },
         },
         y: { ticks: { font: { size: FONT_AXIS } } },
       },
     },
-    plugins: [ valueLabelPlugin(values.map(money), DOT_A_FILL) ],
+    plugins: [ valueLabelPlugin(values.map(money), dotColors) ],
   });
 }
 
 /** 圓點右側標數值。Chart.js 沒有內建 datalabels，用 afterDatasetsDraw 自己畫。 */
-function valueLabelPlugin(labels: string[], color: string): Record<string, unknown> {
+function valueLabelPlugin(labels: string[], colors: string[]): Record<string, unknown> {
   return {
     id: "priceInValueLabels",
     afterDatasetsDraw(chart: ChartInstance): void {
@@ -169,11 +213,12 @@ function valueLabelPlugin(labels: string[], color: string): Record<string, unkno
       const meta = chart.getDatasetMeta(1);
       ctx.save();
       ctx.font = `700 ${FONT_VALUE}px sans-serif`;
-      ctx.fillStyle = color;
       ctx.textBaseline = "middle";
       meta.data.forEach((point, i) => {
         const text = labels[i];
-        if (text) ctx.fillText(text, point.x + 14, point.y);
+        if (!text) return;
+        ctx.fillStyle = colors[i] ?? DOT_A_FILL;
+        ctx.fillText(text, point.x + 14, point.y);
       });
       ctx.restore();
     },

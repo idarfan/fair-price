@@ -15,7 +15,7 @@ class PriceInController < ApplicationController
 
     render PriceIn::PageComponent.new(
       form: @form, chart_a: @chart_a, chart_b: @chart_b,
-      audit: build_audit, valuation: cached_valuation
+      audit: build_audit, valuation: cached_valuation, logo: company_logo
     )
   end
 
@@ -30,6 +30,9 @@ class PriceInController < ApplicationController
     end
 
     result = PriceIn::QuoteFetcher.call(ticker)
+    # 順便暖 logo 快取：使用者已經明確要求連線，多這一次往返不會讓人意外，
+    # 而且換來的是之後每次開圖都有 logo 且零上游請求。
+    PriceIn::CompanyLogoService.call(ticker) if result.ok?
 
     if result.ok?
       render json: {
@@ -54,6 +57,14 @@ class PriceInController < ApplicationController
   end
 
   private
+
+  # 公司 logo。頁面載入只讀快取，不打上游——快取由 #quote（使用者按
+  # 「帶入現價」）順便暖起來。沒有就退回 📈 emoji，logo 是裝飾不該卡流程。
+  def company_logo
+    return nil unless @form.valid?
+
+    PriceIn::CompanyLogoService.cached(@form.ticker)
+  end
 
   # 使用者按過「帶入現價」（price_as_of 有值）才嘗試從快取還原估值對照。
   # 只讀快取、不打上游——「重新出圖」不該變成一次隱形的報價請求。
