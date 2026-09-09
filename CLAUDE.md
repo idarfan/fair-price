@@ -7,6 +7,34 @@ This file provides guidance to Claude Code when working with this repository.
 - **Always review `tasks/lessons.md`** for relevant project patterns and past corrections.
 - 讀取 LEAPS 規格時只讀主文件 `leaps-call-recommendation-spec.md`；`leaps-call-recommendation-history.md` 僅在追查歷史問題時才讀取。
 
+## 按鈕作用範圍：不得越界（違反即重做）
+
+**一顆按鈕只能寫它自己那一區的欄位。** 使用者按下某顆按鈕時的預期是
+「只動這一區」，動到別區等於把他剛設好的東西洗掉，而且畫面不會有任何提示。
+
+### Price-In `/price_in` 的「分析師 EPS 預測」面板（2026-09-09 反覆犯錯四次）
+
+面板上下各一顆「帶入」，以**面板為界**劃分：
+
+| 按鈕 | 只能寫 | 絕對不能碰 |
+|---|---|---|
+| 上面那顆（本財政年度） | 面板**上方**：`fiscal_year_label`、`eps_band_low`、`eps_band_high`、`eps_band_label` | 圖 B 的任何欄位 |
+| 下面那顆（下一財政年度） | 面板**下方**：`eps`、`chart_b_fiscal_year_label` | 綠帶與圖 A 年度 |
+
+「帶入現價」的預設分配必須與這兩顆一致：上方整組用本財政年度，下方用下一財政年度。
+**同一個欄位不得有兩套來源。**
+
+犯錯史（每一次都要使用者截圖標紅箭頭才發現）：
+1. 兩顆都寫圖 A　2. 「選哪一年整張圖就那一年」　3. 下面那顆去寫綠帶　4. 兩顆都寫綠帶
+
+### 通則
+
+- 改任何「按鈕 → 欄位」的對應之前，先確認使用者指定的範圍，**不確定就問**
+- 同一個需求猜錯一次就停下來用 AskUserQuestion，不要用「再改一版給你看」代替問一句
+  （這個專案改一版要走 `vite build → assets:precompile → pm2 restart → 使用者刷新`，
+  一個來回 10–15 分鐘；問一句 1 分鐘）
+- 詳見 `tasks/lessons.md` 的 2026-09-09 條目
+
 ## UI 修改強制流程（違反即重做）
 
 任何前端/樣式修改，**必須按順序執行**：
