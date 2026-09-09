@@ -246,11 +246,15 @@ th[data-tip-key] { cursor: help; }
 th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 
 /* 「價格預估」試算 Modal */
+/* 可拖動：overlay 不再是遮罩，只是一個不吃事件的定位層。
+   遮罩會讓使用者沒辦法一邊看表格一邊調參數——而這個試算的用途正是
+   「拿這一列的合約跟旁邊幾列比」，蓋住表格等於拿掉它一半的價值。
+   pointer-events: none 讓點擊穿透到底下的表格，只有面板本身收事件。 */
 .leaps-pe-overlay {
   position: fixed;
   inset: 0;
   z-index: 100000;
-  background: rgba(17, 24, 39, .5);
+  pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -258,24 +262,63 @@ th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
 }
 .leaps-pe-overlay.hidden { display: none; }
 .leaps-pe-panel {
+  pointer-events: auto;
   background: #fff;
   border-radius: 12px;
   border: 2px solid #f97316; /* orange-500：加深外框，讓彈窗更醒目 */
   box-shadow: 0 20px 50px rgba(0,0,0,.3);
   width: 100%;
-  max-width: 380px;
+  max-width: 460px;   /* 380 → 460：20px 字級下合約資訊列才不會擠成四行 */
   padding: 20px;
 }
-.leaps-pe-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.leaps-pe-title { font-size: 15px; font-weight: 700; color: #111827; }
-.leaps-pe-close {
-  border: none; background: transparent; cursor: pointer;
-  font-size: 16px; color: #6b7280; line-height: 1; padding: 4px;
+/* 被拖動過之後改用絕對定位，位置由 JS 寫進 style 的 left/top。
+   flex 置中與絕對定位不能並存，所以拖動時要把 margin 歸零。 */
+.leaps-pe-panel.leaps-pe-dragged {
+  position: fixed;
+  margin: 0;
 }
-.leaps-pe-close:hover { color: #111827; }
+/* 標題列＝拖動把手。用淺綠底把「這一條可以抓」講清楚，
+   就不需要在標題文字裡加註「可拖動」——需要用文字解釋的介面，
+   通常是視覺沒做到位。 */
+.leaps-pe-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
+  margin: -20px -20px 14px;      /* 抵銷面板 padding，讓色帶貼齊上緣 */
+  padding: 10px 12px;
+  background: #d1fae5;           /* emerald-100 */
+  border-bottom: 1px solid #6ee7b7; /* emerald-300 */
+  border-radius: 10px 10px 0 0;  /* 對齊面板圓角（12px 減去 2px 邊框）*/
+  cursor: grab;
+  user-select: none;             /* 拖動時不要選到標題文字 */
+}
+.leaps-pe-header:active { cursor: grabbing; }
+.leaps-pe-title { font-size: 15px; font-weight: 700; color: #065f46; } /* emerald-800 */
+/* 關閉鈕：方框、紅底白字、22px。原本是透明底的灰色 ✕，
+   在白底面板上幾乎看不見，使用者只能靠 Esc 或猜。 */
+.leaps-pe-close {
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #b91c1c;   /* red-700 */
+  border-radius: 4px;          /* 方框，不是圓 */
+  background: #dc2626;         /* red-600 */
+  color: #fff;
+  padding: 0;
+  flex-shrink: 0;
+}
+.leaps-pe-close:hover { background: #b91c1c; }
+.leaps-pe-close:active { background: #991b1b; }
+/* 合約資訊列：20px。這行是整個試算的基準——履約價、到期日、原始 IV、
+   原始 Mid 全在這裡，調完滑桿要回頭對照的就是它。原本 12px 比結果數字
+   小一半，等於把最該看的東西做成註腳。 */
 .leaps-pe-contract-info {
-  font-size: 12px; color: #6b7280; background: #f9fafb;
-  border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 10px; margin-bottom: 14px;
+  font-size: 20px; line-height: 1.5; color: #374151; background: #f9fafb;
+  border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px;
 }
 .leaps-pe-field { margin-bottom: 14px; }
 .leaps-pe-label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 6px; }
@@ -290,14 +333,33 @@ th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
   margin: 0;
 }
 .leaps-pe-slider { width: 100%; }
+
+/* IV 顏色分級，與排行表 IV 欄位同一組門檻（formatting.rb 的 iv_color_class）：
+   ≤30% 綠（波動率便宜）／30–50% 黃（偏貴，留意）／>50% 紅（昂貴，IV Crush 風險高）。
+   數值本身放大到 20px——它是滑桿唯一的讀數，12px 的標籤等於要人瞇著眼調參數。
+   寫成 class 而非 Tailwind utility：這幾個是 JS 依滑桿值即時切換的，
+   Tailwind v4 的掃描器看不到 JS 裡的字串。 */
+.leaps-pe-iv-green  { color: #16a34a; font-weight: 700; }  /* green-600 */
+.leaps-pe-iv-yellow { color: #ca8a04; font-weight: 700; }  /* yellow-600 */
+.leaps-pe-iv-red    { color: #dc2626; font-weight: 700; }  /* red-600 */
+#leaps-pe-iv-value  { font-size: 20px; }
+
+/* 滑桿本身也要跟著變色，否則數字紅了、軌道還是預設藍，
+   看起來像兩個不相干的元件。accent-color 一次染滑塊與已填軌道
+   （Chrome/Edge/Firefox 都支援），不必逐一改 -webkit-slider-thumb。 */
+.leaps-pe-slider-green  { accent-color: #16a34a; }
+.leaps-pe-slider-yellow { accent-color: #ca8a04; }
+.leaps-pe-slider-red    { accent-color: #dc2626; }
 .leaps-pe-results {
-  border-top: 1px solid #e5e7eb; padding-top: 12px; display: flex; flex-direction: column; gap: 6px;
+  border-top: 1px solid #e5e7eb; padding-top: 12px; display: flex; flex-direction: column; gap: 8px;
 }
-.leaps-pe-result-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
-.leaps-pe-result-label { color: #6b7280; }
+/* 結果區一律 18px（原 13px）：這四個數字是整個試算的產出，
+   比它上面的輸入欄還小沒有道理。推估 Mid 再大一級當視覺焦點。 */
+.leaps-pe-result-row { display: flex; align-items: center; justify-content: space-between; font-size: 18px; }
+.leaps-pe-result-label { color: #4b5563; }  /* gray-600：18px 下 gray-500 對比略低 */
 .leaps-pe-result-value { font-weight: 600; color: #111827; font-variant-numeric: tabular-nums; }
-.leaps-pe-result-primary { font-size: 16px; color: #2563eb; }
-.leaps-pe-result-label-diff { font-weight: 700; font-size: 15px; color: #6b7280; }
+.leaps-pe-result-primary { font-size: 22px; color: #2563eb; }
+.leaps-pe-result-label-diff { font-weight: 700; color: #4b5563; }
 .leaps-pe-result-diff-value { font-weight: 700; color: #16a34a; }
 
 /* 欄位篩選：勾選面板 + 隱藏欄的 th/td */
@@ -727,3 +789,18 @@ th[data-tip-key]:hover { color: #2563eb; }                      /* blue-600 */
   margin-top: 16px;
   padding-top: 8px;
 }
+
+/* 圖 A 圖例色塊。用 class 而非 style 屬性：全站 style-src 不放行 unsafe-inline，
+   內嵌 style="background:#..." 會被 CSP 擋掉而完全沒有顏色（教材頁那次的同一個坑）。
+   色值必須與 priceInCharts.ts 的常數一致，改一邊要記得改另一邊。 */
+.pi-swatch {
+  display: inline-block;
+  width: 18px;
+  height: 12px;
+  border-radius: 2px;
+  vertical-align: -1px;
+  margin-right: 4px;
+}
+.pi-swatch-bar  { background: #C5D2DB; }                    /* 橫條 BAR_A_FILL */
+.pi-swatch-band { background: #CDE3D2; border: 1px solid #9dc3a8; } /* 色帶 BAND_FILL */
+.pi-swatch-dot  { background: #1F5673; border-radius: 50%; width: 12px; } /* 圓點 DOT_A_FILL */

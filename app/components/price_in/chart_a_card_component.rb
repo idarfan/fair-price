@@ -107,18 +107,44 @@ class PriceIn::ChartACardComponent < ApplicationComponent
     end
   end
 
-  # 色帶說明（導覽步驟 9 的錨點）。與判讀卡分開：這一句講的是「這次這張圖有沒有色帶」，
-  # 判讀卡講的是「色帶怎麼讀」。
+  # 圖例＋色帶說明（導覽步驟 9 的錨點）。
+  #
+  # 原本只寫「色帶是⋯落在色帶左側的倍數」，看圖的人分不出「色帶」指的是
+  # 綠色那塊還是灰藍橫條，而且落在左側的是圓點不是倍數。三個視覺元素各給
+  # 一個色塊直接對應，比任何文字描述都快。
   def band_note
     div(class: "px-5 py-3 border-t border-indigo-200", data: { tour_step: 9 }) do
-      p(class: "text-[20px] text-indigo-900") do
-        if @result.band?
-          plain("色帶是 #{@form.eps_band_label}（#{PriceIn::Formatter.money(@result.band_low)}–" \
-                "#{PriceIn::Formatter.money(@result.band_high)}）。落在色帶左側的倍數，代表現有預測撐得住。")
-        else
-          plain("填入 EPS 預測區間後，這裡會標出哪些倍數是現有預測撐得住的。")
-        end
-      end
+      legend
+      p(class: "mt-2 text-[20px] text-indigo-900 leading-[1.6]") { plain(band_sentence) }
     end
+  end
+
+  def legend
+    div(class: "flex flex-wrap items-center gap-x-6 gap-y-1 text-[16px] text-gray-600") do
+      legend_item("pi-swatch-bar", "橫條＝這個倍數需要公司賺到的 EPS")
+      legend_item("pi-swatch-dot", "圓點＝該 EPS 的位置")
+      legend_item("pi-swatch-band", band_legend_label) if @result.band?
+    end
+  end
+
+  def legend_item(swatch_class, text)
+    span(class: "inline-flex items-center") do
+      span(class: "pi-swatch #{swatch_class}")
+      plain(text)
+    end
+  end
+
+  def band_legend_label
+    "綠色直帶＝分析師預測區間 #{PriceIn::Formatter.money(@result.band_low)}–" \
+      "#{PriceIn::Formatter.money(@result.band_high)}"
+  end
+
+  def band_sentence
+    unless @result.band?
+      return "填入 EPS 預測區間後，圖上會出現一條綠色直帶，用來判斷這些倍數難不難達成。"
+    end
+
+    "圓點落在綠帶左側＝現有預測撐得住這個倍數；落在綠帶之中＝需要偏預測上緣；" \
+      "落在綠帶右側＝需要盈利超出目前所有預測。區間來源：#{@form.eps_band_label}。"
   end
 end
