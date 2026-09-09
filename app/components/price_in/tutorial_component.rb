@@ -11,14 +11,18 @@
 # 便宜、把現價反推的倍數當成市場的估值意願、把報酬全押在盈利達標而忽略倍數。
 # 這三件事在欄位說明與判讀說明裡都講不完整——它們不屬於任何單一欄位或單一圖。
 #
+# 數字全部由 TutorialExample 用使用者當前填的欄位算出，不寫死範例：在一個
+# 「拿你自己的數字演一次」的工具裡放別人的作業，等於自打嘴巴。
+#
 # 預設收摺（details 不帶 open）：它是通篇教學，常駐展開會把圖表推出畫面。
 # 用 details/summary 而不是 button + JS：Phlex 2.x 封鎖 on* 事件屬性，
 # 而這裡只需要開關，不需要與其他元件同步狀態。
 class PriceIn::TutorialComponent < ApplicationComponent
   LOCALE = PriceIn::FieldHelpCardComponent::LOCALE
 
-  def initialize
-    @doc = I18n.t("price_in.tutorial", locale: LOCALE)
+  def initialize(form:)
+    @doc     = I18n.t("price_in.tutorial", locale: LOCALE)
+    @example = PriceIn::TutorialExample.call(form: form)
   end
 
   def view_template
@@ -26,14 +30,35 @@ class PriceIn::TutorialComponent < ApplicationComponent
       details(class: "rounded-xl border border-slate-300 overflow-hidden") do
         render_summary
         div(class: "px-5 py-5 bg-slate-50 border-t border-slate-300 space-y-6") do
-          p(class: "text-[20px] text-slate-600") { plain(@doc[:intro]) }
-          Array(@doc[:sections]).each { |section| render_section(section) }
+          paragraph(@doc[:intro], css: "text-[20px] text-slate-600")
+          paragraph(interpolate(@doc[:hint_quote]), css: "text-[20px] text-slate-500") unless all_ready?
+          Array(@doc[:sections]).each { |spec| render_section(spec) }
         end
       end
     end
   end
 
   private
+
+  def ready  = @example[:ready]
+  def vars   = @example[:vars]
+  def tables = @example[:tables]
+
+  def all_ready? = ready.values.all?
+
+  # 這一節要的資料齊了沒。requires 未宣告代表整節都是靜態文字，永遠顯示。
+  def satisfied?(requires)
+    Array(requires).all? { |key| ready[key.to_sym] }
+  end
+
+  # 代入使用者的數字。用 gsub 而不是 String#% ——文案裡有「±16%」這種
+  # 字面的百分號，交給 format 會被當成格式指示字元而拋 ArgumentError。
+  #
+  # 找不到的 key 原樣留著而不是換成空字串：畫面上出現 %{foo} 一眼就知道
+  # 是代入漏了，換成空字串則會變成一句讀起來通順但意思錯掉的話。
+  def interpolate(text)
+    text.to_s.gsub(/%\{(\w+)\}/) { vars[Regexp.last_match(1).to_sym]&.to_s || Regexp.last_match(0) }
+  end
 
   def render_summary
     summary(class: "min-h-[44px] flex items-center gap-2 px-4 py-2 bg-slate-800 cursor-pointer select-none") do
@@ -47,20 +72,48 @@ class PriceIn::TutorialComponent < ApplicationComponent
   def render_section(spec)
     section(class: "space-y-2") do
       h3(class: "text-[22px] font-medium text-slate-900") { plain(spec[:heading]) }
-      Array(spec[:body]).each { |line| paragraph(line) }
-      render_table(spec[:table]) if spec[:table].present?
-      Array(spec[:footer]).each { |line| paragraph(line) }
-      render_callout(spec[:callout]) if spec[:callout].present?
+      satisfied?(spec[:requires]) ? render_body(spec) : render_fallback(spec)
     end
   end
 
-  def paragraph(line)
-    p(class: "text-[20px] text-slate-700 leading-[1.6]") { plain(line) }
+  def render_body(spec)
+    Array(spec[:body]).each { |line| paragraph(interpolate(line)) }
+    render_table(tables[spec[:table].to_sym]) if spec[:table].present?
+    Array(spec[:footer]).each { |line| paragraph(interpolate(line)) }
+    render_extra(spec[:extra]) if spec[:extra].present?
+    render_callout(interpolate(spec[:callout])) if spec[:callout].present?
+  end
+
+  # 「有了 TTM EPS 才講得出來」的補充，與整節的 requires 分開判定：
+  # 第五節只要有 EPS 錨就畫得出表，但「倍數與盈利不可能並存」那句話
+  # 還需要知道目前實際賺多少。
+  def render_extra(extra)
+    return unless satisfied?(extra[:requires])
+
+    Array(extra[:lines]).each { |line| paragraph(interpolate(line)) }
+  end
+
+  # 資料不齊時只說「補什麼就會算給你看」，不顯示半套數字——
+  # 半套數字比沒有更容易誤導。
+  def render_fallback(spec)
+    div(class: "rounded-lg border border-dashed border-slate-300 bg-white px-4 py-3") do
+      paragraph(interpolate(spec[:fallback]), css: "text-[20px] text-slate-500")
+    end
+  end
+
+  # 關鍵字不叫 class：那會遮蔽 Kernel#class，只能靠 binding 取回，讀起來像陷阱。
+  def paragraph(line, css: "text-[20px] text-slate-700 leading-[1.6]")
+    p(class: css) { plain(line) }
   end
 
   # 表格一律可橫向捲動：教學說明是全版面 96% 的區塊，但視窗縮到手機寬度時
   # 三欄數字仍會撐破容器，讓整頁出現水平捲軸。
+  #
+  # spec 為 nil 代表算不出這張表（例如兩個買入價相同，比較就沒有意義），
+  # 此時整張表省略，前後文字仍然成立。
   def render_table(spec)
+    return if spec.blank?
+
     div(class: "overflow-x-auto") do
       table(class: "w-full text-[20px] bg-white rounded-lg border border-slate-300") do
         thead do

@@ -46,7 +46,7 @@ class PriceIn::PageComponent < ApplicationComponent
       render_charts
       # 教學說明放最底：它回答的是「這個工具在說什麼」，屬於看完圖之後
       # 才會想追問的層次，擺在圖表之前會擋住主要工作區。
-      render PriceIn::TutorialComponent.new
+      render PriceIn::TutorialComponent.new(form: @form)
       tour_data_island
       export_islands
     end

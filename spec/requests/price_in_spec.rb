@@ -371,21 +371,16 @@ RSpec.describe "Price-In 反推工具", type: :request do
     end
   end
 
+  # 教學的數字必須跟著使用者的輸入走。寫死範例等於在一個「拿你自己的數字
+  # 演一次」的工具裡放別人的作業，而 price in 的誤判恰恰都發生在
+  # 「套到自己身上」那一步。
   describe "教學說明（頁面最底）" do
-    it "預設收摺，且不含 open 屬性" do
+    it "預設收摺，靜態章節永遠顯示" do
       get "/price_in"
 
       expect(response.body).to include("Price-In 工具教學：這張圖真正在說什麼")
       expect(response.body).to include("圓點在色帶左側不等於便宜")
-    end
-
-    # 表格的數字是這份說明的重點，缺了就只剩抽象規則。
-    it "含「倍數的權重不比盈利低」的完整對照表" do
-      get "/price_in"
-
-      expect(response.body).to include("+266.0%")   # 80 倍
-      expect(response.body).to include("-31.4%")    # 15 倍，達標仍虧損
-      expect(response.body).to include("+37.5%")    # 進場價 $8.00
+      expect(response.body).to include("工具刻意不告訴你「合理倍數」")
     end
 
     # 參數錯誤時不出圖，但教學說明照樣要在——那正是使用者最需要它的時候。
@@ -394,6 +389,90 @@ RSpec.describe "Price-In 反推工具", type: :request do
 
       expect(response.body).to include("這些欄位需要修正")
       expect(response.body).to include("Price-In 工具教學：這張圖真正在說什麼")
+    end
+
+    # 只掃教學那一塊：匯出浮水印的 price_in.export.brand 本來就帶著 %{ticker}，
+    # 由前端在匯出時代入，整頁掃會被它誤判。
+    def tutorial_html = response.body[/📘.*?<\/details>/m]
+
+    it "資料不齊時顯示提示，不顯示半套數字" do
+      get "/price_in"
+
+      expect(tutorial_html).to include("按「帶入現價」之後，這一節會用")
+      expect(tutorial_html).not_to include("%{")   # 代入漏了會原樣留在畫面上
+    end
+
+    it "資料齊備時教學裡沒有未代入的佔位符" do
+      get "/price_in", params: { ticker: "TEST", price: 100, eps_ttm_hint: 2.0,
+                                 eps_band_low: 4, eps_band_high: 6, eps: 5,
+                                 chart_b_multiples: "10,20,30", entry_b_price: 80 }
+
+      expect(tutorial_html).not_to include("%{")
+    end
+
+    context "依使用者輸入推算" do
+      # 現價 100、TTM EPS 2 → 50 倍；預測 4-6（中點 5）→ 隱含 16.7-25 倍；
+      # 圖 B 未來 EPS 5、倍數 10/20/30、假設買入價 80。全部可手算驗證。
+      let(:params) do
+        { ticker: "TEST", price: 100, eps_ttm_hint: 2.0,
+          eps_band_low: 4, eps_band_high: 6, fiscal_year_label: "FY2031",
+          eps: 5, chart_b_multiples: "10,20,30", entry_b_price: 80 }
+      end
+
+      it "第三節用使用者的股價與 TTM EPS 算循環論證" do
+        get "/price_in", params: params
+
+        expect(response.body).to include("TEST 現價 $100.00 ÷ TTM EPS $2.00 = 50.0 倍")
+      end
+
+      it "第四節用使用者的預測區間算隱含倍數（低端由預測高標算出）" do
+        get "/price_in", params: params
+
+        expect(response.body).to include("$100.00 ÷ $6.00 = 16.7 倍")
+        expect(response.body).to include("$100.00 ÷ $4.00 = 25.0 倍")
+        expect(response.body).to include("FY2031 預估盈利的 16.7 倍 到 25.0 倍")
+      end
+
+      # 表一：固定 EPS 5、買入基準 100，倍數 10/20/30 → 目標價 50/100/150
+      it "第五節的表用使用者填的倍數，不是寫死的 15/20/25" do
+        get "/price_in", params: params
+
+        expect(response.body).to include("10 倍")
+        expect(response.body).to include("$50.00")
+        expect(response.body).to include("-50.0%")   # 50 / 100 - 1
+        expect(response.body).to include("+50.0%")   # 150 / 100 - 1
+        expect(response.body).not_to include("+266.0%")
+      end
+
+      # 表二：固定倍數取中位數 20 → 目標價 100；買入價 100 與 80
+      it "第六節的表用使用者的兩個買入價" do
+        get "/price_in", params: params
+
+        expect(response.body).to include("$100.00（買入基準）")
+        expect(response.body).to include("$80.00")
+        expect(response.body).to include("+25.0%")   # 100 / 80 - 1
+      end
+
+      it "第五節的補充句只在有 TTM EPS 時出現" do
+        get "/price_in", params: params
+        expect(response.body).to include("EPS 若真的從 $2.00 成長到 $5.00（+150%）")
+
+        get "/price_in", params: params.except(:eps_ttm_hint)
+        expect(response.body).not_to include("EPS 若真的從")
+      end
+
+      it "換一檔股票、換一組數字，教學跟著換" do
+        get "/price_in", params: params.merge(ticker: "OTHER", price: 60, eps_ttm_hint: 1.5)
+
+        expect(response.body).to include("OTHER 現價 $60.00 ÷ TTM EPS $1.50 = 40.0 倍")
+        expect(response.body).not_to include("TEST 現價")
+      end
+
+      it "分歧度由使用者的區間算出" do
+        get "/price_in", params: params
+
+        expect(response.body).to include("$4.00 到 $6.00 的寬度（±20%）")
+      end
     end
   end
 end
