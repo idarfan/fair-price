@@ -109,10 +109,10 @@ class PriceIn::InputFormComponent < ApplicationComponent
       p(class: "text-[16px] font-medium text-emerald-900 mb-1") { plain("分析師 EPS 預測") }
       # 兩顆各管一半，互不越界：上面那顆只動圖 A，下面那顆只動圖 B。
       # 標籤寫出去向——兩顆長得一樣的按鈕擺在一起，使用者沒有理由猜得到。
-      estimate_row("本財政年度", "current", @valuation&.eps_estimate, target: "圖 A 年度")
+      estimate_row("本財政年度", "current", @valuation&.eps_estimate, target: "綠帶＋圖 A 年度")
       estimate_row("下一財政年度", "next", @valuation&.eps_estimate_next, target: "綠帶＋圖 B")
       p(class: "mt-1 text-[16px] text-gray-400 leading-[1.4]") do
-        plain("來源 Yahoo Finance．上面那顆只改圖 A 的年度標示；下面那顆填綠帶（分歧範圍）與圖 B 的未來 EPS")
+        plain("來源 Yahoo Finance．兩顆都會換掉綠帶，最後按的那顆決定綠帶用哪一年；下面那顆另外填圖 B")
       end
     end
   end
@@ -122,12 +122,18 @@ class PriceIn::InputFormComponent < ApplicationComponent
       (!@valuation.eps_estimate.available? && !@valuation.eps_estimate_next.available?)
   end
 
-  def estimate_row(label_text, key, est = nil, target: nil)
-    usable = est&.available?
+  # apply: false 時只顯示數字不給按鈕。
+  #
+  # 「本財政年度」那一列就是這種：綠帶固定取下一財政年度，圖 A 的年度又已經
+  # 由「帶入現價」設成本年度，這顆按鈕寫進去的值跟現況一模一樣——按了畫面
+  # 毫無變化。一顆按了沒反應的按鈕比沒有更糟，所以只留數字當對照。
+  def estimate_row(label_text, key, est = nil, target: nil, apply: true)
+    has_data = est&.available? || false   # 有沒有數字可顯示
+    usable   = has_data && apply          # 要不要給「帶入」按鈕
 
     div(class: "flex items-baseline justify-between gap-3 py-0.5") do
       span(id: "price-in-estimate-#{key}-label", class: "text-[16px] text-gray-600 shrink-0") do
-        plain(usable ? estimate_label(label_text, est) : label_text)
+        plain(has_data ? estimate_label(label_text, est) : label_text)
         if target
           span(class: "ml-2 text-[16px] px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-900") do
             plain("→ #{target}")
@@ -136,7 +142,7 @@ class PriceIn::InputFormComponent < ApplicationComponent
       end
       div(class: "flex items-center gap-2") do
         span(id: "price-in-estimate-#{key}", class: "text-[20px] font-bold text-gray-900") do
-          plain(usable ? estimate_value_text(est, key) : "—")
+          plain(has_data ? estimate_value_text(est, key) : "—")
         end
         button(
           type: "button", id: "price-in-apply-estimate-#{key}", hidden: !usable,
