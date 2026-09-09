@@ -160,6 +160,7 @@ module PriceIn
     # 年化值錯得很隱蔽，看不出來，所以提示但不擋。
     def warnings
       list = []
+      list << circular_multiple_warning   if circular_multiples.any?
       list << holding_years_mismatch_warning if holding_years_mismatch?
       list.compact
     end
@@ -283,6 +284,36 @@ module PriceIn
 
       errors.add(:attribution_sources, "每一項不得超過 #{MAX_SOURCE_LENGTH} 字")
     end
+
+    # ── 循環論證 ────────────────────────────────────────
+    #
+    # 使用者按「本益比 (P/E)」的帶入之後，倍數就是「現價 ÷ TTM EPS」。
+    # 拿它回去算所需 EPS，必然得到 TTM EPS——圖上圓點的位置完全由這個
+    # 恆等式決定，跟公司值不值這個價無關。
+    #
+    # 這個警告放在頁面最上方而不是只寫在說明卡裡：說明卡預設收起，
+    # 真正踩到坑的人看不到它。
+    def circular_multiples
+      return [] if eps_ttm_hint.nil? || eps_ttm_hint.to_f <= 0 || price.to_f <= 0
+
+      implied = price.to_f / eps_ttm_hint.to_f
+      chart_a_multiples.select { |m| (m - implied).abs <= implied * 0.02 }
+    end
+
+    def circular_multiple_warning
+      list = circular_multiples.map { |m| Kernel.format("%g", m) }.join("、")
+      "倍數 #{list} 就是「現價 ÷ 目前 EPS」算出來的。用它回推所需 EPS 必然得到目前的 EPS，" \
+        "這個比較是循環論證，不能用來判斷貴或便宜——倍數要換成你自己的判斷（歷史中位數、同業中位數，" \
+        "或你說得出理由的數字）。"
+    end
+
+    # 2026-09-09：原本這裡有「標題年度 ≠ 色帶來源年度」的警告，已移除。
+    # 圖 A 的兩個年度本來就該不同：左側長條是「現價現在要求賺多少」（本財政
+    # 年度），右側綠帶是「分析師認為未來賺得到多少」（下一財政年度），
+    # 不同年度才有比較的意義。警告會在正確的設定下每次都叫。
+    #
+    # 兩個年度各自標在畫面上：標題寫 ② 的年度，圖例寫綠帶自己的年度
+    # （見 ChartACardComponent#band_legend_label），使用者看得到差異。
 
     # 年度標籤裡的西元年與持有年數對不對得起來
     def holding_years_mismatch?

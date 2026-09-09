@@ -164,6 +164,48 @@ RSpec.describe PriceIn::ScenarioForm do
     end
   end
 
+  # 2026-09-09：使用者按「本益比 (P/E)」的帶入之後，倍數就是「現價 ÷ TTM EPS」，
+  # 圖 A 算出的所需 EPS 必然等於 TTM EPS。原本只有 🧮 說明卡會標出這件事，
+  # 但那張卡預設收起，真正踩到坑的人看不到。
+  describe "循環論證警告" do
+    def circular_form(multiples)
+      build(price: 134.10, chart_a_multiples: multiples, eps_ttm_hint: 1.4997)
+    end
+
+    it "倍數等於現價隱含倍數時提出警告，但仍可出圖" do
+      form = circular_form("89.42")
+      expect(form).to be_valid
+      expect(form.warnings.join).to include("循環論證")
+      expect(form.warnings.join).to include("89.42")
+    end
+
+    it "使用者自己判斷的倍數不觸發警告" do
+      expect(circular_form("30,40").warnings.join).not_to include("循環論證")
+    end
+
+    it "沒有 eps_ttm_hint（沒按過帶入現價）時不做判定" do
+      form = build(price: 134.10, chart_a_multiples: "89.42")
+      expect(form.warnings.join).not_to include("循環論證")
+    end
+
+    it "容差 2% 內視為同一個倍數（使用者手打 89.4 也算）" do
+      expect(circular_form("89.4").warnings.join).to include("循環論證")
+    end
+  end
+
+  # 年度錯置警告已於 2026-09-09 移除：圖 A 的兩個年度本來就該不同
+  # （左側長條＝本財政年度的門檻，右側綠帶＝下一財政年度的預測）。
+  describe "年度不同不再視為錯誤" do
+    it "標題年度與區間來源年度不同時不警告" do
+      form = build(fiscal_year_label: "FY2026",
+                   eps_band_low: 1.97, eps_band_high: 2.93,
+                   eps_band_label: "Yahoo Finance 分析師預測（截至 2027，39 位）")
+
+      expect(form).to be_valid
+      expect(form.warnings.join).not_to include("年度對不上")
+    end
+  end
+
   describe "不阻擋出圖的提示" do
     it "年度與持有年數明顯不一致時給提示，但仍然 valid" do
       form = build(eps: 11.02, chart_b_fiscal_year_label: "FY2031", holding_years: 2.5, entry_b_price: 365)
