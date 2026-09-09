@@ -1,5 +1,95 @@
 # FairPrice
 
+### 2026-09-09（三）— 新增：Price-In 目前 EPS 對照條、公司 logo；兩個誤用警告
+
+**目前 TTM EPS 畫成獨立橫條**（橘色）。原本圖 A 只有「這些倍數需要賺多少」，
+沒有「現在真的賺多少」，看的人無從判斷現有獲利撐不撐得住。刻意用橘色而非
+假設用的灰藍——分不清「假設」與「事實」正是循環論證的溫床。
+
+**兩個警告，直接顯示在頁面上方**（不阻擋出圖）：
+
+1. **循環論證**：使用者按「本益比 (P/E)」的帶入之後，倍數就是「現價 ÷ TTM EPS」，
+   算回去必然得到 TTM EPS。實測案例 SHOP：`134.10 / 1.4997 = 89.42`，
+   圖上圓點落在預測區間左側只證明了「分析師預期明年比今年賺得多」。
+   原本只有 🧮 說明卡會標，但那張卡預設收起，真正踩坑的人看不到。
+2. **年度錯置**：「帶入」會把預測區間與來源標籤（含年度）一起寫進去，
+   但不會動「哪一年的 EPS」。實測案例：標題 FY2026、色帶卻是 FY2027 的
+   預測值——圖不報錯，就是安靜地拿兩個年度的數字互比。規格 §S4 卡片 3
+   早已指出「兩邊年度對不上是最常見的 Price-in 誤判來源」，實作卻沒防。
+
+**公司 logo**（`PriceIn::CompanyLogoService`）：Finnhub `/stock/profile2` 的
+`logo` 欄位，快取 30 天。**頁面載入只讀快取，絕不打上游**——第一版寫成載入時
+直接抓，被自己的測試抓到違規（`GET /finnhub/ executed 1 time`）；改由
+`#quote`（使用者按「帶入現價」）順便暖快取。抓不到退回 📈 emoji。
+
+圖例補上橘色色塊、字級與判讀句統一為 20px（原本 16px 讀起來像「註腳＋正文」
+兩個層級，但它們是同一件事的兩半）。
+
+涉及檔案：`app/services/price_in/company_logo_service.rb`、
+`app/forms/price_in/scenario_form.rb`、`app/components/price_in/chart_a_card_component.rb`、
+`app/frontend/behaviors/priceInCharts.ts`
+
+---
+
+### 2026-09-09（三）— 調整：LEAPS 價格預估試算可拖動，字級與配色重做
+
+**可拖動**：按住標題列移動。半透明遮罩一併拿掉——這個試算的用途正是「拿這一列
+的合約跟旁邊幾列比」，蓋住表格等於拿掉它一半的價值。overlay 改成
+`pointer-events: none` 的純定位層，點擊穿透到底下的表格。「點空白處關閉」
+隨之移除：可拖動之後使用者本來就會去點旁邊的表格，那時關掉等於把比較對象弄丟。
+
+面板預設由 flex 置中，第一次拖動先把當下座標寫進 `style.left/top` 再切
+`position: fixed`——兩者不能並存，順序反了會瞬移到左上角。位置不記憶，
+另留 40px 在視窗內避免拖到抓不回來。
+
+**IV 滑桿上限 50 → 100**。原本會把高 IV 合約夾住：SHOP 的 57.3% 開起來
+滑桿頂在最右、顯示 50.0%，看起來像「這檔 IV 只有 50」。預設值帶入該列合約的
+原始 IV 並保留一位小數（`data-iv` 是完整精度，浮點誤差由 `toFixed(1)` 吸收）。
+
+**IV 顏色分級**套用與排行表 IV 欄相同的門檻（≤30% 綠／30–50% 黃／>50% 紅），
+數字與滑桿一起變色（`accent-color` 一次染滑塊與已填軌道）。門檻在 Ruby 與 JS
+各寫一份是刻意取捨：SSR 著色與滑桿即時變色共用一份得多開一個資料島。
+
+**字級**：合約資訊列 12px → 20px（它是整個試算的基準，原本比結果數字小一半
+等於把最該看的東西做成註腳）、結果區 13px → 18px、推估 Mid 22px、
+面板 380px → 460px。關閉鈕改方框紅底白字 22px（原本透明底灰色 ✕ 幾乎看不見）。
+
+涉及檔案：`app/assets/javascripts/leaps_recommendations/price_estimator.js`、
+`app/components/leaps_recommendations/price_estimator.rb`、`app/assets/tailwind/application.css`
+
+---
+
+### 2026-09-08（二）— 新增：Price-In S8 匯出（PNG／PDF）與歸屬稽核
+
+**匯出與畫面完全脫鉤**：截的是離屏容器（固定 960×540 CSS px），不是畫面上那張
+卡片。以 `pixelRatio: 2` 捕捉 → 恆為 1920×1080，不受視窗寬度、頁面縮放、
+裝置 DPR 影響。同一組參數在任何機器上匯出都得到同一張圖，否則存檔前後無法比對。
+
+為什麼不直接開 1920 寬：容器若真用 1920，20px 的字只佔畫面寬度的百分之一，
+成品圖上小到看不清。離屏用 `position:absolute; left:-99999px`，**不可用
+`display:none`**——html-to-image 量不到尺寸會產出空白圖。
+
+圖表以 `<img>` 承載，匯出時把畫面上的 canvas 轉 dataURL 填進去：在離屏容器裡
+另開 Chart.js 實例會讓同一份資料有兩個繪製路徑，版面一走鐘就產出與畫面不一致
+的成品。內容超過 540px 整張等比縮到 fit，縮放低於 0.75 提示但仍匯出。
+
+**PDF**（規格外追加）用與 PNG 完全相同的點陣圖，頁面 1920×1080 pt，逐像素一致。
+jsPDF 的 `FAST` 壓縮不可省（LEAPS 實測未壓縮 48MB vs 壓縮後 550KB）。
+
+**S8.3 歸屬稽核**：`AttributionAuditor` 掃描會被寫進成品圖的使用者輸入，
+命中機構名但不在來源白名單時，匯出前跳確認並列出命中詞與放行依據。白名單走
+query string 是稽核的繞過口，因此一律顯示「因為什麼被放行」。機構名只出現在
+`AttributionAuditor` 一個檔案，locale 與元件內不得出現（測試會 grep 把關）。
+
+規格文件同步：html2canvas → html-to-image（Tailwind v4 的 oklch 色彩
+html2canvas 不支援）、附錄 A 三條與實作衝突的禁令逐條標註變更、
+S0–S8 狀態表標為已驗證、導覽補回第 14 步（匯出按鈕）。
+
+涉及檔案：`app/components/price_in/export_{card,buttons}_component.rb`、
+`app/services/price_in/attribution_auditor.rb`、`app/frontend/behaviors/priceInExport.ts`
+
+---
+
 ### 2026-09-08（二）— 修正：期權小學堂 CSP 三層破壞
 
 `refactor: CSP style-src 收斂完成`（2026-08-30）把全站的內嵌樣式與內嵌 script
