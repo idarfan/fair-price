@@ -13,7 +13,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   include LeapsRecommendations::PmccEducation
   include LeapsRecommendations::VocabCards
 
-  def initialize(symbol: nil, candidates: [], recommendation: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil, next_earnings: nil, pmcc_ranking: nil, pmcc_tracker: nil)
+  def initialize(symbol: nil, candidates: [], recommendation: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil, next_earnings: nil, pmcc_ranking: nil, pmcc_tracker: nil, price_context: nil)
     @symbol         = symbol
     @candidates     = Array(candidates)
     @recommendation = recommendation
@@ -28,6 +28,9 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     # 部位追蹤刻意放在 candidates 判斷之外：這是使用者的持久資料，
     # 抓取失敗時不該跟著消失（見 controller 的 pmcc_tracker_for）。
     @pmcc_tracker   = pmcc_tracker
+    # 三個價格情境 widget 的資料。首次載入時通常是 nil（還沒抓），
+    # 畫面先出骨架，由 leapsPriceContext.ts 輪詢 /leaps/price_context 換上來。
+    @price_context  = price_context
   end
 
 
@@ -38,6 +41,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       render_header
       render_search_form
       render_status_bar if @scrape_status
+      render_price_context
       if @candidates.any?
         render_recommendation if @recommendation
         render_ranking_table
@@ -55,4 +59,17 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
 
   private
+
+  # 三個價格情境 widget。外層 div 是輪詢的錨點，內容由
+  # PriceContextComponent 渲染；TS 拿到新 HTML 後整塊換掉 innerHTML。
+  def render_price_context
+    return if @symbol.blank?
+
+    div(id: "leaps-price-context",
+        data: { behavior: "leaps-price-context",
+                symbol: @symbol,
+                user_strike: @user_strike.to_s }) do
+      render LeapsRecommendations::PriceContextComponent.new(payload: @price_context)
+    end
+  end
 end

@@ -103,7 +103,10 @@ class LeapsRecommendationsController < ApplicationController
       user_strike:    @user_strike,
       next_earnings:  next_earnings,
       pmcc_ranking:   @pmcc_ranking,
-      pmcc_tracker:   @pmcc_tracker
+      pmcc_tracker:   @pmcc_tracker,
+      # 已經有快照就直接畫，不必等前端輪詢一輪才看到東西。
+      # 沒有就傳 nil，畫面出骨架，由 leapsPriceContext.ts 接手。
+      price_context:  price_context_payload
     )
   end
 
@@ -155,7 +158,74 @@ class LeapsRecommendationsController < ApplicationController
     render json: cached || { status: "not_found" }
   end
 
+  # 三個價格情境 widget 的輪詢端點。
+  #
+  # 回傳**渲染好的 HTML 片段**而不是原始數字：markup 與數字格式只在 Phlex 寫一份，
+  # TS 端不重寫一套排版（同 pdf_export.rb 註解裡「避免兩處數字格式漂移」的理由）。
+  def price_context
+    symbol = params[:symbol].to_s.upcase.strip.gsub(/[^A-Z0-9.\-]/, "")
+    return render json: { status: "error", message: "missing symbol" },
+                  status: :unprocessable_entity if symbol.blank?
+
+    payload = LeapsPriceContextService.new(symbol, user_strike: params[:user_strike].presence).call
+
+    if payload.values_at(:poi, :week52, :day_range).any?(&:present?)
+      return render json: { status: "ok", html: render_price_context_html(payload) }
+    end
+
+    # 還沒有資料：先看背景 job 回報了什麼，再決定要繼續等還是直接告訴使用者原因。
+    job = Rails.cache.read(ScrapePriceContextJob.cache_key(symbol))
+
+    case job&.dig(:status)
+    when "barchart_session_expired"
+      render json: { status: "error", message: "請先登入 Barchart 後重新查詢。" }
+    when "no_volap_plot"
+      render json: { status: "error",
+                     message: "Barchart 的 interactive-chart 上沒有掛 Volume Profile（VOLAP）指標，" \
+                              "請加上後存成預設模板再重試。" }
+    when "error"
+      render json: { status: "error", message: "價格情境資料抓取失敗，請稍後重試。" }
+    else
+      # CLAUDE.md「CDP 預檢（全域強制）」：排 job 之前先確認 CDP 連得上，
+      # 連不上就直接回報、不排 job，讓使用者 1–2 秒內看到可行動的訊息，
+      # 而不是輪詢兩分鐘才逾時。
+      return render json: { status: "error", message: CDP_OFFLINE_MESSAGE } unless cdp_online?
+
+      # 用 cache lock 擋掉輪詢造成的重複排程——前端每 5 秒問一次，
+      # 沒有這道鎖會排出一串重複的抓取。
+      enqueue_price_context(symbol)
+      render json: { status: "pending" }
+    end
+  end
+
   private
+
+  # index 用：已經有快照就直接帶進畫面。抓取本身是 job 的事，這裡只讀 DB。
+  def price_context_payload
+    return nil if @symbol.blank?
+
+    payload = LeapsPriceContextService.new(@symbol, user_strike: @user_strike).call
+    payload.values_at(:poi, :week52, :day_range).any?(&:present?) ? payload : nil
+  rescue => e
+    # 這三張卡是輔助資訊，算不出來絕不能讓整個 LEAPS 頁 500。
+    Rails.logger.warn("[price_context] payload build failed for #{@symbol}: #{e.class}: #{e.message}")
+    nil
+  end
+
+  def render_price_context_html(payload)
+    LeapsRecommendations::PriceContextComponent.new(payload: payload).call
+  end
+
+  def enqueue_price_context(symbol)
+    lock_key = "price_context_lock_#{symbol}"
+    return if Rails.cache.exist?(lock_key)
+
+    Rails.cache.write(lock_key, true, expires_in: 3.minutes)
+    ScrapePriceContextJob.perform_later(symbol)
+  rescue => e
+    # 排不進去不該讓輪詢端點 500——前端會繼續輪詢，下一輪再試。
+    Rails.logger.warn("[price_context] enqueue failed for #{symbol}: #{e.message}")
+  end
 
   # 判斷邏輯唯一定義在 LeapsOptionChainSnapshot.fresh_for?（時間新鮮 +
   # 中心履約價吻合），這裡跟 BarchartScraperService#fetch_leaps 內部的

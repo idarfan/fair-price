@@ -1,6 +1,66 @@
 @import "tailwindcss";
 @source "../../../app/frontend/**/*.tsx";
 
+/* ── LEAPS 價格情境 widget（POI / 52 週區間 / 當日區間）────────────────────
+   CSP 的 style-src 沒有 'unsafe-inline'，HTML 的 style 屬性一律被瀏覽器擋掉
+   （config/initializers/content_security_policy.rb）。所以：
+     靜態顏色 → 這裡的 class
+     動態數值（寬度百分比、游標位置）→ data-bar-pct / data-marker-pct，
+                                      由 shared/dataStyles.ts 走 CSSOM 套上去
+   兩者缺一不可，只用 Tailwind 動態 class 也不行——v4 的掃描器認不得字串插值。 */
+.pc-title      { color: #152C4E; }
+.pc-sub        { color: #7A8699; }
+.pc-price      { color: #3C4552; }
+.pc-price-now  { color: #6B4EE6; }
+.pc-caption    { color: #8A94A6; letter-spacing: .12em; }
+.pc-label      { color: #2CA58D; }
+.pc-note       { color: #4A5462; }
+.pc-dot        { color: #C3C9D2; }
+.pc-pct-up     { color: #2CA58D; }
+.pc-pct-down   { color: #F4726A; }
+
+.pc-bar        { height: 13px; border-radius: 7px; overflow: hidden; display: flex; }
+.pc-bar-up     { background-color: #2CA58D; height: 100%; }
+.pc-bar-down   { background-color: #F4726A; height: 100%; }
+
+.pc-now-line   { background-color: #6B4EE6; }
+.pc-now-pill   { background-color: #6B4EE6; color: #fff; }
+
+.pc-track      { background-color: #E5E7EB; }
+.pc-fill       { background-color: #2CA58D; }
+
+/* 游標／收摺箭頭：外層深色三角 + 內層白色三角疊上，比 drop-shadow 模擬描邊清楚。
+   border-top-color 不在 dataStyles 支援的 data-accent-* 之列，而這兩個顏色
+   本來就是固定的，寫成 class 最直接。 */
+.pc-cursor     { width: 0; height: 0; border-left: 9px solid transparent;
+                 border-right: 9px solid transparent; border-top: 11px solid #9AA5B1; }
+.pc-cursor::after { content: ""; position: absolute; left: -6px; top: -11px; width: 0; height: 0;
+                 border-left: 6px solid transparent; border-right: 6px solid transparent;
+                 border-top: 8px solid #fff; }
+.pc-chevron    { width: 0; height: 0; border-left: 5px solid transparent;
+                 border-right: 5px solid transparent; border-top: 6px solid #8A94A6;
+                 display: block; }
+
+/* Value Area 的列用極淡的青綠漸層標出來，不搶長條本身的視覺。 */
+.pc-row-va     { background: linear-gradient(90deg, rgba(44,165,141,.07), rgba(44,165,141,0)); }
+
+/* <summary> 預設的三角形 marker 要拿掉，否則會跟自訂的 .pc-chevron 並存。 */
+.pc-summary    { list-style: none; }
+.pc-summary::-webkit-details-marker { display: none; }
+
+/* 可查解釋的名詞：給一點可點擊的暗示，否則沒人知道標籤能滑能點。 */
+.pc-term       { cursor: help; text-decoration: underline dotted rgba(44,165,141,.55);
+                 text-underline-offset: 2px; }
+.pc-term:hover { text-decoration-color: #2CA58D; }
+
+.pc-sw         { display: inline-block; width: 14px; height: 10px; border-radius: 5px;
+                 margin-right: 6px; vertical-align: -1px; }
+.pc-sw-up      { background-color: #2CA58D; }
+.pc-sw-down    { background-color: #F4726A; }
+.pc-sw-now     { display: inline-block; width: 18px; height: 3px; border-radius: 2px;
+                 margin-right: 6px; vertical-align: 3px; background-color: #6B4EE6; }
+.pc-sw-va      { background-color: rgba(44,165,141,.12); border: 1px solid #2CA58D; }
+
 /* OptionsChainTable — dynamic background classes (bypasses Tailwind v4 scanner) */
 .opt-call-selected { background-color: rgb(219 234 254); }         /* blue-100: call 選中 */
 .opt-put-selected  { background-color: rgb(254 226 226); }         /* red-100: put 選中  */
@@ -141,10 +201,13 @@
   color: #d1d5db;                       /* gray-300 */
   border: 1px solid #374151;            /* gray-700 */
   box-shadow: 0 10px 30px rgba(0,0,0,.45);
-  max-width: 400px;                     /* 配合字級放大，避免卡片過長 */
+  /* 內文從 15px 調到 20px（使用者指定）後，400px 每行只放得下十來個字，
+     整張卡會被撐得又窄又長。寬度一起放大。 */
+  max-width: 580px;
 }
-.driver-popover .driver-popover-title { color: #f9fafb; font-size: 17px; }      /* gray-50 */
-.driver-popover .driver-popover-description { color: #d1d5db; font-size: 15px; line-height: 1.8; }
+/* 字級 20px 是使用者指定的（原本標題 17px／內文 15px）。 */
+.driver-popover .driver-popover-title { color: #f9fafb; font-size: 22px; }      /* gray-50 */
+.driver-popover .driver-popover-description { color: #d1d5db; font-size: 20px; line-height: 1.8; }
 .driver-popover .driver-popover-close-btn { color: #6b7280; }                   /* gray-500 */
 .driver-popover .driver-popover-close-btn:hover, .driver-popover .driver-popover-close-btn:focus { color: #f9fafb; }
 .driver-popover .driver-popover-progress-text { color: #9ca3af; }               /* gray-400 */
@@ -164,20 +227,35 @@
 #leaps-col-tip {
   position: fixed;
   z-index: 99999;
-  max-width: 380px;
+  /* 字級 20px 是使用者指定的（原本 14px）。字變大後 380px 會擠成一長條，
+     寬度同步放大，否則每行只放得下幾個字。 */
+  max-width: 560px;
   background: #111827;
   color: #d1d5db;
   border: 1px solid #374151;
   border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 14px;
+  padding: 12px 16px;
+  font-size: 20px;
   line-height: 1.6;
   pointer-events: none;
   opacity: 0;
   transition: opacity .12s ease;
   box-shadow: 0 8px 24px rgba(0,0,0,.4);
 }
-#leaps-col-tip .tip-t { font-weight: 700; color: #f9fafb; margin-bottom: 4px; font-size: 15px; }
+#leaps-col-tip .tip-t { font-weight: 700; color: #f9fafb; margin-bottom: 6px; font-size: 22px; }
+
+/* 該項在圖上的實際數值（例如「FVG 138.22–144.49」）。原本靠元素的 title 屬性
+   顯示，但原生提示會疊在自訂 tooltip 上互相遮擋，改成放進內容的第一列。 */
+#leaps-col-tip .tip-v,
+.driver-popover .driver-popover-description .tip-v {
+  font-weight: 700; color: #f9fafb; font-variant-numeric: tabular-nums;
+  background: rgba(44,165,141,.16); border-left: 3px solid #2CA58D;
+  border-radius: 4px; padding: 4px 10px; margin-bottom: 10px;
+  /* block + fit-content：自成一列（inline-block 會讓後面的解釋文字接在同一行，
+     實測畫面變成「HVN 119.72–127.07 成交量明顯偏高的價格帶」黏在一起），
+     同時底色只包住數值本身、不拉滿整行。 */
+  display: block; width: fit-content;
+}
 /* 欄位說明的分級條列（tooltips.js 的 TIP_H／TIP_L），hover tooltip 與 driver.js
    popover 共用同一份 HTML，樣式也一起定義，兩邊看起來才一致。 */
 #leaps-col-tip .tip-h,

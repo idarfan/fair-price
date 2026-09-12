@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_01_093000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_11_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -48,6 +48,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_01_093000) do
     t.bigint "updated_by_id"
     t.index ["table_key"], name: "index_column_orders_on_table_key", unique: true
     t.index ["updated_by_id"], name: "index_column_orders_on_updated_by_id"
+  end
+
+  create_table "daily_bars", force: :cascade do |t|
+    t.date "bar_date", null: false
+    t.decimal "close_price", precision: 10, scale: 4, null: false
+    t.datetime "created_at", null: false
+    t.decimal "high_price", precision: 10, scale: 4, null: false
+    t.decimal "low_price", precision: 10, scale: 4, null: false
+    t.decimal "open_price", precision: 10, scale: 4, null: false
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "volume"
+    t.index ["symbol", "bar_date"], name: "idx_daily_bars_unique", unique: true
+    t.check_constraint "high_price >= low_price", name: "daily_bars_high_ge_low"
+    t.check_constraint "low_price > 0::numeric", name: "daily_bars_low_positive"
+    t.check_constraint "volume IS NULL OR volume >= 0", name: "daily_bars_volume_non_negative"
   end
 
   create_table "fetch_logs", force: :cascade do |t|
@@ -670,6 +686,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_01_093000) do
     t.datetime "updated_at", null: false
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["google_uid"], name: "index_users_on_google_uid", unique: true
+  end
+
+  create_table "volap_snapshots", force: :cascade do |t|
+    t.string "aggregation", null: false
+    t.jsonb "bars", default: [], null: false
+    t.datetime "created_at", null: false
+    t.jsonb "inputs", default: {}, null: false
+    t.string "period_key", null: false
+    t.integer "poc_index", null: false
+    t.decimal "price_max", precision: 10, scale: 4, null: false
+    t.decimal "price_min", precision: 10, scale: 4, null: false
+    t.datetime "scraped_at", null: false
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.decimal "zone", precision: 10, scale: 6, null: false
+    t.index ["symbol", "scraped_at"], name: "idx_volap_symbol_scraped"
+    t.check_constraint "poc_index >= 0", name: "volap_poc_index_non_negative"
+    t.check_constraint "price_max > price_min", name: "volap_range_ordered"
+    t.check_constraint "zone > 0::numeric", name: "volap_zone_positive"
   end
 
   create_table "watched_tickers", force: :cascade do |t|

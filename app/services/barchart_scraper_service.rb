@@ -411,6 +411,59 @@ class BarchartScraperService
     end
   end
 
+  # LEAPS 頁三個價格情境 widget 的資料來源之一：Barchart 自己算好的 Volume Profile。
+  # 爬蟲會把圖固定到日線 1 年再讀，抓完切回原設定（見 volap_scraper.py）。
+  def fetch_volap
+    return { status: "error", error: "CDP unavailable" } unless cdp_available?
+
+    if VolapSnapshot.fresh_for?(@symbol)
+      log_fetch("volap", "cached", nil)
+      return { status: "cached" }
+    end
+
+    fetch_result = run_scraper("volap")
+
+    case fetch_result[:status]
+    when "success"
+      persist_volap(fetch_result[:data])
+      log_fetch("volap", "success", "bins=#{Array(fetch_result[:data]["bars"]).size}")
+      { status: "success" }
+    when "barchart_session_expired"
+      log_fetch("volap", "barchart_session_expired", nil)
+      { status: "barchart_session_expired" }
+    else
+      # no_volap_plot / volap_timeout / chart_not_ready 都走這裡，原樣往上傳，
+      # 讓呼叫端能對使用者講出「你的圖上沒掛 VOLAP」這種可行動的訊息。
+      log_fetch("volap", fetch_result[:status], fetch_result[:error])
+      { status: fetch_result[:status], error: fetch_result[:error] }
+    end
+  end
+
+  # 日線 OHLCV：結構型 POI 與「當日區間」卡要用。
+  def fetch_price_history
+    return { status: "error", error: "CDP unavailable" } unless cdp_available?
+
+    if DailyBar.fresh_for?(@symbol)
+      log_fetch("price_history", "cached", nil)
+      return { status: "cached" }
+    end
+
+    fetch_result = run_scraper("price_history")
+
+    case fetch_result[:status]
+    when "success"
+      count = persist_daily_bars(fetch_result[:data])
+      log_fetch("price_history", "success", "bars=#{count}")
+      { status: "success", bars_count: count }
+    when "barchart_session_expired"
+      log_fetch("price_history", "barchart_session_expired", nil)
+      { status: "barchart_session_expired" }
+    else
+      log_fetch("price_history", fetch_result[:status], fetch_result[:error])
+      { status: fetch_result[:status], error: fetch_result[:error] }
+    end
+  end
+
   private
 
   def cdp_available?
@@ -474,8 +527,22 @@ class BarchartScraperService
       when "error"
         Rails.logger.error("[#{type}] scraper reported error for #{@symbol}: #{data["error"]}\n#{data["traceback"]}")
         { status: "error", error: data["error"].to_s.first(500) }
-      else
+      when "success"
         { status: "success", data: data }
+      else
+        # 2026-09-11：這裡原本是 `else { status: "success", data: data }`，
+        # 任何沒列進上面 case 的狀態都會被當成成功，這正是 feedback_scraper_status_case
+        # 那個教訓的翻版，而且已經在線上靜靜發生：
+        #   technical_scraper / options_flow_scraper 的 "dom_structure_changed"
+        #   max_pain_scraper 的 "charts_not_ready"
+        # 三個都會回報 success，然後把空資料寫進 DB。
+        #
+        # 改成白名單：只有明確的 "success" 才是成功，其餘一律原樣往上拋，
+        # 讓呼叫端自己決定怎麼處理。新爬蟲加新狀態時不必再記得回來改這裡。
+        Rails.logger.error("[#{type}] scraper returned non-success status for #{@symbol}: " \
+                           "#{data["status"]} #{data["error"]}")
+        { status: data["status"].presence || "error",
+          error: data["error"].presence || "scraper status=#{data["status"].inspect}" }
       end
     else
       Rails.logger.error("[#{type}] scraper exited non-zero for #{@symbol}:\n#{stderr}")
@@ -741,6 +808,45 @@ class BarchartScraperService
       created_at:           fetched_at,
       updated_at:           fetched_at
     }
+  end
+
+  # 每次抓取存成一筆新快照，不 update 舊的——VOLAP 的分箱是整組數字，
+  # 覆蓋會讓「昨天的關注價位長什麼樣」永遠查不回來。清理交給日後的保留策略。
+  def persist_volap(data)
+    VolapSnapshot.create!(
+      symbol:      @symbol,
+      scraped_at:  Time.current,
+      period_key:  data["period_key"],
+      aggregation: data["aggregation"],
+      price_min:   data["min"],
+      price_max:   data["max"],
+      zone:        data["zone"],
+      poc_index:   data["poc_index"],
+      inputs:      data["inputs"] || {},
+      bars:        Array(data["bars"])
+    )
+  end
+
+  # 同一天重抓要覆蓋（當日那根盤中會一直變），靠 [symbol, bar_date] 唯一鍵 upsert。
+  def persist_daily_bars(data)
+    rows = Array(data["bars"]).filter_map do |b|
+      next if b["bar_date"].blank?
+      {
+        symbol:      @symbol,
+        bar_date:    b["bar_date"],
+        open_price:  b["open"],
+        high_price:  b["high"],
+        low_price:   b["low"],
+        close_price: b["close"],
+        volume:      b["volume"],
+        created_at:  Time.current,
+        updated_at:  Time.current
+      }
+    end
+    return 0 if rows.empty?
+
+    DailyBar.upsert_all(rows, unique_by: %i[symbol bar_date])
+    rows.size
   end
 
   def log_fetch(type, status, detail)

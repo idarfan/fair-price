@@ -40,23 +40,28 @@ const REGISTRY: Record<string, Loader> = {
   "confirm-delete": () => import("../behaviors/confirmDelete"),
   "font-size-controls": () => import("../behaviors/fontSizeControls"),
   "iv-analysis": () => import("../behaviors/ivAnalysis"),
-  "iv-education-chain-tooltip": () => import("../behaviors/ivEducationChainTooltip"),
+  "iv-education-chain-tooltip": () =>
+    import("../behaviors/ivEducationChainTooltip"),
   "iv-education-chart": () => import("../behaviors/ivEducationChart"),
   "iv-education-tts": () => import("../behaviors/ivEducationTts"),
   "iv-watchlists": () => import("../behaviors/ivWatchlists"),
   "leaps-loading": () => import("../behaviors/leapsLoading"),
+  "leaps-price-context": () => import("../behaviors/leapsPriceContext"),
   "methodology-note-toggle": () => import("../behaviors/methodologyNoteToggle"),
   "momentum-analysis-panel": () => import("../behaviors/momentumAnalysisPanel"),
   "momentum-news-tabs": () => import("../behaviors/momentumNewsTabs"),
-  "momentum-watchlist-manager": () => import("../behaviors/momentumWatchlistManager"),
+  "momentum-watchlist-manager": () =>
+    import("../behaviors/momentumWatchlistManager"),
   "ownership-panel": () => import("../behaviors/ownershipPanel"),
   "page-progress": () => import("../behaviors/pageProgress"),
   "portfolio-holdings": () => import("../behaviors/portfolioHoldings"),
   "release-notes": () => import("../behaviors/releaseNotes"),
   "tech-dash-dte-filter": () => import("../behaviors/techDashDteFilter"),
   "tech-dash-loading": () => import("../behaviors/techDashLoading"),
-  "tech-dash-max-pain-filter": () => import("../behaviors/techDashMaxPainFilter"),
-  "tech-dash-options-charts": () => import("../behaviors/techDashOptionsCharts"),
+  "tech-dash-max-pain-filter": () =>
+    import("../behaviors/techDashMaxPainFilter"),
+  "tech-dash-options-charts": () =>
+    import("../behaviors/techDashOptionsCharts"),
   "ticker-search": () => import("../behaviors/tickerSearch"),
 };
 

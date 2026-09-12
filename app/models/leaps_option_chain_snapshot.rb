@@ -26,6 +26,23 @@ class LeapsOptionChainSnapshot < ApplicationRecord
     last_center == requested
   end
 
+  # 最近一次抓到的標的現價。價格情境 widget 用它當「現價」，
+  # 好跟排行表／推薦分析顯示的是同一個數字。
+  #
+  # ⚠️ 這裡刻意**不**用 for_symbol scope，自己組 where：
+  # spec/requests/leaps_recommendations_spec.rb 有十幾處
+  # `receive_message_chain(:for_symbol, :fresh, :exists?)`，
+  # 那種 stub 會讓 for_symbol 回傳一個只認得 :fresh 的 double，
+  # 任何接在它後面的新查詢都會炸成 "received unexpected message"。
+  # 查詢放在 model 這層本來就比讓 service 自己組 scope 合理，順便避開這個地雷。
+  def self.latest_underlying_price(symbol)
+    where(symbol: symbol.to_s.upcase)
+      .where.not(underlying_price: nil)
+      .order(scraped_at: :desc)
+      .limit(1)
+      .pick(:underlying_price)
+  end
+
   def mid_price
     return nil if bid.nil? && ask.nil?
     return ask if bid.nil?

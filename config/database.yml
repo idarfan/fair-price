@@ -15,14 +15,28 @@ default: &default
 # 「最後一次 db:migrate 是用哪個 RAILS_ENV 跑的」而漂移，所以
 # config/application.rb 把 development 也一併列入受保護環境，
 # 讓 db:drop / db:reset / db:schema:load 在兩種情況下都被擋下來。
+# 2026-09-11：這裡原本只有 `database: fairprice_production`，沒有 `url:`，
+# 結果 .env 的 DATABASE_URL（當時指向 fairprice_development）直接蓋過它——
+# `bin/rails db:migrate` 靜靜地新建了一個空的 fairprice_development
+# 並把新表建在那裡，正式庫什麼都沒拿到，過程中沒有任何警告。
+#
+# 跟下面 test 區塊是同一個坑，當時只補了 test。現在 development 一併補上：
+# 明確的 `url:` 是唯一能穩定壓過 DATABASE_URL 的方式。
 development:
   <<: *default
   database: fairprice_production
+  url: <%= ENV.fetch("DEV_DATABASE_URL") do
+             require "cgi"
+             user = ENV.fetch("DB_USER", "idarfan")
+             pass = CGI.escape(ENV.fetch("DB_PASSWORD", ""))
+             host = ENV.fetch("DB_HOST", "localhost")
+             port = ENV.fetch("DB_PORT", 5432)
+             "postgresql://#{user}:#{pass}@#{host}:#{port}/fairprice_production"
+           end %>
 
-# .env 裡的 DATABASE_URL 指向正式資料庫，而 dotenv-rails 在 test 環境同樣會
-# 載入 .env——沒有下面這行 `url:`，DATABASE_URL 會蓋掉 `database:`，整套測試
-# 就會跑在正式資料上（rspec 讀得到真實資料、db:test:prepare 會試圖 purge
-# 正式資料庫）。
+# dotenv-rails 在 test 環境同樣會載入 .env——沒有下面這行 `url:`，
+# DATABASE_URL 會蓋掉 `database:`，整套測試就會跑在正式資料上
+# （rspec 讀得到真實資料、db:test:prepare 會試圖 purge 正式資料庫）。
 #
 # 明確指定 url 是唯一能穩定壓過 DATABASE_URL 的方式，而且寫在版控檔案裡，
 # 不會像放在 .env.test 那樣在新環境 checkout 後無聲消失。

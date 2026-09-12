@@ -174,6 +174,11 @@ Rails.application.routes.draw do
   get  "leaps",         to: "leaps_recommendations#index",   as: :leaps_recommendations
   post "leaps/analyze", to: "leaps_recommendations#analyze", as: :leaps_recommendations_analyze
   get  "leaps/status",  to: "leaps_recommendations#status",  as: :leaps_recommendations_status
+  # 三個價格情境 widget（POI / 52 週區間 / 當日區間）的輪詢端點。
+  # 獨立於 leaps/status：那支綁 job_id 看 LEAPS 抓取進度，這支綁 symbol，
+  # 兩者的生命週期與失敗處理完全不同。
+  get  "leaps/price_context", to: "leaps_recommendations#price_context",
+                              as: :leaps_recommendations_price_context
 
   # Bull Put Spread 三級試算工具
   get  "bpus",                    to: "bull_put_spreads#index",             as: :bull_put_spreads
