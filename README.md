@@ -1,6 +1,57 @@
 # FairPrice
 
-### 2026-09-09（三）— 修正：教學說明改由使用者輸入推算，不再寫死範例
+### 2026-09-12（六）— 新增：LEAPS 三張價格情境卡（POI／52 週／當日）與名詞導覽
+
+**推翻了一個錯誤前提。** 規劃時我判定 Barchart 的 Volume Profile 是 canvas
+study、DOM 抓不到，只能自己從日線 OHLCV 分箱重算。使用者一句「沒法子直接從
+barchart 讀取?」逼我實際去看——`document.querySelectorAll('canvas').length === 0`，
+那張圖是自家 SVG widget，VOLAP 算好的分箱結果就掛在頁面 JS 物件上：
+
+```
+interactive-chart-widget._panel.chartService._feed.charts
+  → presenter.panes[0].axes[0].plots.find(_title 含 "VOLAP")
+  → annotations[0].boxes[0]   // min/max/zone/bars[].upVolume/downVolume/isValue/maxVolumeIndex
+```
+
+POC 與 Value Area 是 Barchart 自己算的，直接讀就好——**同一個數字兩套算法是
+規格明文禁止的 bug 溫床**，這次省掉的正是那條。存取路徑與三個踩過的前提見
+`reference_barchart_volap_dom` 記憶。
+
+**三個坑，每一個都只有實際跑才會發現**：`changePeriod(key, aggregationName)`
+要傳兩個字串（傳物件丟 `TypeError: reading 'length'`）；VOLAP 依「可見畫面範圍」
+計算，抓之前必須固定到 `period.1Y`／`CHART.DAILY`；而視窗被別的視窗遮蔽時
+`document.hidden === true`，renderer 被凍結，`boxes` 永遠是空陣列——
+`Target.activateTarget`、`Page.bringToFront`、`Page.setWebLifecycleState('active')`
+三種 CDP 手段全部回成功但救不回來，**只能在 Chrome 啟動參數解**
+（`--disable-backgrounding-occluded-windows` 等三個 flag，改 `chrome-cdp-keeper.sh`）。
+
+**新增檔案**：`volap_scraper.py` / `price_history_scraper.py`（爬蟲）、
+`VolapSnapshot` / `DailyBar`（model）、`VolapParserService` / `StructuralPoiService` /
+`PoiService` / `LeapsPriceContextService`（service）、`ScrapePriceContextJob`、
+`PriceContextComponent`（Phlex）、`leapsPriceContext.ts`。
+
+**所有門檻都拿實際資料校準過**，不是憑感覺訂的（`feedback_boolean_sort_key`）：
+HVN 原設 0.70 → 一個都選不到，看 SHOP 的占比分佈發現 61.3 與 49.4 之間有斷層，
+取中點 0.55，再用 NOK 驗證不是單檔過擬合；位移根原設 1.5 ATR → SHOP 2 根、
+NOK **0 根**，等於 Order Block 與供需區永遠不出現，改 1.0；缺口不設下限時
+63 根 K 產生 **63 個缺口**（中位數只有 0.18 ATR），加 0.5 ATR 門檻後剩 9 個。
+
+**CSP 讓整張圖「靜默」壞掉。** 第一版用 inline `style` 寫顏色與長條寬度，
+上線後顏色與長條全部消失且**不報任何錯**——`style_src :self` 沒有 `unsafe-inline`，
+瀏覽器把 `style=""` 整個丟掉。專案早有 `shared/dataStyles.ts` 解這件事
+（CSSOM 賦值不受 CSP 限制，被擋的只有 HTML 屬性這個形式），我沒先找就自己寫了一套。
+改成靜態色走 `.pc-*` class、動態值走 `data-bar-pct`／`data-marker-pct`。
+這一條是我跳過 CLAUDE.md「UI 修改強制流程」第三步的直接後果。
+
+**順手修掉三個既有漏洞**：`BarchartScraperService#run_scraper` 的 `else` 把任何
+未知狀態當成 success，`technical`／`options_flow` 的 `dom_structure_changed` 與
+`max_pain` 的 `charts_not_ready` 三處在線上一直被回報成「成功」然後寫入空資料，
+改成只認 `"success"` 的白名單；`database.yml` 的 development 少一行 `url:`，
+`.env` 的 `DATABASE_URL` 蓋過它，`db:migrate` 會靜靜新建一個空的
+`fairprice_development` 把表建在那裡；POI 的大 OI 履約價只看名次不看量體，
+SHOP 只有兩個履約價時「OI 2 口」也被標成關注價位（加 10% 相對門檻）。
+
+
 
 第一版把 NOK 的股價、EPS、倍數寫死在 locale 裡當教材。使用者一句話點破：
 「這教學的式子是固定的，應依使用者輸入的美股代號及數值來做推算」。
