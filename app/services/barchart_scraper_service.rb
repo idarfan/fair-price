@@ -850,6 +850,20 @@ class BarchartScraperService
   end
 
   def log_fetch(type, status, detail)
+    status = status.to_s
+
+    # 白名單外的狀態降級成 error 記下來，原值保留在 error_detail。
+    # 原本是直接 create! 然後把 validation 例外 rescue 成一行 warn，結果
+    # scraper 新增一個狀態＝那次抓取在稽核表裡**整筆消失**，而且沒有任何人會發現
+    # （2026-09-21：volap／price_history 兩種抓取從上線起一筆都沒進 DB）。
+    # 記成 error 至少留得住「這個 symbol 在這個時間抓過而且不順利」。
+    unless FetchLog::STATUSES.include?(status)
+      Rails.logger.warn("[BarchartScraperService] 未知的 fetch status=#{status.inspect}（type=#{type}）" \
+                        "，降級記成 error。請把它補進 FetchLog::STATUSES。")
+      detail = [ "unmapped_status=#{status}", detail.presence ].compact.join(" ")
+      status = "error"
+    end
+
     FetchLog.create!(
       symbol:       @symbol,
       fetch_type:   type,
