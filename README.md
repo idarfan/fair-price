@@ -1,5 +1,52 @@
 # FairPrice
 
+### 2026-09-21（日）— 修正：POI 與 52 週卡永遠停在「載入中」（一道過寬的 gate）
+
+使用者回報 NOK 的 POI 與 52 週區間讀不到，當日區間卻正常。查下去發現那個
+「載入中…」**永遠不會結束**——系統早就放棄了，只是訊息還掛在那裡。
+
+根因在 `LeapsRecommendationsController#price_context` 的一行：
+
+```ruby
+if payload.values_at(:poi, :week52, :day_range).any?(&:present?)   # ← :day_range 不該在裡面
+  return render json: { status: "ok", ... }                        # 直接回，不排 job
+end
+```
+
+POI 與 52 週同源於 `VolapSnapshot`，當日區間走 `DailyBar`，**是兩條獨立的供給線**。
+而 day_range 幾乎永遠有值，所以 `any?` 讓每個缺 VOLAP 的代號都被判成「已經有資料了」，
+`ScrapePriceContextJob` 一次都排不出去。實測佐證：`volap_snapshots` 整張表只有
+SHOP 一筆，NOK 的 job cache 是 `nil`——從上線起連一次都沒跑過。前端收到 `ok`
+就停止輪詢，於是空卡的預設訊息「載入中…」變成了永久狀態。
+
+同 `feedback_silent_guards_and_cache`：一道過寬的防護把「沒抓到」偽裝成「不用抓」。
+
+修法：
+
+- gate 只看 VOLAP 那條線（`values_at(:poi, :week52)`）
+- 新增 `partial` 狀態——抓取走到終局但已有 day_range 時，換上那半邊 HTML 再於上方
+  補一條提示，而不是用 `replaceChildren` 把使用者已經看得到的卡片洗掉
+- `pending` 夾帶已有的 HTML，不讓人對著三張空卡等 VOLAP
+- 空卡訊息區分「還在抓」（載入中…）與「抓過但沒有」（暫無資料）
+- 測試補上「只有日線、沒有 VOLAP」這個 context——舊測試只有「三塊全有」與
+  「三塊全無」，正好漏掉實務上最常見的這一種
+
+修正後同步跑一次 job（24 秒）就抓回來了：NOK 52 週 4.63–17.45、POI 24 箱。
+Barchart 帳號上的 VOLAP 指標一直是好的，根本輪不到那一關。
+
+**順手修掉兩個既有缺陷：**
+
+`FetchLog` 的兩份白名單漏了 `volap`／`price_history`／`bcvs_*`，以及
+`invalid_strike`／`no_volap_plot`／`volap_timeout` 等狀態。`log_fetch` 把 validation
+例外 rescue 成一行 warn，所以那些抓取的稽核記錄**整筆安靜消失**——實測修正前
+DB 裡 volap／price_history 記錄數是 0。除了補白名單，也讓未知狀態降級成 `error`
+寫入（原值留在 `error_detail`），未來 scraper 新增狀態不會再靜默丟失；並加上
+稽核測試掃原始碼釘住白名單。
+
+`spec/frontend/behavior_registry_spec.rb` 的 glob 會掃到 `*.test.ts` 並要求它
+export `init`。測試檔與原始碼並排是本專案慣例，只是 `shared/` 在子目錄裡躲過了
+單層 glob，直到 `leapsTooltips.test.ts` 出現在 `behaviors/` 根目錄才撞上。
+
 ### 2026-09-12（六）— 新增：LEAPS 三張價格情境卡（POI／52 週／當日）與名詞導覽
 
 **推翻了一個錯誤前提。** 規劃時我判定 Barchart 的 Volume Profile 是 canvas

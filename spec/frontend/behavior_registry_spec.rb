@@ -51,8 +51,18 @@ RSpec.describe "行為模組註冊表", type: :model do
     expect(missing).to be_empty, "註冊了但找不到模組檔：#{missing.join(', ')}"
   end
 
+  # Vitest 的測試檔與原始碼並排放（app/frontend/behaviors/shared/dom.test.ts 等），
+  # 所以這個 glob 一定會掃到 *.test.ts——那是測試，本來就不該 export init。
+  # behaviors/ 根目錄第一次出現測試檔時（leapsTooltips.test.ts）就踩到了。
+  def behavior_modules
+    Dir[behaviors_dir.join("*.{js,ts}")].reject { |f| File.basename(f).match?(/\.(test|spec)\.[jt]s\z/) }
+  end
+
   it "每個模組都 export 了 init" do
-    without_init = Dir[behaviors_dir.join("*.{js,ts}")].reject do |f|
+    # 排除規則寫過頭（例如 glob 打錯）會讓這條變成永遠通過的空測試。
+    expect(behavior_modules).not_to be_empty, "掃不到任何 behavior 模組，測試本身可能失效了"
+
+    without_init = behavior_modules.reject do |f|
       File.read(f).match?(/export\s+function\s+init\b/)
     end
 
