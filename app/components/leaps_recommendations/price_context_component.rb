@@ -14,8 +14,11 @@
 class LeapsRecommendations::PriceContextComponent < ApplicationComponent
   CARD_CLASS = "bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col"
 
-  # empty_message：三張卡都沒資料時顯示什麼。頁面初次渲染時通常還沒抓，
-  # 顯示「載入中」；輪詢拿到結果後由 TS 換掉整塊，那時才可能是真的沒有資料。
+  # empty_message：沒資料的那張卡顯示什麼。預設「載入中」只適用於
+  # **還會再有東西進來**的情況（頁面初次渲染、或輪詢回 pending）。
+  # 一旦抓取走到終局（no_volap_plot／session 過期／CDP 離線），controller 會
+  # 傳「暫無資料」把它換掉——否則畫面會停在一個永遠不會結束的「載入中…」，
+  # 系統其實早就放棄了（2026-09-21 NOK 實際症狀）。
   def initialize(payload:, empty_message: "價格情境資料載入中…")
     @payload = payload || {}
     @empty_message = empty_message

@@ -169,33 +169,38 @@ class LeapsRecommendationsController < ApplicationController
 
     payload = LeapsPriceContextService.new(symbol, user_strike: params[:user_strike].presence).call
 
-    if payload.values_at(:poi, :week52, :day_range).any?(&:present?)
+    # ⚠️ gate 只看 VOLAP 那條供給線（POI／52 週同源於 VolapSnapshot），
+    # **不能看「三塊任一塊有」**。day_range 走的是 DailyBar，兩條線完全獨立，
+    # 而且 day_range 幾乎永遠有值——用 any? 的話每個缺 VOLAP 的代號都會被判成
+    # 「已經有資料了」直接回 ok，job 一次都排不出去。
+    # 2026-09-21 NOK 實際踩到：volap_snapshots 整張表只有 SHOP 一筆，
+    # NOK 的 POI 與 52 週從上線起就停在「載入中…」，而且是**永遠不會結束**的載入
+    # （前端收到 ok 就停止輪詢）。同 feedback_silent_guards_and_cache：
+    # 一道過寬的防護把「沒抓到」偽裝成「不用抓」。
+    if payload.values_at(:poi, :week52).any?(&:present?)
       return render json: { status: "ok", html: render_price_context_html(payload) }
     end
 
-    # 還沒有資料：先看背景 job 回報了什麼，再決定要繼續等還是直接告訴使用者原因。
+    # VOLAP 缺席。day_range 可能已經有了——那張卡要留著，不能被錯誤訊息洗掉。
+    has_partial = payload[:day_range].present?
     job = Rails.cache.read(ScrapePriceContextJob.cache_key(symbol))
+    terminal = price_context_terminal_message(job&.dig(:status))
 
-    case job&.dig(:status)
-    when "barchart_session_expired"
-      render json: { status: "error", message: "請先登入 Barchart 後重新查詢。" }
-    when "no_volap_plot"
-      render json: { status: "error",
-                     message: "Barchart 的 interactive-chart 上沒有掛 Volume Profile（VOLAP）指標，" \
-                              "請加上後存成預設模板再重試。" }
-    when "error"
-      render json: { status: "error", message: "價格情境資料抓取失敗，請稍後重試。" }
-    else
-      # CLAUDE.md「CDP 預檢（全域強制）」：排 job 之前先確認 CDP 連得上，
-      # 連不上就直接回報、不排 job，讓使用者 1–2 秒內看到可行動的訊息，
-      # 而不是輪詢兩分鐘才逾時。
-      return render json: { status: "error", message: CDP_OFFLINE_MESSAGE } unless cdp_online?
+    # 抓過而且確定拿不到：回終局訊息讓前端停止輪詢。
+    return render json: price_context_stop(payload, has_partial, terminal) if terminal
 
-      # 用 cache lock 擋掉輪詢造成的重複排程——前端每 5 秒問一次，
-      # 沒有這道鎖會排出一串重複的抓取。
-      enqueue_price_context(symbol)
-      render json: { status: "pending" }
-    end
+    # CLAUDE.md「CDP 預檢（全域強制）」：排 job 之前先確認 CDP 連得上，
+    # 連不上就直接回報、不排 job，讓使用者 1–2 秒內看到可行動的訊息，
+    # 而不是輪詢兩分鐘才逾時。
+    return render json: price_context_stop(payload, has_partial, CDP_OFFLINE_MESSAGE) unless cdp_online?
+
+    # 用 cache lock 擋掉輪詢造成的重複排程——前端每 5 秒問一次，
+    # 沒有這道鎖會排出一串重複的抓取。
+    enqueue_price_context(symbol)
+
+    # 已經有 day_range 就連同那張卡一起回，使用者不必盯著三張空卡等 VOLAP。
+    render json: { status: "pending" }
+             .merge(has_partial ? { html: render_price_context_html(payload) } : {})
   end
 
   private
@@ -212,8 +217,37 @@ class LeapsRecommendationsController < ApplicationController
     nil
   end
 
-  def render_price_context_html(payload)
-    LeapsRecommendations::PriceContextComponent.new(payload: payload).call
+  def render_price_context_html(payload, empty_message: nil)
+    LeapsRecommendations::PriceContextComponent
+      .new(**{ payload: payload, empty_message: empty_message }.compact)
+      .call
+  end
+
+  # VOLAP 抓取的終局狀態 → 使用者該做什麼。nil＝還在抓／還沒抓過，繼續等。
+  # 三種原因的處置完全不同（去登入／去圖上掛指標／等一下再試），
+  # 全部收斂成一句「抓取失敗」會讓人不知道該動哪裡。
+  def price_context_terminal_message(job_status)
+    case job_status
+    when "barchart_session_expired"
+      "請先登入 Barchart 後重新查詢。"
+    when "no_volap_plot"
+      "Barchart 的 interactive-chart 上沒有掛 Volume Profile（VOLAP）指標，" \
+      "請加上後存成預設模板再重試。"
+    when "error"
+      "價格情境資料抓取失敗，請稍後重試。"
+    end
+  end
+
+  # 停止輪詢的兩種回法。有 day_range 可看就回 partial：前端換上 HTML 之後
+  # 在上面補一條提示，而不是用 replaceChildren 把已經看得到的卡片整塊洗掉。
+  # 完全沒資料才回 error（那時整塊換成訊息才是對的）。
+  def price_context_stop(payload, has_partial, message)
+    return { status: "error", message: message } unless has_partial
+
+    { status:  "partial",
+      message: message,
+      # 空卡不能再寫「載入中」——這一輪已經確定不會再有東西進來了。
+      html:    render_price_context_html(payload, empty_message: "暫無資料") }
   end
 
   def enqueue_price_context(symbol)

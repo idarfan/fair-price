@@ -74,6 +74,61 @@ RSpec.describe "GET /leaps/price_context", type: :request do
     end
   end
 
+  # 2026-09-21 NOK：原本的 gate 是三塊 any?，日線一有值就回 ok、job 永遠排不出去，
+  # POI 與 52 週停在「載入中…」直到天荒地老。舊測試只有「三塊全有」與「三塊全無」
+  # 兩種情境，正好漏掉實務上最常見的這一種。
+  context "只有日線、沒有 VOLAP（兩條供給線獨立）" do
+    before { create_bar }
+
+    it "照樣排 job 去抓 VOLAP，不會因為日線有值就當成已經有資料" do
+      allow_any_instance_of(LeapsRecommendationsController).to receive(:cdp_online?).and_return(true)
+      expect(ScrapePriceContextJob).to receive(:perform_later).with(symbol).once
+
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      expect(JSON.parse(response.body)["status"]).to eq("pending")
+    end
+
+    it "pending 時夾帶已經有的當日區間，不讓使用者對著三張空卡等" do
+      allow_any_instance_of(LeapsRecommendationsController).to receive(:cdp_online?).and_return(true)
+      allow(ScrapePriceContextJob).to receive(:perform_later)
+
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      html = JSON.parse(response.body)["html"]
+      expect(html).to include("DAY&#39;S RANGE")
+      # 有資料的 POI 卡 key 是小寫 "poi"，空卡走 render_empty_card 用標題當 key（"POI"）。
+      expect(html).not_to include('data-pc-key="poi"')
+      # 還在抓，空卡這時候寫「載入中」才是對的。
+      expect(html).to include("載入中")
+    end
+
+    it "抓取走到終局時回 partial：保留日線卡片，空卡不再寫「載入中」" do
+      Rails.cache.write(ScrapePriceContextJob.cache_key(symbol), { status: "no_volap_plot" })
+
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      body = JSON.parse(response.body)
+      expect(body["status"]).to eq("partial")
+      expect(body["message"]).to include("Volume Profile")
+      expect(body["html"]).to include("DAY&#39;S RANGE")
+      expect(body["html"]).to include("暫無資料")
+      expect(body["html"]).not_to include("載入中")
+    end
+
+    it "CDP 離線時也回 partial，不用一句錯誤把日線卡片洗掉" do
+      allow_any_instance_of(LeapsRecommendationsController).to receive(:cdp_online?).and_return(false)
+      expect(ScrapePriceContextJob).not_to receive(:perform_later)
+
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      body = JSON.parse(response.body)
+      expect(body["status"]).to eq("partial")
+      expect(body["message"]).to include("wsl --shutdown")
+      expect(body["html"]).to include("DAY&#39;S RANGE")
+    end
+  end
+
   context "還沒有資料" do
     it "CDP 連得上時排一次 job 並回 pending" do
       allow_any_instance_of(LeapsRecommendationsController).to receive(:cdp_online?).and_return(true)
