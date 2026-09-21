@@ -100,13 +100,13 @@ layers:
     - ''
   - - TechnicalIndicators
     - ''
+  - - ColumnOrder
+    - ''
+  - - DailyBar
+    - ''
   - - DailyMomentum
     - ''
   - - MarketStancePresenter
-    - ''
-  - - DailyMomentum
-    - ''
-  - - WatchlistRowPresenter
     - ''
 - id: scripts
   type: band
