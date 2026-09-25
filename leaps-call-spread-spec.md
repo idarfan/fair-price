@@ -7,7 +7,7 @@
 
 | 階段 | 名稱 | 狀態 | 驗證證據（指令與輸出摘要、截圖路徑） |
 |---|---|---|---|
-| P0 | 探勘與定位 | 待辦 | |
+| P0 | 探勘與定位 | 進行中 | 2026-09-25：第 1–8、12 步完成（見附錄 A）。發現 4 項與規格衝突（附錄 A「待決事項」），停下回報；第 9、10、11、13 步（需實抓 Barchart）待決定後執行 |
 | P1 | 即時抓取與快取 | 待辦 | |
 | P2 | 計算服務 | 待辦 | |
 | P3 | 路由與 Controller | 待辦 | |
@@ -244,21 +244,29 @@ Request spec 至少包含：
 
 | 項目 | 結果 |
 |---|---|
-| 規格目錄 | TBD |
-| pmcc_section 渲染位置（檔案:行號） | TBD |
-| 候選排行 model／service／欄位 | TBD |
-| 候選排行第 1 名的取法 | TBD |
-| 標的參數名稱、價格參數名稱、驗證邏輯位置 | TBD |
-| 前端慣例與範例檔 | TBD |
-| PMCC 表格樣式 class | TBD |
-| E2E 目錄與登入 helper | TBD |
-| bpus／bcvs sidecar 腳本與 Rails 呼叫端（檔案:行號） | TBD |
-| 30 分鐘快取：資料表、key、TTL 判斷位置 | TBD |
-| 進度條：前端元件與後端回報機制 | TBD |
-| bcvs 快取表能否共用（附理由） | TBD |
+| 規格目錄 | repo 根目錄（與 `pmcc-golden-rule-spec-v3.md` 同層，原本就在，免搬移）；commit `9844a6b` |
+| pmcc_section 渲染位置（檔案:行號） | `app/components/leaps_recommendations/page_component.rb:49`（`render_pmcc_section`，位於 `if @candidates.any?` 區塊內 :45–50）；定義在 `app/components/leaps_recommendations/pmcc_section.rb:23` |
+| 候選排行 model／service／欄位 | `LeapsRankingService`（`app/services/leaps_ranking_service.rb`）讀 `LeapsOptionChainSnapshot`（`db/schema.rb:169–193`）；欄位：`expiration_date`、`strike`、`bid`、`ask`、`delta`、`underlying_price`、`last_price`、`dte`、`open_interest`。controller 呼叫處 `app/controllers/leaps_recommendations_controller.rb:16` |
+| 候選排行第 1 名的取法 | `leaps_ranking_service.rb:26`：`sort_by { [-open_interest, -dte] }` 的第一筆（OI 最大，同 OI 取 DTE 最遠） |
+| 標的參數名稱、價格參數名稱、驗證邏輯位置 | `symbol`（`leaps_recommendations_controller.rb:6`：`upcase.strip.gsub(/[^A-Z0-9.\-]/, "")`）；`user_strike`（index `:12` 只取 `presence` 不驗證；analyze `:118–124` 驗證正數且最多兩位小數，`:128–135` 以 `StrikeChainSnapshot#valid_strike?` 驗證） |
+| 前端慣例與範例檔 | **本專案沒有 Turbo 也沒有 Stimulus**（`package.json`、`Gemfile` 皆無 hotwired／turbo／stimulus；全 repo 無 `turbo_frame_tag`）。慣例是 `app/frontend/entrypoints/behaviors.ts:88` 掃描 `[data-behavior]` 動態載入模組；範例 `app/frontend/behaviors/leapsLoading.ts`（Phlex 端 `page_header.rb` 的 `render_loading_script` 掛 `data-behavior="leaps-loading"`） |
+| PMCC 表格樣式 class | `pmcc_section.rb:106` table `w-full text-xs text-gray-700`；`:107` thead `bg-gray-50 text-gray-500 text-xs`；`:118` th `px-3 py-2 text-center font-medium whitespace-nowrap`；`:157` tr `border-t border-gray-100 hover:bg-purple-200`；`:160` td `px-3 py-2 text-center` |
+| E2E 目錄與登入 helper | **沒有既有 E2E 目錄**（無 `spec/system`、無 playwright config）。request spec 用 `spec/support/auth_helpers.rb`（`sign_in_and_pass_totp!`：OmniAuth mock + 真的 TOTP challenge）。瀏覽器層驗證目前以 Playwright `connectOverCDP("http://localhost:9224")` 搭配 9224 profile 的真實登入進行 |
+| bpus／bcvs sidecar 腳本與 Rails 呼叫端（檔案:行號） | bcvs：`lib/barchart_scrapers/bcvs_expirations_scraper.py`、`lib/barchart_scrapers/bcvs_call_chain_scraper.py`；Rails 端 `app/services/barchart_scraper_service.rb:313`（`fetch_bcvs_expirations`，`run_scraper` 於 `:325`）、`:358`（`fetch_bcvs_call_chain`，`run_scraper` 於 `:369`）。bpus：`bpus_expirations_scraper.py`、`bpus_put_chain_scraper.py`；Rails 端 `barchart_scraper_service.rb:189`、`:230` |
+| 30 分鐘快取：資料表、key、TTL 判斷位置 | bcvs：`bcvs_chain_snapshots`（`db/schema.rb:17–26`，唯一索引 `(symbol, expiration)`，履約價存在 `strikes` jsonb）、`bcvs_expiration_snapshots`（`:28–41`，唯一 `symbol`）；TTL `app/models/bcvs_chain_snapshot.rb:4`（`FRESH_WINDOW = 30.minutes`）、`:9`（`scope :fresh`），判斷 `app/services/bcvs_cache_service.rb:44`。bpus 不用資料表，用 `Rails.cache`（`barchart_scraper_service.rb:236` key `bpus_put_chain_#{symbol}_#{expiration}`） |
+| 進度條：前端元件與後端回報機制 | bcvs：controller 寫 `Rails.cache["bcvs_job_#{job_id}"] = {status: "pending"}` 後排 job（`app/controllers/bull_call_spreads_controller.rb:107–108`），job 結束時只寫最終狀態（`app/jobs/bcvs_fetch_chain_job.rb:14–18`），前端 `app/frontend/behaviors/bullCallSpreads.ts` 輪詢 `GET /bcvs/status`（`bull_call_spreads_controller.rb:113`）。**沒有逐階段進度** |
+| bcvs 快取表能否共用（附理由） | **有條件，見待決事項 1、3**。可以的部分：key 含 ticker 與 expiry；`strikes` jsonb 含 `bid`、`ask`、`last`、`delta`（另有 iv、mid、dte、oi 等）；存全部履約價（AAPL 2026-09-18 共 104 檔，最低 50）；到期日清單含 LEAPS（AAPL 最遠 `2028-12-15-m`）。到期日字串帶後綴（`-m` 月選／`-w` 週選） |
 | ORCL 最遠到期日、最高履約價、現價、比值（sidecar 實抓） | TBD |
 | 各階段耗時（3 輪原始數據）、單一到期日最慢耗時、STALL_TIMEOUT、設定常數位置 | TBD |
-| 既有 LEAPS 到期日篩選邏輯（檔案:行號、條件） | TBD |
+| 既有 LEAPS 到期日篩選邏輯（檔案:行號、條件） | `app/services/leaps_ranking_service.rb:31`（`MIN_DTE = 364`）、`:41`（`where("dte >= ?", MIN_DTE)`）；候選另加 `delta >= 0.60`（`:42`）與外在價值非負（`:46`），但後兩者是候選條件，不是到期日篩選 |
 | delta 的來源頁面 URL 與 selector（或「無 delta」） | TBD |
-| 回歸基準檔案路徑、既有 rspec examples／failures 數 | TBD |
+| 回歸基準檔案路徑、既有 rspec examples／failures 數 | `spec/fixtures/leaps_vertical_spread/baseline/a_empty.html`（6 區塊）、`b_symbol_only.html`（9 區塊）、`c_symbol_strike.html`（9 區塊），內容為 `#leaps-export-root` 各子元素 `outerHTML`，以 `<!-- ===== block ===== -->` 分隔，2026-09-25 08:57 於 localhost 擷取。**注意**：擷取時 ORCL 資料已超過 30 分鐘，(b)(c) 不含候選排行與 PMCC 區塊。`bundle exec rspec`：**1111 examples, 0 failures**（commit `817febd`） |
 | 查無代號／沒有 LEAPS 的 DOM 判定 selector | TBD |
+
+### 待決事項（P0 停下回報，2026-09-25）
+
+1. **bcvs 快取會剔除無買賣價的履約價**：`app/services/bcvs_cache_service.rb:83–89` 的 `filter_quotable` 在寫入前剔除 bid 與 ask 皆為 0／null 的列。規格報價規則第 2 條（bid、ask 皆無 → 以 last 計算、標「盤後參考價」）需要的正是這些列，共用快取就永遠拿不到。依規格「判定不能共用時先停下回報、不得新增資料表」。
+2. **本專案沒有 Turbo／Stimulus**：規格 P3／P4 指定 `turbo_frame_tag`、`requestSubmit()`。引入 turbo-rails 違反「不新增 gem」，引入 `@hotwired/turbo` 則是新的前端依賴。既有慣例是 `data-behavior` + fetch HTML 片段。
+3. **jsonb 數值讀進 Ruby 是 Float**：`strikes` 的 bid／ask／last 經 ActiveRecord 讀出為 Float，與「計算路徑禁止 Float」衝突。可行解法：讀取時以 SQL 取 `strikes::text` 再用 `JSON.parse(..., decimal_class: BigDecimal)`，不必改表。
+4. **禁用 grep 命中 `cdp_helper.py`**：兩支 bcvs sidecar 本身 0 行；但它們 import 的 `lib/barchart_scrapers/cdp_helper.py` 有 5 行 `urllib`（:10、:18、:24、:25、:56），連的是本機 Chrome 控制端點 `127.0.0.1:9222/json*`，不是 Barchart。規格寫「有任何命中要先停下回報」。
+5. （非衝突，備註）bcvs 沒有逐階段進度回報，規格的停滯判定需要新增進度回報（沿用 `Rails.cache`，不需資料表）。
