@@ -47,6 +47,7 @@ const REGISTRY: Record<string, Loader> = {
   "iv-watchlists": () => import("../behaviors/ivWatchlists"),
   "leaps-loading": () => import("../behaviors/leapsLoading"),
   "leaps-price-context": () => import("../behaviors/leapsPriceContext"),
+  "leaps-vertical-spread": () => import("../behaviors/leapsVerticalSpread"),
   "methodology-note-toggle": () => import("../behaviors/methodologyNoteToggle"),
   "momentum-analysis-panel": () => import("../behaviors/momentumAnalysisPanel"),
   "momentum-news-tabs": () => import("../behaviors/momentumNewsTabs"),

@@ -5,6 +5,9 @@
 # 基準在「加入垂直價差之前」的程式碼上擷取（spec/fixtures/leaps_vertical_spread/server_baseline/），
 # 比對時把新增的 #leaps_vertical_spread 外框拿掉，其餘必須一字不差。
 # 每次請求都不同的值（CSRF token、CSP nonce）先移除；時間固定在 FROZEN_AT。
+# 資源檔名的雜湊（behaviors-XXXXXXXX.js）也正規化：任何前端修改都會改變它，
+# 與既有區塊的 HTML 無關（P3 在 behaviors 註冊表加一行，雜湊就變了）。基準檔保留
+# 原始擷取內容，比對時兩邊都套 strip_digests。
 module LeapsPageHtml
   FROZEN_AT = Time.zone.parse("2026-09-25 12:00:00")
   BASELINE_DIR = Rails.root.join("spec/fixtures/leaps_vertical_spread/server_baseline")
@@ -27,10 +30,16 @@ module LeapsPageHtml
     doc.css('input[name="authenticity_token"]').each { |n| n["value"] = "CSRF" }
     doc.css("[data-csrf]").each { |n| n["data-csrf"] = "CSRF" }
     doc.css("[nonce]").each { |n| n["nonce"] = "NONCE" }
-    doc.to_html
+    strip_digests(doc.to_html)
   end
 
+  DIGEST = /-[A-Za-z0-9_]{8}(?=\.(?:js|css)\b)/
+
+  def strip_digests(html) = html.gsub(DIGEST, "-DIGEST")
+
   def baseline_path(name) = BASELINE_DIR.join("#{name}.html")
+
+  def read_baseline(name) = strip_digests(File.read(baseline_path(name)))
 
   # 「有候選」情境：沿用 spec/requests/leaps_recommendations_spec.rb 的做法，stub 掉資料層。
   def stub_candidates!(example_group, symbol)

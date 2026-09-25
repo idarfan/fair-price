@@ -46,8 +46,12 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
         render_recommendation if @recommendation
         render_ranking_table
         render_flow_panel if @flow_panel
+        render_vertical_spread_frame
         render_pmcc_section
       end
+      # 垂直價差只看「有沒有輸入標的與價格」，不跟候選排行綁在一起；沒有候選時
+      # PMCC 不出現，外框就出現在 PMCC 原本的位置（leaps-call-spread-spec 功能定義 0）。
+      render_vertical_spread_frame unless @candidates.any?
       render_pmcc_position_tracker
       render_pmcc_edu_section
       render_vocab_cards
@@ -59,6 +63,12 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
 
   private
+
+  def render_vertical_spread_frame
+    return unless @symbol.present? && @user_strike.present?
+
+    render LeapsRecommendations::VerticalSpreadFrame.new(symbol: @symbol, user_strike: @user_strike.to_s.strip)
+  end
 
   # 三個價格情境 widget。外層 div 是輪詢的錨點，內容由
   # PriceContextComponent 渲染；TS 拿到新 HTML 後整塊換掉 innerHTML。

@@ -179,6 +179,9 @@ Rails.application.routes.draw do
   # 兩者的生命週期與失敗處理完全不同。
   get  "leaps/price_context", to: "leaps_recommendations#price_context",
                               as: :leaps_recommendations_price_context
+  # LEAPS 垂直價差區塊的內容片段（leaps-call-spread-spec P3），由 /leaps 頁的外框以 fetch 載入。
+  get  "leaps/vertical_spread", to: "leaps_recommendations#vertical_spread",
+                                as: :leaps_recommendations_vertical_spread
 
   # Bull Put Spread 三級試算工具
   get  "bpus",                    to: "bull_put_spreads#index",             as: :bull_put_spreads

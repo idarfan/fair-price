@@ -162,6 +162,33 @@ class LeapsRecommendationsController < ApplicationController
   #
   # 回傳**渲染好的 HTML 片段**而不是原始數字：markup 與數字格式只在 Phlex 寫一份，
   # TS 端不重寫一套排版（同 pdf_export.rb 註解裡「避免兩處數字格式漂移」的理由）。
+  # LEAPS 垂直價差區塊的內容片段（leaps-call-spread-spec P3）。/leaps 本身不等 sidecar，
+  # 抓取與計算都在這個請求裡做；回傳不含 layout 的 HTML，由前端放進外框。
+  def vertical_spread
+    symbol = params[:symbol].to_s.upcase.strip.gsub(/[^A-Z0-9.\-]/, "")
+    # 進度查詢走同一條路由（規格 P3：vertical_spread 只能有一條路由）：只讀 fetcher
+    # 寫進 Rails.cache 的進度，不觸發抓取，所以也不需要 CDP 預檢。
+    if params[:progress].present?
+      return head :unprocessable_entity if symbol.blank?
+      return render json: LeapsCallChainFetcher.progress(symbol) || {}
+    end
+
+    strike = params[:user_strike].to_s.strip
+    return head :unprocessable_entity if symbol.blank? || strike.blank?
+
+    section = { symbol: symbol, user_strike: strike }
+    # CLAUDE.md「CDP 預檢（全域強制）」：可能觸發 Barchart 抓取，先確認 CDP 連得上。
+    unless cdp_online?
+      return render html: LeapsRecommendations::VerticalSpreadSection
+        .new(**section, state: :cdp_offline, message: CDP_OFFLINE_MESSAGE).call.html_safe
+    end
+
+    outcome = LeapsVerticalSpreadService.new(
+      ticker: symbol, long_strike: strike, expiry: params[:expiry], short_strike: params[:short_strike]
+    ).call
+    render html: LeapsRecommendations::VerticalSpreadSection.new(**section, outcome: outcome).call.html_safe
+  end
+
   def price_context
     symbol = params[:symbol].to_s.upcase.strip.gsub(/[^A-Z0-9.\-]/, "")
     return render json: { status: "error", message: "missing symbol" },

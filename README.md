@@ -1,5 +1,19 @@
 # FairPrice
 
+### 2026-09-25（四）— 新增：LEAPS 垂直價差 P3（路由、頁面外框、前端載入）
+
+- `GET /leaps/vertical_spread`：回傳垂直價差區塊的 HTML 片段（CDP 離線直接回報、缺參數 422）；
+  帶 `progress=1` 時只回抓取進度 JSON。
+- `/leaps` 在輸入標的與價格時，於 PMCC 區塊之前（沒有候選時在同一位置）放外框；
+  頁面本身不等 sidecar，由 `leapsVerticalSpread.ts` 取回片段、處理選單切換、重試與進度顯示。
+- **既有行為不變**：修改前先擷取 5 種輸入的伺服器 HTML 基準，修改後除了新增外框外一字不差
+  （CSRF、nonce、資源檔名雜湊正規化）。PMCC 區塊未修改。
+- 驗證：request spec 21 例、vitest 6 例；整體 RSpec 1178 examples, 0 failures。
+
+**涉及檔案：** `config/routes.rb`、`app/controllers/leaps_recommendations_controller.rb`、
+`app/components/leaps_recommendations/page_component.rb`、`vertical_spread_frame.rb`、`vertical_spread_section.rb`、
+`app/frontend/behaviors/leapsVerticalSpread.ts`、`app/frontend/entrypoints/behaviors.ts`，以及對應的測試
+
 ### 2026-09-25（四）— 新增：LEAPS 垂直價差 P2（計算服務）
 
 `LeapsVerticalSpreadService`：輸入標的與買入腳履約價 K_L（可選到期日、賣出腳），回傳兩個
