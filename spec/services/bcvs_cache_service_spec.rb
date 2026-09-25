@@ -95,6 +95,48 @@ RSpec.describe BcvsCacheService do
 
       expect(described_class.read_chain(symbol, expiration)[:strikes].map { |r| r["strike"] }).to eq([ 40.0 ])
     end
+
+    # 2026-09-25 LEAPS 垂直價差（leaps-call-spread-spec 附錄 A 決議 1）：篩選從寫入移到
+    # 讀取。bid、ask 皆為 0 的列要留在快取裡，垂直價差才能以 last 計算「盤後參考價」；
+    # bcvs 經 read_chain 讀到的內容不變（上面兩個測試）。
+    it "stores every row, including those without bid and ask" do
+      rows = [
+        { "strike" => 40.0, "bid" => 1.1, "ask" => 1.3 },
+        { "strike" => 42.0, "bid" => 0,   "ask" => 0, "last" => 0.8 }
+      ]
+      described_class.upsert_chain!(symbol, expiration, strikes: rows, underlying_price: 42.5)
+
+      stored = BcvsChainSnapshot.for_symbol_and_expiration(symbol, expiration).first.strikes
+      expect(stored.map { |r| r["strike"] }).to eq([ 40.0, 42.0 ])
+    end
+  end
+
+  describe ".read_chain_decimal" do
+    it "returns nil when nothing cached" do
+      expect(described_class.read_chain_decimal(symbol, expiration)).to be_nil
+    end
+
+    it "returns every row with numeric fields as BigDecimal (no Float on the calculation path)" do
+      rows = [
+        { "strike" => 60, "bid" => 81.5, "ask" => 84.5, "last" => 91, "delta" => 0.938226 },
+        { "strike" => 230, "bid" => 0, "ask" => 0, "last" => 11.2, "delta" => nil }
+      ]
+      described_class.upsert_chain!(symbol, expiration, strikes: rows, underlying_price: 139.54)
+
+      chain = described_class.read_chain_decimal(symbol, expiration)
+      first, second = chain[:strikes]
+
+      expect(chain[:strikes].size).to eq(2)
+      expect(first["strike"]).to eq(BigDecimal("60"))
+      expect(first["bid"]).to eq(BigDecimal("81.5"))
+      expect(first["delta"]).to eq(BigDecimal("0.938226"))
+      expect(second["last"]).to eq(BigDecimal("11.2"))
+      expect(second["delta"]).to be_nil
+      numeric = chain[:strikes].flat_map { |r| r.values_at("strike", "bid", "ask", "last", "delta") }.compact
+      expect(numeric).to all(be_a(BigDecimal))
+      expect(chain[:underlying_price]).to eq(BigDecimal("139.54"))
+      expect(chain[:scraped_at]).to be_within(5.seconds).of(Time.current)
+    end
   end
 
   describe "cache-hit does not trigger a scrape (integration with BarchartScraperService)" do

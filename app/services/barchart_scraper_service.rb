@@ -331,6 +331,11 @@ class BarchartScraperService
     when "no_candidates"
       log_fetch("bcvs_expirations", "no_candidates", nil)
       { status: "no_candidates" }
+    # 2026-09-25 sidecar 新增的兩個狀態（LEAPS 垂直價差要分流錯誤訊息用），
+    # bcvs 維持原本的 no_candidates 行為。
+    when "symbol_not_found", "no_options"
+      log_fetch("bcvs_expirations", "no_candidates", fetch_result[:status])
+      { status: "no_candidates" }
     when "success"
       data    = fetch_result[:data]
       summary = data["summary"] || {}
@@ -381,8 +386,10 @@ class BarchartScraperService
       snapshot = BcvsCacheService.upsert_chain!(
         @symbol, expiration, strikes: data["rows"], underlying_price: data["underlying_price"]
       )
-      log_fetch("bcvs_call_chain", "success", "rows=#{snapshot.strikes.length} expiration=#{expiration}")
-      { status: "success", rows: snapshot.strikes, underlying_price: snapshot.underlying_price&.to_f }
+      # 快取存全部列，bcvs 要的是篩選後的（與快取命中時走同一個 read_chain）
+      cached = BcvsCacheService.read_chain(@symbol, expiration)
+      log_fetch("bcvs_call_chain", "success", "rows=#{cached[:strikes].length} expiration=#{expiration}")
+      { status: "success", rows: cached[:strikes], underlying_price: snapshot.underlying_price&.to_f }
     else
       log_fetch("bcvs_call_chain", "error", fetch_result[:error])
       { status: "error", errors: [ fetch_result[:error].to_s ] }

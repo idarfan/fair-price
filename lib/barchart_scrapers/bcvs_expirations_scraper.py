@@ -20,6 +20,12 @@ Output JSON (stdout):
                      "summary":{"price_change":N,"iv_atm":N,"hv":N,"iv_rank":N,
                      "latest_earnings":"..."},"debug_url":"..."}
   no_candidates -> {"status":"no_candidates"}   # expiration dropdown 空/讀不到
+  not found     -> {"status":"symbol_not_found"} # 404 頁（.bc-error-404-page）
+  no options    -> {"status":"no_options"}       # 頁面正常但 "no option data"
+
+2026-09-25 新增後兩個狀態（leaps-call-spread-spec P0 第 13 步實測 ZZZZQ／BRK.A）：
+原本兩者都是 no_candidates，LEAPS 垂直價差要分流錯誤訊息。Rails 端
+fetch_bcvs_expirations 把兩者對應回 no_candidates，bcvs 行為不變。
   expired       -> {"status":"barchart_session_expired"}
   error         -> {"status":"error","error":"..."}
 """
@@ -37,6 +43,17 @@ VOLATILITY_PATH = "volatility-charts"
 STAGE1_SETTLE   = 3000
 VOL_SETTLE      = 1500
 VOL_MAX_WAIT_S  = 15
+
+# 讀不到到期日時分辨原因（只讀 DOM）。innerText 對隱藏元素是空字串，
+# 所以 ng-hide 的 .error-page 不會誤判。
+PAGE_STATE_JS = """
+(() => {
+  if (document.querySelector('.bc-error-404-page')) return 'not_found';
+  const noData = [...document.querySelectorAll('.error-page')]
+    .some(e => /no option data/i.test(e.innerText || ''));
+  return noData ? 'no_options' : null;
+})()
+"""
 
 EXPIRATIONS_JS = """
 (() => {
@@ -182,6 +199,12 @@ async def main(symbol):
         is_expired = await cdp_eval(ws_url, SESSION_EXPIRED_JS) or False
         if is_expired:
             print(json.dumps({"status": "barchart_session_expired"}))
+            return
+        page_state = await cdp_eval(ws_url, PAGE_STATE_JS)
+        if page_state == "not_found":
+            print(json.dumps({"status": "symbol_not_found"}))
+        elif page_state == "no_options":
+            print(json.dumps({"status": "no_options"}))
         else:
             print(json.dumps({"status": "no_candidates"}))
         return
