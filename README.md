@@ -1,5 +1,22 @@
 # FairPrice
 
+### 2026-09-25（四）— 新增：LEAPS 垂直價差 P2（計算服務）
+
+`LeapsVerticalSpreadService`：輸入標的與買入腳履約價 K_L（可選到期日、賣出腳），回傳兩個
+下拉選單的選項、預設值與每口的實付淨成本、最大獲利／虧損、損益兩平、風險報酬比。
+所有公式只在這裡，全程 BigDecimal，只在顯示時四捨五入（`format.rb`）。
+
+- 報價：bid、ask 皆 > 0 用 mid；否則 last > 0 用 last 並標「盤後參考價」（不算保守成交價）；否則停用。
+- 預設：買入腳取候選排行中履約價 = K_L 的第 1 名到期日，沒有就取最遠有報價的到期日；
+  賣出腳在 `K_S > max(K_L, 現價)` 且 `0 < D_mid < W` 中取 delta 最接近 0.30，無 delta 取最接近 現價 × 1.3。
+- 錯誤分流：查無代號、沒有 LEAPS、查無履約價（附上下最接近的履約價）、無有效報價、沒有合格賣出腳、
+  讀取失敗（可重試），以及無效組合會寫出哪個條件不成立。
+- 驗證：22 examples, 0 failures，兩次反向驗證；真實 ORCL K_L = 100 算出淨成本 $3,692.50、
+  損益兩平 $136.93、風險報酬比 1 : 2.52。
+
+**涉及檔案：** `app/services/leaps_vertical_spread_service.rb`、`app/services/leaps_vertical_spread_service/format.rb`、
+`spec/services/leaps_vertical_spread_service_spec.rb`
+
 ### 2026-09-25（四）— 新增：LEAPS 垂直價差 P1（即時抓取與快取）
 
 `leaps-call-spread-spec.md` 的第一個實作階段，UI 還沒有接上。
