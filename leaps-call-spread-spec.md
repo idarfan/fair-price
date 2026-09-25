@@ -8,7 +8,7 @@
 | 階段 | 名稱 | 狀態 | 驗證證據（指令與輸出摘要、截圖路徑） |
 |---|---|---|---|
 | P0 | 探勘與定位 | 通過 | 2026-09-25。4 項與規格衝突的待決事項已由使用者裁示（附錄 A「決議」），規格相關段落已修改。驗證：附錄 A 內 TBD = 0；附錄 A 列出的 22 個既有路徑 `test -f` 全部存在（規劃中的 `app/services/leaps_call_chain_fetcher.rb` 除外）；第 12 步前後 `git diff -- app lib` 皆無變更；禁用 grep 對兩支 bcvs sidecar 皆 0 行；`cdp_helper.py` 的 4 處 `urlopen`／`Request` 目標皆為 `{CDP_BASE}`。實測：ORCL 6 個 LEAPS 到期日 max_strike／spot 最低 1.65；單一到期日最慢 7.61 秒 → `STALL_TIMEOUT = 30`；delta 100% 有值；查無代號與沒有 LEAPS 在既有 sidecar 皆為 `no_candidates`，判定 selector 已記錄（P1 需補判定） |
-| P1 | 即時抓取與快取 | 待辦 | |
+| P1 | 即時抓取與快取 | 通過 | 2026-09-25。新增 `app/services/leaps_call_chain_fetcher.rb`（`STALL_TIMEOUT = 30`）、`leaps_call_chain_fetcher/sidecar_runner.rb`（逐階段時限、終止程序群組）、`app/services/symbol_scrape_lock.rb`（advisory lock，bcvs 兩個 job 共用）。bcvs 快取改存全部列、`read_chain` 篩選、新增 `read_chain_decimal`（決議 1、3）；`bcvs_expirations_scraper.py` 新增 `symbol_not_found`／`no_options`，Rails 端對應回 bcvs 原本的 `no_candidates`，`FetchLog::STATUSES` 登記。**驗證**：`spec/services/leaps_call_chain_fetcher_spec.rb` 16 examples 0 failures（案例 1–11 + BigDecimal 回傳 + SidecarRunner 實際逾時終止 2 例；「sidecar 呼叫次數」以到期日 chain 抓取次數計，到期日清單另外斷言）；反向驗證：拿掉鎖後案例 8 失敗（抓 2 次）。實抓 ORCL（不 stub，快取原為空）：59 秒、6 個 LEAPS 到期日，max_strike／spot = 2.65、3.65、3.37、2.65、1.72、1.65（全部 ≥ 1.5），每個到期日都有履約價 100，進度 `done 6/6`；再查一次命中快取 0.29 秒。禁用 grep：兩支 bcvs sidecar 0 行，`cdp_helper.py` 4 處 HTTP 呼叫皆為 `{CDP_BASE}`。靜態檢查 `to_f\|Float(`：0 行。實測 sidecar：ZZZZQ → `symbol_not_found`、BRK.A → `no_options`、ORCL → success。bcvs 相關 spec 與整體 `bundle exec rspec`：**1134 examples, 0 failures**（P0 基準 1111，全部保留）。備註：chain 的抓取時間取「全部成功後寫入」的時刻，同一輪各到期日相同 |
 | P2 | 計算服務 | 待辦 | |
 | P3 | 路由與 Controller | 待辦 | |
 | P4 | UI 元件 | 待辦 | |

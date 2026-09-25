@@ -2,7 +2,10 @@
 
 class BcvsFetchChainJob < ApplicationJob
   def perform(symbol, expiration, job_id)
-    result = BarchartScraperService.new(symbol).fetch_bcvs_call_chain(expiration: expiration)
+    # 與 LEAPS 垂直價差共用同一個標的鎖：同時在抓時等前一次寫完快取再讀
+    result = SymbolScrapeLock.with(symbol) do
+      BarchartScraperService.new(symbol).fetch_bcvs_call_chain(expiration: expiration)
+    end
 
     result_status = case result[:status]
     when "barchart_session_expired" then "session_expired"
