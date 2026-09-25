@@ -1,5 +1,15 @@
 # FairPrice
 
+### 2026-09-25（四）— 驗收：LEAPS 垂直價差 P4 元件測試、P5 E2E 通過
+
+- P4：`VerticalSpreadSection` 4 種狀態的元件測試（9 例），反向驗證兩次。
+- P5：新增 `e2e/leaps_vertical_spread.e2e.mjs`（專案第一支 E2E，Playwright 連 9224 沿用真實登入），
+  證據在 `e2e/evidence/2026-09-25/`。從表單送出 ORCL／100 開始，實際抓 Barchart 6 個 LEAPS 到期日
+  （42 秒、逐段進度無停滯），畫面數值與 psql 讀出的報價重算完全一致（預設、換賣出腳、換到期日三組），
+  重新整理命中快取、錯誤情境訊息正確、禁用 grep 為 0。
+- 既有區塊回歸：與 P0 的瀏覽器 DOM 基準比對，差異 0（只遮蔽價格情境區塊的即時行情）。
+- 執行方式：`node e2e/leaps_vertical_spread.e2e.mjs`（前提與注意事項寫在檔頭）。
+
 ### 2026-09-25（四）— 新增：LEAPS 垂直價差 P3（路由、頁面外框、前端載入）
 
 - `GET /leaps/vertical_spread`：回傳垂直價差區塊的 HTML 片段（CDP 離線直接回報、缺參數 422）；

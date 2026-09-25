@@ -1,0 +1,151 @@
+{
+ "started_at": "2026-09-25T15:47:43.148Z",
+ "steps": {
+  "regression": {
+   "skipped": true,
+   "reason": "--skip-regression"
+  },
+  "step0": {
+   "deleted_rows": "270"
+  },
+  "step1": {
+   "block_present": false
+  },
+  "step2": {
+   "url": "http://localhost:3003/leaps?symbol=ORCL&user_strike=100",
+   "seconds_until_navigation": 2
+  },
+  "step3": {
+   "progress_shown_ms": 322,
+   "total_seconds": 42,
+   "N": 6,
+   "written_expiries": 6,
+   "expirations_list_cached": true,
+   "stages": [
+    "已完成 0 / 6 個到期日｜讀取 2027-10-15 chain（1/6）",
+    "已完成 1 / 6 個到期日｜讀取 2027-12-17 chain（2/6）",
+    "已完成 2 / 6 個到期日｜讀取 2028-01-21 chain（3/6）",
+    "已完成 3 / 6 個到期日｜讀取 2028-09-15 chain（4/6）",
+    "已完成 4 / 6 個到期日｜讀取 2028-12-15 chain（5/6）",
+    "已完成 5 / 6 個到期日｜讀取 2029-01-19 chain（6/6）"
+   ],
+   "quoted": "報價時間：2026-09-25 23:48（台北時間）",
+   "pmcc_present": true,
+   "stall_timeout": 30
+  },
+  "step4": {
+   "expiry": "2028-01-21-m",
+   "kS": 250,
+   "spot": "138.3800",
+   "legs": {
+    "long": {
+     "bid": "54.7500",
+     "ask": "55.7000",
+     "last": "55.1900"
+    },
+    "short": {
+     "bid": "12.7500",
+     "ask": "13.0500",
+     "last": "12.9500"
+    }
+   },
+   "sources": [
+    "mid",
+    "mid"
+   ],
+   "dom": {
+    "實付淨成本": 4232.5,
+    "最大獲利": 10767.5,
+    "損益兩平": 142.33
+   },
+   "expected": {
+    "實付淨成本": 4232.5,
+    "最大獲利": 10767.5,
+    "損益兩平": 142.33
+   },
+   "after_hours": false
+  },
+  "step5": {
+   "expiry": "2028-01-21-m",
+   "kS": 140,
+   "spot": "138.3800",
+   "legs": {
+    "long": {
+     "bid": "54.7500",
+     "ask": "55.7000",
+     "last": "55.1900"
+    },
+    "short": {
+     "bid": "36.1500",
+     "ask": "36.9000",
+     "last": "36.4000"
+    }
+   },
+   "sources": [
+    "mid",
+    "mid"
+   ],
+   "dom": {
+    "實付淨成本": 1870,
+    "最大獲利": 2130,
+    "損益兩平": 118.7
+   },
+   "expected": {
+    "實付淨成本": 1870,
+    "最大獲利": 2130,
+    "損益兩平": 118.7
+   },
+   "after_hours": false
+  },
+  "step6": {
+   "expiry": "2027-10-15-m",
+   "short_options": 30,
+   "kS": 230,
+   "spot": "138.3800",
+   "legs": {
+    "long": {
+     "bid": "51.4500",
+     "ask": "52.5000",
+     "last": "52.4000"
+    },
+    "short": {
+     "bid": "11.4000",
+     "ask": "11.8500",
+     "last": "11.9000"
+    }
+   },
+   "sources": [
+    "mid",
+    "mid"
+   ],
+   "dom": {
+    "實付淨成本": 4035,
+    "最大獲利": 8965,
+    "損益兩平": 140.35
+   },
+   "expected": {
+    "實付淨成本": 4035,
+    "最大獲利": 8965,
+    "損益兩平": 140.35
+   },
+   "after_hours": false
+  },
+  "step7": {
+   "quoted": "報價時間：2026-09-25 23:48（台北時間）",
+   "seconds_until_result": 1.507
+  },
+  "step8": {
+   "zzzzq": "查無股票代號 ZZZZQ",
+   "strike_101_37": "ORCL 的 LEAPS 中查無履約價 101.37；最接近的履約價：100.00、105.00"
+  },
+  "step10": {
+   "forbidden_grep": [
+    "lib/barchart_scrapers/leaps_spread_expirations_scraper.py:0",
+    "lib/barchart_scrapers/leaps_spread_chain_scraper.py:0"
+   ]
+  }
+ },
+ "result": "PASS",
+ "finished_at": "2026-09-25T15:49:15.130Z",
+ "js_errors": []
+}

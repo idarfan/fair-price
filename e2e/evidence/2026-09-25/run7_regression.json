@@ -1,0 +1,45 @@
+{
+ "started_at": "2026-09-25T15:43:33.449Z",
+ "steps": {
+  "regression": {
+   "a_empty": {
+    "baseline_blocks": 6,
+    "now_blocks": 6,
+    "differing": [],
+    "masked_selectors": [
+     "#leaps-price-context（內部內容）"
+    ]
+   },
+   "b_symbol_only": {
+    "baseline_blocks": 9,
+    "now_blocks": 9,
+    "differing": [],
+    "masked_selectors": [
+     "#leaps-price-context（內部內容）"
+    ]
+   },
+   "c_symbol_strike": {
+    "baseline_blocks": 9,
+    "now_blocks": 9,
+    "differing": [],
+    "masked_selectors": [
+     "#leaps-price-context（內部內容）"
+    ]
+   }
+  },
+  "step0": {
+   "deleted_rows": "270"
+  },
+  "step1": {
+   "block_present": false
+  },
+  "step2": {
+   "url": "http://localhost:3003/leaps?symbol=ORCL&job_status=success&user_strike=100",
+   "seconds_until_navigation": 118
+  }
+ },
+ "result": "FAIL",
+ "error": "斷言失敗：第 3 步：第一個階段應為讀取到期日清單（快取未命中），實際 已完成 0 / 6 個到期日｜讀取 2027-10-15 chain（1/6）",
+ "finished_at": "2026-09-25T15:46:17.982Z",
+ "js_errors": []
+}
