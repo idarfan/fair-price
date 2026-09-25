@@ -117,7 +117,8 @@ module LeapsRecommendations::PageHeader
 
 
   def render_alert(class_str, msg)
-    div(class: "px-4 py-3 rounded-lg text-sm #{class_str}") { plain msg }
+    # data-leaps-status-alert：送出新查詢時由 leapsLoading.ts 收起
+    div(class: "px-4 py-3 rounded-lg text-sm #{class_str}", data_leaps_status_alert: "true") { plain msg }
   end
 
 

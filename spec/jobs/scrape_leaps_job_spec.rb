@@ -105,6 +105,25 @@ RSpec.describe ScrapeLeapsJob, type: :job do
     end
   end
 
+  # 2026-09-25 ORCL：狀態先寫 success、Short Call 後抓，前端一看到 success 就跳轉，
+  # 頁面比 Short Call 早 1.5 分鐘出現，PMCC 區塊顯示「尚無 Short Call 資料，請重新查詢」。
+  # 使用者決定：等 Short Call 抓完才寫狀態。
+  describe "#perform — job status is written only after PMCC Short Call finishes" do
+    let(:events) { [] }
+
+    before do
+      svc = instance_double(BarchartScraperService, fetch_leaps: { status: "success", errors: [] })
+      allow(svc).to receive(:fetch_pmcc_short_calls) { events << :pmcc; { status: "success" } }
+      allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc)
+      allow(Rails.cache).to receive(:write) { |key, *| events << :status if key == "leaps_job_#{job_id}" }
+    end
+
+    it "fetches PMCC Short Calls before writing the job status" do
+      described_class.perform_now(symbol, job_id)
+      expect(events).to eq([ :pmcc, :status ])
+    end
+  end
+
   # PMCC v3 §1/§8 鐵律：PMCC 失敗不可讓 LEAPS 查詢的 job 狀態變 error。
   describe "#perform — PMCC Short Call failure is isolated from the LEAPS result" do
     let(:fake_result) { { status: "success", errors: [] } }

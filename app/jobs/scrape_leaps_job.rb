@@ -12,6 +12,11 @@ class ScrapeLeapsJob < ApplicationJob
     when "cached", "success"        then "success"
     else "error"
     end
+
+    # 先抓 Short Call 再寫狀態：前端一看到狀態就跳轉，先寫的話頁面會比 Short Call
+    # 早 1.5 分鐘出現，PMCC 區塊顯示「尚無 Short Call 資料」（2026-09-25 ORCL）。
+    fetch_pmcc_short_calls_isolated(symbol)
+
     Rails.cache.write(
       "leaps_job_#{job_id}",
       { status: result_status, errors: errors },
@@ -19,8 +24,6 @@ class ScrapeLeapsJob < ApplicationJob
     )
     # Write errors by symbol so controller can read them on redirect without job_id
     Rails.cache.write("leaps_last_errors_#{symbol}", errors, expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW) if errors.any?
-
-    fetch_pmcc_short_calls_isolated(symbol)
   rescue => e
     err_msg = e.message.first(200)
     Rails.cache.write(

@@ -12,7 +12,12 @@ export function init(root: HTMLElement): void {
   const form = document.getElementById("leaps-form");
   const btn = document.getElementById("leaps-submit-btn");
   const loading = document.getElementById("leaps-loading");
-  if (!(form instanceof HTMLFormElement) || !(btn instanceof HTMLButtonElement) || !loading) return;
+  if (
+    !(form instanceof HTMLFormElement) ||
+    !(btn instanceof HTMLButtonElement) ||
+    !loading
+  )
+    return;
 
   const inpEl = document.getElementById("leaps-symbol-input");
   const inp = inpEl instanceof HTMLInputElement ? inpEl : null;
@@ -24,7 +29,10 @@ export function init(root: HTMLElement): void {
     inp.value = inp.value.toUpperCase();
     // 代號一改，先前的快照就失效——清掉履約價與錯誤訊息
     if (strikeInp) strikeInp.value = "";
-    if (strikeErr) { strikeErr.classList.add("hidden"); strikeErr.textContent = ""; }
+    if (strikeErr) {
+      strikeErr.classList.add("hidden");
+      strikeErr.textContent = "";
+    }
   });
 
   form.addEventListener("submit", (e) => {
@@ -32,8 +40,17 @@ export function init(root: HTMLElement): void {
     const symbol = inp ? inp.value.trim().toUpperCase() : "";
     if (!symbol) return;
 
-    if (strikeErr) { strikeErr.classList.add("hidden"); strikeErr.textContent = ""; }
+    if (strikeErr) {
+      strikeErr.classList.add("hidden");
+      strikeErr.textContent = "";
+    }
     const userStrike = strikeInp ? strikeInp.value.trim() : "";
+
+    // 上一輪的狀態橫幅（網址帶來的 job_status=error 等）收起來，
+    // 否則會和「查詢中…」同時出現，看起來像新查詢失敗了（2026-09-25 ORCL）
+    document
+      .querySelectorAll("[data-leaps-status-alert]")
+      .forEach((el) => el.classList.add("hidden"));
 
     btn.disabled = true;
     btn.textContent = "查詢中…";
@@ -41,10 +58,14 @@ export function init(root: HTMLElement): void {
     loading.classList.remove("hidden");
     loading.classList.add("flex");
 
-    const meta = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]');
+    const meta = document.querySelector<HTMLMetaElement>(
+      'meta[name="csrf-token"]',
+    );
     const token = meta ? meta.content : (root.dataset["csrf"] ?? "");
 
-    const strikeSuffix = userStrike ? `&user_strike=${encodeURIComponent(userStrike)}` : "";
+    const strikeSuffix = userStrike
+      ? `&user_strike=${encodeURIComponent(userStrike)}`
+      : "";
 
     const body: { symbol: string; user_strike?: string } = { symbol };
     if (userStrike) body.user_strike = userStrike;
@@ -68,7 +89,8 @@ export function init(root: HTMLElement): void {
         if (status === "invalid_strike") {
           // 就地顯示錯誤，把表單放回可用狀態
           if (strikeErr) {
-            strikeErr.textContent = str(data, "message") ?? "履約價不在有效範圍，請重新輸入。";
+            strikeErr.textContent =
+              str(data, "message") ?? "履約價不在有效範圍，請重新輸入。";
             strikeErr.classList.remove("hidden");
           }
           btn.disabled = false;
@@ -98,9 +120,11 @@ export function init(root: HTMLElement): void {
               if (!st || st === "pending" || st === "not_found") return;
               clearInterval(pollInterval);
               window.location.href = `/leaps?symbol=${symbol}&job_status=${st}${strikeSuffix}`;
-            }).catch(() => {});
+            })
+            .catch(() => {});
         }, 2500);
-      }).catch(() => {
+      })
+      .catch(() => {
         window.location.href = `/leaps?symbol=${symbol}&job_status=error${strikeSuffix}`;
       });
   });

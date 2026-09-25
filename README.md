@@ -1,5 +1,27 @@
 # FairPrice
 
+### 2026-09-25（四）— 修正：LEAPS 新查詢時殘留舊錯誤橫幅、PMCC 顯示「尚無 Short Call 資料」
+
+兩個都是「畫面比實際狀態早一步」的問題，ORCL 查詢時同一輪踩到：
+
+- **舊錯誤橫幅**：網址帶著上一次的 `job_status=error`，按「查詢」後紅色的「抓取時發生未知錯誤」
+  還留著，和「查詢中…」同時出現，看起來像新查詢失敗了。`render_alert` 加上
+  `data-leaps-status-alert`，`leapsLoading.ts` 送出查詢時收起。
+- **PMCC 尚無 Short Call 資料**：`ScrapeLeapsJob` 先寫 `success` 再抓 Short Call，前端一看到
+  success 就跳轉，頁面比 Short Call 早約 1.5 分鐘出現（實測 14:48:14 跳轉、14:49:35 才寫入）。
+  改成抓完 Short Call 才寫狀態；Short Call 失敗仍不會讓查詢變成 error（PMCC v3 §8）。
+- 驗證：vitest 新增 `leapsLoading.test.ts`；RSpec 新增「PMCC 先於狀態寫入」順序測試；
+  Playwright 改前／改後截圖比對（`fetch` 以替身攔截，不排真的 job）。
+
+**已知問題（未修）**：`force_ssl` 會讓 Rails 把 session cookie 無條件標記 Secure，
+`http://localhost:3003` 拿不到 session cookie，本機登入一律 CSRF 422（自 2026-08-28 起）。
+`production.rb` 註解「exclude 會關掉 cookie Secure」與實際行為不符。修法涉及安全設定，待決定；
+目前請用 `https://fairprice-ohmy.com` 登入。
+
+**涉及檔案：** `app/jobs/scrape_leaps_job.rb`、`spec/jobs/scrape_leaps_job_spec.rb`、
+`app/frontend/behaviors/leapsLoading.ts`、`app/frontend/behaviors/leapsLoading.test.ts`、
+`app/components/leaps_recommendations/page_header.rb`
+
 ### 2026-09-25（四）— 修正：Chrome 視窗被關後所有 Barchart 爬蟲報「No Chrome CDP page found」
 
 ORCL 查 LEAPS 時，畫面顯示「No Chrome CDP page found」和「價格情境資料抓取失敗」。
