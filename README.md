@@ -10,7 +10,7 @@ session cookie，登入表單的 CSRF token 永遠驗不過。`production.rb` �
 
 - `config.session_store :cookie_store, key: "_fairprice_session", secure: false`：
   key 沿用預設名稱，既有登入不受影響。注意這個階段 `session_options` 還是 nil，
-  寫成 `session_options[:secure] = false` 會讓 production 開不了機（已踩過、重啟前攔下）。
+  寫成 `session_options[:secure] = false` 會讓 production 開不了機（實際遇到過，重啟前攔下）。
 - 公網安全性不變，重啟後實測：
 
 | 路徑 | 修正前 | 修正後 |
