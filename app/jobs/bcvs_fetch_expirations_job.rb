@@ -2,8 +2,7 @@
 
 class BcvsFetchExpirationsJob < ApplicationJob
   def perform(symbol, job_id)
-    # 與 LEAPS 垂直價差共用同一個標的鎖：同時在抓時等前一次寫完快取再讀
-    result = SymbolScrapeLock.with(symbol) { BarchartScraperService.new(symbol).fetch_bcvs_expirations }
+    result = BarchartScraperService.new(symbol).fetch_bcvs_expirations
 
     result_status = case result[:status]
     when "barchart_session_expired" then "session_expired"

@@ -5,11 +5,12 @@
 # 回傳標的每一個 LEAPS 到期日（DTE ≥ LeapsRankingService::MIN_DTE）的全部 call：
 # 履約價、bid、ask、last、delta（皆 BigDecimal）與抓取時間。
 #
-# - 快取：共用 bcvs 的 bcvs_expiration_snapshots／bcvs_chain_snapshots，
-#   以 (ticker, expiry) 為單位判斷 30 分鐘；只抓過期或沒有快取的到期日。
+# - 快取：垂直價差自己的 leaps_spread_quotes 與到期日清單（LeapsSpreadCache），
+#   與 bcvs 完全分開（使用者裁示）；以 (ticker, expiry) 為單位判斷 30 分鐘，
+#   只抓過期或沒有快取的到期日。sidecar 也是垂直價差專用的兩支腳本。
 # - 停滯判定：每個階段（到期日清單、每個到期日的 chain）各給 STALL_TIMEOUT 秒，
 #   有進度就繼續等，單一階段超時才判定失敗；失敗時這一輪抓到的 chain 一筆都不寫。
-# - 同一標的互斥：SymbolScrapeLock，後到的請求等待後直接讀前一次寫好的快取。
+# - 同一標的互斥：LeapsSpreadFetchLock，後到的請求等待後直接讀前一次寫好的快取。
 # - 進度寫進 Rails.cache（.progress 讀取），給 P4 的進度條輪詢。
 class LeapsCallChainFetcher
   # P0 第 10 步實測：單一到期日最慢 7.61 秒 → max(30, ceil(7.61 × 3)) = 30。
@@ -47,10 +48,10 @@ class LeapsCallChainFetcher
 
   # only_expiry：選單切換到某個到期日時只刷新那一個（其他到期日不重抓）。
   def call(only_expiry: nil)
-    SymbolScrapeLock.with(@symbol) do
+    LeapsSpreadFetchLock.with(@symbol) do
       leaps = leaps_expirations(allow_stale: only_expiry.present?)
       targets = (only_expiry ? [ only_expiry ] & leaps : leaps)
-                  .reject { |expiry| BcvsCacheService.fresh_chain?(@symbol, expiry) }
+                  .reject { |expiry| LeapsSpreadCache.fresh_chain?(@symbol, expiry) }
       persist!(fetch_chains(targets))
       write_progress(state: "done", done: targets.size, total: targets.size)
       build_result(leaps)
@@ -64,9 +65,9 @@ class LeapsCallChainFetcher
   private
 
   def leaps_expirations(allow_stale:)
-    cached = BcvsCacheService.read_expirations(@symbol)
-    list = if cached && (allow_stale || BcvsCacheService.fresh_expirations?(@symbol))
-      cached[:expirations]
+    cached = LeapsSpreadCache.read_expirations(@symbol)
+    list = if cached && (allow_stale || LeapsSpreadCache.fresh_expirations?(@symbol))
+      cached
     else
       fetch_expirations
     end
@@ -83,8 +84,7 @@ class LeapsCallChainFetcher
 
     case data["status"]
     when "success"
-      BcvsCacheService.upsert_expirations!(@symbol, expirations: data["expirations"],
-                                                    underlying_price: data["underlying_price"])
+      LeapsSpreadCache.write_expirations!(@symbol, data["expirations"])
       Array(data["expirations"])
     when "symbol_not_found" then raise FetchFailed.new(:symbol_not_found, "查無股票代號 #{@symbol}")
     when "no_options"       then raise FetchFailed.new(:no_leaps, "#{@symbol} 沒有適合的 LEAPS 標的")
@@ -118,26 +118,22 @@ class LeapsCallChainFetcher
   def persist!(fetched)
     ActiveRecord::Base.transaction do
       fetched.each do |f|
-        BcvsCacheService.upsert_chain!(@symbol, f[:expiry], strikes: f[:rows], underlying_price: f[:underlying_price])
+        LeapsSpreadCache.replace_chain!(@symbol, f[:expiry], rows: f[:rows], underlying_price: f[:underlying_price])
       end
     end
   end
 
   def build_result(leaps)
     chains = leaps.filter_map do |expiry|
-      chain = BcvsCacheService.read_chain_decimal(@symbol, expiry)
+      chain = LeapsSpreadCache.read_chain(@symbol, expiry)
       next unless chain
 
       { expiry: expiry, date: expiry_date(expiry), dte: dte(expiry), fetched_at: chain[:scraped_at],
-        spot: chain[:underlying_price], calls: chain[:strikes].map { |row| call_of(row) } }
+        spot: chain[:underlying_price], calls: chain[:strikes] }
     end
 
     { status: :ok, symbol: @symbol, spot: chains.max_by { |c| c[:fetched_at] }&.dig(:spot),
       expirations: chains.map { |c| c.except(:spot) } }
-  end
-
-  def call_of(row)
-    { strike: row["strike"], bid: row["bid"], ask: row["ask"], last: row["last"], delta: row["delta"] }
   end
 
   def leaps?(expiry) = dte(expiry) >= LeapsRankingService::MIN_DTE

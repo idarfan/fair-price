@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_11_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_25_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -190,6 +190,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_11_120000) do
     t.integer "volume"
     t.index ["symbol", "expiration_date", "strike", "option_type"], name: "idx_leaps_chain_unique", unique: true
     t.index ["symbol", "scraped_at"], name: "idx_leaps_chain_symbol_scraped"
+  end
+
+  create_table "leaps_spread_quotes", force: :cascade do |t|
+    t.decimal "ask", precision: 10, scale: 4
+    t.decimal "bid", precision: 10, scale: 4
+    t.datetime "created_at", null: false
+    t.decimal "delta", precision: 8, scale: 6
+    t.string "expiration", null: false
+    t.date "expiration_date", null: false
+    t.decimal "last", precision: 10, scale: 4
+    t.datetime "scraped_at", null: false
+    t.decimal "strike", precision: 10, scale: 4, null: false
+    t.string "symbol", null: false
+    t.decimal "underlying_price", precision: 10, scale: 4
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "expiration", "scraped_at"], name: "idx_leaps_spread_quotes_freshness"
+    t.index ["symbol", "expiration", "strike"], name: "idx_leaps_spread_quotes_unique", unique: true
   end
 
   create_table "margin_positions", force: :cascade do |t|

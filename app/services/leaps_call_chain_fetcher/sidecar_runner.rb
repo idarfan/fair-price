@@ -3,14 +3,15 @@
 require "open3"
 
 class LeapsCallChainFetcher
-  # 執行 bcvs 的 sidecar（一次呼叫 = 一個階段），並負責停滯判定：
+  # 執行垂直價差專用的 sidecar（一次呼叫 = 一個階段），並負責停滯判定：
   # 一個階段超過 timeout 秒沒有結束就終止整個程序群組，丟出 Stalled。
+  # JSON 以 BigDecimal 解析，報價從 sidecar 輸出開始就不經過 Float。
   #
   # stdout／stderr 用獨立執行緒讀：chain 的 JSON 可能超過管線緩衝區，
   # 如果等程序結束才讀，子程序會卡在寫入，反而被誤判成停滯。
   class SidecarRunner
     SCRIPT_DIR = Rails.root.join("lib/barchart_scrapers")
-    SCRIPTS = { expirations: "bcvs_expirations_scraper.py", chain: "bcvs_call_chain_scraper.py" }.freeze
+    SCRIPTS = { expirations: "leaps_spread_expirations_scraper.py", chain: "leaps_spread_chain_scraper.py" }.freeze
     KILL_GRACE_SECONDS = 2
 
     def initialize(command: nil)
@@ -64,7 +65,7 @@ class LeapsCallChainFetcher
     def parse(stdout, stderr, status)
       return { "status" => "error", "error" => stderr.strip.first(500) } unless status.success?
 
-      JSON.parse(stdout)
+      JSON.parse(stdout, decimal_class: BigDecimal)
     rescue JSON::ParserError => e
       { "status" => "error", "error" => "JSON parse error: #{e.message.first(200)}" }
     end

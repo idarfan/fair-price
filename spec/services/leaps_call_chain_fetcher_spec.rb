@@ -84,7 +84,13 @@ RSpec.describe LeapsCallChainFetcher do
       expect(result[:status]).to eq(:ok)
       expect(runner.chain_calls).to eq([ exp_a ])
       expect(runner.expiration_calls).to eq(1)
-      expect(BcvsChainSnapshot.for_symbol_and_expiration("ORCL", exp_a)).to exist
+      expect(LeapsSpreadQuote.for_chain("ORCL", exp_a)).to exist
+    end
+
+    it "只寫垂直價差自己的表，不碰 bcvs 的快取" do
+      fetch(runner_for([ exp_a ]))
+      expect(BcvsChainSnapshot.where(symbol: "ORCL")).not_to exist
+      expect(BcvsExpirationSnapshot.where(symbol: "ORCL")).not_to exist
     end
 
     it "2. 29 分鐘內再查：不呼叫 sidecar" do
@@ -116,7 +122,7 @@ RSpec.describe LeapsCallChainFetcher do
       expect(result[:status]).to eq(:error)
       expect(result[:code]).to eq(:stalled)
       expect(result[:message]).to include("讀取 #{exp_c[0, 10]} chain").and include("#{stall} 秒沒有回應")
-      expect(BcvsChainSnapshot.where(symbol: "ORCL")).not_to exist
+      expect(LeapsSpreadQuote.where(symbol: "ORCL")).not_to exist
     end
 
     it "5. 慢但有進度：總耗時超過 STALL_TIMEOUT × 3，但每段都在時限內 → 成功" do
@@ -141,7 +147,7 @@ RSpec.describe LeapsCallChainFetcher do
   describe "7 部分快取與進度" do
     it "3 個到期日中 1 個過期：只抓那 1 個，進度 N = 1" do
       fetch(runner_for([ exp_a, exp_b, exp_c ]))
-      BcvsChainSnapshot.for_symbol_and_expiration("ORCL", exp_b).update_all(scraped_at: 31.minutes.ago)
+      LeapsSpreadQuote.for_chain("ORCL", exp_b).update_all(scraped_at: 31.minutes.ago)
 
       runner = runner_for([ exp_a, exp_b, exp_c ])
       result = fetch(runner)
@@ -158,8 +164,7 @@ RSpec.describe LeapsCallChainFetcher do
     self.use_transactional_tests = false
 
     after do
-      BcvsChainSnapshot.where(symbol: "ORCL").delete_all
-      BcvsExpirationSnapshot.where(symbol: "ORCL").delete_all
+      LeapsSpreadQuote.where(symbol: "ORCL").delete_all
     end
 
     it "兩個執行緒同時查 ORCL：sidecar 只抓 1 次，兩邊結果相同" do
@@ -199,8 +204,8 @@ RSpec.describe LeapsCallChainFetcher do
       result = fetch(runner, " orcl ")
 
       expect(result[:symbol]).to eq("ORCL")
-      expect(BcvsChainSnapshot.for_symbol_and_expiration("ORCL", exp_a)).to exist
-      expect(BcvsExpirationSnapshot.where(symbol: "ORCL")).to exist
+      expect(LeapsSpreadQuote.for_chain("ORCL", exp_a)).to exist
+      expect(LeapsSpreadCache.read_expirations("ORCL")).to be_present
     end
   end
 

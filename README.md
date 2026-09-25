@@ -4,23 +4,24 @@
 
 `leaps-call-spread-spec.md` 的第一個實作階段，UI 還沒有接上。
 
-- **`LeapsCallChainFetcher`**：回傳標的每個 LEAPS 到期日（DTE ≥ 364）的全部 call，
-  履約價、bid、ask、last、delta 一律 BigDecimal。共用 bcvs 的快取表，以
-  `(ticker, expiry)` 判斷 30 分鐘，只抓過期的到期日。
-- **停滯判定**：每個階段（到期日清單、每個到期日的 chain）各給 `STALL_TIMEOUT = 30` 秒
-  （P0 實測單一到期日最慢 7.61 秒 × 3，下限 30），超時就終止 sidecar 程序群組，
-  訊息寫出停在哪個階段；這一輪抓到的 chain 一筆都不寫。
-- **同一標的互斥**：`SymbolScrapeLock`（PostgreSQL advisory lock），bcvs 的兩個 job 也共用。
-- **bcvs 調整（行為不變）**：快取改存全部列，bid/ask 皆 0 的篩選移到 `read_chain`；
-  到期日 sidecar 能分辨查無代號（`.bc-error-404-page`）與沒有選擇權，bcvs 仍對應為
-  `no_candidates`。
-- 驗證：實抓 ORCL 6 個 LEAPS 到期日 59 秒、再查命中快取 0.29 秒；
-  RSpec 1134 examples, 0 failures。
+- **不碰 bcvs**：首版曾共用 bcvs 的快取表與 sidecar（因此改了 bcvs 三處），使用者裁示
+  兩邊完全分開後，bcvs 程式全部還原、寫進 bcvs 表的 ORCL 測試資料已刪除。
+- **專用快取表 `leaps_spread_quotes`**：每檔履約價一列，strike／bid／ask／last／delta 為
+  decimal 欄位，讀出即 BigDecimal；bid、ask 皆 0 的列也存（「盤後參考價」要用）。
+  到期日清單存 `Rails.cache`。以 `(ticker, expiry)` 判斷 30 分鐘，只抓過期的到期日。
+- **專用 sidecar**：`leaps_spread_expirations_scraper.py`（多了查無代號 `.bc-error-404-page`
+  與沒有選擇權的判定）、`leaps_spread_chain_scraper.py`（自 bcvs 逐字複製）。
+  Barchart 改版時兩邊都要檢查。
+- **`LeapsCallChainFetcher`**：每個階段各給 `STALL_TIMEOUT = 30` 秒（P0 實測單一到期日
+  最慢 7.61 秒 × 3，下限 30），超時終止 sidecar 程序群組、寫出停在哪個階段，這一輪不寫快取；
+  同一標的以 `LeapsSpreadFetchLock`（advisory lock）互斥。
+- 驗證：實抓 ORCL 6 個 LEAPS 到期日 43 秒、270 列，再查命中快取 0.17 秒，bcvs 表 0 筆；
+  RSpec 1135 examples, 0 failures。
 
-**涉及檔案：** `app/services/leaps_call_chain_fetcher.rb`、`app/services/leaps_call_chain_fetcher/sidecar_runner.rb`、
-`app/services/symbol_scrape_lock.rb`、`app/services/bcvs_cache_service.rb`、`app/services/barchart_scraper_service.rb`、
-`app/jobs/bcvs_fetch_expirations_job.rb`、`app/jobs/bcvs_fetch_chain_job.rb`、`app/models/fetch_log.rb`、
-`lib/barchart_scrapers/bcvs_expirations_scraper.py`，以及對應的 spec
+**涉及檔案：** `db/migrate/20260925120000_create_leaps_spread_quotes.rb`、`app/models/leaps_spread_quote.rb`、
+`app/services/leaps_spread_cache.rb`、`app/services/leaps_call_chain_fetcher.rb`、
+`app/services/leaps_call_chain_fetcher/sidecar_runner.rb`、`app/services/leaps_spread_fetch_lock.rb`、
+`app/models/fetch_log.rb`、`lib/barchart_scrapers/leaps_spread_*_scraper.py`，以及對應的 spec
 
 ### 2026-09-25（四）— 修正：http://localhost:3003 無法登入（CSRF 422）
 

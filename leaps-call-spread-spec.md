@@ -8,7 +8,7 @@
 | 階段 | 名稱 | 狀態 | 驗證證據（指令與輸出摘要、截圖路徑） |
 |---|---|---|---|
 | P0 | 探勘與定位 | 通過 | 2026-09-25。4 項與規格衝突的待決事項已由使用者裁示（附錄 A「決議」），規格相關段落已修改。驗證：附錄 A 內 TBD = 0；附錄 A 列出的 22 個既有路徑 `test -f` 全部存在（規劃中的 `app/services/leaps_call_chain_fetcher.rb` 除外）；第 12 步前後 `git diff -- app lib` 皆無變更；禁用 grep 對兩支 bcvs sidecar 皆 0 行；`cdp_helper.py` 的 4 處 `urlopen`／`Request` 目標皆為 `{CDP_BASE}`。實測：ORCL 6 個 LEAPS 到期日 max_strike／spot 最低 1.65；單一到期日最慢 7.61 秒 → `STALL_TIMEOUT = 30`；delta 100% 有值；查無代號與沒有 LEAPS 在既有 sidecar 皆為 `no_candidates`，判定 selector 已記錄（P1 需補判定） |
-| P1 | 即時抓取與快取 | 通過 | 2026-09-25。新增 `app/services/leaps_call_chain_fetcher.rb`（`STALL_TIMEOUT = 30`）、`leaps_call_chain_fetcher/sidecar_runner.rb`（逐階段時限、終止程序群組）、`app/services/symbol_scrape_lock.rb`（advisory lock，bcvs 兩個 job 共用）。bcvs 快取改存全部列、`read_chain` 篩選、新增 `read_chain_decimal`（決議 1、3）；`bcvs_expirations_scraper.py` 新增 `symbol_not_found`／`no_options`，Rails 端對應回 bcvs 原本的 `no_candidates`，`FetchLog::STATUSES` 登記。**驗證**：`spec/services/leaps_call_chain_fetcher_spec.rb` 16 examples 0 failures（案例 1–11 + BigDecimal 回傳 + SidecarRunner 實際逾時終止 2 例；「sidecar 呼叫次數」以到期日 chain 抓取次數計，到期日清單另外斷言）；反向驗證：拿掉鎖後案例 8 失敗（抓 2 次）。實抓 ORCL（不 stub，快取原為空）：59 秒、6 個 LEAPS 到期日，max_strike／spot = 2.65、3.65、3.37、2.65、1.72、1.65（全部 ≥ 1.5），每個到期日都有履約價 100，進度 `done 6/6`；再查一次命中快取 0.29 秒。禁用 grep：兩支 bcvs sidecar 0 行，`cdp_helper.py` 4 處 HTTP 呼叫皆為 `{CDP_BASE}`。靜態檢查 `to_f\|Float(`：0 行。實測 sidecar：ZZZZQ → `symbol_not_found`、BRK.A → `no_options`、ORCL → success。bcvs 相關 spec 與整體 `bundle exec rspec`：**1134 examples, 0 failures**（P0 基準 1111，全部保留）。備註：chain 的抓取時間取「全部成功後寫入」的時刻，同一輪各到期日相同 |
+| P1 | 即時抓取與快取 | 通過（改版） | 2026-09-25 首版共用 bcvs，同日依決議 5 改成**不碰 bcvs**並重新驗證。新增：`db/migrate/20260925120000_create_leaps_spread_quotes.rb`、`app/models/leaps_spread_quote.rb`、`app/services/leaps_spread_cache.rb`、`app/services/leaps_call_chain_fetcher.rb`（`STALL_TIMEOUT = 30`）、`app/services/leaps_call_chain_fetcher/sidecar_runner.rb`（逐階段時限、終止程序群組、JSON 以 BigDecimal 解析）、`app/services/leaps_spread_fetch_lock.rb`、`lib/barchart_scrapers/leaps_spread_expirations_scraper.py`、`lib/barchart_scrapers/leaps_spread_chain_scraper.py`。**驗證**：`spec/services/leaps_call_chain_fetcher_spec.rb` 17 examples 0 failures（案例 1–11、不寫 bcvs 表、BigDecimal 回傳、SidecarRunner 實際逾時終止 2 例；「sidecar 呼叫次數」以到期日 chain 抓取次數計，到期日清單另外斷言）；`spec/services/leaps_spread_cache_spec.rb` 7 examples 0 failures；反向驗證：拿掉鎖後案例 8 失敗。Python：`test_leaps_spread_expirations_scraper.py` 7 項通過。實測 sidecar：ZZZZQ → `symbol_not_found`、BRK.A → `no_options`、ORCL → success（21 個到期日），chain ORCL 2029-01-19 29 列 delta 100%。實抓 ORCL（不 stub）：43 秒、6 個 LEAPS 到期日、270 列寫入 `leaps_spread_quotes`，max_strike／spot = 2.65、3.65、3.37、2.65、1.72、1.65（全部 ≥ 1.5），每個到期日都有履約價 100，數值皆 BigDecimal；bcvs 兩張表 ORCL 仍為 0 筆；再查命中快取 0.17 秒。禁用 grep：兩支垂直價差 sidecar 0 行。靜態檢查 `to_f\|Float(`（fetcher、runner、cache）：0 行。**bcvs 無回歸**：bcvs 所有程式與 spec 檔對 `57cdff9` 的 diff 為空，bcvs 相關 spec 全數通過。整體 `bundle exec rspec`：**1135 examples, 0 failures**（P0 基準 1111，全部保留）。備註：chain 的抓取時間取「全部成功後寫入」的時刻，同一輪各到期日相同 |
 | P2 | 計算服務 | 待辦 | |
 | P3 | 路由與 Controller | 待辦 | |
 | P4 | UI 元件 | 待辦 | |
@@ -21,6 +21,7 @@
 - 不新增頂層路由，也不新增 sidebar 入口：本功能是 `/leaps` 頁面（`LeapsRecommendationsController#index`）裡的一個區塊，入口就是既有的 `/leaps` 頁面。
 - 抓取 Barchart 只能用 Playwright／CDP 解析 DOM。**禁止呼叫 Barchart 內部 API 或任何 Barchart API**（沒有付費訂閱）。這包括攔截 XHR／fetch 回應後直接讀 JSON，以及在 Python 中用 requests／httpx 打 Barchart 的任何端點。
 - 不新增 gem、憑證，也不新增資料表。P1 若判定必須新增，要先停下來回報。
+  - **例外（2026-09-25 使用者裁示）**：本功能**不碰 bcvs**（程式碼、sidecar、快取資料皆不修改、不共用），改建垂直價差專用的快取表 `leaps_spread_quotes` 與專用 sidecar（自 bcvs 複製）。詳見附錄 A 決議 5。
 - **既有行為不得改變**：`/leaps` 既有的所有區塊（候選排行、PMCC 等）和既有的輸入驗證，在加入本區塊前後的行為必須完全相同。驗收方式見 P0 第 12 步（建立基準）和 P3、P5 的回歸比對。
 - **數值一律用 BigDecimal**：履約價比對、mid、淨成本、所有公式全程使用 BigDecimal，只在顯示時才四捨五入。禁止在計算路徑中出現 Float（`to_f`、浮點數字面值）。
 
@@ -64,9 +65,9 @@
    - **盤後標示**：任一腳使用盤後參考價時，結果卡上方顯示黃色標籤「盤後參考價：以最後成交價計算，實際成交價可能不同」，並在使用 last 的那一腳旁標註。
 4. **固定提示（一行）**：「需 Firstrade 選擇權 Level 3；請用價差單一次成交兩腳。最大獲利要到到期日才完整實現。」
 5. **資料來源與載入（即時抓取）**
-   - 使用者輸入標的和價格後，由 Python sidecar 即時讀取 Barchart 的 call chain：先取到期日清單，再取每個 LEAPS 到期日的全部履約價。沿用 bpus／bcvs 的抓取架構，實際檔案路徑以附錄 A 為準。
+   - 使用者輸入標的和價格後，由 Python sidecar 即時讀取 Barchart 的 call chain：先取到期日清單，再取每個 LEAPS 到期日的全部履約價。使用垂直價差專用的 sidecar（`lib/barchart_scrapers/leaps_spread_expirations_scraper.py`、`leaps_spread_chain_scraper.py`，選擇器自 bcvs 複製），不呼叫、不修改 bcvs 的腳本。
    - **非同步載入**：`GET /leaps` 只渲染本區塊的外框（`id="leaps_vertical_spread"`、`data-behavior="leaps-vertical-spread"`、`data-src` 指向 `/leaps/vertical_spread?...`）。前端 behavior 以 fetch 取回片段替換外框內容；抓取和計算都在這個片段請求裡進行，不能讓 `/leaps` 本身等待 sidecar。（原規格為 Turbo Frame，依附錄 A 決議 2 改為既有 `data-behavior` 慣例。）
-   - **同一標的只抓一次**：以 PostgreSQL advisory lock 對標的上鎖。同一個標的已經在抓取時（連點、多個分頁、bcvs 同時在抓），後來的請求不啟動新的 sidecar，改為等待並共用同一次抓取的結果與進度。
+   - **同一標的只抓一次**：以 PostgreSQL advisory lock 對標的上鎖。同一個標的已經在抓取時（連點、多個分頁），後來的請求不啟動新的 sidecar，改為等待並共用同一次抓取的結果與進度。
    - **部分快取**：快取以 `(ticker, expiry)` 為單位判斷。只重新抓取已經過期或還沒有快取的到期日，仍在 30 分鐘內的到期日直接讀快取。進度條的 N 等於這次實際要抓的到期日數。
    - chain 必須包含**全部履約價**，不能只有 near-the-money 視窗。Barchart 頁面預設只列部分履約價時，要用 DOM 操作（例如切換 "Show All" 之類的控制項）展開後再解析。
    - 快取：以 `(ticker, expiry)` 為 key，存進 PostgreSQL，TTL 30 分鐘。30 分鐘內重複查詢時直接讀快取，不啟動 sidecar。
@@ -121,11 +122,15 @@
 
 ## P1 即時抓取與快取
 
-- 新增 `app/services/leaps_call_chain_fetcher.rb`：輸入 `ticker`，回傳每個 LEAPS 到期日的全部 call（履約價、bid、ask、last、delta、抓取時間）。last 同樣只能從 DOM 讀取；bcvs 快取表沒有 last 欄位時，依 P0 第 8 步的規則停下來回報。
-  - 流程：先查快取，30 分鐘內有資料就直接回傳；否則呼叫 P0 第 7 步記錄的 bcvs sidecar，寫入快取後再回傳。
-  - P0 第 8 步判定可以共用時，使用 bcvs 的快取表；判定不能共用時，先停下來回報，不能自行新增資料表。
-- P0 第 9 步的比值 < 1.5 時，修改 sidecar 的 DOM 操作，讓它展開全部履約價。只准修改既有腳本，而且要維持 bcvs 原本的行為。
-- 進度回報沿用 P0 第 7 步記錄的 bcvs 機制，階段文字依照「功能定義 5」。
+（2026-09-25 依附錄 A 決議 5 改版：不碰 bcvs。）
+
+- 新增 `app/services/leaps_call_chain_fetcher.rb`：輸入 `ticker`，回傳每個 LEAPS 到期日的全部 call（履約價、bid、ask、last、delta、抓取時間）。last 同樣只能從 DOM 讀取。
+  - 流程：先查快取，30 分鐘內有資料就直接回傳；否則呼叫垂直價差專用的 sidecar，寫入快取後再回傳。
+  - 快取：新增資料表 `leaps_spread_quotes`（每檔履約價一列，strike／bid／ask／last／delta／underlying_price 為 decimal 欄位，唯一鍵 `(symbol, expiration, strike)`，`scraped_at` 判斷 30 分鐘），由 `app/services/leaps_spread_cache.rb` 讀寫；bid、ask 皆為 0 的列也要存。到期日清單存 `Rails.cache`（以 `scraped_at` 判斷 30 分鐘，TTL 1 天，供選單切換時沿用）。
+  - sidecar：`lib/barchart_scrapers/leaps_spread_expirations_scraper.py`（自 bcvs 複製，另加查無代號／沒有選擇權判定，不抓 volatility 摘要）、`lib/barchart_scrapers/leaps_spread_chain_scraper.py`（自 `bcvs_call_chain_scraper.py` 逐字複製，只改說明）。Barchart 改版時兩邊都要檢查。
+  - 同一標的互斥：`app/services/leaps_spread_fetch_lock.rb`（advisory lock），只在垂直價差內部使用。
+- P0 第 9 步的比值 < 1.5 時，修改垂直價差 sidecar 的 DOM 操作，讓它展開全部履約價（P0 實測最低 1.65，不需修改）。
+- 進度回報寫入 `Rails.cache`（`LeapsCallChainFetcher.progress`），階段文字依照「功能定義 5」。
 
 新增 `spec/services/leaps_call_chain_fetcher_spec.rb`（sidecar 用 stub），至少包含：
 1. 快取未命中：sidecar 被呼叫 1 次，並寫入快取。
@@ -273,7 +278,13 @@ Request spec 至少包含：
 
 ### 決議（使用者 2026-09-25 裁示）
 
-1. **改成讀取時才篩選**：`bcvs_chain_snapshots` 改存全部履約價（含 bid、ask 皆為 0 者），`filter_quotable` 從寫入移到 bcvs 的讀取路徑，bcvs 畫面行為不變；垂直價差讀取時保留這些列以套用盤後參考價規則。不新增資料表。需補 bcvs 回歸測試。
+1. **（已被決議 5 取代，2026-09-25）** ~~改成讀取時才篩選~~：`bcvs_chain_snapshots` 改存全部履約價（含 bid、ask 皆為 0 者），`filter_quotable` 從寫入移到 bcvs 的讀取路徑，bcvs 畫面行為不變；垂直價差讀取時保留這些列以套用盤後參考價規則。不新增資料表。需補 bcvs 回歸測試。
 2. **沿用 `data-behavior` 慣例**：不引入 Turbo／Stimulus。本規格中的 Turbo Frame 一律改為「Phlex 輸出外框 + `data-behavior`，TS 以 fetch 取回 `/leaps/vertical_spread` 的 HTML 片段替換外框內容」；`requestSubmit()` 改為 select `change` 事件觸發 fetch。
-3. **jsonb 以 BigDecimal 解析**：以 SQL 取 `strikes::text`，`JSON.parse(..., decimal_class: BigDecimal)`，計算路徑不經過 Float。
-4. **禁用 grep 排除 `cdp_helper.py`**：它是本機 CDP 控制層（`127.0.0.1:9222/json*`），所有爬蟲共用、不連 Barchart。禁用 grep 只檢查 sidecar 腳本本身（目前兩支 bcvs sidecar 皆 0 行）。`cdp_helper.py` 另做一項檢查：每一個 `urlopen(`／`Request(` 的目標都必須以 `{CDP_BASE}` 開頭（`git grep -n -E "urlopen\(|Request\(" -- lib/barchart_scrapers/cdp_helper.py` 逐行確認；2026-09-25 為 :18、:24、:25、:56 共 4 處，全部是 `{CDP_BASE}`）。檔內出現的 `barchart.com`（:31、:38、:161）是比對分頁網址與讓瀏覽器導覽，屬 DOM 操作，允許。
+3. **（已被決議 5 取代，2026-09-25）** ~~jsonb 以 BigDecimal 解析~~：改用 `leaps_spread_quotes` 的 decimal 欄位，讀出即 BigDecimal；sidecar 輸出也以 `JSON.parse(..., decimal_class: BigDecimal)` 解析，全程不經過 Float。
+4. **禁用 grep 排除 `cdp_helper.py`**：它是本機 CDP 控制層（`127.0.0.1:9222/json*`），所有爬蟲共用、不連 Barchart。禁用 grep 只檢查 sidecar 腳本本身（目前兩支 bcvs sidecar 皆 0 行）。`cdp_helper.py` 另做一項檢查：每一個 `urlopen(`／`Request(` 的目標都必須以 `{CDP_BASE}` 開頭（`git grep -n -E "urlopen\(|Request\(" -- lib/barchart_scrapers/cdp_helper.py` 逐行確認；2026-09-25 為 :18、:24、:25、:56 共 4 處，全部是 `{CDP_BASE}`）。檔內出現的 `barchart.com`（:31、:38、:161）是比對分頁網址與讓瀏覽器導覽，屬 DOM 操作，允許。改版後禁用 grep 的對象改為垂直價差專用的兩支 sidecar（`leaps_spread_expirations_scraper.py`、`leaps_spread_chain_scraper.py`）。
+5. **不碰 bcvs，另建專用快取表與 sidecar**（使用者 2026-09-25 第二次裁示，取代決議 1、3）：
+   - bcvs 的程式碼、sidecar、快取資料一律不修改、不共用。先前依決議 1 對 bcvs 做的修改（`BcvsCacheService` 篩選時點、`bcvs_expirations_scraper.py` 新狀態、bcvs 兩個 job 的標的鎖）全部還原至 `57cdff9`；P1 首版實抓時寫進 bcvs 表的 ORCL 資料（chain 7 筆、清單 1 筆，皆 2026-09-25 18:30 後建立）已刪除。
+   - 快取：新表 `leaps_spread_quotes`（每檔履約價一列、decimal 欄位）；到期日清單存 `Rails.cache`（使用者選「一張表、每檔履約價一列」）。
+   - sidecar：複製成垂直價差專用腳本（使用者選「複製成自己的腳本」）。
+   - advisory lock 只在垂直價差內部互斥，不再與 bcvs job 共用；功能定義 5 已刪除「bcvs 同時在抓」。
+   - `FetchLog::STATUSES` 保留 `symbol_not_found`、`no_options`（新腳本會回傳；`spec/models/fetch_log_spec.rb` 會掃描所有 sidecar 的狀態）。

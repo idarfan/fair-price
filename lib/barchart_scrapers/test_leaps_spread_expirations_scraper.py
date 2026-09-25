@@ -1,11 +1,10 @@
 """
-Unit tests for bcvs_expirations_scraper.py 的「讀不到到期日」分流。
+Unit tests for leaps_spread_expirations_scraper.py（LEAPS 垂直價差專用，與 bcvs 分開）。
 
-2026-09-25（leaps-call-spread-spec P0 第 13 步）：原本查無代號與沒有選擇權都回
-no_candidates，LEAPS 垂直價差需要分成兩種錯誤訊息。判定依據是 DOM 實際內容：
-  - .bc-error-404-page 存在                         → symbol_not_found（ZZZZQ 實測）
-  - .error-page 顯示 "no option data" 且無到期日    → no_options（BRK.A 實測）
-  - 其他讀不到的情況                                 → 維持 no_candidates
+讀不到到期日時依 DOM 分流（leaps-call-spread-spec P0 第 13 步實測）：
+  - .bc-error-404-page 存在                      → symbol_not_found（ZZZZQ）
+  - .error-page 顯示 "no option data"           → no_options（BRK.A）
+  - 其他                                         → no_candidates
 """
 import asyncio
 import json
@@ -24,11 +23,11 @@ def _load_scraper():
     sys.modules["cdp_helper"] = stub
 
     spec = importlib.util.spec_from_file_location(
-        "bcvs_expirations_scraper",
-        __file__.replace("test_bcvs_expirations_scraper.py", "bcvs_expirations_scraper.py"),
+        "leaps_spread_expirations_scraper",
+        __file__.replace("test_leaps_spread_expirations_scraper.py", "leaps_spread_expirations_scraper.py"),
     )
     mod = importlib.util.module_from_spec(spec)
-    sys.modules["bcvs_expirations_scraper"] = mod
+    sys.modules["leaps_spread_expirations_scraper"] = mod
     spec.loader.exec_module(mod)
     return mod
 
@@ -47,7 +46,7 @@ def _capture_main(symbol):
     return json.loads(captured.getvalue().strip())
 
 
-def _setup(page_state, expirations=None):
+def _setup(page_state=None, expirations=None, expired=False):
     scraper.prepare_page = AsyncMock(return_value=("target-1", "ws://fake"))
     scraper.cdp_navigate = AsyncMock(return_value=None)
     scraper.activate_target = AsyncMock(return_value=None)
@@ -55,14 +54,30 @@ def _setup(page_state, expirations=None):
 
     async def fake_eval(ws_url, js_expr, timeout=25, **_):
         if js_expr == scraper.SESSION_EXPIRED_JS:
-            return False
+            return expired
         if js_expr == scraper.EXPIRATIONS_JS:
             return expirations or []
         if js_expr == scraper.PAGE_STATE_JS:
             return page_state
+        if js_expr == scraper.UNDERLYING_JS:
+            return 139.54
         return None
 
     scraper.cdp_eval = AsyncMock(side_effect=fake_eval)
+
+
+class TestSuccess(unittest.TestCase):
+    def test_returns_expirations_and_underlying(self):
+        _setup(expirations=["2027-10-15-m", "2028-01-21-m"])
+        result = _capture_main("orcl")
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["expirations"], ["2027-10-15-m", "2028-01-21-m"])
+        self.assertEqual(result["underlying_price"], 139.54)
+        self.assertIn("/ORCL/options", result["debug_url"])
+
+    def test_page_state_is_not_consulted_when_expirations_exist(self):
+        _setup(page_state="not_found", expirations=["2027-10-15-m"])
+        self.assertEqual(_capture_main("ORCL")["status"], "success")
 
 
 class TestEmptyExpirationsClassification(unittest.TestCase):
@@ -78,10 +93,16 @@ class TestEmptyExpirationsClassification(unittest.TestCase):
         _setup(None)
         self.assertEqual(_capture_main("ORCL"), {"status": "no_candidates"})
 
-    def test_page_state_is_not_consulted_when_expirations_exist(self):
-        _setup("not_found", expirations=["2027-10-15-m"])
-        result = _capture_main("ORCL")
-        self.assertEqual(result["status"], "success")
+
+class TestSessionAndCdp(unittest.TestCase):
+    def test_session_expired(self):
+        _setup(expired=True)
+        self.assertEqual(_capture_main("ORCL"), {"status": "barchart_session_expired"})
+
+    def test_no_cdp_page(self):
+        _setup()
+        scraper.prepare_page = AsyncMock(return_value=(None, None))
+        self.assertEqual(_capture_main("ORCL")["status"], "error")
 
 
 if __name__ == "__main__":
