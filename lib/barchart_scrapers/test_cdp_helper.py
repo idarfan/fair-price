@@ -132,5 +132,61 @@ class TestCdpEvalRetry(unittest.TestCase):
         once.assert_awaited_once_with("ws://url", "JS EXPR", 7)
 
 
+def _page(tid, url):
+    return {"id": tid, "type": "page", "url": url, "webSocketDebuggerUrl": f"ws://{tid}"}
+
+
+class TestGetTarget(unittest.TestCase):
+    """
+    2026-09-25 ORCL 事故：9222 的 Chrome 程序還活著（/json/version 有回應），
+    但視窗被關掉、一個分頁都沒有，get_target 回 (None, None)，所有爬蟲都報
+    「No Chrome CDP page found」。沒有分頁時要自己開一個，不能直接放棄。
+    """
+
+    def test_prefers_exact_symbol_page(self):
+        targets = [_page("A", "https://www.barchart.com/stocks/quotes/MU/options"),
+                   _page("B", "https://www.barchart.com/stocks/quotes/ORCL/options")]
+        with patch.object(helper, "_list_targets", return_value=targets), \
+             patch.object(helper, "_open_blank_tab") as open_tab:
+            self.assertEqual(helper.get_target("ORCL", "options"), ("B", "ws://B"))
+        open_tab.assert_not_called()
+
+    def test_reuses_any_existing_page_without_opening_new_tab(self):
+        targets = [{"id": "X", "type": "iframe", "url": "https://x", "webSocketDebuggerUrl": "ws://X"},
+                   _page("P", "about:blank")]
+        with patch.object(helper, "_list_targets", return_value=targets), \
+             patch.object(helper, "_open_blank_tab") as open_tab:
+            self.assertEqual(helper.get_target("ORCL", "options"), ("P", "ws://P"))
+        open_tab.assert_not_called()
+
+    def test_opens_blank_tab_when_no_page_exists(self):
+        targets = [{"id": "U", "type": "browser_ui", "url": "chrome://omnibox-popup.top-chrome/",
+                    "webSocketDebuggerUrl": "ws://U"}]
+        with patch.object(helper, "_list_targets", return_value=targets), \
+             patch.object(helper, "_open_blank_tab", return_value=_page("N", "about:blank")) as open_tab:
+            self.assertEqual(helper.get_target("ORCL", "options"), ("N", "ws://N"))
+        open_tab.assert_called_once_with()
+
+    def test_returns_none_when_opening_tab_fails(self):
+        with patch.object(helper, "_list_targets", return_value=[]), \
+             patch.object(helper, "_open_blank_tab", side_effect=OSError("refused")):
+            self.assertEqual(helper.get_target("ORCL", "options"), (None, None))
+
+
+class TestOpenBlankTab(unittest.TestCase):
+
+    def test_uses_put_on_json_new(self):
+        """Chrome 111 起 /json/new 只接受 PUT，GET 會回 405。"""
+        response = unittest.mock.MagicMock()
+        response.read.return_value = b'{"id": "N", "type": "page", "url": "about:blank", "webSocketDebuggerUrl": "ws://N"}'
+        with patch.object(helper.urllib.request, "urlopen", return_value=response) as urlopen:
+            tab = helper._open_blank_tab()
+
+        request = urlopen.call_args.args[0]
+        self.assertEqual(request.get_method(), "PUT")
+        self.assertEqual(request.full_url, f"{helper.CDP_BASE}/json/new?about:blank")
+        self.assertEqual(tab["id"], "N")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

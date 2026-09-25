@@ -13,11 +13,21 @@ import websockets
 CDP_BASE = "http://127.0.0.1:9222"
 
 
-def get_target(symbol, page_type):
-    """Return (target_id, ws_url) for the matching page, or any barchart page as fallback."""
-    targets = json.loads(
+def _list_targets():
+    return json.loads(
         urllib.request.urlopen(f"{CDP_BASE}/json", timeout=5).read()
     )
+
+
+def _open_blank_tab():
+    """Open a new about:blank tab (Chrome 111+ only accepts PUT on /json/new)."""
+    request = urllib.request.Request(f"{CDP_BASE}/json/new?about:blank", method="PUT")
+    return json.loads(urllib.request.urlopen(request, timeout=5).read())
+
+
+def get_target(symbol, page_type):
+    """Return (target_id, ws_url) for the matching page, or any barchart page as fallback."""
+    targets = _list_targets()
     pattern = f"barchart.com/stocks/quotes/{symbol}/{page_type}"
     # Exact match first
     for t in targets:
@@ -31,7 +41,13 @@ def get_target(symbol, page_type):
     for t in targets:
         if t.get("type") == "page":
             return t["id"], t["webSocketDebuggerUrl"]
-    return None, None
+    # No page at all: Chrome is alive but its window was closed (2026-09-25 ORCL).
+    # Open one ourselves instead of failing every scraper until someone notices.
+    try:
+        tab = _open_blank_tab()
+    except (OSError, ValueError):
+        return None, None
+    return tab["id"], tab["webSocketDebuggerUrl"]
 
 
 def get_browser_ws():

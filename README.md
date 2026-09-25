@@ -1,5 +1,25 @@
 # FairPrice
 
+### 2026-09-25（四）— 修正：Chrome 視窗被關後所有 Barchart 爬蟲報「No Chrome CDP page found」
+
+ORCL 查 LEAPS 時，畫面顯示「No Chrome CDP page found」和「價格情境資料抓取失敗」。
+當時 9222 的 Chrome 程序還在（`/json/version` 回 200），但**一個分頁都沒有**：
+視窗被關了，程序留在背景。`CdpPrecheckable` 只檢查 `/json/version` 所以放行，
+job 送出後爬蟲才在 `get_target` 找不到分頁而失敗。
+
+keeper 沒有補開是因為它自己也卡住了：舊版在前景呼叫 chrome.exe，
+監控迴圈 26 小時沒跑過一次。
+
+- `lib/barchart_scrapers/cdp_helper.py`：`get_target` 在沒有任何分頁時用
+  `PUT /json/new?about:blank` 自己開一個（Chrome 111 起只接受 PUT）；開不了才回 `(None, None)`。
+  13 支爬蟲都經過這裡，一次修好。
+- keeper 搬到獨立 repo `~/chrome-cdp-keeper/`，修正前景卡死、加上「0 個分頁就補開視窗」，
+  並用 `--window-name` 讓視窗標題直接顯示「CDP 9222 爬蟲」；9222 的 profile 改用橘色主題。
+- 驗證：把 9222 的分頁全部關掉重現事故，直接跑 `leaps_scraper.py ORCL`，
+  爬蟲自己開分頁並抓到 94 列，delta／vega／itm_probability 都有值。
+
+**涉及檔案：** `lib/barchart_scrapers/cdp_helper.py`、`lib/barchart_scrapers/test_cdp_helper.py`
+
 ### 2026-09-21（日）— 修正：POI 與 52 週卡永遠停在「載入中」（一道過寬的 gate）
 
 使用者回報 NOK 的 POI 與 52 週區間讀不到，當日區間卻正常。查下去發現那個
