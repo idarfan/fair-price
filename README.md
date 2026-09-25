@@ -1,5 +1,32 @@
 # FairPrice
 
+### 2026-09-25（四）— 修正：http://localhost:3003 無法登入（CSRF 422）
+
+自 2026-08-28 開啟 `force_ssl` 起，本機直連一律登入失敗。原因是 Rails 在
+`force_ssl = true` 時會**無條件**把 session cookie 標記 Secure（railties
+`default_middleware_stack.rb:77`），`ssl_options` 的 `exclude` 管不到；http 請求因此拿不到
+session cookie，登入表單的 CSRF token 永遠驗不過。`production.rb` 原本的註解
+「exclude 同時關掉……把 cookie 標記 Secure」與實際行為不符，已拿掉。
+
+- `config.session_store :cookie_store, key: "_fairprice_session", secure: false`：
+  key 沿用預設名稱，既有登入不受影響。注意這個階段 `session_options` 還是 nil，
+  寫成 `session_options[:secure] = false` 會讓 production 開不了機（已踩過、重啟前攔下）。
+- 公網安全性不變，重啟後實測：
+
+| 路徑 | 修正前 | 修正後 |
+|---|---|---|
+| `http://localhost:3003/login` | 沒有 session cookie | `path=/; httponly; samesite=lax` |
+| `https://fairprice-ohmy.com/login` | `…; secure` | `…; secure`（不變，由 ActionDispatch::SSL 標記） |
+| `http://fairprice-ohmy.com/login` | 301 → https | 301 → https，不發 cookie |
+
+- 修改由使用者執行腳本套用（自動權限檢查不允許 Claude 直接改這類設定），腳本會先以
+  production 開機驗證，失敗自動還原。
+- **尚需 Google 端設定**：本機登入的 POST 已不再 422，但 Google 回 `redirect_uri_mismatch`，
+  要在 Google Cloud Console 的 OAuth client 加上
+  `http://localhost:3003/auth/google_oauth2/callback`。
+
+**涉及檔案：** `config/environments/production.rb`
+
 ### 2026-09-25（四）— 修正：LEAPS 新查詢時殘留舊錯誤橫幅、PMCC 顯示「尚無 Short Call 資料」
 
 兩個都是「畫面比實際狀態早一步」的問題，ORCL 查詢時同一輪踩到：
@@ -13,10 +40,7 @@
 - 驗證：vitest 新增 `leapsLoading.test.ts`；RSpec 新增「PMCC 先於狀態寫入」順序測試；
   Playwright 改前／改後截圖比對（`fetch` 以替身攔截，不排真的 job）。
 
-**已知問題（未修）**：`force_ssl` 會讓 Rails 把 session cookie 無條件標記 Secure，
-`http://localhost:3003` 拿不到 session cookie，本機登入一律 CSRF 422（自 2026-08-28 起）。
-`production.rb` 註解「exclude 會關掉 cookie Secure」與實際行為不符。修法涉及安全設定，待決定；
-目前請用 `https://fairprice-ohmy.com` 登入。
+**本機登入 CSRF 422**：已於同日另案修正，見上一則。
 
 **涉及檔案：** `app/jobs/scrape_leaps_job.rb`、`spec/jobs/scrape_leaps_job_spec.rb`、
 `app/frontend/behaviors/leapsLoading.ts`、`app/frontend/behaviors/leapsLoading.test.ts`、

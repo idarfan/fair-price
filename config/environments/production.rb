@@ -30,11 +30,15 @@ Rails.application.configure do
   # 不開的話 Rails 依 X-Forwarded-Proto 判斷，公網是 https、本機是 http，兩邊都正確。
   config.force_ssl = true
 
-  # exclude 同時關掉「導向 https」與「把 cookie 標記 Secure」兩件事，
-  # 所以本機直連（http://localhost:3003）與健康檢查都不受影響——本機沒有 TLS
-  # 監聽器，一旦被導向 https 或拿到 Secure cookie，開發與 Playwright 流程就會壞掉。
-  # 公網網域走完整的 force_ssl。
-  #
+  # force_ssl 會讓 Rails 無條件把 session cookie 標記 Secure（railties
+  # default_middleware_stack，下面的 exclude 管不到），http://localhost:3003 因此
+  # 拿不到 session、登入一律 CSRF 422（2026-08-28 起，09-25 發現）。這裡關掉那一道：
+  # https 請求仍由 ActionDispatch::SSL 把 cookie 標記 Secure，公網 http 會先被導向
+  # https、到不了應用程式，所以公網 cookie 一樣只走 https。
+  # （這個階段 session_options 還是 nil，不能寫 session_options[:secure]=，會開不了機。）
+  # key 沿用預設名稱，既有登入不會被登出。
+  config.session_store :cookie_store, key: "_fairprice_session", secure: false
+
   # HSTS 由 Rails 這邊關掉，改在 Cloudflare 端設定：ActionDispatch::SSL 的 HSTS
   # header 不受 exclude 管轄，會一起送給 localhost，把瀏覽器對 localhost 的
   # http 存取永久鎖成 https。
