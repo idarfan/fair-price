@@ -7,7 +7,7 @@
 
 | 階段 | 名稱 | 狀態 | 驗證證據（指令與輸出摘要、截圖路徑） |
 |---|---|---|---|
-| P0 | 探勘與定位 | 進行中 | 2026-09-25：第 1–8、12 步完成（見附錄 A）。發現 4 項與規格衝突（附錄 A「待決事項」），停下回報；第 9、10、11、13 步（需實抓 Barchart）待決定後執行 |
+| P0 | 探勘與定位 | 通過 | 2026-09-25。4 項與規格衝突的待決事項已由使用者裁示（附錄 A「決議」），規格相關段落已修改。驗證：附錄 A 內 TBD = 0；附錄 A 列出的 22 個既有路徑 `test -f` 全部存在（規劃中的 `app/services/leaps_call_chain_fetcher.rb` 除外）；第 12 步前後 `git diff -- app lib` 皆無變更；禁用 grep 對兩支 bcvs sidecar 皆 0 行；`cdp_helper.py` 的 4 處 `urlopen`／`Request` 目標皆為 `{CDP_BASE}`。實測：ORCL 6 個 LEAPS 到期日 max_strike／spot 最低 1.65；單一到期日最慢 7.61 秒 → `STALL_TIMEOUT = 30`；delta 100% 有值；查無代號與沒有 LEAPS 在既有 sidecar 皆為 `no_candidates`，判定 selector 已記錄（P1 需補判定） |
 | P1 | 即時抓取與快取 | 待辦 | |
 | P2 | 計算服務 | 待辦 | |
 | P3 | 路由與 Controller | 待辦 | |
@@ -256,12 +256,12 @@ Request spec 至少包含：
 | 30 分鐘快取：資料表、key、TTL 判斷位置 | bcvs：`bcvs_chain_snapshots`（`db/schema.rb:17–26`，唯一索引 `(symbol, expiration)`，履約價存在 `strikes` jsonb）、`bcvs_expiration_snapshots`（`:28–41`，唯一 `symbol`）；TTL `app/models/bcvs_chain_snapshot.rb:4`（`FRESH_WINDOW = 30.minutes`）、`:9`（`scope :fresh`），判斷 `app/services/bcvs_cache_service.rb:44`。bpus 不用資料表，用 `Rails.cache`（`barchart_scraper_service.rb:236` key `bpus_put_chain_#{symbol}_#{expiration}`） |
 | 進度條：前端元件與後端回報機制 | bcvs：controller 寫 `Rails.cache["bcvs_job_#{job_id}"] = {status: "pending"}` 後排 job（`app/controllers/bull_call_spreads_controller.rb:107–108`），job 結束時只寫最終狀態（`app/jobs/bcvs_fetch_chain_job.rb:14–18`），前端 `app/frontend/behaviors/bullCallSpreads.ts` 輪詢 `GET /bcvs/status`（`bull_call_spreads_controller.rb:113`）。**沒有逐階段進度** |
 | bcvs 快取表能否共用（附理由） | **有條件，見待決事項 1、3**。可以的部分：key 含 ticker 與 expiry；`strikes` jsonb 含 `bid`、`ask`、`last`、`delta`（另有 iv、mid、dte、oi 等）；存全部履約價（AAPL 2026-09-18 共 104 檔，最低 50）；到期日清單含 LEAPS（AAPL 最遠 `2028-12-15-m`）。到期日字串帶後綴（`-m` 月選／`-w` 週選） |
-| ORCL 最遠到期日、最高履約價、現價、比值（sidecar 實抓） | TBD |
-| 各階段耗時（3 輪原始數據）、單一到期日最慢耗時、STALL_TIMEOUT、設定常數位置 | TBD |
+| ORCL 最遠到期日、最高履約價、現價、比值（sidecar 實抓） | 2026-09-25 實抓（`bcvs_call_chain_scraper.py`，URL `https://www.barchart.com/stocks/quotes/ORCL/options?view=sbs&expiration={exp}&moneyness=100`）。LEAPS 到期日（DTE ≥ 364）共 6 個：`2027-10-15-m`、`2027-12-17-m`、`2028-01-21-m`、`2028-09-15-m`、`2028-12-15-m`、`2029-01-19-m`。**最遠 `2029-01-19-m`：最高履約價 230、現價 139.54、比值 1.65**。各到期日 max_strike／spot：2.65、3.65、3.37、2.65、1.72、1.65，全部 ≥ 1.5 → P1 不需修改 sidecar 展開邏輯。各到期日 delta 皆 100% 有值；當次無「bid、ask 皆 0」的列 |
+| 各階段耗時（3 輪原始數據）、單一到期日最慢耗時、STALL_TIMEOUT、設定常數位置 | 原始數據（秒）：到期日清單 10.42／9.96／16.76；`2027-10-15-m` 6.1／6.3／7.0；`2027-12-17-m` 5.3／7.5／5.4；`2028-01-21-m` 6.8／4.6／5.2；`2028-09-15-m` **7.6**／4.7／5.6；`2028-12-15-m` 5.1／5.5／5.8；`2029-01-19-m` 6.5／6.5／5.3（第 1／2／3 輪）。完整 JSON 在 `tmp/p0/measure.json`（gitignore，量測腳本 `tmp/p0/measure.py`）。**單一到期日最慢 7.61 秒 → `STALL_TIMEOUT = max(30, ceil(7.61 × 3)) = max(30, 23) = 30` 秒**。設定常數規劃位置：`LeapsCallChainFetcher::STALL_TIMEOUT`（`app/services/leaps_call_chain_fetcher.rb`，P1 建立；P0 階段檔案尚不存在，不列入 `test -f` 檢查） |
 | 既有 LEAPS 到期日篩選邏輯（檔案:行號、條件） | `app/services/leaps_ranking_service.rb:31`（`MIN_DTE = 364`）、`:41`（`where("dte >= ?", MIN_DTE)`）；候選另加 `delta >= 0.60`（`:42`）與外在價值非負（`:46`），但後兩者是候選條件，不是到期日篩選 |
-| delta 的來源頁面 URL 與 selector（或「無 delta」） | TBD |
+| delta 的來源頁面 URL 與 selector（或「無 delta」） | 有 delta。頁面 `https://www.barchart.com/stocks/quotes/{SYMBOL}/options?view=sbs&expiration={exp}&moneyness=100`；selector `bc-data-grid`（頁面上有 3 個，需全掃再以 `optionType === 'Call'` 篩選），欄位讀 `_data[].raw.delta`（`lib/barchart_scrapers/bcvs_call_chain_scraper.py:43–66`）。讀的是頁面元件的資料，未攔截網路請求 |
 | 回歸基準檔案路徑、既有 rspec examples／failures 數 | `spec/fixtures/leaps_vertical_spread/baseline/a_empty.html`（6 區塊）、`b_symbol_only.html`（9 區塊）、`c_symbol_strike.html`（9 區塊），內容為 `#leaps-export-root` 各子元素 `outerHTML`，以 `<!-- ===== block ===== -->` 分隔，2026-09-25 08:57 於 localhost 擷取。**注意**：擷取時 ORCL 資料已超過 30 分鐘，(b)(c) 不含候選排行與 PMCC 區塊。`bundle exec rspec`：**1111 examples, 0 failures**（commit `817febd`） |
-| 查無代號／沒有 LEAPS 的 DOM 判定 selector | TBD |
+| 查無代號／沒有 LEAPS 的 DOM 判定 selector | 2026-09-25 實測。既有 `bcvs_expirations_scraper.py` 對兩者**都回 `no_candidates`，無法區分**，P1 需在 sidecar 加判定。**查無代號**（`ZZZZQ`）：`https://www.barchart.com/stocks/quotes/ZZZZQ/options` 顯示 404 頁，`document.title === "Page not found"`，selector `.bc-error-404-page` 存在（文字「404 Error … Oops, something's wrong.」）。**沒有 LEAPS**（`BRK.A`，完全沒有上市選擇權）：頁面正常（h1「Berkshire Hathaway Cl A (BRK.A)」），無 `.bc-error-404-page`，到期日選項 0 個，`.error-page` 文字「There is no option data for this symbol and month, or the options for the selected month have already expired.」。有選擇權但沒有 DTE ≥ 364 到期日的標的，判定為「到期日清單中 DTE ≥ 364 者為 0」（由 Rails 端依清單計算，不需額外 selector）。探查腳本 `tmp/p0/probe.py`、`tmp/p0/probe2.py` |
 
 ### 待決事項（P0 停下回報，2026-09-25）
 
