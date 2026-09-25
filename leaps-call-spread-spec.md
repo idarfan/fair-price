@@ -65,7 +65,7 @@
 4. **固定提示（一行）**：「需 Firstrade 選擇權 Level 3；請用價差單一次成交兩腳。最大獲利要到到期日才完整實現。」
 5. **資料來源與載入（即時抓取）**
    - 使用者輸入標的和價格後，由 Python sidecar 即時讀取 Barchart 的 call chain：先取到期日清單，再取每個 LEAPS 到期日的全部履約價。沿用 bpus／bcvs 的抓取架構，實際檔案路徑以附錄 A 為準。
-   - **非同步載入**：`GET /leaps` 只渲染本區塊的外框，以及一個帶 `src` 的 Turbo Frame（指向 `/leaps/vertical_spread`）。抓取和計算都在這個 frame 的請求裡進行，不能讓 `/leaps` 本身等待 sidecar。
+   - **非同步載入**：`GET /leaps` 只渲染本區塊的外框（`id="leaps_vertical_spread"`、`data-behavior="leaps-vertical-spread"`、`data-src` 指向 `/leaps/vertical_spread?...`）。前端 behavior 以 fetch 取回片段替換外框內容；抓取和計算都在這個片段請求裡進行，不能讓 `/leaps` 本身等待 sidecar。（原規格為 Turbo Frame，依附錄 A 決議 2 改為既有 `data-behavior` 慣例。）
    - **同一標的只抓一次**：以 PostgreSQL advisory lock 對標的上鎖。同一個標的已經在抓取時（連點、多個分頁、bcvs 同時在抓），後來的請求不啟動新的 sidecar，改為等待並共用同一次抓取的結果與進度。
    - **部分快取**：快取以 `(ticker, expiry)` 為單位判斷。只重新抓取已經過期或還沒有快取的到期日，仍在 30 分鐘內的到期日直接讀快取。進度條的 N 等於這次實際要抓的到期日數。
    - chain 必須包含**全部履約價**，不能只有 near-the-money 視窗。Barchart 頁面預設只列部分履約價時，要用 DOM 操作（例如切換 "Show All" 之類的控制項）展開後再解析。
@@ -183,13 +183,13 @@
 
 ## P3 路由與 Controller
 
-- 在既有的 leaps 路由下新增 `GET /leaps/vertical_spread`（collection route），由 `LeapsRecommendationsController#vertical_spread` 處理，回傳 Turbo Frame `leaps_vertical_spread` 的片段。
+- 在既有的 leaps 路由下新增 `GET /leaps/vertical_spread`（collection route），由 `LeapsRecommendationsController#vertical_spread` 處理，回傳區塊內容的 HTML 片段（不含 layout），由前端 behavior 放進 `#leaps_vertical_spread` 外框。
 - 新增 request spec：`spec/requests/leaps_vertical_spread_spec.rb`（這是強制交付項目，等級和 unit spec 相同）。
 
 Request spec 至少包含：
 1. **`GET /leaps` 不帶標的和價格**：body 不含 `leaps_vertical_spread`。
 2. **`GET /leaps` 只帶標的**：body 不含 `leaps_vertical_spread`。
-3. **`GET /leaps` 帶標的和價格 100（核心情境）**：body 含有 `id="leaps_vertical_spread"` 的 Turbo Frame，而且帶有指向 `/leaps/vertical_spread` 的 `src`；這個 frame 出現的位置在 PMCC 區塊之前（比較字串 index）。這個請求中 fetcher 被呼叫 0 次（`/leaps` 不能等待 sidecar）。
+3. **`GET /leaps` 帶標的和價格 100（核心情境）**：body 含有 `id="leaps_vertical_spread"` 的外框，帶 `data-behavior="leaps-vertical-spread"` 與指向 `/leaps/vertical_spread` 的 `data-src`；這個外框出現的位置在 PMCC 區塊之前（比較字串 index）。這個請求中 fetcher 被呼叫 0 次（`/leaps` 不能等待 sidecar）。
 4. **`GET /leaps/vertical_spread` 只帶標的和價格 100**：body 含有 `實付淨成本`、`最大獲利`、`損益兩平`、`報價時間`；買入腳選單的每個選項履約價都是 100.00；數值等於用 service 直接計算的結果。
 4b. `GET /leaps/vertical_spread` 帶完整參數（含 expiry、short_strike）：body 的數值等於用 service 直接計算的結果。
 5. `GET /leaps/vertical_spread` 缺少 ticker 或 long_strike：回傳 422。
@@ -208,7 +208,7 @@ Request spec 至少包含：
 ## P4 UI 元件
 
 - 新增 `app/components/leaps_recommendations/vertical_spread_section.rb`（Phlex），在 P0 第 2 步找到的位置、`pmcc_section` 之前渲染。只在 service 回傳值不是 `nil` 時才渲染。
-- 整個區塊包在 `turbo_frame_tag "leaps_vertical_spread", src: ...` 裡；表單以 GET 送到 `/leaps/vertical_spread`，select 變動時執行 `requestSubmit()`（依照 P0 第 5 步記錄的前端慣例實作）。
+- 整個區塊包在 `div(id: "leaps_vertical_spread", data_behavior: "leaps-vertical-spread", data_src: ...)` 外框裡；新增 `app/frontend/behaviors/leapsVerticalSpread.ts`：載入時 fetch `data-src` 取得片段放進外框，select 的 `change` 事件以目前選值組成 GET 參數重新 fetch `/leaps/vertical_spread` 並替換內容（依附錄 A 決議 2，比照 `leapsLoading.ts` 的 behavior 慣例；不引入 Turbo／Stimulus）。
 - 版面：第一列放 2 個下拉選單（買入腳、賣出腳）；第二列放結果卡，順序是實付淨成本、最大獲利、損益兩平、最大虧損、風險報酬比、價差寬度；最後放固定提示。標題列右側顯示報價時間。視覺沿用同一頁 PMCC 區塊的表格樣式 class（P0 記錄的實際 class 名稱列在附錄 A）。
 - 4 種狀態都要有對應畫面：載入中（進度條，含「已完成 n / N 個到期日」和已經過的秒數）、結果、錯誤（功能定義 6）、讀取失敗（紅字加「重試」按鈕）。版面參考示意圖：https://claude.ai/artifact/EzpHKtiDsoMZ2cLz3rH8g6（以本 spec 的文字為準，示意圖的報價是假數據）。
 
@@ -228,7 +228,7 @@ Request spec 至少包含：
 3. 斷言：送出後 2 秒內，區塊內出現進度條。等待進度條消失，採停滯判定：每次輪詢讀取進度文字「n / N」，n 有增加就重新計時；n 超過 `STALL_TIMEOUT` 秒都沒有變化，才判定失敗。`STALL_TIMEOUT` 從設定常數讀取。狀態表中記錄這次的總耗時和 N。
    斷言：「LEAPS 垂直價差」區塊出現，而且位置在「PMCC 黃金法則組合」之前；買入腳選單的每個選項履約價都是 100.00；標題列有「報價時間」，而且和現在時間相差 ≤ 30 分鐘。
 4. 讀取預設選到的到期日和賣出腳 K_S。斷言 K_S > 頁面顯示的現價。用 psql 查出這兩檔的 bid、ask、last，依報價規則和公式算出期望值，再和 DOM 上的實付淨成本、最大獲利、損益兩平比對，誤差要 ≤ $0.01。如果有任一腳是盤後參考價，斷言畫面上有盤後標籤，並在狀態表註明這次是盤後執行。
-5. 把賣出腳改成另一檔，等 Turbo Frame 更新後，重做第 4 步的比對。
+5. 把賣出腳改成另一檔，等 `#leaps_vertical_spread` 的內容更新後，重做第 4 步的比對。
 6. 把買入腳切換到另一個到期日（買入腳選單有 2 個以上選項時才執行；只有 1 個時在狀態表記錄「ORCL 的 100 只有 1 個到期日」）：斷言賣出腳選單換成新到期日的選項，而且全部 > max(100, 現價)；重做第 4 步的比對。
 7. 重新整理頁面，再查一次 ORCL 和 100：斷言沒有出現進度條，而且「報價時間」和第 3 步相同（命中快取）。
 8. 錯誤情境：依序查詢 `ZZZZQ` 和 100、ORCL 和 101.37，斷言分別顯示功能定義 6 的「查無股票代號」和「查無履約價……最接近的履約價」訊息。
@@ -270,3 +270,10 @@ Request spec 至少包含：
 3. **jsonb 數值讀進 Ruby 是 Float**：`strikes` 的 bid／ask／last 經 ActiveRecord 讀出為 Float，與「計算路徑禁止 Float」衝突。可行解法：讀取時以 SQL 取 `strikes::text` 再用 `JSON.parse(..., decimal_class: BigDecimal)`，不必改表。
 4. **禁用 grep 命中 `cdp_helper.py`**：兩支 bcvs sidecar 本身 0 行；但它們 import 的 `lib/barchart_scrapers/cdp_helper.py` 有 5 行 `urllib`（:10、:18、:24、:25、:56），連的是本機 Chrome 控制端點 `127.0.0.1:9222/json*`，不是 Barchart。規格寫「有任何命中要先停下回報」。
 5. （非衝突，備註）bcvs 沒有逐階段進度回報，規格的停滯判定需要新增進度回報（沿用 `Rails.cache`，不需資料表）。
+
+### 決議（使用者 2026-09-25 裁示）
+
+1. **改成讀取時才篩選**：`bcvs_chain_snapshots` 改存全部履約價（含 bid、ask 皆為 0 者），`filter_quotable` 從寫入移到 bcvs 的讀取路徑，bcvs 畫面行為不變；垂直價差讀取時保留這些列以套用盤後參考價規則。不新增資料表。需補 bcvs 回歸測試。
+2. **沿用 `data-behavior` 慣例**：不引入 Turbo／Stimulus。本規格中的 Turbo Frame 一律改為「Phlex 輸出外框 + `data-behavior`，TS 以 fetch 取回 `/leaps/vertical_spread` 的 HTML 片段替換外框內容」；`requestSubmit()` 改為 select `change` 事件觸發 fetch。
+3. **jsonb 以 BigDecimal 解析**：以 SQL 取 `strikes::text`，`JSON.parse(..., decimal_class: BigDecimal)`，計算路徑不經過 Float。
+4. **禁用 grep 排除 `cdp_helper.py`**：它是本機 CDP 控制層（`127.0.0.1:9222/json*`），所有爬蟲共用、不連 Barchart。禁用 grep 只檢查 sidecar 腳本本身（目前兩支 bcvs sidecar 皆 0 行）。`cdp_helper.py` 另做一項檢查：每一個 `urlopen(`／`Request(` 的目標都必須以 `{CDP_BASE}` 開頭（`git grep -n -E "urlopen\(|Request\(" -- lib/barchart_scrapers/cdp_helper.py` 逐行確認；2026-09-25 為 :18、:24、:25、:56 共 4 處，全部是 `{CDP_BASE}`）。檔內出現的 `barchart.com`（:31、:38、:161）是比對分頁網址與讓瀏覽器導覽，屬 DOM 操作，允許。
