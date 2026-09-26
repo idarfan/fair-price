@@ -206,7 +206,12 @@ describe("leapsVerticalSpread", () => {
       expect(drive).toHaveBeenCalledOnce();
       const config = factory.mock.calls[0]?.[0];
       if (!config) throw new Error("driver.js 沒有被呼叫");
-      expect(config).toMatchObject({ showProgress: true, allowClose: true });
+      // vs-tour-popover：這個導覽專用的寬版、內文可捲動，第 6、7 步字多也看得到按鈕
+      expect(config).toMatchObject({
+        showProgress: true,
+        allowClose: true,
+        popoverClass: "vs-tour-popover",
+      });
       expect(config.steps).toHaveLength(2);
       const [first, second] = config.steps;
       if (!first || !second) throw new Error("導覽步驟數不對");

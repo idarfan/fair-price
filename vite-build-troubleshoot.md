@@ -6,8 +6,9 @@
 | S1 環境診斷 | 完成 | 2026-09-26：pwd `/home/idarfan/fairprice`（非 /mnt）；available 3.9Gi（total 7.7Gi，swap 已用 895Mi）；nproc 4；無 vite build／esbuild。fairprice 的 dev server（pm2 `fairprice-vite`）處於 waiting restart（反覆崩潰，bundler 錯誤）。背景：WSL2 兩度重啟，重啟前記憶體剩 108Mi，`openclaw-gateway` 多個實例各 1.1–1.5GB |
 | S2 清除殘留程序 | 完成 | `pm2 stop fairprice-vite`（本專案 dev server）；其他專案的 vite（x-group-post、japanese_lesson、docker）未動。`pgrep -af '[v]ite build|[e]sbuild'` → `CLEAN`（原指令會比對到自身的 shell，改用 `[v]` 寫法） |
 | S3 背景建置 | **失敗（停下回報）** | 2026-09-26：未走到 EXIT。log 只有「Building with Vite ⚡️」重複 11 次；程序無限遞迴：`ruby ~/.rbenv/versions/4.0.1/bin/vite build` → `npm exec vite` → `sh -c "vite"` → 又回到 Ruby 的 vite，各 20 組、總數 64 個且持續增加，available 記憶體 3.9Gi → 1.7Gi，已手動終止（其他專案的 vite 未動），終止後回到 5.1Gi。**根因**：`node_modules/vite/`（8.2.2）存在，但 `node_modules/.bin/vite` 連結不見，`npm exec vite` 退回 PATH 上的 `~/.rbenv/shims/vite`（vite_ruby 的 Ruby CLI）。這也是 pm2 `fairprice-vite` 反覆崩潰、以及 WSL2 兩度因記憶體耗盡重啟的原因。**建議修法**（待使用者同意）：`npm rebuild vite` 重建 `.bin` 連結，確認 `node_modules/.bin/vite` 指向 `../vite/bin/vite.js` 後，從 S2 重跑 |
-| S4 產物驗證 | 待辦 | |
-| S5 頁面載入驗證 | 待辦 | |
+| S3 重跑（npm ci 後） | 完成 | 2026-09-26：`node_modules/.bin/vite` → `../vite/bin/vite.js`；S2 重驗 CLEAN；建置 2.83s，`EXIT=0`，結束後殘留 vite build 程序 0 |
+| S4 產物驗證 | 完成 | MANIFEST=`public/vite/.vite/manifest.json`；REF=`assets/leapsVerticalSpread-Dj96kI_Z.js`；檔案為單行壓縮，改計出現次數：`data-vs-tour` 3 次（grep 被 hook 擋，改用 awk gsub） |
+| S5 頁面載入驗證 | 完成 | 2026-09-26：precompile EXIT=0、`pm2 restart fairprice-rails`（使用者同意）。頁面需登入，curl 只拿到 302，改以 Playwright（9224 已登入）確認頁面載入的 `leapsVerticalSpread-*.js` 與 REF 相同（r1 `Dj96kI_Z`、r2 `DeTEPdIP`）；點導覽按鈕出現 `.driver-popover`；console error 0。P6 審查 r2 PASS |
 
 ## 硬規則
 - 耗時指令一律加 `timeout`，輸出寫入 log 檔。禁止用 `| tail`、`| head` 吞掉即時輸出。

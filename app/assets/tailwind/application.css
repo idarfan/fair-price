@@ -281,11 +281,19 @@
 .driver-popover .driver-popover-description .vs-tone-breakeven,
 .driver-popover .driver-popover-description .vs-tone-loss { font-weight: 700; }
 .driver-popover .driver-popover-description .vs-tour-line + .vs-tour-line { margin-top: 8px; }
+/* 垂直價差賣出腳導覽專用：第 6、7 步字多，580px 寬會超出視窗高度、看不到按鈕。
+   加寬以減少行數，內文超出時在卡片內捲動，標題與上一步／下一步固定可見。 */
+.driver-popover.vs-tour-popover { max-width: min(820px, calc(100vw - 32px)); }
+.driver-popover.vs-tour-popover .driver-popover-description {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  padding-right: 6px;
+}
 /* tooltip 第一列數值（data-tip-tone）：沿用 .tip-v 的版型，只換左邊線、底色與字色 */
 #leaps-col-tip .tip-v--profit,
 .driver-popover .driver-popover-description .tip-v--profit    { color: #2CA58D; border-left-color: #2CA58D; background: rgba(44,165,141,.16); }
 #leaps-col-tip .tip-v--breakeven,
-.driver-popover .driver-popover-description .tip-v--breakeven { color: #eab308; border-left-color: #ca8a04; background: rgba(202,138,4,.18); }
+.driver-popover .driver-popover-description .tip-v--breakeven { color: #ca8a04; border-left-color: #ca8a04; background: rgba(202,138,4,.18); }
 #leaps-col-tip .tip-v--loss,
 .driver-popover .driver-popover-description .tip-v--loss      { color: #F4726A; border-left-color: #F4726A; background: rgba(244,114,106,.16); }
 

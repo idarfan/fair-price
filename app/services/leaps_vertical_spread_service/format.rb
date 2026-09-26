@@ -20,6 +20,16 @@ class LeapsVerticalSpreadService
       ActiveSupport::NumberHelper.number_to_rounded(value, precision: 2, round_mode: :half_up)
     end
 
+    # 算式用：兩位能精確表示就兩位，否則補到精確為止（最多 4 位），讓使用者照著算對得上。
+    # 例：54.55 → "54.55"、12.975 → "12.975"、41.575 → "41.575"
+    def exact(value)
+      return nil if value.nil?
+
+      v = BigDecimal(value.to_s)
+      places = (2..4).find { |p| v == v.round(p) } || 4
+      ActiveSupport::NumberHelper.number_to_rounded(v, precision: places, round_mode: :half_up)
+    end
+
     # 比例 → 百分比字串（0.028508 → "+2.85%"）。signed: false 不加正號。
     def pct(ratio, signed: true)
       text = "#{num(ratio * 100)}%"

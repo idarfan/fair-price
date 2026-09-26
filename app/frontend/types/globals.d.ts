@@ -10,7 +10,6 @@ interface FairPriceTrack {
   command(name: string, payload?: unknown): void;
 }
 
-
 declare global {
   interface DriverStep {
     element: Element | string;
@@ -27,6 +26,8 @@ declare global {
     allowClose?: boolean;
     overlayOpacity?: number;
     showProgress?: boolean;
+    // 加在每個 .driver-popover 上的 class，讓單一導覽有自己的版面
+    popoverClass?: string;
     steps: DriverStep[];
     // price-in 用它在導覽走到某步時展開對應的說明卡（說明卡預設收摺）。
     onHighlightStarted?: (element: Element | undefined) => void;
@@ -103,8 +104,14 @@ declare global {
     jsPDF: new (options?: Record<string, unknown>) => {
       internal: { pageSize: { getWidth(): number; getHeight(): number } };
       addImage(
-        data: string, format: string, x: number, y: number,
-        w: number, h: number, alias?: string, compression?: string,
+        data: string,
+        format: string,
+        x: number,
+        y: number,
+        w: number,
+        h: number,
+        alias?: string,
+        compression?: string,
       ): void;
       addPage(): void;
       save(filename: string): void;

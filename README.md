@@ -1,5 +1,14 @@
 # FairPrice
 
+### 2026-09-26（六）— 完成：LEAPS 垂直價差 P6（tooltip、顏色、賣出腳導覽）審查通過
+
+- 前端 production 建置恢復正常（`npm ci` 修好 `node_modules/.bin/vite`，建置 2.7 秒），實機驗證 8 格 tooltip 與 7 步導覽。
+- 審查修正：tooltip 算式改用精確位數，mid 為半分時顯示三位，照著算對得上（例 54.55 − 12.975 = 41.575）；
+  預設賣出腳 Δ 偏低時，說明改為「相鄰履約價間距較大」。
+- 損益兩平在深色 tooltip 內的顏色改回規格的 `#ca8a04`；賣出腳導覽卡片加寬、內文可捲動，第 6、7 步不再超出視窗。
+- 規格更正：3003 的 server 是 production，`Rails.cache` 為 `FileStore`（`tmp/cache/`），不是 development `memory_store`。
+- 驗證：`bundle exec rspec` 1210 examples, 0 failures；vitest 53 passed；配對審查 r2 PASS。
+
 ### 2026-09-25（四）— 驗收：LEAPS 垂直價差 P4 元件測試、P5 E2E 通過
 
 - P4：`VerticalSpreadSection` 4 種狀態的元件測試（9 例），反向驗證兩次。

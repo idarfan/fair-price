@@ -41,6 +41,9 @@ class LeapsVerticalSpreadService
         k_l: Format.num(long[:strike]), k_s: Format.num(short[:strike]), date: long[:expiry][0, 10], dte: long[:dte],
         long_price: Format.num(long[:price]), short_price: Format.num(short[:price]),
         d_mid: Format.num(result[:d_mid]), spot_s: outcome[:spot] && Format.num(outcome[:spot]),
+        # 算式專用（P6 審查 r1）：半分的 mid 不四捨五入，算式兩邊才對得上
+        long_price_x: Format.exact(long[:price]), short_price_x: Format.exact(short[:price]),
+        d_mid_x: Format.exact(result[:d_mid]),
         default: default, default_option: default && outcome[:short_options]&.find { |o| o[:strike] == default },
         user_changed: default && default != short[:strike]
       }
@@ -96,14 +99,14 @@ class LeapsVerticalSpreadService
         "有一腳沒有買賣價（用盤後參考價），無法計算保守成交。"
       end
       { value: disp[:net_cost], tone: nil, lines: [
-        "每口實際要付的錢 = (買入腳 #{c[:long_price]} − 賣出腳 #{c[:short_price]}) × 100 = #{c[:d_mid]} × 100 = #{disp[:net_cost]}（一口 100 股）。",
+        "每口實際要付的錢 = (買入腳 #{c[:long_price_x]} − 賣出腳 #{c[:short_price_x]}) × 100 = #{c[:d_mid_x]} × 100 = #{disp[:net_cost]}（一口 100 股）。",
         nat
       ] }
     end
 
     def tip_max_profit(c)
       r, disp = c[:result], c[:display]
-      lines = [ "到期時股價在賣出腳履約價 #{c[:k_s]} 以上，拿到最大獲利 = (價差寬度 #{disp[:width]} − 淨成本 #{c[:d_mid]}) × 100 = #{disp[:max_profit]}。" ]
+      lines = [ "到期時股價在賣出腳履約價 #{c[:k_s]} 以上，拿到最大獲利 = (價差寬度 #{disp[:width]} − 淨成本 #{c[:d_mid_x]}) × 100 = #{disp[:max_profit]}。" ]
       lines << "股價要從現價 #{c[:spot_s]} 漲到 #{c[:k_s]}，約 #{Format.pct(r[:short_vs_spot])}。" if c[:spot_s]
       lines << "要到到期日 #{c[:date]} 才完整實現；在那之前提早平倉，通常拿不到全部。"
       { value: disp[:max_profit], tone: :profit, lines: lines }
@@ -111,7 +114,7 @@ class LeapsVerticalSpreadService
 
     def tip_breakeven(c)
       r, disp = c[:result], c[:display]
-      lines = [ "到期時股價要高於 買入腳履約價 #{c[:k_l]} + 每股淨成本 #{c[:d_mid]} = #{Format.num(r[:breakeven])} 才開始賺錢。" ]
+      lines = [ "到期時股價要高於 買入腳履約價 #{c[:k_l]} + 每股淨成本 #{c[:d_mid_x]} = #{Format.exact(r[:breakeven])} 才開始賺錢。" ]
       lines << breakeven_distance(c) if c[:spot_s]
       { value: disp[:breakeven], tone: :breakeven, lines: lines }
     end
@@ -218,8 +221,13 @@ class LeapsVerticalSpreadService
       ]
       opt = c[:default_option]
       if opt && opt[:delta] && (opt[:delta] - LeapsVerticalSpreadService::TARGET_DELTA).abs > FAR_FROM_TARGET
-        lines << line("這個到期日最接近 0.30 的是 #{Format.num(opt[:strike])}（Δ #{Format.num(opt[:delta])}），" \
-                      "因為 chain 的履約價不夠高，找不到更接近的。")
+        # Δ 偏高：價外最高的履約價還不夠遠；Δ 偏低：相鄰履約價間距大，跳過了 0.30 附近（P6 審查 r1 質詢 2）
+        reason = if opt[:delta] > LeapsVerticalSpreadService::TARGET_DELTA
+          "因為 chain 的履約價不夠高，找不到更接近的。"
+        else
+          "因為這一段相鄰履約價間距較大，沒有更接近 0.30 的檔。"
+        end
+        lines << line("這個到期日最接近 0.30 的是 #{Format.num(opt[:strike])}（Δ #{Format.num(opt[:delta])}），#{reason}")
       end
       lines << line("找不到剛好 0.30 時，系統選最接近的那一檔；資料沒有 Δ 時，改選履約價最接近 現價 × 1.3 的那一檔。")
       lines << line("以上只是計算與說明，不構成投資建議。")

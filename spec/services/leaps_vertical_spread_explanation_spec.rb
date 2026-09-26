@@ -39,10 +39,12 @@ RSpec.describe LeapsVerticalSpreadService::Explanation do
     end
 
     it "說明句用實際兩腳與現價計算" do
-      expect(tips[:net_cost][:lines].join).to include("55.23", "12.90", "42.33", "$4,232.50")
+      # 買入腳 mid 55.225 是半分：算式保留三位（P6 審查 r1），格子數值仍四捨五入到兩位
+      expect(tips[:net_cost][:lines].join).to include("55.225", "12.90", "42.325", "$4,232.50")
       expect(tips[:net_cost][:lines].join).to include("55.70", "12.75", "$4,295.00")
-      expect(tips[:max_profit][:lines].join).to include("$150.00", "42.33", "250.00", "+80.66%")
-      expect(tips[:breakeven][:lines].join).to include("100.00", "142.33", "138.38", "+2.85%")
+      expect(tips[:max_profit][:lines].join).to include("$150.00", "42.325", "250.00", "+80.66%")
+      expect(tips[:breakeven][:lines].join).to include("100.00", "142.325", "138.38", "+2.85%")
+      expect(tips[:breakeven][:value]).to eq("$142.33")
       expect(tips[:width][:lines].join).to include("250.00", "100.00", "$150.00")
       expect(tips[:short_leg][:lines].join).to include("250.00", "138.38", "23.36%")
     end
@@ -54,6 +56,38 @@ RSpec.describe LeapsVerticalSpreadService::Explanation do
       expect(other_tips[:net_cost][:lines].join).to include("61.00", "10.50", "50.50")
       expect(other_tips[:net_cost][:lines].join).not_to include("42.33")
       expect(other_tips[:breakeven][:lines].join).to include("150.50", "150.00")
+    end
+
+    # P6 審查 r1 問題 1：mid 為半分時，算式若用四捨五入後的兩位數，照著算會對不上。
+    describe "mid 為半分時算式照著算對得上" do
+      def nums(text) = text.scan(/[\d,]+\.\d+/).map { |s| BigDecimal(s.delete(",")) }
+
+      let(:half) do
+        outcome([ quote(100, bid: 54.10, ask: 55.00, delta: 0.79), quote(250, bid: 12.80, ask: 13.15, delta: 0.30) ], spot: "137.10")
+      end
+      let(:half_tips) { described_class.tips(half) }
+
+      it "淨成本：(買入腳 − 賣出腳) × 100 = 每股淨成本 × 100 = 金額" do
+        # 「100」沒有小數點，不會被 nums 抓到
+        long, short, per_share, total = nums(half_tips[:net_cost][:lines].first)
+        expect([ long, short ]).to eq([ d("54.55"), d("12.975") ])
+        expect(long - short).to eq(per_share)
+        expect(per_share * 100).to eq(total)
+      end
+
+      it "最大獲利：(寬度 − 每股淨成本) × 100 = 金額" do
+        _k, width, per_share, total = nums(half_tips[:max_profit][:lines].first)
+        expect((width - per_share) * 100).to eq(total)
+      end
+
+      it "損益兩平：買入腳履約價 + 每股淨成本 = 損益兩平" do
+        k_long, per_share, be = nums(half_tips[:breakeven][:lines].first)
+        expect(k_long + per_share).to eq(be)
+      end
+
+      it "兩位數就精確的值維持兩位" do
+        expect(tips[:net_cost][:lines].first).to include("(買入腳 55.225 − 賣出腳 12.90)")
+      end
     end
 
     it "使用者改選賣出腳時，說明預設是哪一檔" do
@@ -98,7 +132,15 @@ RSpec.describe LeapsVerticalSpreadService::Explanation do
 
     it "這個到期日沒有接近 0.30 的賣出腳時，說明實際選到的 Δ" do
       far = described_class.tour(outcome([ calls[0], quote(230, bid: 29, ask: 30, delta: 0.48) ]))
-      expect(tour_text([ far.last ])).to include("最接近 0.30 的是 230.00", "Δ 0.48")
+      expect(tour_text([ far.last ])).to include("最接近 0.30 的是 230.00", "Δ 0.48", "履約價不夠高")
+    end
+
+    # P6 審查 r1 質詢 2：最接近的一檔 Δ 低於 0.30 太多時，原因是履約價間距大，不是履約價不夠高。
+    it "最接近 0.30 的一檔 Δ 偏低時，說明是履約價間距太大" do
+      low = described_class.tour(outcome([ calls[0], quote(190, bid: 21, ask: 22, delta: 0.46), quote(250, bid: 8, ask: 9, delta: 0.20) ]))
+      text = tour_text([ low.last ])
+      expect(text).to include("最接近 0.30 的是 250.00", "Δ 0.20", "間距")
+      expect(text).not_to include("履約價不夠高")
     end
   end
 

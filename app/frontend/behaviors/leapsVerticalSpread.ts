@@ -205,6 +205,8 @@ function startTour(root: HTMLElement, button: HTMLElement): void {
     allowClose: true,
     overlayOpacity: 0.4,
     showProgress: true,
+    // 第 6、7 步字多：寬版＋內文可捲動（樣式見 application.css 的 .vs-tour-popover）
+    popoverClass: "vs-tour-popover",
     steps,
   }).drive();
 }
