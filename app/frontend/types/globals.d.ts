@@ -31,6 +31,19 @@ declare global {
     steps: DriverStep[];
     // price-in 用它在導覽走到某步時展開對應的說明卡（說明卡預設收摺）。
     onHighlightStarted?: (element: Element | undefined) => void;
+    // 全站導覽可拖曳（behaviors/shared/driverDraggable.ts）用這兩個掛點。
+    // driver.js 1.6 先呼叫 onPopoverRender，之後才設定卡片的 left／top。
+    onPopoverRender?: (popover: DriverPopoverDom, options: unknown) => void;
+    onDestroyed?: (
+      element: Element | undefined,
+      step: unknown,
+      options: unknown,
+    ) => void;
+  }
+
+  interface DriverPopoverDom {
+    wrapper: HTMLElement;
+    title?: HTMLElement;
   }
 
   interface DriverInstance {

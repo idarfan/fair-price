@@ -1,5 +1,13 @@
 # FairPrice
 
+### 2026-09-26（六）— 新增：全站 driver.js 導覽卡片可拖曳
+
+- 新增 `app/frontend/behaviors/shared/driverDraggable.ts`，由 `behaviors.ts` 安裝一次，包裝 `window.driver.js.driver`；
+  LEAPS 欄位說明、垂直價差導覽、Price-In 逐步導覽、BPUS／BCVS 表頭說明全部生效，不需逐一修改呼叫端。
+- 拖曳卡片標題移動（按鈕、連結上按下不算），卡片限制在視窗內；拖過後隱藏箭頭。
+- 換到下一步、捲動或縮放視窗時維持拖過的位置（driver.js 重新定位後以 MutationObserver 套回）；關閉導覽後重開回到預設位置。
+- 驗證：vitest 60 passed（新增 7 例）、rspec 1210 examples, 0 failures；實機以真實滑鼠拖曳驗證；配對審查 PASS。
+
 ### 2026-09-26（六）— 修正：股價警示 cron 從未在美股盤中執行
 
 - crontab 的 `stock_alerts:check` 寫成 `* 13-20 * * 1-5`（以 UTC 撰寫的盤中時段），但 cron 使用系統時區 Asia/Taipei，

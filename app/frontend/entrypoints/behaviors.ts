@@ -16,6 +16,8 @@
  * 然後在下面的 REGISTRY 加一行。不需要動 layout。
  */
 
+import { installDraggableDriver } from "../behaviors/shared/driverDraggable";
+
 export interface Behavior {
   init: (root: HTMLElement) => void;
 }
@@ -87,3 +89,7 @@ function mount(el: HTMLElement): void {
 // entrypoint 以 type="module" 載入，本身就是 deferred，執行時 DOM 已經解析完成。
 // 這比原本內嵌在 body 中段、靠位置碰運氣的寫法更可靠。
 document.querySelectorAll<HTMLElement>("[data-behavior]").forEach(mount);
+
+// 全站 driver.js 導覽卡片可拖曳。driver.js 由 layout 在 <head> 同步載入，這裡已經可用；
+// 沒載入 driver.js 的頁面什麼都不做。
+installDraggableDriver(window);
