@@ -126,6 +126,100 @@ describe("LEAPS 名詞說明 tooltip", () => {
     });
   });
 
+  describe("LEAPS 垂直價差 8 格（P6）：data-tip-lines、data-tip-tone", () => {
+    const KEYS = [
+      "vs_long_leg",
+      "vs_short_leg",
+      "vs_net_cost",
+      "vs_max_profit",
+      "vs_breakeven",
+      "vs_max_loss",
+      "vs_risk_reward",
+      "vs_width",
+    ];
+
+    it("8 個 key 都有定義", () => {
+      for (const key of KEYS) {
+        loadTooltips(`<span id="t" data-tip-key="${key}">x</span>`);
+        hover("#t");
+        expect(tip().style.opacity, key).toBe("1");
+        expect(tip().querySelector(".tip-t")?.textContent, key).not.toBe("");
+      }
+    });
+
+    it("data-tip-lines 的句子以條列顯示在定義之後", () => {
+      const lines = JSON.stringify([
+        "到期時股價要高於 100.00 + 42.33 = 142.33 才開始賺錢。",
+        "目前現價 138.38。",
+      ]);
+      loadTooltips(
+        `<div id="t" data-tip-key="vs_breakeven" data-tip-value="$142.33" data-tip-lines='${lines}'>x</div>`,
+      );
+
+      hover("#t");
+
+      const items = [...tip().querySelectorAll(".tip-l li")].map(
+        (li) => li.textContent,
+      );
+      expect(items).toEqual([
+        "到期時股價要高於 100.00 + 42.33 = 142.33 才開始賺錢。",
+        "目前現價 138.38。",
+      ]);
+      expect(tip().querySelector(".tip-h")?.textContent).toBe("以目前組合計算");
+    });
+
+    it("data-tip-lines 逐字轉義", () => {
+      const lines = JSON.stringify(["<img src=x onerror=alert(1)>"]).replace(
+        /'/g,
+        "&#39;",
+      );
+      loadTooltips(
+        `<div id="t" data-tip-key="vs_net_cost" data-tip-lines='${lines}'>x</div>`,
+      );
+
+      hover("#t");
+
+      const li = tip().querySelector(".tip-l li");
+      expect(li?.querySelector("img")).toBeNull();
+      expect(li?.textContent).toBe("<img src=x onerror=alert(1)>");
+    });
+
+    it("壞掉的 data-tip-lines 不丟例外，只顯示定義", () => {
+      loadTooltips(
+        '<div id="t" data-tip-key="vs_width" data-tip-lines="不是 JSON">x</div>',
+      );
+
+      expect(() => hover("#t")).not.toThrow();
+      expect(tip().querySelector(".tip-l")).toBeNull();
+    });
+
+    it("data-tip-tone 讓數值列上色；不在白名單的值被忽略", () => {
+      loadTooltips(
+        '<div id="t" data-tip-key="vs_max_profit" data-tip-value="$1" data-tip-tone="profit">x</div>',
+      );
+      hover("#t");
+      expect(tip().querySelector(".tip-v")?.className).toBe(
+        "tip-v tip-v--profit",
+      );
+
+      loadTooltips(
+        '<div id="t" data-tip-key="vs_max_profit" data-tip-value="$1" data-tip-tone="x&quot; onclick=&quot;y">x</div>',
+      );
+      hover("#t");
+      expect(tip().querySelector(".tip-v")?.className).toBe("tip-v");
+    });
+
+    it("沒有這兩個屬性的既有 tooltip 行為不變", () => {
+      loadTooltips(
+        '<span id="t" data-tip-key="poi_fvg" data-tip-value="FVG 1–2">FVG</span>',
+      );
+      hover("#t");
+      expect(tip().querySelector(".tip-v")?.className).toBe("tip-v");
+      // poi_fvg 的定義本身就帶條列，所以只檢查沒有多出「以目前組合計算」那一段
+      expect(tip().textContent).not.toContain("以目前組合計算");
+    });
+  });
+
   it("認不得的 tip key 不顯示也不丟例外", () => {
     loadTooltips('<span id="t" data-tip-key="這個key不存在">x</span>');
 

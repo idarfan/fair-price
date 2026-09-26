@@ -47,7 +47,7 @@ RSpec.describe LeapsRecommendations::VerticalSpreadSection do
     end
 
     it "結果卡依規格順序：實付淨成本、最大獲利、損益兩平、最大虧損、風險報酬比、價差寬度" do
-      labels = html.css(".grid > div > p:first-child").map(&:text)
+      labels = html.css(".grid > div > p:first-child").map { |p| p.text.delete_suffix(" ⓘ") }
       expect(labels).to eq(%w[實付淨成本 最大獲利 損益兩平 最大虧損 風險報酬比 價差寬度])
     end
 
@@ -58,6 +58,55 @@ RSpec.describe LeapsRecommendations::VerticalSpreadSection do
 
     it "兩腳都有買賣價時不出現盤後標籤" do
       expect(html.text).not_to include("盤後參考價")
+    end
+  end
+
+  describe "P6：8 格 tooltip、顏色、導覽" do
+    let(:out) { outcome_for(chain, expiry: "2027-10-15-m") }
+    let(:html) { render_html(outcome: out) }
+    let(:tips) { LeapsVerticalSpreadService::Explanation.tips(out) }
+
+    it "8 格都有 data-tip-key，值與句子來自當下的兩腳" do
+      keys = html.css("[data-tip-key^='vs_']").map { |n| n["data-tip-key"] }
+      expect(keys).to match_array(%w[vs_long_leg vs_short_leg vs_net_cost vs_max_profit vs_breakeven
+                                     vs_max_loss vs_risk_reward vs_width])
+
+      node = html.at_css("[data-tip-key='vs_net_cost']")
+      expect(node["data-tip-value"]).to eq(tips[:net_cost][:value])
+      expect(JSON.parse(node["data-tip-lines"])).to eq(tips[:net_cost][:lines])
+    end
+
+    it "選單的 tooltip 掛在標題文字上，不掛在 select（點選單不會跳出說明）" do
+      expect(html.css("select[data-tip-key]")).to be_empty
+      expect(html.at_css("[data-tip-key='vs_short_leg']").name).to eq("span")
+    end
+
+    it "最大獲利綠、損益兩平黃、最大虧損紅；實付淨成本維持深灰" do
+      tone = ->(key) { html.at_css("[data-tip-key='#{key}']")["data-tip-tone"] }
+      value_class = ->(key) { html.at_css("[data-tip-key='#{key}'] [data-vs-value]")["class"] }
+
+      expect(tone.("vs_max_profit")).to eq("profit")
+      expect(tone.("vs_breakeven")).to eq("breakeven")
+      expect(tone.("vs_max_loss")).to eq("loss")
+      expect(value_class.("vs_max_profit")).to include("vs-tone-profit")
+      expect(value_class.("vs_breakeven")).to include("vs-tone-breakeven")
+      expect(value_class.("vs_max_loss")).to include("vs-tone-loss")
+      expect(value_class.("vs_net_cost")).not_to include("vs-tone")
+      expect(html.at_css("[data-tip-key='vs_net_cost']")["data-tip-tone"]).to be_nil
+    end
+
+    it "賣出腳旁有導覽按鈕，導覽資料以 JSON 隨片段輸出（7 步），錨點都在畫面上" do
+      expect(html.at_css("button[data-vs-tour]").text).to eq("為什麼建議 Δ 0.30？")
+      steps = JSON.parse(html.at_css("script[data-vs-tour-data]").text)
+      expect(steps.size).to eq(7)
+      steps.map { |s| s["anchor"] }.uniq.each do |anchor|
+        expect(html.at_css("[data-vs-tour-anchor='#{anchor}']")).to be_present
+      end
+    end
+
+    it "錯誤狀態沒有 tooltip 與導覽" do
+      err = render_html(outcome: outcome_for(chain, long_strike: "101.37"))
+      expect(err.css("[data-tip-key^='vs_'], button[data-vs-tour], script[data-vs-tour-data]")).to be_empty
     end
   end
 

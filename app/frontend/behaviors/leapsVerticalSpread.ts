@@ -11,7 +11,7 @@
  * 也不組 markup——只搬運 HTML（同 leapsPriceContext.ts 的理由）。
  */
 
-import { num, str } from "./shared/json";
+import { isRecord, num, str } from "./shared/json";
 
 const ENDPOINT = "/leaps/vertical_spread";
 const PROGRESS_INTERVAL_MS = 1000;
@@ -66,8 +66,10 @@ export function init(root: HTMLElement): void {
 
   root.addEventListener("click", (event) => {
     const target = event.target;
-    if (target instanceof Element && target.closest("[data-vs-retry]"))
-      load(lastUrl);
+    if (!(target instanceof Element)) return;
+    if (target.closest("[data-vs-retry]")) load(lastUrl);
+    const tourButton = target.closest<HTMLElement>("[data-vs-tour]");
+    if (tourButton) startTour(root, tourButton);
   });
 
   load(initialSrc);
@@ -106,6 +108,105 @@ function describeProgress(data: unknown): string | undefined {
   const done = num(data, "done");
   if (total === undefined || done === undefined) return stage || undefined;
   return `已完成 ${done} / ${total} 個到期日｜${stage}`;
+}
+
+// ── 賣出腳導覽（leaps-call-spread-spec P6）──────────────────────────────
+// 導覽內容由伺服器依當下兩腳組好，以 JSON data island 隨片段輸出；每一行是
+// [文字, 顏色] 片段。這裡只負責轉義、上色與交給 driver.js，不產生任何說明文字。
+// driver.js 的樣式沿用 LEAPS 頁既有的深色主題（application.css 的 .driver-popover）。
+
+type Segment = { text: string; tone: string | null };
+type TourStep = { anchor: string; title: string; lines: Segment[][] };
+
+const TONES = new Set(["profit", "breakeven", "loss"]);
+
+function parseTour(raw: string | null | undefined): TourStep[] {
+  if (!raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed.flatMap((item): TourStep[] => {
+    const anchor = str(item, "anchor");
+    const title = str(item, "title");
+    const lines =
+      isRecord(item) && Array.isArray(item["lines"]) ? item["lines"] : null;
+    if (!anchor || !title || !lines) return [];
+    return [{ anchor, title, lines: lines.map(parseLine) }];
+  });
+}
+
+function parseLine(line: unknown): Segment[] {
+  if (!Array.isArray(line)) return [];
+  return line.flatMap((seg): Segment[] => {
+    if (!Array.isArray(seg) || typeof seg[0] !== "string") return [];
+    const tone =
+      typeof seg[1] === "string" && TONES.has(seg[1]) ? seg[1] : null;
+    return [{ text: seg[0], tone }];
+  });
+}
+
+function escapeHtml(text: string): string {
+  const el = document.createElement("div");
+  el.textContent = text;
+  return el.innerHTML;
+}
+
+function describeLines(lines: Segment[][]): string {
+  return lines
+    .map((segments) => {
+      const html = segments
+        .map((s) =>
+          s.tone
+            ? `<span class="vs-tone-${s.tone}">${escapeHtml(s.text)}</span>`
+            : escapeHtml(s.text),
+        )
+        .join("");
+      return `<div class="vs-tour-line">${html}</div>`;
+    })
+    .join("");
+}
+
+function startTour(root: HTMLElement, button: HTMLElement): void {
+  const factory = window.driver?.js?.driver;
+  if (!factory) {
+    // 靜靜什麼都不做最難查：按鈕點了沒反應，使用者分不出是自己點錯還是壞了。
+    button.textContent = "導覽元件未載入";
+    return;
+  }
+
+  const steps = parseTour(
+    root.querySelector("script[data-vs-tour-data]")?.textContent,
+  ).flatMap((s) => {
+    const element = root.querySelector(`[data-vs-tour-anchor="${s.anchor}"]`);
+    return element
+      ? [
+          {
+            element,
+            popover: {
+              title: s.title,
+              description: describeLines(s.lines),
+              side: "bottom",
+              align: "center",
+            },
+          },
+        ]
+      : [];
+  });
+  if (steps.length === 0) return;
+
+  // 設定沿用 tooltips.js 的「欄位導覽」。
+  factory({
+    animate: true,
+    allowClose: true,
+    overlayOpacity: 0.4,
+    showProgress: true,
+    steps,
+  }).drive();
 }
 
 function showFailure(root: HTMLElement): void {

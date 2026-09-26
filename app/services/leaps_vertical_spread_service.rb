@@ -54,8 +54,10 @@ class LeapsVerticalSpreadService
   end
 
   def finish(base, long, expiry_data, short_options, k_l)
-    short = requested_short(expiry_data) || default_short(short_options, long, k_l)
-    selected = { expiry: long[:expiry], short_strike: short&.dig(:strike) }
+    default = default_short(short_options, long, k_l)
+    short = requested_short(expiry_data) || default
+    selected = { expiry: long[:expiry], short_strike: short&.dig(:strike), default_short_strike: default&.dig(:strike) }
+    base = base.merge(legs: { long: long, short: short })
     return base.merge(selected: selected).merge(failure(:no_short, "#{long[:expiry][0, 10]} 沒有符合條件的價外賣出腳")) unless short
 
     invalid = invalid_reason(long, short, k_l)
@@ -157,8 +159,20 @@ class LeapsVerticalSpreadService
       breakeven: k_l + d_mid,
       risk_reward: (width - d_mid) / d_mid,
       after_hours_legs: [ (:long if long[:source] == :last), (:short if short[:source] == :last) ].compact
-    }
+    }.merge(explanation_values(long, short, k_l, d_mid))
     values.merge(display: Format.result(values))
+  end
+
+  # P6 說明用的衍生值（公式只寫在這個 service）。
+  def explanation_values(long, short, k_l, d_mid)
+    intrinsic = @spot ? [ @spot - short[:strike], BigDecimal("0") ].max : BigDecimal("0")
+    {
+      short_extrinsic:   short[:price] - intrinsic,
+      breakeven_vs_spot: @spot && (k_l + d_mid - @spot) / @spot,
+      short_vs_spot:     @spot && (short[:strike] - @spot) / @spot,
+      premium_recovery:  short[:price] / long[:price],
+      no_delta_target:   @spot && @spot * NO_DELTA_SPOT_MULTIPLIER
+    }
   end
 
   # ── 錯誤（功能定義 6）──

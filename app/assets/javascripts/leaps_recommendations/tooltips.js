@@ -24,12 +24,36 @@
       }[c];
     });
   }
-  function TIP_V(value) {
-    return value ? '<div class="tip-v">' + esc(value) + "</div>" : "";
+  /* tone（data-tip-tone）讓數值列上色：賺錢綠／損益兩平黃／賠錢紅。只接受白名單，
+     其他值一律忽略——它會被拼進 class，不能讓任意字串進 HTML。 */
+  var TIP_TONES = { profit: true, breakeven: true, loss: true };
+  function TIP_V(value, tone) {
+    var cls = TIP_TONES[tone] ? "tip-v tip-v--" + tone : "tip-v";
+    return value ? '<div class="' + cls + '">' + esc(value) + "</div>" : "";
   }
-  /* 解釋文字 + 該項實際數值；有 data-tip-value 就把數值放最前面。 */
+  /* data-tip-lines：伺服器依當下數據組好的說明句（JSON 字串陣列），逐字轉義後條列。
+     LEAPS 垂直價差用它讓 tooltip 的計算過程跟著畫面上實際的兩腳走，不寫死範例。 */
+  function linesFor(el) {
+    var raw = el && el.dataset ? el.dataset.tipLines : null;
+    if (!raw) return "";
+    var parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return "";
+    }
+    if (!Array.isArray(parsed)) return "";
+    var items = parsed
+      .filter(function (s) {
+        return typeof s === "string";
+      })
+      .map(esc);
+    return items.length ? TIP_H("以目前組合計算") + TIP_L(items) : "";
+  }
+  /* 解釋文字 + 該項實際數值；有 data-tip-value 就把數值放最前面，有 data-tip-lines 就接在後面。 */
   function descFor(d, el) {
-    return TIP_V(el && el.dataset ? el.dataset.tipValue : null) + d.desc;
+    var ds = el && el.dataset ? el.dataset : {};
+    return TIP_V(ds.tipValue, ds.tipTone) + d.desc + linesFor(el);
   }
 
   var LEAPS_COL_EXPLAIN = {
@@ -501,6 +525,56 @@
 
   Object.keys(POI_EXPLAIN).forEach(function (k) {
     LEAPS_COL_EXPLAIN[k] = POI_EXPLAIN[k];
+  });
+
+  /* ── LEAPS 垂直價差區塊的 8 格（leaps-call-spread-spec P6）────────────────
+     這裡只放「定義」，不放任何範例數字：實際的數值與計算過程由伺服器依當下
+     選到的兩腳組好，放在元素的 data-tip-value／data-tip-lines（見 linesFor）。
+     沒有 el，不進 TOUR_ORDER；滑過看、點擊聚光。 */
+  var VERTICAL_SPREAD_EXPLAIN = {
+    vs_long_leg: {
+      title: "📈 買入腳",
+      desc: "你付錢買進的 LEAPS Call，履約價固定是你輸入的價格；可以切換到期日。",
+      side: "bottom",
+    },
+    vs_short_leg: {
+      title: "📉 賣出腳",
+      desc: "你同時賣出的 Call：同一個到期日、履約價較高且必須價外。收到的權利金抵掉買入腳的成本，代價是股價漲過這個履約價之後的獲利不屬於你。",
+      side: "bottom",
+    },
+    vs_net_cost: {
+      title: "💵 實付淨成本",
+      desc: "開這個價差每口實際要付的錢 = (買入腳權利金 − 賣出腳權利金) × 100（一口 100 股）。",
+      side: "top",
+    },
+    vs_max_profit: {
+      title: "🟢 最大獲利",
+      desc: "到期時股價在賣出腳履約價以上，拿到最大獲利 = (價差寬度 − 淨成本) × 100。",
+      side: "top",
+    },
+    vs_breakeven: {
+      title: "🟡 損益兩平",
+      desc: "到期時股價要高於「買入腳履約價 + 每股淨成本」才開始賺錢。",
+      side: "top",
+    },
+    vs_max_loss: {
+      title: "🔴 最大虧損",
+      desc: "到期時股價在買入腳履約價以下，兩腳都沒有價值，付出的淨成本全部虧掉；這就是最多虧的金額。",
+      side: "top",
+    },
+    vs_risk_reward: {
+      title: "⚖️ 風險報酬比",
+      desc: "最多賺的錢是最多虧的錢的幾倍。只比較兩個極端，沒有考慮發生的機率。",
+      side: "top",
+    },
+    vs_width: {
+      title: "📏 價差寬度",
+      desc: "兩個履約價的差距，是這個價差每股最多值多少錢。",
+      side: "top",
+    },
+  };
+  Object.keys(VERTICAL_SPREAD_EXPLAIN).forEach(function (k) {
+    LEAPS_COL_EXPLAIN[k] = VERTICAL_SPREAD_EXPLAIN[k];
   });
 
   /* 價格情境 widget 在頁面上位於排行表之上，導覽順序跟著閱讀順序走，放最前面。

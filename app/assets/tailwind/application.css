@@ -269,6 +269,26 @@
 #leaps-col-tip .tip-l li,
 .driver-popover .driver-popover-description .tip-l li { margin-top: 3px; }
 
+/* LEAPS 垂直價差（leaps-call-spread-spec P6）：賺錢綠、損益兩平黃、賠錢紅。
+   色值沿用既有色票（.pc-pct-up／.pc-pct-down 的綠紅、.leaps-pe-iv-yellow 的 yellow-600），
+   卡片（白底）與導覽 popover（深色底）共用同一組 class。
+   寫成固定 class 而不是 Tailwind 動態 class：Phlex 端以常數對應，Tailwind v4 的掃描器
+   讀不到 Ruby 常數裡組出來的字串（feedback_tailwind_v4_dynamic_class）。 */
+.vs-tone-profit    { color: #2CA58D; }
+.vs-tone-breakeven { color: #ca8a04; }
+.vs-tone-loss      { color: #F4726A; }
+.driver-popover .driver-popover-description .vs-tone-profit,
+.driver-popover .driver-popover-description .vs-tone-breakeven,
+.driver-popover .driver-popover-description .vs-tone-loss { font-weight: 700; }
+.driver-popover .driver-popover-description .vs-tour-line + .vs-tour-line { margin-top: 8px; }
+/* tooltip 第一列數值（data-tip-tone）：沿用 .tip-v 的版型，只換左邊線、底色與字色 */
+#leaps-col-tip .tip-v--profit,
+.driver-popover .driver-popover-description .tip-v--profit    { color: #2CA58D; border-left-color: #2CA58D; background: rgba(44,165,141,.16); }
+#leaps-col-tip .tip-v--breakeven,
+.driver-popover .driver-popover-description .tip-v--breakeven { color: #eab308; border-left-color: #ca8a04; background: rgba(202,138,4,.18); }
+#leaps-col-tip .tip-v--loss,
+.driver-popover .driver-popover-description .tip-v--loss      { color: #F4726A; border-left-color: #F4726A; background: rgba(244,114,106,.16); }
+
 /* 欄位拖曳排序（column_reorder.js，僅 admin 的頁面會掛上）。
    拖動中把整頁游標換成移動游標，被拖的整欄半透明，插入位置畫一條藍線。 */
 body.leaps-col-dragging,

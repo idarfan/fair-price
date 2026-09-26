@@ -33,7 +33,8 @@ module LeapsPageHtml
     strip_digests(doc.to_html)
   end
 
-  DIGEST = /-[A-Za-z0-9_]{8}(?=\.(?:js|css)\b)/
+  # Vite 的雜湊是 base64url，可能含「-」（例如 behaviors-DaqtVP-V.js）。
+  DIGEST = /-[A-Za-z0-9_-]{8}(?=\.(?:js|css)\b)/
 
   def strip_digests(html) = html.gsub(DIGEST, "-DIGEST")
 

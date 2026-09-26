@@ -52,6 +52,23 @@ RSpec.describe LeapsVerticalSpreadService do
                                      breakeven: "$145.00", risk_reward: "1 : 1.57", width: "$90.00")
     end
 
+    it "P6 說明用的衍生值：外在價值、損益兩平距現價、賣出腳距現價、權利金收回比例（皆 BigDecimal）" do
+      r = run(chain, expiry: exp1, short_strike: "200")[:result]
+
+      expect(r[:short_extrinsic]).to eq(d(20))                                   # 價外：權利金全是時間價值
+      expect(r[:breakeven_vs_spot]).to eq((d(145) - d("139.54")) / d("139.54"))
+      expect(r[:short_vs_spot]).to eq((d(200) - d("139.54")) / d("139.54"))
+      expect(r[:premium_recovery]).to eq(d(20) / d(55))
+      expect(r.values_at(:short_extrinsic, :breakeven_vs_spot, :short_vs_spot, :premium_recovery)).to all(be_a(BigDecimal))
+    end
+
+    it "P6：回傳實際兩腳與預設賣出腳，使用者改選時兩者不同" do
+      out = run(chain, expiry: exp1, short_strike: "200")
+      expect(out[:legs][:long]).to include(strike: d(110), price: d(55), dte: 483)
+      expect(out[:legs][:short]).to include(strike: d(200), price: d(20))
+      expect(out[:selected][:default_short_strike]).to eq(d(200))
+    end
+
     it "保守成交：ask_L = 56、bid_S = 19 → D_nat × 100 = 3700.00" do
       nat = fetch_result(139.54, expiry(exp1, 483, [
         quote(110, bid: 54, ask: 56, delta: 0.8),

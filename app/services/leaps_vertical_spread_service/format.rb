@@ -20,6 +20,12 @@ class LeapsVerticalSpreadService
       ActiveSupport::NumberHelper.number_to_rounded(value, precision: 2, round_mode: :half_up)
     end
 
+    # 比例 → 百分比字串（0.028508 → "+2.85%"）。signed: false 不加正號。
+    def pct(ratio, signed: true)
+      text = "#{num(ratio * 100)}%"
+      signed && ratio.positive? ? "+#{text}" : text
+    end
+
     # 2028-01-21 · 483 DTE｜100.00｜mid 53.50｜Δ 0.82
     def long_label(option)
       "#{option[:expiry][0, 10]} · #{option[:dte]} DTE｜#{num(option[:strike])}｜#{price_part(option)}｜#{delta_part(option[:delta])}"

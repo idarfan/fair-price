@@ -12,6 +12,7 @@
 | P2 | 計算服務 | 通過 | 2026-09-25。新增 `app/services/leaps_vertical_spread_service.rb`（全部公式、預設值、報價規則、無效組合、錯誤訊息）與 `app/services/leaps_vertical_spread_service/format.rb`（選項文字、金額 `$` 千分位、ROUND_HALF_UP 2 位）。**驗證**：`spec/services/leaps_vertical_spread_service_spec.rb` **22 examples, 0 failures**（規格表格 17 案例 + 候選排行第 1 名預設、fetcher 錯誤原文傳出、停滯轉「Barchart 讀取失敗：…」可重試、選定到期日時只要求刷新該到期日、保守成交顯示）。反向驗證：植入「盤後也算 D_nat」→ 2 例失敗；植入「賣腳預設取第一檔」→ 3 例失敗。靜態檢查 `to_f\|Float(`（service、format、fetcher）：0 行。真實資料（ORCL、K_L = 100，不 stub）：買入腳 6 個到期日皆 100.00；候選排行無 100 → 取最遠有報價 `2029-01-19-m`；賣腳預設 230（該到期日最高履約價）；D_mid 36.925、W 130 → 實付淨成本 $3,692.50（保守 $4,085.00）、最大獲利 $9,307.50、損益兩平 $136.93、風險報酬比 1 : 2.52，D_mid 為 BigDecimal |
 | P3 | 路由與 Controller | 通過 | 2026-09-25。新增 `GET /leaps/vertical_spread`（`LeapsRecommendationsController#vertical_spread`：422、CDP 預檢、呼叫 service、回傳不含 layout 的片段；進度查詢走同一條路由帶 `progress=1` 回 JSON，不觸發抓取也不做 CDP 預檢，以維持「只有一條路由」）。`page_component.rb` 在 `render_pmcc_section` 前插入 `render_vertical_spread_frame`，並在候選區塊外補一行「沒有候選時也顯示」；PMCC 那一行未修改。新增 `app/components/leaps_recommendations/vertical_spread_frame.rb`、`vertical_spread_section.rb`。因 `spec/…behavior registry` 防護測試要求 `data-behavior` 必須註冊，前端 `app/frontend/behaviors/leapsVerticalSpread.ts`（取片段、選單變動、重試、進度輪詢）提前在 P3 完成。**回歸基準**：P0 的基準是瀏覽器 DOM（P5 用），request spec 另在**尚未修改程式時**擷取伺服器 HTML 基準 `spec/fixtures/leaps_vertical_spread/server_baseline/`（5 種輸入：空白、只有代號、代號＋100、不合法價格、有候選且 PMCC 顯示；commit `dbf8aac`），正規化 CSRF、CSP nonce、資源檔名雜湊，時間固定，連續擷取兩次相同。**驗證**：`bin/rails routes \| grep vertical_spread` 1 行，前綴 `/leaps/`；`spec/requests/leaps_vertical_spread_spec.rb` **21 examples, 0 failures**（案例 1–9，含 3b 無候選、CDP 離線不呼叫 fetcher、progress JSON）；反向驗證：外框之外多輸出一個元素 → 回歸 5 例中 4 例失敗（空白頁不輸出，正確）；vitest `leapsVerticalSpread.test.ts` 6 例通過（全部 45 例）；整體 `bundle exec rspec` **1178 examples, 0 failures**（P0 基準 1111 全部保留） |
 | P4 | UI 元件 | 通過 | 2026-09-25。元件 `app/components/leaps_recommendations/vertical_spread_section.rb`、外框 `vertical_spread_frame.rb`、前端 `leapsVerticalSpread.ts` 已於 P3 完成（見 P3 列）；P4 補元件測試與版面核對。版面：第一列買入腳／賣出腳兩個選單；第二列結果卡依序為實付淨成本（附保守成交）、最大獲利、損益兩平、最大虧損、風險報酬比、價差寬度；最後固定提示；標題列右側報價時間（台北時間）；標題列沿用 PMCC 區塊的 `px-4 py-3 border-b border-gray-100 bg-gray-50` 與外框 `bg-white rounded-xl border border-gray-200 shadow-sm`。4 種狀態：載入中（進度條＋「已完成 n / N 個到期日」＋已經過秒數，由前端輪詢 `progress=1`）、結果、錯誤（紅字）、讀取失敗（紅字＋重試）；另有 CDP 離線（紅字＋重試）。**驗證**：`spec/components/leaps_recommendations/vertical_spread_section_spec.rb` **9 examples, 0 failures**（結果：2 個 select、買入腳皆 100.00、賣出腳皆 > max(K_L, 現價)、卡片順序、報價時間與提示、無盤後標籤；盤後標籤寫出哪一腳；載入中、錯誤、讀取失敗、CDP 離線皆不含「實付淨成本」）。元件先於測試完成，改以反向驗證確認測試有效：卡片順序倒過來 → 1 例失敗；拿掉重試按鈕 → 2 例失敗。實機截圖（P3 上線後，ORCL／100）：`tmp/p3/after_loading.png`（第 4 秒「讀取到期日清單（已經過 5 秒）」）、`tmp/p3/after_result.png`（53 秒完成，數值與 P2 一致）；改前 `tmp/p3/before_leaps_orcl_100.png` 無此區塊。整體 `bundle exec rspec` **1187 examples, 0 failures** |
+| P6 | 說明（tooltip、顏色、導覽） | 進行中 | 2026-09-25 使用者追加，見「P6 說明」章節 |
 | P5 | E2E 驗收 | 通過 | 2026-09-25。腳本 `e2e/leaps_vertical_spread.e2e.mjs`（專案原本沒有 E2E 目錄，新建 `e2e/`；以 Playwright `connectOverCDP` 連 9224，沿用使用者的真實登入）。證據存於 `e2e/evidence/2026-09-25/`。**exit code 0**（run 8，23:47:43–23:49:15）。**與規格字面順序的差異**：①第 9 步回歸移到最前面，因為第 2 步送出後 ORCL＋100 的 LEAPS 資料會新鮮 1 小時（`FRESH_WINDOW = 1.hour`），無法重現 P0 基準的狀態；回歸證據取自 run 7（23:43，條件正確）`run7_regression.json`：a／b／c 三種輸入，區塊數 6／9／9 與基準相同，差異 0；**遮蔽 selector：`#leaps-price-context` 的內部內容**（即時行情：現價、POI、52 週、當日區間，由背景 job 更新；外層屬性照常比對），run 8 以 `--skip-regression` 執行並在證據中標示 skipped。②第 3 步「2 秒內出現進度條」從送出後跳轉、頁面載入完成起算。③第 8 步直接開網址（表單送出時既有驗證會擋下不存在的履約價）。④第 0 步只能用 psql 刪除 chain 快取（270 列）；到期日清單存在伺服器記憶體（development `memory_store`），psql 刪不到，本輪清單命中快取（`expirations_list_cached: true`），chain 6 個到期日全部重抓（N = 6 = 實際寫入的到期日數）。**各步結果**：第 1 步無區塊。第 2 步表單輸入 ORCL、100 送出，2 秒後導向 `http://localhost:3003/leaps?symbol=ORCL&user_strike=100`。第 3 步進度條於載入後 322 ms 出現，總耗時 42 秒、N = 6，逐段進度「已完成 0 / 6 … 5 / 6」，無停滯（`STALL_TIMEOUT = 30` 讀自常數）；區塊在 PMCC 之前；買入腳皆 100.00；報價時間 2026-09-25 23:48（台北時間）。第 4 步預設 `2028-01-21-m`（候選排行第 1 名）、K_S 250 > 現價 138.38；DOM／psql 期望值：實付淨成本 4232.50／4232.50、最大獲利 10767.50／10767.50、損益兩平 142.33／142.33（買腳 bid 54.75 ask 55.70、賣腳 bid 12.75 ask 13.05，皆 mid，非盤後）。第 5 步改賣出腳 140：1870.00／1870.00、2130.00／2130.00、118.70／118.70。第 6 步換到 `2027-10-15-m`：賣出腳選單換成 30 檔、皆 > max(100, 現價)，預設 K_S 230：4035.00／4035.00、8965.00／8965.00、140.35／140.35。第 7 步重新整理 1.5 秒出結果、無抓取進度、報價時間與第 3 步相同（23:48）。第 8 步 ZZZZQ →「查無股票代號 ZZZZQ」；ORCL 101.37 →「ORCL 的 LEAPS 中查無履約價 101.37；最接近的履約價：100.00、105.00」。第 10 步禁用 grep：兩支 sidecar 皆 0。截圖：`step3_default.png`（預設）、`step5_changed_short.png`（修改後）、`step8_strike_not_found.png`、`p3_loading.png`（載入中）。頁面 JS 錯誤 0 |
 
 ## 共通規則
@@ -244,6 +245,28 @@ Request spec 至少包含：
 - 腳本 exit code 為 0。
 - 狀態表中記錄：實際導向的 URL、DOM 讀到的值、psql 算出的期望值（兩組並列）、截圖路徑（預設情境與修改後情境各 1 張）。
 - 沒有以上證據，就不能把 P5 或整份規格標記為「通過」。
+
+## P6 說明：8 格 tooltip、顏色、賣出腳導覽（2026-09-25 使用者追加）
+
+**原則**：所有說明文字的數字，一律以**當下實際選到的買入腳、賣出腳與現價**即時計算，不放任何固定範例。字典（`app/assets/javascripts/leaps_recommendations/tooltips.js`）只放每一格的「定義」，數字與計算過程由伺服器依 `LeapsVerticalSpreadService` 的結果組成。公式仍只寫在 service（新增的衍生值：賣出腳外在價值、損益兩平距現價 %、賣出腳距現價 %、權利金收回比例、預設賣出腳）；組句放在 `LeapsVerticalSpreadService::Explanation`。
+
+**樣式**：沿用 LEAPS 頁既有的 driver.js 深色主題與 `#leaps-col-tip` hover tooltip（標題 22px、內文 20px），不另設字級。顏色沿用既有色票：賺錢綠 `#2CA58D`（同 `.pc-pct-up`）、損益兩平黃 `#ca8a04`（yellow-600，同 `.leaps-pe-iv-yellow`）、賠錢紅 `#F4726A`（同 `.pc-pct-down`）。
+
+**顏色對應**：最大獲利 → 綠；損益兩平 → 黃；最大虧損 → 紅；實付淨成本、風險報酬比、價差寬度、兩個選單 → 維持深灰。tooltip 第一列數值與導覽內提到這三個數字時用同樣顏色。
+
+**8 格 tooltip**（買入腳、賣出腳、實付淨成本、最大獲利、損益兩平、最大虧損、風險報酬比、價差寬度）：沿用既有引擎（`data-tip-key` 滑過顯示、點擊 driver.js 聚光）。引擎小幅擴充兩個選用屬性，未使用者行為不變：
+- `data-tip-lines`：JSON 字串陣列，伺服器依當下數據組好的說明句，引擎逐字轉義後以條列呈現。
+- `data-tip-tone`：`profit`／`breakeven`／`loss`，決定第一列數值（`data-tip-value`）的顏色。
+
+**賣出腳導覽「為什麼建議 Δ 0.30？」**：按鈕放在賣出腳標題旁，點了才開始，driver.js 7 步（內容見 2026-09-25 與使用者確認的版本）：①賣出腳在做什麼 ②Δ 是什麼 ③為什麼是 0.30 ④最大獲利 ⑤損益兩平 ⑥提前履約與配息：LEAPS 價差為什麼很少遇到（依據：美式 Call 只在除息日前、股息 > 剩餘時間價值時提前履約才划算；長天期賣出腳時間價值大，風險主要在接近到期且價內時）⑦0.30 是起點，不是答案（含找不到 0.30、沒有 Δ 時的規則與「不構成投資建議」）。導覽資料以 JSON data island 隨片段輸出，由 `leapsVerticalSpread.ts` 啟動。**不做比較表**（使用者裁示）。
+
+**驗證**
+- service spec：衍生值（外在價值、距現價 %、收回比例、預設賣出腳）以 BigDecimal 計算且正確。
+- Explanation spec：8 格 tooltip 與 7 步導覽的句子含當下兩腳的實際數字；換一組報價，句子跟著改變（證明不是固定範例）；賣出腳為盤後參考價、非預設賣出腳、沒有 Δ 時的句子正確。
+- 元件 spec：8 格都有 `data-tip-key`、`data-tip-value`、`data-tip-lines`；最大獲利／損益兩平／最大虧損有對應顏色 class；實付淨成本沒有；導覽按鈕與 data island 存在。
+- 前端測試：tooltips.js 對 `data-tip-lines` 逐字轉義、`data-tip-tone` 套顏色、既有 tooltip 行為不變；`leapsVerticalSpread.ts` 點按鈕以 data island 建立 7 步導覽、內容轉義。
+- 實機：Playwright 截圖 hover tooltip 與導覽其中一步，數字與畫面上當下組合一致。
+- 整體 `bundle exec rspec`、vitest 皆 0 failures。
 
 ## 附錄 A：P0 探勘結果（Claude Code 填寫）
 

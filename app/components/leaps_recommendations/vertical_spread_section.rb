@@ -89,16 +89,32 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
          class: "grid grid-cols-1 md:grid-cols-2 gap-3") do
       input(type: "hidden", name: "symbol", value: @symbol)
       input(type: "hidden", name: "user_strike", value: @user_strike)
-      render_select("expiry", "買入腳（履約價固定 #{Format.num(@outcome[:long_strike])}）",
+      render_select("expiry", "買入腳（履約價固定 #{Format.num(@outcome[:long_strike])}）", :long_leg,
                     @outcome[:long_options], selected[:expiry]) { |o| o[:expiry] }
-      render_select("short_strike", "賣出腳（同到期日、價外）",
+      render_select("short_strike", "賣出腳（同到期日、價外）", :short_leg,
                     @outcome[:short_options] || [], selected[:short_strike]) { |o| Format.num(o[:strike]) }
     end
   end
 
-  def render_select(name, label_text, options, selected_value)
-    label(class: "block text-xs text-gray-500 space-y-1") do
-      span { plain label_text }
+  # tooltip 掛在標題文字上而不是 select：tooltips.js 點擊 [data-tip-key] 會開聚光說明，
+  # 掛在 select 上會讓「點選單換履約價」先跳出說明框。
+  def render_select(name, label_text, tip_key, options, selected_value, &value_of)
+    div(class: "space-y-1", data_vs_tour_anchor: tip_key.to_s) do
+      div(class: "flex items-center justify-between gap-2") do
+        span(class: "text-xs text-gray-500 cursor-help", **tip_attrs(tip_key)) { plain "#{label_text} ⓘ" }
+        render_tour_button if tip_key == :short_leg && tips.any?
+      end
+      render_options(name, options, selected_value, &value_of)
+    end
+  end
+
+  def render_tour_button
+    button(type: "button", data_vs_tour: "true",
+           class: "text-xs text-blue-600 hover:text-blue-800 underline underline-offset-2") { plain "為什麼建議 Δ 0.30？" }
+  end
+
+  def render_options(name, options, selected_value)
+    label(class: "block") do
       select(name: name, class: SELECT_CLASS) do
         options.each do |o|
           value = yield(o)
@@ -124,13 +140,38 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
 
     div(class: "grid grid-cols-2 md:grid-cols-3 gap-3") do
       RESULT_ROWS.each do |key, label_text|
-        div(class: "rounded-lg border border-gray-200 px-3 py-2") do
-          p(class: "text-xs text-gray-500") { plain label_text }
-          p(class: "text-lg font-semibold text-gray-800") { plain display[key] }
+        div(class: "rounded-lg border border-gray-200 px-3 py-2 cursor-help",
+            data_vs_tour_anchor: key.to_s, **tip_attrs(key)) do
+          p(class: "text-xs text-gray-500") { plain "#{label_text} ⓘ" }
+          p(class: "text-lg font-semibold #{VALUE_TONE.fetch(key, 'text-gray-800')}", data_vs_value: "true") { plain display[key] }
           p(class: "text-xs text-gray-400") { plain "保守成交 #{display[:net_cost_nat]}" } if key == :net_cost
         end
       end
     end
+    render_tour_data
+  end
+
+  # 賺錢綠、損益兩平黃、賠錢紅（色值定義在 application.css 的 .vs-tone-*，沿用 LEAPS 頁既有色票）。
+  VALUE_TONE = { max_profit: "vs-tone-profit", breakeven: "vs-tone-breakeven", max_loss: "vs-tone-loss" }.freeze
+
+  def tips = @tips ||= LeapsVerticalSpreadService::Explanation.tips(@outcome)
+
+  # tooltips.js 讀取：data-tip-key（字典裡的定義）、data-tip-value（第一列目前數值）、
+  # data-tip-tone（第一列顏色）、data-tip-lines（依當下兩腳組好的說明句，引擎逐字轉義）。
+  def tip_attrs(key)
+    tip = tips[key]
+    return {} unless tip
+
+    { data_tip_key: "vs_#{key}", data_tip_value: tip[:value], data_tip_tone: tip[:tone]&.to_s,
+      data_tip_lines: tip[:lines].to_json }.compact
+  end
+
+  # 導覽資料：JSON data island（type=application/json 不會執行），由 leapsVerticalSpread.ts 讀取。
+  def render_tour_data
+    steps = LeapsVerticalSpreadService::Explanation.tour(@outcome)
+    return if steps.empty?
+
+    script(type: "application/json", data_vs_tour_data: "true") { raw(safe(ERB::Util.json_escape(steps.to_json))) }
   end
 
   Format = LeapsVerticalSpreadService::Format
