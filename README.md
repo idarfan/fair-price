@@ -1,5 +1,13 @@
 # FairPrice
 
+### 2026-09-26（六）— 修正：股價警示 cron 從未在美股盤中執行
+
+- crontab 的 `stock_alerts:check` 寫成 `* 13-20 * * 1-5`（以 UTC 撰寫的盤中時段），但 cron 使用系統時區 Asia/Taipei，
+  實際跑在美東 01:00–08:59，`StockPriceChecker#market_open?` 一律跳過，警示從未觸發。
+- 改為台北時間 `* 21-23 * * 1-5` 與 `* 0-5 * * 2-6`，涵蓋夏令與冬令盤中；多跑的時段仍由 `market_open?` 跳過。
+- 同時整理時區：互動 shell 移除 `TZ=UTC`（改顯示台北時間）；pm2 daemon（systemd drop-in＋`.bashrc` 包裝）
+  與 systemd 使用者服務（`~/.config/environment.d/10-tz.conf`）維持 UTC，pm2 的 iv-* 排程不受影響。
+
 ### 2026-09-26（六）— 完成：LEAPS 垂直價差 P6（tooltip、顏色、賣出腳導覽）審查通過
 
 - 前端 production 建置恢復正常（`npm ci` 修好 `node_modules/.bin/vite`，建置 2.7 秒），實機驗證 8 格 tooltip 與 7 步導覽。
