@@ -27,22 +27,39 @@ interface TourStep {
 function parseSteps(raw: string | null): TourStep[] {
   if (!raw) return [];
   let parsed: unknown;
-  try { parsed = JSON.parse(raw); } catch { return []; }
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
   if (!Array.isArray(parsed)) return [];
 
   const out: TourStep[] = [];
   for (const item of parsed) {
     if (!isRecord(item)) continue;
     const { step, title, body } = item;
-    if (typeof step !== "number" || typeof title !== "string" || !Array.isArray(body)) continue;
-    out.push({ step, title, body: body.filter((b): b is string => typeof b === "string") });
+    if (
+      typeof step !== "number" ||
+      typeof title !== "string" ||
+      !Array.isArray(body)
+    )
+      continue;
+    out.push({
+      step,
+      title,
+      body: body.filter((b): b is string => typeof b === "string"),
+    });
   }
   return out;
 }
 
-/** 一句一行（規格 §S4 斷句規則）。locale 已切好，這裡只負責包 block。 */
+/** 一句一行（規格 §S4 斷句規則）。locale 已切好，這裡只負責包 block。
+ *  行距寫在 application.css 的 .pi-tour-line：頁面 CSP 不允許 style="" 屬性，
+ *  寫成 inline style 會被瀏覽器擋下並在 console 報錯。 */
 function describe(sentences: string[]): string {
-  return sentences.map((s) => `<div style="line-height:1.6">${escapeHtml(s)}</div>`).join("");
+  return sentences
+    .map((s) => `<div class="pi-tour-line">${escapeHtml(s)}</div>`)
+    .join("");
 }
 
 function escapeHtml(text: string): string {
@@ -57,26 +74,41 @@ function runTour(steps: TourStep[], button: HTMLElement | null): void {
     // 靜靜什麼都不做是最難查的失敗：按鈕有 hover 效果、點下去毫無反應，
     // 使用者無從判斷是自己點錯還是壞了。driver.js 由 layout 依 controller
     // 條件載入，漏掛就會走到這裡。
-    // eslint-disable-next-line no-console
+     
     console.error("[price-in] driver.js 未載入，逐步導覽無法啟動");
     if (button) button.textContent = "導覽元件未載入";
     return;
   }
 
   const usable = steps
-    .filter((s) => document.querySelector(`[data-tour-step="${s.step}"]`) !== null)
+    .filter(
+      (s) => document.querySelector(`[data-tour-step="${s.step}"]`) !== null,
+    )
     .map((s) => ({
       element: `[data-tour-step="${s.step}"]`,
-      popover: { title: s.title, description: describe(s.body), side: "bottom", align: "center" },
+      popover: {
+        title: s.title,
+        description: describe(s.body),
+        side: "bottom",
+        align: "center",
+      },
     }));
   if (usable.length === 0) return;
 
   // 設定沿用 option-basics-lesson8.html 那份。
-  factory({ animate: true, allowClose: true, overlayOpacity: 0.35, showProgress: true, steps: usable }).drive();
+  factory({
+    animate: true,
+    allowClose: true,
+    overlayOpacity: 0.35,
+    showProgress: true,
+    steps: usable,
+  }).drive();
 }
 
-const TOGGLE_OFF = "px-3 py-2 rounded-lg border border-gray-300 bg-white text-[16px] text-gray-700 hover:bg-gray-50";
-const TOGGLE_ON  = "px-3 py-2 rounded-lg border border-slate-700 bg-slate-700 text-[16px] text-white hover:bg-slate-800";
+const TOGGLE_OFF =
+  "px-3 py-2 rounded-lg border border-gray-300 bg-white text-[16px] text-gray-700 hover:bg-gray-50";
+const TOGGLE_ON =
+  "px-3 py-2 rounded-lg border border-slate-700 bg-slate-700 text-[16px] text-white hover:bg-slate-800";
 
 /**
  * 狀態同時寫進三個地方：
@@ -84,7 +116,12 @@ const TOGGLE_ON  = "px-3 py-2 rounded-lg border border-slate-700 bg-slate-700 te
  *  - 按鈕底色（看得見）
  *  - aria-pressed（讀得出來——單靠顏色表達狀態對色覺障礙使用者無效）
  */
-function applyToggle(button: HTMLButtonElement, root: HTMLElement, attr: string, on: boolean): void {
+function applyToggle(
+  button: HTMLButtonElement,
+  root: HTMLElement,
+  attr: string,
+  on: boolean,
+): void {
   root.dataset[attr] = on ? "true" : "false";
   button.setAttribute("aria-pressed", on ? "true" : "false");
   button.className = on ? TOGGLE_ON : TOGGLE_OFF;
@@ -114,7 +151,9 @@ export function init(root: HTMLElement): void {
     });
   }
 
-  startBtn?.addEventListener("click", () => { runTour(steps, startBtn); });
+  startBtn?.addEventListener("click", () => {
+    runTour(steps, startBtn);
+  });
 
   if (readBtn instanceof HTMLButtonElement) {
     readBtn.addEventListener("click", () => {
@@ -123,7 +162,8 @@ export function init(root: HTMLElement): void {
         // 灰掉的按鈕只會讓人猜為什麼不能點。
         const field = document.getElementById(epsFieldId);
         field?.scrollIntoView({ behavior: "smooth", block: "center" });
-        if (field instanceof HTMLInputElement) field.focus({ preventScroll: true });
+        if (field instanceof HTMLInputElement)
+          field.focus({ preventScroll: true });
         return;
       }
       readOn = !readOn;

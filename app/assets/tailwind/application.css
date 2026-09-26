@@ -281,6 +281,8 @@
 .driver-popover .driver-popover-description .vs-tone-breakeven,
 .driver-popover .driver-popover-description .vs-tone-loss { font-weight: 700; }
 .driver-popover .driver-popover-description .vs-tour-line + .vs-tour-line { margin-top: 8px; }
+/* Price-In 逐步導覽一句一行（priceInTour.ts）。原本是 inline style，被頁面 CSP 擋下。 */
+.driver-popover .driver-popover-description .pi-tour-line { line-height: 1.6; }
 /* 全站導覽卡片可拖曳（app/frontend/behaviors/shared/driverDraggable.ts）：
    標題是把手；拖過之後箭頭不再指向被標示的元素，所以隱藏。 */
 .driver-popover.driver-popover-draggable .driver-popover-title { cursor: move; user-select: none; touch-action: none; }

@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-09-26（六）— 修正：Price-In 逐步導覽的 CSP 錯誤
+
+- `priceInTour.ts` 以 `<div style="line-height:1.6">` 包每一句，被頁面 CSP（`style-src` 不允許 inline style）擋下，
+  每一步在 console 報 2 個錯誤，行距也從未生效（自 2026-09-07）。
+- 改為 `class="pi-tour-line"`，行距寫進 `application.css`；實機 11 步 console error 0、行高 32px（20px × 1.6）。
+- 新增 `priceInTour.test.ts`（原本沒有測試）；vitest 62 passed、rspec 1210 examples, 0 failures；配對審查 PASS。
+
 ### 2026-09-26（六）— 新增：全站 driver.js 導覽卡片可拖曳
 
 - 新增 `app/frontend/behaviors/shared/driverDraggable.ts`，由 `behaviors.ts` 安裝一次，包裝 `window.driver.js.driver`；
