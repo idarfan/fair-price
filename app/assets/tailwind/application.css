@@ -281,12 +281,23 @@
 .driver-popover .driver-popover-description .vs-tone-breakeven,
 .driver-popover .driver-popover-description .vs-tone-loss { font-weight: 700; }
 .driver-popover .driver-popover-description .vs-tour-line + .vs-tour-line { margin-top: 8px; }
-/* 垂直價差區塊標題：漸層橘文字（orange-600 → amber-500）。 */
-.vs-title-gradient {
-  background: linear-gradient(90deg, #ea580c, #f59e0b);
-  -webkit-background-clip: text; background-clip: text;
-  color: transparent;
-}
+/* ── 垂直價差配色（2026-09-27，dataviz 驗證；使用者選定：下拉方案 A＋卡片 C3）──
+   文字對比一律 ≥ 4.5:1（WCAG），純分隔符號「｜」「 · 」除外（見下方 .vs-select option）。下拉只有 3 段上色（日期藍、mid 琥珀、Δ 紫），
+   dataviz validate_palette：色盲 ΔE ≥ 24.4、一般視覺 ≥ 28.8，全部 PASS；
+   DTE 用次要墨色、履約價用主墨色粗體、分隔線淡灰。 */
+/* 標題列：淡橘漸層背景（orange-50 → orange-200），標題維持深灰；報價時間在元件改 gray-600（5.58:1）。 */
+.vs-header-gradient { background: linear-gradient(90deg, #fff7ed, #fed7aa); }
+/* 賺／賠／兩平：只在垂直價差區塊內（白底）改深色。導覽 popover 與 tooltip 是深色底，
+   沿用 .vs-tone-* 原本的亮色，所以用 [data-vs-section] 限定範圍。
+   損益兩平是價位不是好壞，改主墨色；賺賠另有正負號與卡片標籤，不只靠顏色。 */
+[data-vs-section] .vs-tone-profit    { color: #006300; }
+[data-vs-section] .vs-tone-breakeven { color: #0b0b0b; }
+[data-vs-section] .vs-tone-loss      { color: #b91c1c; }
+/* 結果卡（C3）：淡底＋4px 左色條；獲利淡綠、虧損淡紅、實付淨成本琥珀條，其他淡灰。 */
+.vs-card        { background: #f9fafb; border: 1px solid #e5e7eb; border-left: 4px solid #9ca3af; }
+.vs-card-profit { background: #f0fdf4; border-color: #bbf7d0; border-left-color: #006300; }
+.vs-card-loss   { background: #fef2f2; border-color: #fecaca; border-left-color: #b91c1c; }
+.vs-card-cost   { border-left-color: #b45309; }
 /* 垂直價差兩個下拉：Chrome 可自訂 select（base-select），選項各段上色、下拉箭頭 22px。
    不支援的瀏覽器忽略整段，退回原生下拉。 */
 .vs-select, .vs-select::picker(select) { appearance: base-select; }
@@ -308,11 +319,15 @@
 .vs-select option:hover, .vs-select option:focus-visible { background: #f3f4f6; }
 .vs-select option:checked { background: #eff6ff; }
 .vs-select option:disabled { opacity: .45; }
-.vs-opt-date   { color: #2563eb; }
-.vs-opt-dte    { color: #7c3aed; }
-.vs-opt-strike { color: #111827; font-weight: 600; }
-.vs-opt-price  { color: #ea580c; }
-.vs-opt-delta  { color: #db2777; }
+/* 純分隔符號「｜」「 · 」（Format 中 tone 為 nil 的片段）：淡灰 #898781（白底 3.59:1），
+   刻意低於 4.5 的只有這兩個裝飾符號；有資訊的文字一律帶 tone。 */
+.vs-select option, .vs-select selectedcontent { color: #898781; }
+.vs-opt-note   { color: #52514e; } /* 無報價、（盤後參考價） */
+.vs-opt-date   { color: #256abf; }
+.vs-opt-dte    { color: #52514e; }
+.vs-opt-strike { color: #0b0b0b; font-weight: 600; }
+.vs-opt-price  { color: #b45309; }
+.vs-opt-delta  { color: #4a3aa7; }
 /* Price-In 逐步導覽一句一行（priceInTour.ts）。原本是 inline style，被頁面 CSP 擋下。 */
 .driver-popover .driver-popover-description .pi-tour-line { line-height: 1.6; }
 /* 全站導覽卡片可拖曳（app/frontend/behaviors/shared/driverDraggable.ts）：

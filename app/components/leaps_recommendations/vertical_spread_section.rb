@@ -37,10 +37,10 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
   private
 
   def render_header
-    div(class: "px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center flex-wrap gap-2") do
-      h2(class: "text-base font-semibold vs-title-gradient") { plain "#{TITLE} — #{@symbol}" }
+    div(class: "px-4 py-3 border-b border-gray-100 vs-header-gradient flex justify-between items-center flex-wrap gap-2") do
+      h2(class: "text-base font-semibold text-gray-700") { plain "#{TITLE} — #{@symbol}" }
       if (quoted_at = @outcome[:quoted_at])
-        span(class: "text-xs text-gray-500") do
+        span(class: "text-xs text-gray-600") do
           plain "報價時間：#{quoted_at.in_time_zone('Asia/Taipei').strftime('%Y-%m-%d %H:%M')}（台北時間）"
         end
       end
@@ -155,11 +155,11 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
 
     div(class: "grid grid-cols-2 md:grid-cols-3 gap-3") do
       RESULT_ROWS.each do |key, label_text|
-        div(class: "rounded-lg border border-gray-200 px-3 py-2 cursor-help",
+        div(class: "rounded-lg px-3 py-2 cursor-help vs-card #{CARD_TONE[key]}",
             data_vs_tour_anchor: key.to_s, **tip_attrs(key)) do
-          p(class: "text-xs text-gray-500") { plain "#{label_text} ⓘ" }
+          p(class: "text-xs text-gray-600") { plain "#{label_text} ⓘ" }
           p(class: "text-lg font-semibold #{VALUE_TONE.fetch(key, 'text-gray-800')}", data_vs_value: "true") { plain display[key] }
-          p(class: "text-xs text-gray-400") { plain "保守成交 #{display[:net_cost_nat]}" } if key == :net_cost
+          p(class: "text-xs text-gray-600") { plain "保守成交 #{display[:net_cost_nat]}" } if key == :net_cost
         end
       end
     end
@@ -185,6 +185,8 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
 
   # 賺錢綠、損益兩平黃、賠錢紅（色值定義在 application.css 的 .vs-tone-*，沿用 LEAPS 頁既有色票）。
   VALUE_TONE = { max_profit: "vs-tone-profit", breakeven: "vs-tone-breakeven", max_loss: "vs-tone-loss" }.freeze
+  # 卡片底色與左色條（application.css 的 .vs-card-*；2026-09-27 使用者選定 C3）。
+  CARD_TONE = { max_profit: "vs-card-profit", max_loss: "vs-card-loss", net_cost: "vs-card-cost" }.freeze
 
   def tips = @tips ||= LeapsVerticalSpreadService::Explanation.tips(@outcome)
 

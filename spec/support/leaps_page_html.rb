@@ -30,7 +30,15 @@ module LeapsPageHtml
     doc.css('input[name="authenticity_token"]').each { |n| n["value"] = "CSRF" }
     doc.css("[data-csrf]").each { |n| n["data-csrf"] = "CSRF" }
     doc.css("[nonce]").each { |n| n["nonce"] = "NONCE" }
+    mask_release_notes(doc)
     canonical(doc.to_html)
+  end
+
+  # 全站 layout 的版本號與「版本更新說明」內容每次發版都會變（config/initializers/release_notes.rb），
+  # 與 /leaps 既有區塊無關：版本號換成固定字串、說明視窗的內容清空（外框保留）。
+  def mask_release_notes(doc)
+    doc.css("[data-app-version], .release-notes-version").each { |n| n.content = "VERSION" }
+    doc.css("#release-notes-overlay .release-notes-panel").each { |n| n.children.each(&:remove) }
   end
 
   # Vite 的雜湊是 base64url，可能含「-」（例如 behaviors-DaqtVP-V.js）。
@@ -46,7 +54,8 @@ module LeapsPageHtml
 
   def baseline_path(name) = BASELINE_DIR.join("#{name}.html")
 
-  def read_baseline(name) = canonical(File.read(baseline_path(name)))
+  # 基準檔擷取時已經過 normalize；再套一次，讓版本號遮蔽等後來新增的規則也作用在基準上。
+  def read_baseline(name) = normalize(File.read(baseline_path(name)))
 
   # 「有候選」情境：沿用 spec/requests/leaps_recommendations_spec.rb 的做法，stub 掉資料層。
   def stub_candidates!(example_group, symbol)

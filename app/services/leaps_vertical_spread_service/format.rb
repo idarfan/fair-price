@@ -42,7 +42,8 @@ class LeapsVerticalSpreadService
     # 210.00｜mid 11.20｜Δ 0.30 ／ 210.00｜last 11.20（盤後參考價）｜Δ 0.30 ／ 210.00｜無報價｜Δ 0.30
     def short_label(option) = short_segments(option).map(&:first).join
 
-    # 下拉選項分段上色用：[[文字, tone]]，tone 為 nil 的是分隔符號（顏色見 application.css 的 .vs-opt-*）。
+    # 下拉選項分段上色用：[[文字, tone]]，tone 為 nil 的只有純分隔符號（淡灰）；
+    # 有資訊的文字（含「無報價」「（盤後參考價）」→ :note）都要帶 tone。顏色見 application.css 的 .vs-opt-*。
     def long_segments(option)
       [ [ option[:expiry][0, 10], :date ], [ " · ", nil ], [ "#{option[:dte]} DTE", :dte ], [ "｜", nil ],
         *short_segments(option) ]
@@ -56,8 +57,8 @@ class LeapsVerticalSpreadService
     def price_segments(option)
       case option[:source]
       when :mid  then [ [ "mid #{num(option[:price])}", :price ] ]
-      when :last then [ [ "last #{num(option[:price])}", :price ], [ AFTER_HOURS_NOTE, nil ] ]
-      else [ [ NO_QUOTE, nil ] ]
+      when :last then [ [ "last #{num(option[:price])}", :price ], [ AFTER_HOURS_NOTE, :note ] ]
+      else [ [ NO_QUOTE, :note ] ]
       end
     end
 

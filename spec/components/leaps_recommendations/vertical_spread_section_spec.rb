@@ -117,6 +117,17 @@ RSpec.describe LeapsRecommendations::VerticalSpreadSection do
     expect(html.at_css('select[name="short_strike"] option[selected]').text).to include("（盤後參考價）")
   end
 
+  it "配色（2026-09-27 使用者選定 C3）：六格都有 vs-card，獲利／虧損／實付淨成本另帶角色 class" do
+    html = render_html(outcome: outcome_for(chain, expiry: "2027-10-15-m"))
+    cards = html.css(".grid-cols-2 > div[data-vs-tour-anchor]").to_h { |c| [ c["data-vs-tour-anchor"], c["class"].split ] }
+
+    expect(cards.keys).to eq(%w[net_cost max_profit breakeven max_loss risk_reward width])
+    expect(cards.values).to all(include("vs-card"))
+    expect(cards.slice("max_profit", "max_loss", "net_cost").transform_values { |c| c.grep(/vs-card-/) })
+      .to eq("max_profit" => [ "vs-card-profit" ], "max_loss" => [ "vs-card-loss" ], "net_cost" => [ "vs-card-cost" ])
+    expect(cards.except("max_profit", "max_loss", "net_cost").values.flat_map { |c| c.grep(/vs-card-/) }).to be_empty
+  end
+
   describe "到期日預估股價（P7）" do
     let(:html) { render_html(outcome: outcome_for(chain, expiry: "2027-10-15-m")) }
 

@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-09-27（日）— 改善：LEAPS 垂直價差配色重整（dataviz 驗證）；版本 v20260927
+
+- 原配色經 dataviz `validate_palette.js` 驗證失敗：日期藍 vs DTE 紫在色盲模擬下 ΔE 0.4；賺綠 3.06、兩平黃 2.94、賠紅 2.81、mid 橘 3.56 皆未達 WCAG 文字 4.5:1。
+- 使用者看過比較圖後選定「下拉方案 A＋卡片 C3」：下拉只有日期藍 `#256abf`、mid 琥珀 `#b45309`、Δ 紫 `#4a3aa7` 三段上色（驗證全 PASS），DTE 次要墨色、履約價主墨粗體；結果卡淡底＋4px 左色條（獲利綠、虧損紅、實付淨成本琥珀）；區塊內賺 `#006300`、賠 `#b91c1c`、兩平改主墨色；卡片小字與報價時間改 gray-600。
+- 導覽 popover 與 tooltip 是深色底，`.vs-tone-*` 的亮色不變，新色只以 `[data-vs-section]` 限定在區塊內。
+- 使用者版「版本更新說明」新增 `v20260927`（`config/initializers/release_notes.rb`）。`/leaps` HTML 回歸比對遮蔽 footer 版本號與說明視窗內容，之後每次發版不會再誤判。
+
 ### 2026-09-27（日）— 修正：CI bundler-audit 因 rack-proxy 通報失敗
 
 - ruby-advisory-db 收錄 GHSA-42qh-8mx8-7wqm（rack-proxy HTTP response smuggling）後，0.x 被判為受影響（上游只確認 1.0.0–1.0.2，0.x「未經評估」）。
@@ -15,7 +22,7 @@
 
 ### 2026-09-27（日）— 改善：LEAPS 垂直價差區塊標題加上英文
 
-- `/leaps` 垂直價差區塊標題從「LEAPS 垂直價差 — SNOW」改成「LEAPS Vertical Spread 垂直價差 — SNOW」（`VerticalSpreadSection::TITLE`），載入中與結果狀態共用同一個標題；標題文字改為漸層橘（`.vs-title-gradient`，orange-600 → amber-500）。
+- `/leaps` 垂直價差區塊標題從「LEAPS 垂直價差 — SNOW」改成「LEAPS Vertical Spread 垂直價差 — SNOW」（`VerticalSpreadSection::TITLE`），載入中與結果狀態共用同一個標題；標題列背景改為淡橘漸層（`.vs-header-gradient`，orange-50 → orange-200），文字維持深灰（最初誤做成文字漸層，已依使用者更正改回）。
 - 移除 `LeapsVerticalSpreadService::Format#price_part` 死碼（上一項重構後已沒有呼叫者）。
 
 ### 2026-09-27（日）— 改善：LEAPS 垂直價差下拉選單分段上色、箭頭 22px
