@@ -7,7 +7,7 @@
 # 結果／錯誤／讀取失敗狀態，替換外框內容。數字全部來自 LeapsVerticalSpreadService，
 # 這裡不做任何計算。CSP 不允許 inline style，一律用 class。
 class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
-  TITLE = "LEAPS 垂直價差"
+  TITLE = "LEAPS Vertical Spread 垂直價差"
   NOTE = "需 Firstrade 選擇權 Level 3；請用價差單一次成交兩腳。最大獲利要到到期日才完整實現。"
   AFTER_HOURS_BADGE = "盤後參考價：以最後成交價計算，實際成交價可能不同"
   RESULT_ROWS = [
@@ -38,7 +38,7 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
 
   def render_header
     div(class: "px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center flex-wrap gap-2") do
-      h2(class: "text-base font-semibold text-gray-700") { plain "#{TITLE} — #{@symbol}" }
+      h2(class: "text-base font-semibold vs-title-gradient") { plain "#{TITLE} — #{@symbol}" }
       if (quoted_at = @outcome[:quoted_at])
         span(class: "text-xs text-gray-500") do
           plain "報價時間：#{quoted_at.in_time_zone('Asia/Taipei').strftime('%Y-%m-%d %H:%M')}（台北時間）"
@@ -146,6 +146,7 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
 
   def render_result(result)
     display = result[:display]
+    render_payoff_row(result)
     if result[:after_hours_legs].any?
       div(class: "px-3 py-2 rounded-lg text-xs bg-yellow-50 border border-yellow-300 text-yellow-800") do
         plain "#{AFTER_HOURS_BADGE}（#{result[:after_hours_legs].map { |leg| leg == :long ? '買入腳' : '賣出腳' }.join('、')}）"
@@ -163,6 +164,23 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
       end
     end
     render_tour_data
+  end
+
+  # P7 到期日預估股價：置中一列，輸入後由前端取回 VerticalSpreadPayoff 片段填進結果欄。
+  # 兩腳參數取自 service 的計算結果（BigDecimal 原值，不經顯示四捨五入），前端原樣帶回伺服器。
+  PAYOFF_INPUT_CLASS = "w-36 px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-right " \
+                       "focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+  def render_payoff_row(result)
+    div(class: "flex items-center justify-center gap-3 flex-wrap text-sm", data_vs_payoff: "true",
+        data_long_strike: @outcome[:long_strike].to_s("F"),
+        data_short_strike: @outcome.dig(:legs, :short, :strike).to_s("F"),
+        data_d_mid: result[:d_mid].to_s("F")) do
+      label(for: "vs-target-price", class: "text-gray-600") { plain "到期日預估股價" }
+      input(id: "vs-target-price", type: "number", min: "0", step: "0.01", inputmode: "decimal",
+            data_vs_target_price: "true", class: PAYOFF_INPUT_CLASS)
+      span(class: "text-gray-700", data_vs_payoff_result: "true", aria_live: "polite")
+    end
   end
 
   # 賺錢綠、損益兩平黃、賠錢紅（色值定義在 application.css 的 .vs-tone-*，沿用 LEAPS 頁既有色票）。

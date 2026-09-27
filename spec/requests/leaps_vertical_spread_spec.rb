@@ -173,6 +173,32 @@ RSpec.describe "LEAPS 垂直價差", type: :request do
       Rails.cache = ActiveSupport::Cache::NullStore.new
     end
 
+    describe "payoff=1（P7 到期日預估股價）" do
+      let(:legs) { { payoff: "1", long_strike: "100.0", short_strike: "160.0", d_mid: "48.075" } }
+
+      it "回傳到期損益片段，不觸發抓取、不做 CDP 預檢" do
+        expect(LeapsCallChainFetcher).not_to receive(:new)
+        expect_any_instance_of(LeapsRecommendationsController).not_to receive(:cdp_online?)
+
+        get "/leaps/vertical_spread", params: legs.merge(target_price: "155")
+
+        expect(response).to have_http_status(:ok)
+        expect(Nokogiri::HTML.fragment(response.body).text).to eq("→ 到期損益 +$692.50（+14.40%）")
+      end
+
+      it "預估價空白：200、空片段" do
+        get "/leaps/vertical_spread", params: legs.merge(target_price: "")
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to eq("")
+      end
+
+      it "參數不合法：422、紅字訊息（逐字跳脫）" do
+        get "/leaps/vertical_spread", params: legs.merge(target_price: "<b>x</b>")
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.body).to include("預估股價格式錯誤：&lt;b&gt;x&lt;/b&gt;")
+      end
+    end
+
     it "CDP 離線：直接回報，不呼叫 fetcher（全域 CDP 預檢規則）" do
       allow_any_instance_of(LeapsRecommendationsController).to receive(:cdp_online?).and_return(false)
       expect(LeapsCallChainFetcher).not_to receive(:new)

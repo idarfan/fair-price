@@ -117,6 +117,53 @@ RSpec.describe LeapsRecommendations::VerticalSpreadSection do
     expect(html.at_css('select[name="short_strike"] option[selected]').text).to include("（盤後參考價）")
   end
 
+  describe "到期日預估股價（P7）" do
+    let(:html) { render_html(outcome: outcome_for(chain, expiry: "2027-10-15-m")) }
+
+    it "位在選單與結果卡之間、置中；帶著 service 算好的兩腳參數，結果一開始是空的" do
+      row = html.at_css("[data-vs-payoff]")
+      expect(row["class"]).to include("justify-center")
+      expect(row.at_css("input#vs-target-price")["value"]).to be_nil
+      expect(row.at_css("label[for='vs-target-price']").text).to eq("到期日預估股價")
+      expect(row.at_css("[data-vs-payoff-result]").text).to eq("")
+      # 預設：買入腳 100（mid 53）、賣出腳 170（mid 5）→ 淨成本 48
+      expect(row.to_h.slice("data-long-strike", "data-short-strike", "data-d-mid"))
+        .to eq("data-long-strike" => "100.0", "data-short-strike" => "170.0", "data-d-mid" => "48.0")
+
+      body = html.to_html
+      expect(body.index("data-vs-form")).to be < body.index("data-vs-payoff")
+      expect(body.index("data-vs-payoff")).to be < body.index("實付淨成本")
+    end
+
+    it "載入中、錯誤狀態沒有輸入欄位" do
+      expect(render_html(state: :loading).at_css("[data-vs-payoff]")).to be_nil
+      expect(render_html(outcome: outcome_for(chain, long_strike: "101.37")).at_css("[data-vs-payoff]")).to be_nil
+    end
+  end
+
+  describe LeapsRecommendations::VerticalSpreadPayoff do
+    def render_payoff(result) = Nokogiri::HTML.fragment(described_class.new(result: result).call)
+
+    it "獲利：綠字、正號、報酬率" do
+      frag = render_payoff(LeapsVerticalSpreadService::Payoff.call(long_strike: "100", short_strike: "160",
+                                                                   d_mid: "48.075", target_price: "155"))
+      expect(frag.text).to eq("→ 到期損益 +$692.50（+14.40%）")
+      expect(frag.at_css(".vs-tone-profit").text).to eq("+$692.50（+14.40%）")
+    end
+
+    it "虧損：紅字" do
+      frag = render_payoff(LeapsVerticalSpreadService::Payoff.call(long_strike: "100", short_strike: "160",
+                                                                   d_mid: "48.075", target_price: "90"))
+      expect(frag.at_css(".vs-tone-loss").text).to eq("-$4,807.50（-100.00%）")
+    end
+
+    it "nil：空白；錯誤：紅字訊息" do
+      expect(render_payoff(nil).text).to eq("")
+      expect(render_payoff({ error: "預估股價格式錯誤：abc" }).at_css(".vs-tone-loss").text)
+        .to eq("預估股價格式錯誤：abc")
+    end
+  end
+
   it "載入中：進度條與進度文字，沒有任何計算數字" do
     html = render_html(state: :loading)
 

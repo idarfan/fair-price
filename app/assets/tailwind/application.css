@@ -281,6 +281,12 @@
 .driver-popover .driver-popover-description .vs-tone-breakeven,
 .driver-popover .driver-popover-description .vs-tone-loss { font-weight: 700; }
 .driver-popover .driver-popover-description .vs-tour-line + .vs-tour-line { margin-top: 8px; }
+/* 垂直價差區塊標題：漸層橘文字（orange-600 → amber-500）。 */
+.vs-title-gradient {
+  background: linear-gradient(90deg, #ea580c, #f59e0b);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+}
 /* 垂直價差兩個下拉：Chrome 可自訂 select（base-select），選項各段上色、下拉箭頭 22px。
    不支援的瀏覽器忽略整段，退回原生下拉。 */
 .vs-select, .vs-select::picker(select) { appearance: base-select; }

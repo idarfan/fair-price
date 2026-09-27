@@ -1,5 +1,16 @@
 # FairPrice
 
+### 2026-09-27（日）— 新增：LEAPS 垂直價差「到期日預估股價」試算
+
+- 買入腳／賣出腳選單與結果卡之間新增置中的一列：輸入到期日預估股價，顯示每口到期損益與報酬率（賺綠、平黃、賠紅），成本用 mid 淨成本。
+- 公式在 `LeapsVerticalSpreadService::Payoff`；沿用 `GET /leaps/vertical_spread`，多一個 `payoff=1` 模式（不抓 Barchart、不做 CDP 預檢）；結果片段元件 `LeapsRecommendations::VerticalSpreadPayoff`。
+- 前端停止輸入 300ms 後才取結果，只換結果欄。規格見 `leaps-call-spread-spec.md` P7。
+
+### 2026-09-27（日）— 改善：LEAPS 垂直價差區塊標題加上英文
+
+- `/leaps` 垂直價差區塊標題從「LEAPS 垂直價差 — SNOW」改成「LEAPS Vertical Spread 垂直價差 — SNOW」（`VerticalSpreadSection::TITLE`），載入中與結果狀態共用同一個標題；標題文字改為漸層橘（`.vs-title-gradient`，orange-600 → amber-500）。
+- 移除 `LeapsVerticalSpreadService::Format#price_part` 死碼（上一項重構後已沒有呼叫者）。
+
 ### 2026-09-27（日）— 改善：LEAPS 垂直價差下拉選單分段上色、箭頭 22px
 
 - 買入腳／賣出腳兩個下拉改用 Chrome 可自訂 select（`appearance: base-select`），

@@ -239,6 +239,82 @@ describe("leapsVerticalSpread", () => {
     });
   });
 
+  describe("到期日預估股價（P7）", () => {
+    const WITH_PAYOFF = `
+      <div data-vs-section="true">
+        <div data-vs-payoff="true" data-long-strike="100.0" data-short-strike="160.0" data-d-mid="48.075">
+          <input id="vs-target-price" type="number" data-vs-target-price="true">
+          <span data-vs-payoff-result="true"></span>
+        </div>
+      </div>`;
+
+    async function mountWithPayoff(): Promise<HTMLElement> {
+      fetchMock.mockResolvedValueOnce(htmlResponse(WITH_PAYOFF));
+      const root = mountFrame();
+      init(root);
+      await flush();
+      return root;
+    }
+
+    function typePrice(root: HTMLElement, value: string): void {
+      const input = root.querySelector<HTMLInputElement>(
+        "[data-vs-target-price]",
+      );
+      if (!input) throw new Error("沒有預估股價輸入欄");
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    function payoffCalls(): string[] {
+      return fragmentCalls(fetchMock).filter((u) => u.includes("payoff=1"));
+    }
+
+    it("停止輸入 300ms 後才帶兩腳參數取片段，填進結果欄；不重載整個區塊", async () => {
+      const root = await mountWithPayoff();
+      fetchMock.mockResolvedValue(
+        htmlResponse(
+          '→ 到期損益 <span class="vs-tone-profit">+$692.50（+14.40%）</span>',
+        ),
+      );
+
+      typePrice(root, "15");
+      typePrice(root, "155");
+      await vi.advanceTimersByTimeAsync(299);
+      expect(payoffCalls()).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await flush();
+
+      expect(payoffCalls()).toEqual([
+        "/leaps/vertical_spread?payoff=1&long_strike=100.0&short_strike=160.0&d_mid=48.075&target_price=155",
+      ]);
+      expect(root.querySelector("[data-vs-payoff-result]")?.textContent).toBe(
+        "→ 到期損益 +$692.50（+14.40%）",
+      );
+      expect(root.querySelector("[data-vs-target-price]")).not.toBeNull();
+    });
+
+    it("較早送出的請求較晚回來時不覆蓋新結果", async () => {
+      const root = await mountWithPayoff();
+      let resolveSlow: (r: Response) => void = () => undefined;
+      fetchMock
+        .mockReturnValueOnce(new Promise<Response>((r) => (resolveSlow = r)))
+        .mockResolvedValueOnce(htmlResponse("新"));
+
+      typePrice(root, "120");
+      await vi.advanceTimersByTimeAsync(300);
+      typePrice(root, "155");
+      await vi.advanceTimersByTimeAsync(300);
+      await flush();
+      resolveSlow(htmlResponse("舊"));
+      await flush();
+
+      expect(root.querySelector("[data-vs-payoff-result]")?.textContent).toBe(
+        "新",
+      );
+    });
+  });
+
   it("連線失敗：顯示讀取失敗與重試", async () => {
     fetchMock.mockRejectedValue(new Error("network"));
     const root = mountFrame();

@@ -173,6 +173,8 @@ class LeapsRecommendationsController < ApplicationController
       return render json: LeapsCallChainFetcher.progress(symbol) || {}
     end
 
+    return render_vertical_spread_payoff if params[:payoff].present?
+
     strike = params[:user_strike].to_s.strip
     return head :unprocessable_entity if symbol.blank? || strike.blank?
 
@@ -293,6 +295,17 @@ class LeapsRecommendationsController < ApplicationController
   # cache 短路都呼叫同一個方法，避免兩處各自維護一份、又漂移出不一致。
   def fresh_data_exists?(symbol, user_strike: nil)
     LeapsOptionChainSnapshot.fresh_for?(symbol, user_strike: user_strike)
+  end
+
+  # 到期日預估股價（leaps-call-spread-spec P7）也走 vertical_spread 同一條路由：
+  # 只用頁面帶回的兩腳參數重算一個公式，不觸發抓取，所以不需要 CDP 預檢。
+  def render_vertical_spread_payoff
+    result = LeapsVerticalSpreadService::Payoff.call(
+      long_strike: params[:long_strike], short_strike: params[:short_strike],
+      d_mid: params[:d_mid], target_price: params[:target_price]
+    )
+    render html: LeapsRecommendations::VerticalSpreadPayoff.new(result: result).call.html_safe,
+           status: result&.key?(:error) ? :unprocessable_entity : :ok
   end
 
   def cached_errors(symbol)

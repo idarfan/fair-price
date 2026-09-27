@@ -6,6 +6,7 @@
  *  2. 選單變動就帶目前的值重新取片段；換買入腳到期日時不帶賣出腳，由伺服器重新套預設值。
  *  3. 「重試」重送上一次的請求。
  *  4. 載入期間每秒輪詢進度（同一條路由帶 progress=1），顯示「已完成 n / N 個到期日」與經過秒數。
+ *  5. 到期日預估股價（P7）：停止輸入 300ms 後帶兩腳參數取 payoff=1 片段，只換結果欄。
  *
  * 版面、數字與公式都只在伺服器（Phlex + LeapsVerticalSpreadService）產生，這裡不做任何計算，
  * 也不組 markup——只搬運 HTML（同 leapsPriceContext.ts 的理由）。
@@ -16,6 +17,8 @@ import { isRecord, num, str } from "./shared/json";
 const ENDPOINT = "/leaps/vertical_spread";
 const PROGRESS_INTERVAL_MS = 1000;
 const FAILURE_TEXT = "Barchart 讀取失敗：連線中斷，請重試。";
+const PAYOFF_DEBOUNCE_MS = 300;
+const PAYOFF_FAILURE_TEXT = "到期損益計算失敗：連線中斷，請再輸入一次。";
 
 export function init(root: HTMLElement): void {
   const initialSrc = root.dataset["src"];
@@ -64,6 +67,23 @@ export function init(root: HTMLElement): void {
     load(`${ENDPOINT}?${params.toString()}`);
   });
 
+  // 到期日預估股價（P7）：停止輸入後才向伺服器要結果片段，只換結果欄，不重載整個區塊。
+  let payoffTimer: number | undefined;
+  let payoffSeq = 0;
+  root.addEventListener("input", (event) => {
+    const input = event.target;
+    if (
+      !(input instanceof HTMLInputElement) ||
+      !input.matches("[data-vs-target-price]")
+    )
+      return;
+    window.clearTimeout(payoffTimer);
+    payoffTimer = window.setTimeout(() => {
+      payoffSeq += 1;
+      void loadPayoff(input, payoffSeq, () => payoffSeq);
+    }, PAYOFF_DEBOUNCE_MS);
+  });
+
   root.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
@@ -73,6 +93,33 @@ export function init(root: HTMLElement): void {
   });
 
   load(initialSrc);
+}
+
+async function loadPayoff(
+  input: HTMLInputElement,
+  seq: number,
+  latestSeq: () => number,
+): Promise<void> {
+  const row = input.closest<HTMLElement>("[data-vs-payoff]");
+  const output = row?.querySelector<HTMLElement>("[data-vs-payoff-result]");
+  if (!row || !output) return;
+
+  const params = new URLSearchParams({
+    payoff: "1",
+    long_strike: row.dataset["longStrike"] ?? "",
+    short_strike: row.dataset["shortStrike"] ?? "",
+    d_mid: row.dataset["dMid"] ?? "",
+    target_price: input.value.trim(),
+  });
+  try {
+    const res = await fetch(`${ENDPOINT}?${params.toString()}`, {
+      headers: { Accept: "text/html" },
+    });
+    const html = await res.text();
+    if (seq === latestSeq()) output.innerHTML = html;
+  } catch {
+    if (seq === latestSeq()) output.textContent = PAYOFF_FAILURE_TEXT;
+  }
 }
 
 async function pollProgress(
