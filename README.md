@@ -1,5 +1,13 @@
 # FairPrice
 
+### 2026-09-27（日）— 新增：CI 加入 rspec（test job）
+
+- `.github/workflows/ci.yml` 新增 `test` job：postgres:16 服務容器（CI 專用假帳密）、`TEST_DATABASE_URL` 指向它，
+  不讀 `.env*`、不可能連到正式庫；先印出實際連線的 database 名稱。
+- Node 24 + `npm ci` + `bundle exec vite build`（repo 沒有 `bin/vite` binstub，不能靠 autoBuild）→ `db:schema:load` → `bundle exec rspec`。
+- `FINNHUB_API_KEY`、`TELEGRAM_BOT_TOKEN`、`OUOU_TELEGRAM_CHAT_ID` 給假值（程式以無預設值的 `ENV.fetch` 讀取）；外網由 WebMock 擋下，不會呼叫 Barchart。
+- 公開 repo 使用標準 GitHub 託管 runner，Actions 不計費。
+
 ### 2026-09-27（日）— 修正：CI lint 自 9/12 起持續失敗
 
 - GitHub Actions `lint`（`bin/rubocop -f github`）因 3 個 spec 檔的 17 個 RSpec 風格 offenses 失敗，最近 6 次 push 全紅。

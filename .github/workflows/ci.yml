@@ -50,3 +50,62 @@ jobs:
       - name: Lint code for consistent style
         run: bin/rubocop -f github
 
+  # 2026-09-27：CI 原本不跑 rspec。這個 job 在 GitHub 的臨時機器上跑全套測試，
+  # 資料庫是 job 內的 postgres 服務容器（帳密為 CI 專用假值），跑完即銷毀；
+  # 不讀 .env／.env.test（gitignore，CI 上不存在），也不可能連到正式庫。
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: fairprice_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      # config/database.yml 的 test 區塊優先讀這個變數
+      TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/fairprice_test
+      # 程式以沒有預設值的 ENV.fetch 讀取；測試不會真的呼叫外部服務（WebMock 擋外網），給假值即可
+      FINNHUB_API_KEY: ci-dummy
+      TELEGRAM_BOT_TOKEN: ci-dummy
+      OUOU_TELEGRAM_CHAT_ID: ci-dummy
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      # config/vite.json 的 test 環境 autoBuild，但 repo 沒有 bin/vite binstub；
+      # 先明確建置到 public/vite-test，request spec 渲染頁面時直接讀 manifest。
+      - name: Build frontend for test
+        run: bundle exec vite build
+
+      - name: Load schema
+        run: bin/rails db:schema:load
+
+      - name: Show test database（證明連的是 CI 的測試庫）
+        run: bin/rails runner 'c = ActiveRecord::Base.connection; puts "database=#{c.current_database} user=#{c.select_value("select current_user")}"'
+
+      - name: Run rspec
+        run: bundle exec rspec
+
