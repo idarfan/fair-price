@@ -197,6 +197,12 @@ RSpec.describe "LEAPS 垂直價差", type: :request do
         expect(response).to have_http_status(:unprocessable_entity)
         expect(response.body).to include("預估股價格式錯誤：&lt;b&gt;x&lt;/b&gt;")
       end
+
+      it "預估價 NaN：422（不可變成 500）" do
+        get "/leaps/vertical_spread", params: legs.merge(target_price: "NaN")
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.body).to include("預估股價格式錯誤：NaN")
+      end
     end
 
     it "CDP 離線：直接回報，不呼叫 fetcher（全域 CDP 預檢規則）" do

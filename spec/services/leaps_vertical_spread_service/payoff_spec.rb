@@ -47,10 +47,18 @@ RSpec.describe LeapsVerticalSpreadService::Payoff do
     expect(call(nil)).to be_nil
   end
 
-  it "預估價不是正數：回錯誤" do
+  it "預估價 0（標的歸零）：屬於低於買入腳，虧掉全部淨成本" do
+    result = call("0")
+    expect(result[:pnl]).to eq(BigDecimal("-4807.5"))
+    expect(result[:display]).to eq(pnl: "-$4,807.50", pct: "-100.00%")
+  end
+
+  it "預估價不是數字、非有限值或為負數：回錯誤" do
     expect(call("abc")).to eq(error: "預估股價格式錯誤：abc")
     expect(call("-5")).to eq(error: "預估股價格式錯誤：-5")
-    expect(call("0")).to eq(error: "預估股價格式錯誤：0")
+    # BigDecimal 解析得出 NaN／Infinity；NaN 若放行，clamp 會丟 ArgumentError 變成 500
+    expect(call("NaN")).to eq(error: "預估股價格式錯誤：NaN")
+    expect(call("Infinity")).to eq(error: "預估股價格式錯誤：Infinity")
   end
 
   it "兩腳參數不合法（K_S ≤ K_L、淨成本 ≤ 0 或 ≥ 寬度、格式錯誤）：回錯誤" do

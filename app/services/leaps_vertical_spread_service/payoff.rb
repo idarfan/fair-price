@@ -13,8 +13,10 @@ class LeapsVerticalSpreadService
     def call(long_strike:, short_strike:, d_mid:, target_price:)
       return nil if target_price.to_s.strip.empty?
 
-      target = positive_decimal(target_price)
-      return { error: "預估股價格式錯誤：#{target_price}" } unless target
+      # 預估價可以是 0（標的歸零，落在「低於 K_L」＝最大虧損）；兩腳參數仍須 > 0。
+      # BigDecimal 會把 "NaN"／"Infinity" 解析成功，要另外擋（NaN 進 clamp 會丟例外）。
+      target = decimal(target_price)
+      return { error: "預估股價格式錯誤：#{target_price}" } if target.nil? || !target.finite? || target.negative?
 
       k_l, k_s, cost = [ long_strike, short_strike, d_mid ].map { |v| positive_decimal(v) }
       return { error: "價差參數不合法，請重新整理區塊" } unless valid_legs?(k_l, k_s, cost)
@@ -43,8 +45,12 @@ class LeapsVerticalSpreadService
     def signed_money(value) = value.positive? ? "+#{Format.money(value)}" : Format.money(value)
 
     def positive_decimal(raw)
-      value = BigDecimal(raw.to_s.strip)
-      value.positive? ? value : nil
+      value = decimal(raw)
+      value&.positive? ? value : nil
+    end
+
+    def decimal(raw)
+      BigDecimal(raw.to_s.strip)
     rescue ArgumentError, TypeError
       nil
     end
