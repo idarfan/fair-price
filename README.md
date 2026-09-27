@@ -7,6 +7,8 @@
 - Node 24 + `npm ci` + `bundle exec vite build`（repo 沒有 `bin/vite` binstub，不能靠 autoBuild）→ `db:schema:load` → `bundle exec rspec`。
 - `FINNHUB_API_KEY`、`TELEGRAM_BOT_TOKEN`、`OUOU_TELEGRAM_CHAT_ID` 給假值（程式以無預設值的 `ENV.fetch` 讀取）；外網由 WebMock 擋下，不會呼叫 Barchart。
 - 公開 repo 使用標準 GitHub 託管 runner，Actions 不計費。
+- 第一次執行 1210 examples 中 331 失敗，全部是 `Missing Active Record encryption credential`（User 的 `totp_secret` 加密金鑰只在需要 master.key 的 credentials 裡）。
+  改在 `config/environments/test.rb` 設定測試專用的 encryption 金鑰（隨機產生、與正式環境無關），不把 master.key 放進 CI。
 
 ### 2026-09-27（日）— 修正：CI lint 自 9/12 起持續失敗
 

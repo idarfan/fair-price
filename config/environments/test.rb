@@ -39,4 +39,12 @@ Rails.application.configure do
 
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true
+
+  # 2026-09-27：User 的 totp_secret／backup_codes 用 Active Record encryption，金鑰原本只在
+  # credentials.yml.enc（需要 gitignore 的 master.key）。CI 沒有 master.key，建立 User 就報
+  # "Missing Active Record encryption credential"。test 環境改用這組測試專用金鑰：
+  # 隨機產生、與正式環境無關，測試庫每次清空，不影響任何真實資料。
+  config.active_record.encryption.primary_key = "kRol1d2UGQo8EjTgLfkwi0rypgCr3w0x"
+  config.active_record.encryption.deterministic_key = "ucGkSfOpSQMBG44vvMGQlFMEolFuFNGZ"
+  config.active_record.encryption.key_derivation_salt = "pNxf3tlTH01ScXrxUfgQJXx284MjNhAh"
 end
