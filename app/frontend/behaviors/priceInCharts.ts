@@ -9,6 +9,9 @@
 
 import { isRecord } from "./shared/json";
 
+// 全形空格（U+3000）排版用。用 fromCodePoint 產生，原始碼裡不出現這個字元
+// （ESLint no-irregular-whitespace 會擋）。
+const FULLWIDTH_SPACE = String.fromCodePoint(0x3000);
 const FONT_TITLE = 22;
 const FONT_VALUE = 24;
 const FONT_AXIS = 20;
@@ -163,7 +166,7 @@ function renderChartA(
   const bandYear = bandLabel.match(/\d{4}/)?.[0] ?? null;
   const chartTitle =
     hasBand && bandYear !== null
-      ? `${fiscalYear} 需要的 EPS　｜　綠帶＝FY${bandYear} 分析師預測`
+      ? `${fiscalYear} 需要的 EPS${FULLWIDTH_SPACE}｜${FULLWIDTH_SPACE}綠帶＝FY${bandYear} 分析師預測`
       : `${fiscalYear} 需要的 EPS`;
 
   new Chart(canvas, {

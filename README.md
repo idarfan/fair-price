@@ -1,5 +1,13 @@
 # FairPrice
 
+### 2026-09-27（日）— 新增：CI 的 frontend job 加入 tsc 與 eslint
+
+- `frontend` job 在 vitest 之前新增 `npm run typecheck`（`tsc --noEmit`）與 `npm run lint`（`eslint .`）。
+- 加入前 eslint 有 6 個 error，已修正（畫面與行為不變）：
+  - Price-In 兩處排版用的全形空格（U+3000）觸發 `no-irregular-whitespace`：`priceInCharts.ts` 圖 A 標題、`priceInExport.ts` 匯出確認清單的縮排，改由常數 `FULLWIDTH_SPACE = String.fromCodePoint(0x3000)` 產生，產出的字串完全相同。
+  - `e2e/*.mjs` 在 Node 執行，`eslint.config.js` 補 Node 全域（`process`），消除 `no-undef` 誤判。
+- 剩下 11 個 `react-hooks/set-state-in-effect` 為 warn，不會讓 CI 失敗。
+
 ### 2026-09-27（日）— 新增：CI 加入 vitest（frontend job）
 
 - `.github/workflows/ci.yml` 新增 `frontend` job：setup-node 24（npm cache）→ `npm ci` → `npm test`（`vitest run`，`app/frontend/**/*.test.ts`）。

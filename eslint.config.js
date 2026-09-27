@@ -107,7 +107,21 @@ export default tseslint.config(
     files: ["*.cjs", "*.config.js"],
     languageOptions: {
       sourceType: "commonjs",
-      globals: { module: "writable", require: "readonly", process: "readonly", __dirname: "readonly" },
+      globals: {
+        module: "writable",
+        require: "readonly",
+        process: "readonly",
+        __dirname: "readonly",
+      },
+    },
+  },
+  {
+    // E2E 腳本（Playwright connectOverCDP）在 Node 執行，不是瀏覽器程式碼：
+    // 補 Node 全域，否則 process 會被 no-undef 誤判（2026-09-27 CI 加入 eslint 時發現）。
+    files: ["e2e/**/*.mjs"],
+    languageOptions: {
+      sourceType: "module",
+      globals: { process: "readonly", console: "readonly" },
     },
   },
   {
@@ -150,7 +164,10 @@ export default tseslint.config(
       // 剩下的 no-redeclare / no-unused-expressions 是逐字搬移的 ES5 慣用寫法，
       // 留給型別化那一輪一起處理，所以維持 warn。
       "no-useless-assignment": "warn",
-      "@typescript-eslint/no-unused-vars": ["warn", { args: "none", varsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { args: "none", varsIgnorePattern: "^_" },
+      ],
     },
   },
   {

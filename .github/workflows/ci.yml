@@ -50,7 +50,7 @@ jobs:
       - name: Lint code for consistent style
         run: bin/rubocop -f github
 
-  # 2026-09-27：前端單元測試（vitest，app/frontend/**/*.test.ts）。只需要 Node：
+  # 2026-09-27：前端檢查（tsc、eslint、vitest）。只需要 Node：
   # vitest.config.ts 不載入 vite-plugin-ruby、環境是 happy-dom，不需要 Ruby、資料庫或前端建置。
   frontend:
     runs-on: ubuntu-latest
@@ -66,6 +66,14 @@ jobs:
 
       - name: Install JS dependencies
         run: npm ci
+
+      # tsconfig.json：strict、noUncheckedIndexedAccess，範圍 app/frontend 與 stories
+      - name: Type check (tsc --noEmit)
+        run: npm run typecheck
+
+      # 只有 error 會讓 job 失敗；目前 11 個 react-hooks/set-state-in-effect 為 warn
+      - name: Lint (eslint)
+        run: npm run lint
 
       - name: Run vitest
         run: npm test

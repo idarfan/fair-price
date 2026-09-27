@@ -13,6 +13,9 @@
 const STAGE_W = 960;
 const STAGE_H = 540;
 const MIN_SCALE_WARNING = 0.75;
+// 全形空格（U+3000）排版用。用 fromCodePoint 產生，原始碼裡不出現這個字元
+// （ESLint no-irregular-whitespace 會擋）。
+const FULLWIDTH_SPACE = String.fromCodePoint(0x3000);
 
 interface AuditHit {
   keyword: string;
@@ -165,7 +168,9 @@ function confirmAttribution(key: string): boolean {
   const blocked = auditHits(key).filter((h) => h.allowed_by === null);
   if (blocked.length === 0) return true;
 
-  const lines = blocked.map((h) => `　· ${h.keyword}`).join("\n");
+  const lines = blocked
+    .map((h) => `${FULLWIDTH_SPACE}· ${h.keyword}`)
+    .join("\n");
   return window.confirm(
     `${t("audit_title")}\n\n${t("audit_intro")}\n\n${lines}\n\n${t("audit_hint")}`,
   );
