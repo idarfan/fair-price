@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-09-27（日）— 修正：CI bundler-audit 因 rack-proxy 通報失敗
+
+- ruby-advisory-db 收錄 GHSA-42qh-8mx8-7wqm（rack-proxy HTTP response smuggling）後，0.x 被判為受影響（上游只確認 1.0.0–1.0.2，0.x「未經評估」）。
+- Gemfile 明確鎖 `rack-proxy ~> 1.0, >= 1.0.3`（已修補；2.x 有 breaking change，vite_ruby 只宣告支援 1.0），`bundle update --conservative` 連帶升 vite_ruby 3.9.3 → 3.11.0、vite_rails 3.0.20 → 3.11.1。
+- vite_ruby 3.11 要求 `vite-plugin-ruby ^5.2.0`，npm 端 5.1.3 → 5.2.4。
+- vite_rails 3.10 起 vite 標籤輸出 `crossorigin=""`（原為 `"anonymous"`，HTML 規範下同義）；`/leaps` HTML 回歸比對的正規化把兩種寫法視為相同，基準檔不動。
+
 ### 2026-09-27（日）— 新增：LEAPS 垂直價差「到期日預估股價」試算
 
 - 買入腳／賣出腳選單與結果卡之間新增置中的一列：輸入到期日預估股價，顯示每口到期損益與報酬率（賺綠、平黃、賠紅），成本用 mid 淨成本。

@@ -15,6 +15,9 @@ gem "kramdown",            "~> 2.4"
 gem "kramdown-parser-gfm", "~> 1.1"
 gem "tailwindcss-rails", "~> 4.0"
 gem "vite_rails",        "~> 3.0"
+# vite_ruby 的 dev server proxy。鎖在已修補 GHSA-42qh-8mx8-7wqm 的 1.x：
+# 0.x 未經評估（bundler-audit 判為受影響），2.x 有 breaking change 且 vite_ruby 只宣告支援 1.0。
+gem "rack-proxy",        "~> 1.0", ">= 1.0.3"
 
 # Auth: Google OAuth 登入 + TOTP 雙因子
 gem "omniauth-google-oauth2"

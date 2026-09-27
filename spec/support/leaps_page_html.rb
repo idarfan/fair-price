@@ -7,7 +7,7 @@
 # 每次請求都不同的值（CSRF token、CSP nonce）先移除；時間固定在 FROZEN_AT。
 # 資源檔名的雜湊（behaviors-XXXXXXXX.js）也正規化：任何前端修改都會改變它，
 # 與既有區塊的 HTML 無關（P3 在 behaviors 註冊表加一行，雜湊就變了）。基準檔保留
-# 原始擷取內容，比對時兩邊都套 strip_digests。
+# 原始擷取內容，比對時兩邊都套 canonical（strip_digests＋crossorigin 同義寫法）。
 module LeapsPageHtml
   FROZEN_AT = Time.zone.parse("2026-09-25 12:00:00")
   BASELINE_DIR = Rails.root.join("spec/fixtures/leaps_vertical_spread/server_baseline")
@@ -30,17 +30,23 @@ module LeapsPageHtml
     doc.css('input[name="authenticity_token"]').each { |n| n["value"] = "CSRF" }
     doc.css("[data-csrf]").each { |n| n["data-csrf"] = "CSRF" }
     doc.css("[nonce]").each { |n| n["nonce"] = "NONCE" }
-    strip_digests(doc.to_html)
+    canonical(doc.to_html)
   end
 
   # Vite 的雜湊是 base64url，可能含「-」（例如 behaviors-DaqtVP-V.js）。
   DIGEST = /-[A-Za-z0-9_-]{8}(?=\.(?:js|css)\b)/
 
+  # vite_rails 3.10 起 vite 標籤輸出 crossorigin=""（基準擷取時是 crossorigin="anonymous"）。
+  # 依 HTML 規範，空字串與 "anonymous" 同為 Anonymous 狀態，瀏覽器行為相同，只是寫法不同。
+  CROSSORIGIN_ANONYMOUS = 'crossorigin="anonymous"'
+
+  def canonical(html) = strip_digests(html).gsub(CROSSORIGIN_ANONYMOUS, 'crossorigin=""')
+
   def strip_digests(html) = html.gsub(DIGEST, "-DIGEST")
 
   def baseline_path(name) = BASELINE_DIR.join("#{name}.html")
 
-  def read_baseline(name) = strip_digests(File.read(baseline_path(name)))
+  def read_baseline(name) = canonical(File.read(baseline_path(name)))
 
   # 「有候選」情境：沿用 spec/requests/leaps_recommendations_spec.rb 的做法，stub 掉資料層。
   def stub_candidates!(example_group, symbol)
