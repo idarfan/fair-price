@@ -61,8 +61,6 @@ class LeapsVerticalSpreadService
       end
     end
 
-    def price_part(option) = price_segments(option).map(&:first).join
-
     def delta_part(delta) = delta.nil? ? "Δ —" : "Δ #{num(delta)}"
 
     def result(values)
