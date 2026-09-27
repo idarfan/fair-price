@@ -37,22 +37,31 @@ class LeapsVerticalSpreadService
     end
 
     # 2028-01-21 · 483 DTE｜100.00｜mid 53.50｜Δ 0.82
-    def long_label(option)
-      "#{option[:expiry][0, 10]} · #{option[:dte]} DTE｜#{num(option[:strike])}｜#{price_part(option)}｜#{delta_part(option[:delta])}"
-    end
+    def long_label(option) = long_segments(option).map(&:first).join
 
     # 210.00｜mid 11.20｜Δ 0.30 ／ 210.00｜last 11.20（盤後參考價）｜Δ 0.30 ／ 210.00｜無報價｜Δ 0.30
-    def short_label(option)
-      "#{num(option[:strike])}｜#{price_part(option)}｜#{delta_part(option[:delta])}"
+    def short_label(option) = short_segments(option).map(&:first).join
+
+    # 下拉選項分段上色用：[[文字, tone]]，tone 為 nil 的是分隔符號（顏色見 application.css 的 .vs-opt-*）。
+    def long_segments(option)
+      [ [ option[:expiry][0, 10], :date ], [ " · ", nil ], [ "#{option[:dte]} DTE", :dte ], [ "｜", nil ],
+        *short_segments(option) ]
     end
 
-    def price_part(option)
+    def short_segments(option)
+      [ [ num(option[:strike]), :strike ], [ "｜", nil ], *price_segments(option), [ "｜", nil ],
+        [ delta_part(option[:delta]), :delta ] ]
+    end
+
+    def price_segments(option)
       case option[:source]
-      when :mid  then "mid #{num(option[:price])}"
-      when :last then "last #{num(option[:price])}#{AFTER_HOURS_NOTE}"
-      else NO_QUOTE
+      when :mid  then [ [ "mid #{num(option[:price])}", :price ] ]
+      when :last then [ [ "last #{num(option[:price])}", :price ], [ AFTER_HOURS_NOTE, nil ] ]
+      else [ [ NO_QUOTE, nil ] ]
       end
     end
+
+    def price_part(option) = price_segments(option).map(&:first).join
 
     def delta_part(delta) = delta.nil? ? "Δ —" : "Δ #{num(delta)}"
 

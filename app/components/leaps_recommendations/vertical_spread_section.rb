@@ -113,14 +113,28 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
            class: "text-xs text-blue-600 hover:text-blue-800 underline underline-offset-2") { plain "為什麼建議 Δ 0.30？" }
   end
 
+  # vs-select 用 Chrome 的可自訂 select（appearance: base-select，樣式見 application.css），
+  # 選項內各段才能上色；<selectedcontent> 把選中項目的彩色內容複製到收合狀態的按鈕上。
+  # 不支援的瀏覽器會忽略 button 與 span，退回原生下拉、純文字顯示。
+  SELECTED_CONTENT = "<button><selectedcontent></selectedcontent></button>"
+
   def render_options(name, options, selected_value)
     label(class: "block") do
-      select(name: name, class: SELECT_CLASS) do
+      select(name: name, class: "#{SELECT_CLASS} vs-select") do
+        raw(safe(SELECTED_CONTENT))
         options.each do |o|
           value = yield(o)
-          option(value: value, selected: same_value?(value, selected_value), disabled: o[:disabled]) { plain o[:label] }
+          option(value: value, selected: same_value?(value, selected_value), disabled: o[:disabled]) do
+            render_segments(name == "expiry" ? Format.long_segments(o) : Format.short_segments(o))
+          end
         end
       end
+    end
+  end
+
+  def render_segments(segments)
+    segments.each do |text, tone|
+      tone ? span(class: "vs-opt-#{tone}") { plain text } : plain(text)
     end
   end
 

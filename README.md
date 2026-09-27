@@ -1,5 +1,13 @@
 # FairPrice
 
+### 2026-09-27（日）— 改善：LEAPS 垂直價差下拉選單分段上色、箭頭 22px
+
+- 買入腳／賣出腳兩個下拉改用 Chrome 可自訂 select（`appearance: base-select`），
+  日期（藍）、天數（紫）、履約價（深灰粗體）、mid 價格（橘）、Δ（桃紅）各自上色，收合與展開狀態都有效。
+- 下拉箭頭改成 22px SVG chevron（原本是瀏覽器內建箭頭，約 10px 寬），展開時旋轉 180°。
+- `LeapsVerticalSpreadService::Format` 新增 `long_segments`／`short_segments`，`long_label`／`short_label`
+  改由分段組出，純文字結果不變。不支援 base-select 的瀏覽器退回原生下拉、純文字。
+
 ### 2026-09-27（日）— 新增：CI 加入 rspec（test job）
 
 - `.github/workflows/ci.yml` 新增 `test` job：postgres:16 服務容器（CI 專用假帳密）、`TEST_DATABASE_URL` 指向它，

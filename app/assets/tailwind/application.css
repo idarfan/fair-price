@@ -281,6 +281,32 @@
 .driver-popover .driver-popover-description .vs-tone-breakeven,
 .driver-popover .driver-popover-description .vs-tone-loss { font-weight: 700; }
 .driver-popover .driver-popover-description .vs-tour-line + .vs-tour-line { margin-top: 8px; }
+/* 垂直價差兩個下拉：Chrome 可自訂 select（base-select），選項各段上色、下拉箭頭 22px。
+   不支援的瀏覽器忽略整段，退回原生下拉。 */
+.vs-select, .vs-select::picker(select) { appearance: base-select; }
+.vs-select { display: flex; align-items: center; }
+.vs-select > button { flex: 1; min-width: 0; text-align: start; }
+.vs-select::picker-icon {
+  content: ""; width: 22px; height: 22px; flex: none; color: #4b5563;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / 22px 22px no-repeat;
+  transition: rotate .15s;
+}
+.vs-select:open::picker-icon { rotate: 180deg; }
+.vs-select::picker(select) {
+  border: 1px solid #d1d5db; border-radius: 8px; background: #fff;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 4px 0; max-height: 360px;
+}
+.vs-select option { padding: 6px 12px; font-size: 14px; }
+.vs-select option::checkmark { display: none; }
+.vs-select option:hover, .vs-select option:focus-visible { background: #f3f4f6; }
+.vs-select option:checked { background: #eff6ff; }
+.vs-select option:disabled { opacity: .45; }
+.vs-opt-date   { color: #2563eb; }
+.vs-opt-dte    { color: #7c3aed; }
+.vs-opt-strike { color: #111827; font-weight: 600; }
+.vs-opt-price  { color: #ea580c; }
+.vs-opt-delta  { color: #db2777; }
 /* Price-In 逐步導覽一句一行（priceInTour.ts）。原本是 inline style，被頁面 CSP 擋下。 */
 .driver-popover .driver-popover-description .pi-tour-line { line-height: 1.6; }
 /* 全站導覽卡片可拖曳（app/frontend/behaviors/shared/driverDraggable.ts）：
