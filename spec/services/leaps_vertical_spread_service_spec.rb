@@ -165,13 +165,13 @@ RSpec.describe LeapsVerticalSpreadService do
   end
 
   describe "選項與預設值" do
-    let(:exp0) { "2027-10-15-m" }
-    let(:exp2) { "2029-01-19-m" }
+    let(:exp_near) { "2027-10-15-m" }
+    let(:exp_far) { "2029-01-19-m" }
     let(:multi) do
       fetch_result(139.54,
-        expiry(exp0, 385, [ quote(100, bid: 44, ask: 46, delta: 0.85), quote(150, bid: 9, ask: 11, delta: 0.45),
+        expiry(exp_near, 385, [ quote(100, bid: 44, ask: 46, delta: 0.85), quote(150, bid: 9, ask: 11, delta: 0.45),
                             quote(170, bid: 4, ask: 6, delta: 0.31), quote(190, bid: 2, ask: 3, delta: 0.2) ]),
-        expiry(exp2, 847, [ quote(100, bid: 54, ask: 56, delta: 0.8), quote(160, bid: 19, ask: 21, delta: 0.42),
+        expiry(exp_far, 847, [ quote(100, bid: 54, ask: 56, delta: 0.8), quote(160, bid: 19, ask: 21, delta: 0.42),
                             quote(200, bid: 11, ask: 13, delta: 0.29), quote(230, bid: 8, ask: 9, delta: 0.22) ]),
         expiry(exp1, 483, [ quote(100, bid: 48, ask: 50, delta: 0.82), quote(180, bid: 9, ask: 10, delta: 0.3) ]))
     end
@@ -180,7 +180,7 @@ RSpec.describe LeapsVerticalSpreadService do
       out = run(multi, long_strike: "100")
 
       expect(out[:long_options].map { |o| o[:strike] }).to all(eq(d(100)))
-      expect(out[:selected][:expiry]).to eq(exp2)
+      expect(out[:selected][:expiry]).to eq(exp_far)
       expect(out[:short_options].map { |o| o[:strike] }).to all(be > d("139.54"))
       expect(out[:selected][:short_strike]).to eq(d(200))
       expect(out[:result]).to be_present
@@ -188,20 +188,20 @@ RSpec.describe LeapsVerticalSpreadService do
 
     it "同履約價多個到期日：依 DTE 由近到遠；切換 expiry 後賣腳換成該到期日的 chain" do
       out = run(multi, long_strike: "100")
-      expect(out[:long_options].map { |o| o[:expiry] }).to eq([ exp0, exp1, exp2 ])
+      expect(out[:long_options].map { |o| o[:expiry] }).to eq([ exp_near, exp1, exp_far ])
       expect(out[:long_options].first[:label]).to eq("2027-10-15 · 385 DTE｜100.00｜mid 45.00｜Δ 0.85")
 
-      switched = run(multi, long_strike: "100", expiry: exp0)
+      switched = run(multi, long_strike: "100", expiry: exp_near)
       expect(switched[:short_options].map { |o| o[:strike] }).to eq([ d(150), d(170), d(190) ])
       expect(switched[:selected][:short_strike]).to eq(d(170))
     end
 
     it "買入腳預設優先取候選排行第 1 名（履約價等於 K_L）的到期日" do
-      snapshot = instance_double(LeapsOptionChainSnapshot, strike: d(100), expiration_date: Date.parse(exp0[0, 10]))
+      snapshot = instance_double(LeapsOptionChainSnapshot, strike: d(100), expiration_date: Date.parse(exp_near[0, 10]))
       allow(LeapsRankingService).to receive(:new).with("ORCL")
         .and_return(instance_double(LeapsRankingService, call: [ { snapshot: snapshot } ]))
 
-      expect(run(multi, long_strike: "100")[:selected][:expiry]).to eq(exp0)
+      expect(run(multi, long_strike: "100")[:selected][:expiry]).to eq(exp_near)
     end
 
     it "賣腳必須價外：K_L = 100、現價 139.54，chain 有 120、130、140、150 → 只有 140、150" do

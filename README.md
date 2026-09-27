@@ -1,5 +1,13 @@
 # FairPrice
 
+### 2026-09-27（日）— 修正：CI lint 自 9/12 起持續失敗
+
+- GitHub Actions `lint`（`bin/rubocop -f github`）因 3 個 spec 檔的 17 個 RSpec 風格 offenses 失敗，最近 6 次 push 全紅。
+- `LeapsChainFakeRunner` 移到 `spec/support/leaps_chain_fake_runner.rb`；`SidecarRunner` 的 describe 拆到
+  `spec/services/leaps_call_chain_fetcher/sidecar_runner_spec.rb`；`exp0`／`exp2` 改名 `exp_near`／`exp_far`；
+  POI spec 的 `Bar` 改用 `stub_const`。只動 spec，不動產品程式碼。
+- 驗證：`bin/rubocop` no offenses；rspec 1210 examples, 0 failures；配對審查 PASS。
+
 ### 2026-09-26（六）— 修正：Price-In 逐步導覽的 CSP 錯誤
 
 - `priceInTour.ts` 以 `<div style="line-height:1.6">` 包每一句，被頁面 CSP（`style-src` 不允許 inline style）擋下，

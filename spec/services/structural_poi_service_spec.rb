@@ -7,7 +7,8 @@ require "rails_helper"
 RSpec.describe StructuralPoiService do
   # 不落 DB：這支 service 只讀 bar 的屬性，用 Struct 當替身比建 264 筆記錄快得多，
   # 也讓每個案例的資料一眼看得完。
-  Bar = Struct.new(:bar_date, :open_price, :high_price, :low_price, :close_price, :volume)
+  # 以 stub_const 定義，避免洩漏成全域常數（RuboCop RSpec/LeakyConstantDeclaration）。
+  before { stub_const("Bar", Struct.new(:bar_date, :open_price, :high_price, :low_price, :close_price, :volume)) }
 
   # 平靜的墊底行情：把 ATR 撐起來，好讓後面刻意安排的位移根真的超過門檻。
   # 每根全距 1.0，所以 ATR ≈ 1.0，位移門檻 ≈ 1.5。
