@@ -50,6 +50,26 @@ jobs:
       - name: Lint code for consistent style
         run: bin/rubocop -f github
 
+  # 2026-09-27：前端單元測試（vitest，app/frontend/**/*.test.ts）。只需要 Node：
+  # vitest.config.ts 不載入 vite-plugin-ruby、環境是 happy-dom，不需要 Ruby、資料庫或前端建置。
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Run vitest
+        run: npm test
+
   # 2026-09-27：CI 原本不跑 rspec。這個 job 在 GitHub 的臨時機器上跑全套測試，
   # 資料庫是 job 內的 postgres 服務容器（帳密為 CI 專用假值），跑完即銷毀；
   # 不讀 .env／.env.test（gitignore，CI 上不存在），也不可能連到正式庫。

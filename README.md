@@ -1,5 +1,10 @@
 # FairPrice
 
+### 2026-09-27（日）— 新增：CI 加入 vitest（frontend job）
+
+- `.github/workflows/ci.yml` 新增 `frontend` job：setup-node 24（npm cache）→ `npm ci` → `npm test`（`vitest run`，`app/frontend/**/*.test.ts`）。
+- 只需要 Node：`vitest.config.ts` 不載入 vite-plugin-ruby、環境是 happy-dom，不需要 Ruby、資料庫或前端建置，與 rspec 的 `test` job 平行執行。
+
 ### 2026-09-27（日）— 改善：LEAPS 垂直價差配色重整（dataviz 驗證）；版本 v20260927
 
 - 原配色經 dataviz `validate_palette.js` 驗證失敗：日期藍 vs DTE 紫在色盲模擬下 ΔE 0.4；賺綠 3.06、兩平黃 2.94、賠紅 2.81、mid 橘 3.56 皆未達 WCAG 文字 4.5:1。
