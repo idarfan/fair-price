@@ -1,5 +1,10 @@
 # FairPrice
 
+### 2026-09-27（日）— 修正：CI 的 Node.js 20 棄用警告
+
+- `actions/setup-node@v4` → `@v7`（frontend、test job）、`actions/cache@v4` → `@v6`（lint job）。v4 的 `action.yml` 是 `runs.using: node20`，GitHub 已強制改用 Node 24 執行並發出警告；v7／v6 皆為 `node24`。
+- 對我們的用法沒有 breaking change：setup-node v5 的自動快取只在 `package.json` 有 `packageManager` 時啟用（我們沒有），v6 限 npm（我們明確寫 `cache: npm`），v7 為 ESM 遷移；cache v5／v6 只換執行環境與 ESM，`path`／`key`／`restore-keys` 不變。
+
 ### 2026-09-27（日）— 新增：CI 的 frontend job 加入 tsc 與 eslint
 
 - `frontend` job 在 vitest 之前新增 `npm run typecheck`（`tsc --noEmit`）與 `npm run lint`（`eslint .`）。
