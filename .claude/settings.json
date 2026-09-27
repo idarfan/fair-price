@@ -11,6 +11,17 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r \".tool_input.file_path // empty\"); case \"$f\" in /home/idarfan/fairprice-review/request-*.md) /home/idarfan/fairprice-review/bin/backup-reviews.sh || { echo \"審查紀錄備份失敗，詳見 ~/fairprice-review/backup-reviews.log\" >&2; exit 2; } ;; esac"
+          }
+        ]
+      }
     ]
   }
 }
