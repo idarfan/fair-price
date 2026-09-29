@@ -86,6 +86,11 @@ EXPIRATIONS_JS = """
 # Stage 1: underlying price (Angular rootScope → moneyness-median fallback)
 UNDERLYING_JS = """
 (() => {
+  // 頁首已渲染的即時報價（2026-09-29：angular $root 已失效、moneyness 反推落後即時價，
+  // SHOP 頁首 146.84 時反推只得 145.23）。讀不到才走下面原本的兩條路。
+  const header = document.querySelector('.pricechangerow .last-change');
+  const hv = header && parseFloat(header.textContent.replace(/[^0-9.]/g, ''));
+  if (hv > 0) return hv;
   try {
     const root = angular.element(
       document.querySelector('[ng-app]') || document.body

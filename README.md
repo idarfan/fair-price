@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-09-29（二）— 修正：LEAPS 爬蟲抓不到現價（SHOP 顯示 126.60）
+
+- 根因：`leaps_scraper.py` 的 `UNDERLYING_JS` 原本兩條路都失效——Barchart 頁面的 angular `$root` 已拿不到，moneyness 反推對 SHOP 回傳 null（且反推值本身落後即時價）。現價變成 null 後，頁面退回 9/10 的日線收盤 126.60。
+- 修正：先讀頁首已渲染的即時報價 `.pricechangerow .last-change`，讀不到才走原本的兩條路。
+- 實測：爬蟲 148.06 ＝ 同時間 Barchart 頁首 148.06；清掉 21:50 那批現價全空的 SHOP 快照後重新查詢，頁面 POI 現價 147.90。
+- 未處理（另一件事）：POI／52 週／當日區間的底層資料（VOLAP、日線）仍停在 9/10–9/11。
+
 ### 2026-09-27（日）— 修正：CI 的 Node.js 20 棄用警告
 
 - `actions/setup-node@v4` → `@v7`（frontend、test job）、`actions/cache@v4` → `@v6`（lint job）。v4 的 `action.yml` 是 `runs.using: node20`，GitHub 已強制改用 Node 24 執行並發出警告；v7／v6 皆為 `node24`。

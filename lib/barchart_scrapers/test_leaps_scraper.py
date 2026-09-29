@@ -599,5 +599,34 @@ class TestPickCandidatesMissingGreeks(unittest.TestCase):
         self.assertEqual(result, [7.0, 12.0])
 
 
+import shutil
+import subprocess
+
+
+@unittest.skipIf(shutil.which("node") is None, "需要 node 才能執行 UNDERLYING_JS")
+class TestUnderlyingJsHeader(unittest.TestCase):
+    """UNDERLYING_JS 先讀頁首即時報價（2026-09-29 SHOP：原本讀到 null，現價退回舊日線）。"""
+
+    def _run(self, header_text):
+        harness = (
+            "const angular = { element: () => ({ scope: () => undefined }) };\n"
+            "const document = { body: {}, querySelector: (s) => s === '.pricechangerow .last-change' && "
+            + json.dumps(header_text) + " !== null ? { textContent: " + json.dumps(header_text) + " } : null };\n"
+            "console.log(JSON.stringify(" + scraper.UNDERLYING_JS.strip() + "));\n"
+        )
+        out = subprocess.run(["node", "-e", harness], capture_output=True, text=True, timeout=30)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        return json.loads(out.stdout)
+
+    def test_reads_header_price(self):
+        self.assertEqual(self._run("146.84"), 146.84)
+
+    def test_header_with_thousands_separator(self):
+        self.assertEqual(self._run("1,234.56"), 1234.56)
+
+    def test_no_header_falls_back_to_null_when_nothing_else(self):
+        self.assertIsNone(self._run(None))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
