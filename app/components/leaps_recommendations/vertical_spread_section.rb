@@ -8,7 +8,9 @@
 # 這裡不做任何計算。CSP 不允許 inline style，一律用 class。
 class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
   TITLE = "LEAPS Vertical Spread 垂直價差"
-  NOTE = "需 Firstrade 選擇權 Level 3；請用價差單一次成交兩腳。最大獲利要到到期日才完整實現。"
+  # tasks/leaps-vertical-fix.md S4 第 3 點（固定文字）：Firstrade App 沒有組合單，補網頁版與單腳下單順序。
+  NOTE = "需 Firstrade 選擇權 Level 3。價差單請用 Firstrade 網頁版一次成交兩腳；若只能單腳下單：" \
+         "建倉先買入 LC 再賣出 SC，平倉先買回 SC 再賣出 LC，避免出現裸賣買權。最大獲利要到到期日才完整實現。"
   AFTER_HOURS_BADGE = "盤後參考價：以最後成交價計算，實際成交價可能不同"
   RESULT_ROWS = [
     [ :net_cost, "實付淨成本" ], [ :max_profit, "最大獲利" ], [ :breakeven, "損益兩平" ],
@@ -80,7 +82,7 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
     div(class: ERROR_CLASS) { plain error[:message] } if error
     render_flag_warnings(@outcome.dig(:result, :flags) || {})
     render_result(@outcome[:result]) if @outcome[:result]
-    p(class: "text-xs text-gray-500") { plain NOTE }
+    p(class: "text-xs text-gray-500", data_vs_note: "true") { plain NOTE }
   end
 
   # 讀取失敗／CDP 離線：紅字加重試，不顯示任何計算數字。
@@ -139,7 +141,14 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
         render_tour_button if tip_key == :short_leg && tips.any?
       end
       render_options(name, options, selected_value, &value_of)
+      render_delta_deviation if tip_key == :short_leg
     end
+  end
+
+  # S4 第 2 點：選中的賣出腳偏離建議 Δ 時，在選單下方提示（不強制）。
+  def render_delta_deviation
+    delta = @outcome.dig(:result, :delta_deviation)
+    p(class: "text-xs text-yellow-800", data_vs_delta_deviation: "true") { plain Format.delta_deviation(delta) } if delta
   end
 
   def render_tour_button

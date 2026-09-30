@@ -100,6 +100,48 @@ RSpec.describe "LEAPS 垂直價差卡片（S3）", type: :system do
       .to have_text("到期時若股價介於兩履約價之間，買入腳會自動履約、需付款買股；建議到期前平倉", exact: true)
   end
 
+  it "S4：底部說明文字完全等於規格固定文字" do
+    expect(find("[data-vs-note]")).to have_text(
+      "需 Firstrade 選擇權 Level 3。價差單請用 Firstrade 網頁版一次成交兩腳；若只能單腳下單：" \
+      "建倉先買入 LC 再賣出 SC，平倉先買回 SC 再賣出 LC，避免出現裸賣買權。最大獲利要到到期日才完整實現。",
+      exact: true
+    )
+  end
+
+  # S4：FX-1 加入 SC 候選 200（Δ 0.62）、260（Δ 0.31）、280（Δ 0.29）。
+  context "S4 Δ 偏離提示" do
+    let(:fx1_expiration) do
+      { expiry: "2028-12-15-m", dte: 807, fetched_at: Time.zone.parse("2026-09-30 14:00 UTC"),
+        calls: [ quote(100, bid: "74.95", ask: "79.05", delta: "0.84"), quote(200, bid: "40", ask: "42", delta: "0.62"),
+                 quote(240, bid: "29.70", ask: "33.70", delta: "0.5"), quote(260, bid: "27", ask: "29", delta: "0.31"),
+                 quote(280, bid: "24", ask: "26", delta: "0.29") ] }
+    end
+
+    def short_select = find("select[name='short_strike']")
+    def hint_selector = "[data-vs-delta-deviation]"
+
+    def choose_short(strike)
+      short_select.find("option[value='#{strike}']").select_option
+      expect(page).to have_css("select[name='short_strike'] option[value='#{strike}'][selected]")
+    end
+
+    it "預設選中 260（|Δ − 0.30| 與 280 同為 0.01，取較低履約價），不出現提示" do
+      expect(short_select.value).to eq("260.00")
+      expect(page).to have_no_css(hint_selector)
+    end
+
+    it "改選 240（Δ 0.50）→ 出現提示；改回 260 或 280 → 不出現" do
+      choose_short("240.00")
+      expect(page).to have_css(hint_selector, exact_text: "目前 Δ 0.50，偏離建議值 0.30")
+
+      choose_short("280.00")
+      expect(page).to have_no_css(hint_selector)
+
+      choose_short("260.00")
+      expect(page).to have_no_css(hint_selector)
+    end
+  end
+
   context "兩個 chain 的爬取時間相差 16 分鐘（注入 stale_quote）" do
     # 預設選有報價的最遠到期日（2029）；它比現價所屬的 FX-1 chain（14:00）早爬 16 分鐘。
     let(:expirations) do

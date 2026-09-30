@@ -7,6 +7,7 @@
 # chain 只透過 LeapsCallChainFetcher 取得。
 class LeapsVerticalSpreadService
   TARGET_DELTA = BigDecimal("0.30")          # 賣腳預設：delta 最接近 0.30
+  DELTA_TOLERANCE = BigDecimal("0.05")       # 選中的賣腳 |Δ − 0.30| 超過這個值就提示偏離（tasks/leaps-vertical-fix.md S4）
   NO_DELTA_SPOT_MULTIPLIER = BigDecimal("1.3") # 沒有 delta 時：履約價最接近 現價 × 1.3
   CONTRACT_MULTIPLIER = 100
   FETCH_FAILURE_CODES = %i[stalled fetch_failed session_expired].freeze
@@ -183,12 +184,18 @@ class LeapsVerticalSpreadService
                                       fee_per_leg: fee, dividend_annual: dividend_annual,
                                       spot_quoted_at: @spot_quoted_at, option_quoted_at: @quoted_at)
     {
-      contracts: contracts, fee_per_leg: fee,
+      contracts: contracts, fee_per_leg: fee, delta_deviation: delta_deviation(short),
       metrics: Metrics.dual(**legs, contracts: contracts, fee_per_leg: fee),
       ivs: close_out&.ivs, close_out_error: close_out ? close_out.error : CloseOut::IV_FAILURE,
       flags: close_out&.quote_flags || {},
       payoff_params: close_out && payoff_params(legs, long, contracts)
     }
+  end
+
+  # 選中的賣腳偏離建議 Δ 時回傳它的 Δ（S4 第 2 點）；沒有 Δ 資料時無從判斷，不提示。
+  def delta_deviation(short)
+    delta = short[:delta]
+    delta if delta && (delta - TARGET_DELTA).abs > DELTA_TOLERANCE
   end
 
   # 兩腳都有買賣價才帶 bid／ask（盤後以 last 為價的腳沒有保守基準，與 compute 的 d_nat 一致）。

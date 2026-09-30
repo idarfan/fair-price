@@ -76,6 +76,9 @@ class LeapsVerticalSpreadService
       }
     end
 
+    # S4 第 2 點：目前 Δ 0.50，偏離建議值 0.30
+    def delta_deviation(delta) = "目前 Δ #{num(delta)}，偏離建議值 #{num(TARGET_DELTA)}"
+
     # 反推 IV（小數）→ "IV 60.9%"（S3 第 6 點：小數一位）。
     def iv(value) = "IV #{ActiveSupport::NumberHelper.number_to_rounded(value * 100, precision: 1, round_mode: :half_up)}%"
 

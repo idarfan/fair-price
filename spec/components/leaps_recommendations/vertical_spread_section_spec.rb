@@ -304,6 +304,16 @@ RSpec.describe LeapsRecommendations::VerticalSpreadSection do
       expect(JSON.parse(card(html, :width)["data-tip-lines"])).not_to include(note)
     end
 
+    it "S4：賣出腳 Δ 0.50 → 選單下方提示偏離；沒有 Δ 資料 → 不提示" do
+      html = fx1_html
+      hint = html.at_css("[data-vs-tour-anchor='short_leg'] [data-vs-delta-deviation]")
+      expect(hint.text).to eq("目前 Δ 0.50，偏離建議值 0.30")
+
+      chain = fx1_chain.deep_dup
+      chain[:expirations][0][:calls][1] = quote(240, bid: "29.70", ask: "33.70")
+      expect(fx1_html(chain: chain).at_css("[data-vs-delta-deviation]")).to be_nil
+    end
+
     it "dividend_unknown：沒有股息資料 → 固定警示" do
       Fundamental.delete_all
       expect(fx1_html.at_css("[data-vs-flag='dividend_unknown']").text).to eq("未取得股息資料，以無股息計算")
