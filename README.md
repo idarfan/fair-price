@@ -1,5 +1,13 @@
 # FairPrice
 
+### 2026-09-30（三）— LEAPS 垂直價差修正規格 S3：卡片雙基準、平倉日、口數、IV 調整
+
+- 五張指標卡第二行顯示保守數字（LC ask − SC bid）；保守成交沒有獲利空間時，最大獲利卡加註提示。
+- 新增口數、平倉日、IV 調整三個輸入欄；結果列顯示「平倉理論損益（保守）｜到期損益」，並有常駐的到期前平倉提示。兩腳選單旁顯示反推出的 IV。
+- 卡片金額計入 `fee_per_contract_leg`（使用者裁示）；ⓘ 裡的算式維持每口、不含費用，末尾補一句說明。
+- 顯示 `stale_quote`、`dividend_unknown`、`early_assignment_risk` 三種警示。股息取自 `fundamentals.dividend_annual`。
+- 加上第一支 system spec（Capybara、headless Chrome）：`spec/system/leaps_vertical_spread_spec.rb`（審查 PASS）。
+
 ### 2026-09-30（三）— LEAPS 垂直價差修正規格 S2：指定日平倉理論損益
 
 - 新增 `LeapsVerticalSpreadService::BlackScholes`：含股息率 q 的歐式買權定價；以二分法反推 IV（容差 1e-6，範圍讀自 `config/leaps_vertical.yml`）。
