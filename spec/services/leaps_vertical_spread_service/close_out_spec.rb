@@ -68,6 +68,39 @@ RSpec.describe LeapsVerticalSpreadService::CloseOut do
     end
   end
 
+  # 2026-09-30 使用者裁示：與到期損益（Metrics）統一，到期作廢時不扣平倉費。
+  describe "費用（每口每腳 0.05）" do
+    def with_fee
+      described_class.new(
+        long: long_leg, short: short_leg, spot: BigDecimal("150"), quote_date: quote_date, expiry: expiry,
+        contracts: 1, fee_per_leg: BigDecimal("0.05"), rate: BigDecimal("0.04"), dividend_annual: BigDecimal("0")
+      )
+    end
+
+    def metrics_payoff(price)
+      LeapsVerticalSpreadService::Metrics.dual(long: long_leg, short: short_leg, contracts: 1,
+                                               fee_per_leg: BigDecimal("0.05"), target_price: BigDecimal(price.to_s))
+    end
+
+    it "到期作廢（S = 90）：只扣開倉費 −4,530.10，與到期損益相同" do
+      result = pnl(90, expiry, close_out: with_fee)
+      expect(result[:pnl]).to eq(BigDecimal("-4530.10"))
+      expect(result[:pnl]).to eq(metrics_payoff(90)[:mid][:payoff][:pnl])
+      expect(result[:pnl_conservative]).to eq(metrics_payoff(90)[:conservative][:payoff][:pnl])
+    end
+
+    it "到期價內（S = 200）：扣來回費用，與到期損益相同" do
+      result = pnl(200, expiry, close_out: with_fee)
+      expect(result[:pnl]).to eq(BigDecimal("5469.80"))
+      expect(result[:pnl]).to eq(metrics_payoff(200)[:mid][:payoff][:pnl])
+    end
+
+    it "到期前平倉（S = 90、報價日）：即使價值很低也要買賣兩腳，照扣來回費用" do
+      no_fee = pnl(90, quote_date)[:pnl]
+      expect(pnl(90, quote_date, close_out: with_fee)[:pnl]).to eq(no_fee - BigDecimal("0.20"))
+    end
+  end
+
   it "平倉日不在報價日～到期日之間 → 回傳錯誤" do
     expect(pnl(200, quote_date - 1)[:error]).to be_present
     expect(pnl(200, expiry + 1)[:error]).to be_present

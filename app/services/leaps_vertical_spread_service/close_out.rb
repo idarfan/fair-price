@@ -6,7 +6,7 @@ class LeapsVerticalSpreadService
   # 1. 以報價日兩腳 mid 反推 IV（BS 歐式、連續股息率 q = 年股息 ÷ S₀）。
   # 2. 平倉日 t、股價 S、IV 調整 ΔIV（百分點，兩腳同步）→ 兩腳價值 V；τ = (到期日 − t) ÷ 365，
   #    τ ≤ 0 不呼叫 BS，直接取內在價值 max(S − K, 0)。
-  # 3. 平倉損益 = (V(LC) − V(SC) − mid 淨成本) × 100 × 口數 − 來回費用；
+  # 3. 平倉損益 = (V(LC) − V(SC) − mid 淨成本) × 100 × 口數 − 來回費用（到期作廢時只扣開倉費，見 fee_for）；
   #    保守版以半價差 h 吃進兩腳：(V(LC) − h_LC) − (V(SC) + h_SC)，下限 0，對保守淨成本。
   class CloseOut
     DAYS_PER_YEAR = 365
@@ -41,8 +41,9 @@ class LeapsVerticalSpreadService
       long_v = leg_value(:long, price, date, iv_shift)
       short_v = leg_value(:short, price, date, iv_shift)
       value = long_v - short_v
-      { value: value, pnl: pnl(value, Metrics.leg_price(@legs[:long]) - Metrics.leg_price(@legs[:short])),
-        **conservative(long_v, short_v), flags: flags(price, date), ivs: @ivs }
+      fee = fee_for(date, value)
+      { value: value, pnl: pnl(value, Metrics.leg_price(@legs[:long]) - Metrics.leg_price(@legs[:short]), fee),
+        **conservative(long_v, short_v, fee), flags: flags(price, date), ivs: @ivs }
     end
 
     # 單腳在股價 S、日期 t 的理論價值（BigDecimal）。
@@ -88,19 +89,26 @@ class LeapsVerticalSpreadService
       sigma && BigDecimal(sigma.to_s)
     end
 
-    def conservative(long_v, short_v)
+    def conservative(long_v, short_v, fee)
       nat_cost = Metrics.conservative_cost(@legs[:long], @legs[:short])
       return { value_conservative: nil, pnl_conservative: nil } unless nat_cost
 
       value = [ (long_v - half_spread(:long)) - (short_v + half_spread(:short)), BigDecimal("0") ].max
-      { value_conservative: value, pnl_conservative: pnl(value, nat_cost) }
+      { value_conservative: value, pnl_conservative: pnl(value, nat_cost, fee) }
+    end
+
+    # 開倉費一定有；平倉費只有要買賣兩腳時才有。2026-09-30 使用者裁示（與 Metrics 的到期損益統一）：
+    # 平倉日就是到期日、價差價值為 0（兩腳都作廢）時不需平倉，不扣平倉費。到期前平倉一律照扣。
+    def fee_for(date, value)
+      open_fee = @fee_per_leg * 2 * @contracts
+      expired_worthless = !tau_from(date).positive? && value.zero?
+      expired_worthless ? open_fee : open_fee * 2
     end
 
     def half_spread(leg) = (@legs[leg][:ask] - @legs[leg][:bid]) / 2
 
-    def pnl(value, net_cost)
-      round_trip_fee = @fee_per_leg * 2 * @contracts * 2
-      (value - net_cost) * CONTRACT_MULTIPLIER * @contracts - round_trip_fee
+    def pnl(value, net_cost, fee)
+      (value - net_cost) * CONTRACT_MULTIPLIER * @contracts - fee
     end
 
     def flags(price, date)
