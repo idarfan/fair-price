@@ -1,5 +1,10 @@
 # FairPrice
 
+### 2026-09-30（三）— LEAPS 垂直價差修正規格 S2：指定日平倉理論損益
+
+- 新增 `LeapsVerticalSpreadService::BlackScholes`：含股息率 q 的歐式買權定價；以二分法反推 IV（容差 1e-6，範圍讀自 `config/leaps_vertical.yml`）。
+- 新增 `LeapsVerticalSpreadService::CloseOut`：以報價時兩腳 mid 反推 IV，計算指定平倉日、股價、IV 調整下的 mid／保守平倉損益。τ ≤ 0 時取內在價值；另回傳 `stale_quote`、`dividend_unknown`、`early_assignment_risk` 三個旗標（審查 PASS）。本階段還沒接進卡片，S3 才接上。
+
 ### 2026-09-30（三）— LEAPS 垂直價差修正規格 S1：中間價／保守價雙基準計算核心
 
 - 新增 `LeapsVerticalSpreadService::Metrics`：用同一組公式，分別以 mid 淨成本與保守淨成本（LC ask − SC bid）計算淨成本、最大獲利、最大虧損、兩平點、報酬比、到期損益；含口數、每口每腳費用、`no_profit_room` 旗標（審查 PASS）。

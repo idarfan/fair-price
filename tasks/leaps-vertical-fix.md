@@ -34,7 +34,7 @@
 |---|---|---|---|---|
 | S0 | 定位檔案、盤點資料欄位 | ✅ | ✅ PASS r1（verdict-leaps-vertical-fix-S0-r1.md） | 路徑表 7 個路徑 `test -f` 全部 exit 0（Barchart IV 填「無」）；`config/leaps_vertical.yml` 載入為 `{risk_free_rate: 0.04, fee_per_contract_leg: 0.02, iv_bounds: {min: 0.005, max: 10}}`；capybara 3.40.0／selenium-webdriver 4.41.0 安裝，暫存 smoke system spec 1 example 0 failures；`bin/rubocop` 0 offenses；`bundle exec rspec` 1236 passed（測試庫 fairprice_test） |
 | S1 | 計算核心：中間價／保守價雙基準 | ✅ | ✅ PASS r1（verdict-leaps-vertical-fix-S1-r1.md） | 新增 `LeapsVerticalSpreadService::Metrics`（dual／call）與 `::Config`；`rspec metrics_spec.rb config_spec.rb` 14 examples 0 failures exit 0（FX-1 雙基準六項指標、檢核式 1／2 口、no_profit_room、S1-b）；`bin/rubocop` 0 offenses；全套 1250 examples 0 failures。尚未接進 controller／畫面（S3 接上並交付 request spec） |
-| S2 | 計算核心：指定日平倉理論損益（BS） | ⬜ | ⬜ | |
+| S2 | 計算核心：指定日平倉理論損益（BS） | ✅ | ✅ PASS r1（verdict-leaps-vertical-fix-S2-r1.md） | 新增 `LeapsVerticalSpreadService::BlackScholes`、`::CloseOut`；`rspec close_out_spec.rb` 16 examples 0 failures exit 0；FX-1 反推 IV LC 60.92%／SC 57.29%，重新定價 77.0000／31.7000；S=200 報價日平倉 +1,578.20（保守 +768.20）、ΔIV+10 → +984.13、到期日 +5,470.00（保守 +4,660.00）；LC mid 50 → 「無法反推 IV，平倉損益不可用」；`bin/rubocop` 0 offenses；全套 1266 examples 0 failures。尚未接進 controller／畫面（S3） |
 | S3 | UI：雙基準顯示＋平倉日輸入 | ⬜ | ⬜ | |
 | S4 | UI：Δ 偏離提示＋底部下單說明 | ⬜ | ⬜ | |
 | S5 | 端到端驗收 | ⬜ | ⬜ | |
