@@ -1,0 +1,15 @@
+# LEAPS 垂直價差試算卡參數（tasks/leaps-vertical-fix.md 通則 8）。
+# 日後調參請改這裡，不要動程式碼。
+
+# Black-Scholes 無風險利率（年化、連續複利）
+risk_free_rate: 0.04
+
+# 每口每腳費用（美元）。Firstrade 零佣金，只代收 ORF：
+# 自 2026-07-01 起每口 $0.02、買賣雙向（Firstrade Help Center「regulatory transaction fees」）。
+# SEC fee 依賣出金額計（每口約幾美分），不在此計入。
+fee_per_contract_leg: 0.02
+
+# 反推 IV 的二分法搜尋範圍（小數，0.005 = 0.5%、10 = 1000%）
+iv_bounds:
+  min: 0.005
+  max: 10

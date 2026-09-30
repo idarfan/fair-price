@@ -72,6 +72,13 @@ group :development, :test do
   gem "database_consistency", require: false
 end
 
+group :test do
+  # System spec（tasks/leaps-vertical-fix.md S3／S4）：Rails 預設組合，driver 用 headless Chrome，
+  # 設定見 spec/support/system_specs.rb。
+  gem "capybara"
+  gem "selenium-webdriver"
+end
+
 group :development do
   gem "web-console"
   gem "lookbook", ">= 2.3"

@@ -1,5 +1,11 @@
 # FairPrice
 
+### 2026-09-30（三）— LEAPS 垂直價差修正規格 S0：盤點、參數設定檔、加裝 Capybara
+
+- 規格 `tasks/leaps-vertical-fix.md` S0 完成（審查 PASS）：填入路徑表與欄位盤點。Barchart IV 雖有爬到但沒有存下；沒有除息日資料，也沒有交易所報價時間。
+- 新增 `config/leaps_vertical.yml`：`risk_free_rate` 0.04、`fee_per_contract_leg` 0.02（Firstrade 代收 ORF，自 2026-07-01 起每口 $0.02）、`iv_bounds` 0.005～10。
+- `:test` group 加裝 `capybara`、`selenium-webdriver`，system spec 的 driver 用 headless Chrome（`spec/support/system_specs.rb`，使用者裁示）。
+
 ### 2026-09-30（三）— 版本 v20260930
 
 - 使用者版「版本更新說明」新增 `v20260930`（4 條）：LEAPS 現價改讀 Barchart 即時價、價格情境卡超過 1 小時自動重抓、重抓失敗的說明、缺現價的快照不再擋住重新查詢。
