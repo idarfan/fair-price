@@ -17,6 +17,14 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
   SELECT_CLASS = "w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white " \
                  "focus:outline-none focus:ring-2 focus:ring-blue-500"
   ERROR_CLASS = "px-4 py-3 rounded-lg text-sm bg-red-50 border border-red-300 text-red-800"
+  WARNING_CLASS = "px-3 py-2 rounded-lg text-xs bg-yellow-50 border border-yellow-300 text-yellow-800"
+  # 旗標 → 固定警示文字（tasks/leaps-vertical-fix.md S3 第 10 點）。early_assignment_risk 隨預估股價變動，
+  # 由 VerticalSpreadPayoff 片段顯示。
+  FLAG_WARNINGS = {
+    stale_quote: "股價與期權報價時間不一致，IV 與平倉損益可能失真",
+    dividend_unknown: "未取得股息資料，以無股息計算"
+  }.freeze
+  NO_PROFIT_ROOM = "保守成交下無獲利空間"
 
   # outcome：LeapsVerticalSpreadService#call 的回傳值。state：:loading／:cdp_offline 時不看 outcome。
   def initialize(symbol:, user_strike:, outcome: nil, state: nil, message: nil)
@@ -70,6 +78,7 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
 
     render_form if @outcome[:long_options].present?
     div(class: ERROR_CLASS) { plain error[:message] } if error
+    render_flag_warnings(@outcome.dig(:result, :flags) || {})
     render_result(@outcome[:result]) if @outcome[:result]
     p(class: "text-xs text-gray-500") { plain NOTE }
   end
@@ -93,7 +102,29 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
                     @outcome[:long_options], selected[:expiry]) { |o| o[:expiry] }
       render_select("short_strike", "賣出腳（同到期日、價外）", :short_leg,
                     @outcome[:short_options] || [], selected[:short_strike]) { |o| Format.num(o[:strike]) }
+      render_contracts_input
     end
+  end
+
+  # 口數（S3 第 8 點）：改完（change）由前端帶表單重取整個區塊，所有金額隨口數連動。
+  def render_contracts_input
+    div(class: "md:col-span-2 flex items-center gap-2 text-sm") do
+      label(for: "vs-contracts", class: "text-xs text-gray-500") { plain "口數" }
+      input(id: "vs-contracts", type: "number", name: "contracts", min: "1", step: "1", inputmode: "numeric",
+            value: @outcome[:contracts] || "1", class: "w-20 px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-right")
+    end
+  end
+
+  def render_flag_warnings(flags)
+    FLAG_WARNINGS.each do |flag, text|
+      div(class: WARNING_CLASS, data_vs_flag: flag.to_s) { plain text } if flags[flag]
+    end
+  end
+
+  # 兩腳選單旁的反推 IV 小字（S3 第 6 點）；反推失敗時不顯示。
+  def render_iv(tip_key)
+    iv = @outcome.dig(:result, :ivs, tip_key == :long_leg ? :long : :short)
+    span(class: "text-xs text-gray-500", data_vs_iv: "true") { plain Format.iv(iv) } if iv
   end
 
   # tooltip 掛在標題文字上而不是 select：tooltips.js 點擊 [data-tip-key] 會開聚光說明，
@@ -101,7 +132,10 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
   def render_select(name, label_text, tip_key, options, selected_value, &value_of)
     div(class: "space-y-1", data_vs_tour_anchor: tip_key.to_s) do
       div(class: "flex items-center justify-between gap-2") do
-        span(class: "text-xs text-gray-500 cursor-help", **tip_attrs(tip_key)) { plain "#{label_text} ⓘ" }
+        div(class: "flex items-center gap-2") do
+          span(class: "text-xs text-gray-500 cursor-help", **tip_attrs(tip_key)) { plain "#{label_text} ⓘ" }
+          render_iv(tip_key)
+        end
         render_tour_button if tip_key == :short_leg && tips.any?
       end
       render_options(name, options, selected_value, &value_of)
@@ -146,7 +180,7 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
 
   def render_result(result)
     display = result[:display]
-    render_payoff_row(result)
+    render LeapsRecommendations::VerticalSpreadPayoffRow.new(result: result)
     if result[:after_hours_legs].any?
       div(class: "px-3 py-2 rounded-lg text-xs bg-yellow-50 border border-yellow-300 text-yellow-800") do
         plain "#{AFTER_HOURS_BADGE}（#{result[:after_hours_legs].map { |leg| leg == :long ? '買入腳' : '賣出腳' }.join('、')}）"
@@ -158,29 +192,23 @@ class LeapsRecommendations::VerticalSpreadSection < ApplicationComponent
         div(class: "rounded-lg px-3 py-2 cursor-help vs-card #{CARD_TONE[key]}",
             data_vs_tour_anchor: key.to_s, **tip_attrs(key)) do
           p(class: "text-xs text-gray-600") { plain "#{label_text} ⓘ" }
-          p(class: "text-lg font-semibold #{VALUE_TONE.fetch(key, 'text-gray-800')}", data_vs_value: "true") { plain display[key] }
-          p(class: "text-xs text-gray-600") { plain "保守成交 #{display[:net_cost_nat]}" } if key == :net_cost
+          card = result[:cards][key]
+          p(class: "text-lg font-semibold #{VALUE_TONE.fetch(key, 'text-gray-800')}", data_vs_value: "true") do
+            plain card ? card[:mid] : display[key]
+          end
+          render_conservative_line(key, card, result) if card
         end
       end
     end
     render_tour_data
   end
 
-  # P7 到期日預估股價：置中一列，輸入後由前端取回 VerticalSpreadPayoff 片段填進結果欄。
-  # 兩腳參數取自 service 的計算結果（BigDecimal 原值，不經顯示四捨五入），前端原樣帶回伺服器。
-  PAYOFF_INPUT_CLASS = "w-36 px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-right " \
-                       "focus:outline-none focus:ring-2 focus:ring-blue-500"
+  # 五張卡的第二行（S3 第 1、2 點）：樣式沿用原本「保守成交」那一行。
+  def render_conservative_line(key, card, result)
+    p(class: "text-xs text-gray-600", data_vs_conservative: "true") { plain "保守 #{card[:conservative]}" }
+    return unless key == :max_profit && result.dig(:metrics, :no_profit_room)
 
-  def render_payoff_row(result)
-    div(class: "flex items-center justify-center gap-3 flex-wrap text-sm", data_vs_payoff: "true",
-        data_long_strike: @outcome[:long_strike].to_s("F"),
-        data_short_strike: @outcome.dig(:legs, :short, :strike).to_s("F"),
-        data_d_mid: result[:d_mid].to_s("F")) do
-      label(for: "vs-target-price", class: "text-gray-600") { plain "到期日預估股價" }
-      input(id: "vs-target-price", type: "number", min: "0", step: "0.01", inputmode: "decimal",
-            data_vs_target_price: "true", class: PAYOFF_INPUT_CLASS)
-      span(class: "text-gray-700", data_vs_payoff_result: "true", aria_live: "polite")
-    end
+    p(class: "text-xs vs-tone-loss", data_vs_no_profit_room: "true") { plain NO_PROFIT_ROOM }
   end
 
   # 賺錢綠、損益兩平黃、賠錢紅（色值定義在 application.css 的 .vs-tone-*，沿用 LEAPS 頁既有色票）。

@@ -17,7 +17,19 @@ class LeapsVerticalSpreadService
       ctx = context(outcome)
       return {} unless ctx
 
-      TIP_KEYS.index_with { |key| send(:"tip_#{key}", ctx) }
+      TIP_KEYS.index_with { |key| with_card_note(key, send(:"tip_#{key}", ctx), ctx[:result]) }
+    end
+
+    CARD_NOTE_KEYS = Format::CARD_KEYS
+
+    # 2026-09-30 使用者裁示（tasks/leaps-vertical-fix.md S3）：算式維持每口、不含費用，
+    # 五張指標卡的說明末尾補一句，交代卡片數字已乘口數並計入費用。
+    def with_card_note(key, tip, result)
+      return tip unless CARD_NOTE_KEYS.include?(key) && result[:contracts]
+
+      note = "以上算式以 1 口、不含費用計算；卡片數字為 #{result[:contracts]} 口，" \
+             "並計入每口每腳 #{Format.money(result[:fee_per_leg])} 的監管費。"
+      tip.merge(lines: tip[:lines] + [ note ])
     end
 
     def tour(outcome)

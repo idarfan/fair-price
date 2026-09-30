@@ -2,6 +2,14 @@
 
 class LeapsRecommendationsController < ApplicationController
   include CdpPrecheckable
+
+  # 垂直價差預估股價片段（payoff=1）接受的參數：LeapsVerticalSpreadService#payoff_params 加上三個輸入欄。
+  VERTICAL_SPREAD_PAYOFF_PARAMS = %i[
+    long_strike long_bid long_ask long_price short_strike short_bid short_ask short_price
+    spot quote_date expiry dividend_annual spot_quoted_at option_quoted_at contracts
+    target_price close_date iv_shift
+  ].freeze
+
   def index
     @symbol        = params[:symbol]&.upcase&.strip&.gsub(/[^A-Z0-9.\-]/, "")
     @candidates    = []
@@ -186,7 +194,8 @@ class LeapsRecommendationsController < ApplicationController
     end
 
     outcome = LeapsVerticalSpreadService.new(
-      ticker: symbol, long_strike: strike, expiry: params[:expiry], short_strike: params[:short_strike]
+      ticker: symbol, long_strike: strike, expiry: params[:expiry], short_strike: params[:short_strike],
+      contracts: params[:contracts]
     ).call
     render html: LeapsRecommendations::VerticalSpreadSection.new(**section, outcome: outcome).call.html_safe
   end
@@ -312,10 +321,7 @@ class LeapsRecommendationsController < ApplicationController
   # 到期日預估股價（leaps-call-spread-spec P7）也走 vertical_spread 同一條路由：
   # 只用頁面帶回的兩腳參數重算一個公式，不觸發抓取，所以不需要 CDP 預檢。
   def render_vertical_spread_payoff
-    result = LeapsVerticalSpreadService::Payoff.call(
-      long_strike: params[:long_strike], short_strike: params[:short_strike],
-      d_mid: params[:d_mid], target_price: params[:target_price]
-    )
+    result = LeapsVerticalSpreadService::Payoff.call(params.permit(*VERTICAL_SPREAD_PAYOFF_PARAMS).to_h.symbolize_keys)
     render html: LeapsRecommendations::VerticalSpreadPayoff.new(result: result).call.html_safe,
            status: result&.key?(:error) ? :unprocessable_entity : :ok
   end

@@ -3,10 +3,11 @@
  *
  * /leaps 只輸出外框（載入中狀態 + data-src），這裡負責：
  *  1. 依 data-src 取回 /leaps/vertical_spread 的 HTML 片段，整塊換掉外框內容。
- *  2. 選單變動就帶目前的值重新取片段；換買入腳到期日時不帶賣出腳，由伺服器重新套預設值。
+ *  2. 選單或口數欄變動就帶目前的值重新取片段；換買入腳到期日時不帶賣出腳，由伺服器重新套預設值。
  *  3. 「重試」重送上一次的請求。
  *  4. 載入期間每秒輪詢進度（同一條路由帶 progress=1），顯示「已完成 n / N 個到期日」與經過秒數。
- *  5. 到期日預估股價（P7）：停止輸入 300ms 後帶兩腳參數取 payoff=1 片段，只換結果欄。
+ *  5. 預估股價、平倉日、IV 調整（P7；tasks/leaps-vertical-fix.md S3）：停止輸入 300ms 後帶
+ *     data-vs-payoff-params 與三欄的值取 payoff=1 片段，只換結果欄。
  *
  * 版面、數字與公式都只在伺服器（Phlex + LeapsVerticalSpreadService）產生，這裡不做任何計算，
  * 也不組 markup——只搬運 HTML（同 leapsPriceContext.ts 的理由）。
@@ -18,7 +19,9 @@ const ENDPOINT = "/leaps/vertical_spread";
 const PROGRESS_INTERVAL_MS = 1000;
 const FAILURE_TEXT = "Barchart 讀取失敗：連線中斷，請重試。";
 const PAYOFF_DEBOUNCE_MS = 300;
-const PAYOFF_FAILURE_TEXT = "到期損益計算失敗：連線中斷，請再輸入一次。";
+const PAYOFF_FAILURE_TEXT = "損益計算失敗：連線中斷，請再輸入一次。";
+const PAYOFF_INPUTS =
+  "[data-vs-target-price], [data-vs-close-date], [data-vs-iv-shift]";
 
 export function init(root: HTMLElement): void {
   const initialSrc = root.dataset["src"];
@@ -53,29 +56,31 @@ export function init(root: HTMLElement): void {
       .finally(() => window.clearInterval(timer));
   };
 
+  // 選單與口數欄（tasks/leaps-vertical-fix.md S3 第 8 點）變動：帶整張表單重取區塊，所有金額隨之連動。
   root.addEventListener("change", (event) => {
-    const select = event.target;
-    if (!(select instanceof HTMLSelectElement)) return;
-    const form = select.closest<HTMLFormElement>("form[data-vs-form]");
+    const field = event.target;
+    const isFormField =
+      field instanceof HTMLSelectElement ||
+      (field instanceof HTMLInputElement && field.name === "contracts");
+    if (!isFormField) return;
+    const form = field.closest<HTMLFormElement>("form[data-vs-form]");
     if (!form) return;
 
     const params = new URLSearchParams();
     new FormData(form).forEach((value, key) => {
       if (typeof value === "string") params.set(key, value);
     });
-    if (select.name === "expiry") params.delete("short_strike");
+    if (field.name === "expiry") params.delete("short_strike");
     load(`${ENDPOINT}?${params.toString()}`);
   });
 
-  // 到期日預估股價（P7）：停止輸入後才向伺服器要結果片段，只換結果欄，不重載整個區塊。
+  // 預估股價、平倉日、IV 調整（P7；S3 第 3、5-b 點）：停止輸入後才向伺服器要結果片段，
+  // 只換結果欄，不重載整個區塊。
   let payoffTimer: number | undefined;
   let payoffSeq = 0;
   root.addEventListener("input", (event) => {
     const input = event.target;
-    if (
-      !(input instanceof HTMLInputElement) ||
-      !input.matches("[data-vs-target-price]")
-    )
+    if (!(input instanceof HTMLInputElement) || !input.matches(PAYOFF_INPUTS))
       return;
     window.clearTimeout(payoffTimer);
     payoffTimer = window.setTimeout(() => {
@@ -104,13 +109,14 @@ async function loadPayoff(
   const output = row?.querySelector<HTMLElement>("[data-vs-payoff-result]");
   if (!row || !output) return;
 
-  const params = new URLSearchParams({
-    payoff: "1",
-    long_strike: row.dataset["longStrike"] ?? "",
-    short_strike: row.dataset["shortStrike"] ?? "",
-    d_mid: row.dataset["dMid"] ?? "",
-    target_price: input.value.trim(),
-  });
+  // 兩腳參數是伺服器算好的原值（data-vs-payoff-params），原樣帶回；這裡不做任何計算。
+  const params = new URLSearchParams({ payoff: "1" });
+  Object.entries(payoffParams(row.dataset["vsPayoffParams"])).forEach(
+    ([key, value]) => params.set(key, value),
+  );
+  params.set("target_price", fieldValue(row, "[data-vs-target-price]"));
+  params.set("close_date", fieldValue(row, "[data-vs-close-date]"));
+  params.set("iv_shift", fieldValue(row, "[data-vs-iv-shift]"));
   try {
     const res = await fetch(`${ENDPOINT}?${params.toString()}`, {
       headers: { Accept: "text/html" },
@@ -120,6 +126,26 @@ async function loadPayoff(
   } catch {
     if (seq === latestSeq()) output.textContent = PAYOFF_FAILURE_TEXT;
   }
+}
+
+function payoffParams(raw: string | undefined): Record<string, string> {
+  if (!raw) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return {};
+  }
+  if (!isRecord(parsed)) return {};
+  return Object.fromEntries(
+    Object.entries(parsed).flatMap(([key, value]): [string, string][] =>
+      typeof value === "string" ? [[key, value]] : [],
+    ),
+  );
+}
+
+function fieldValue(row: HTMLElement, selector: string): string {
+  return row.querySelector<HTMLInputElement>(selector)?.value.trim() ?? "";
 }
 
 async function pollProgress(

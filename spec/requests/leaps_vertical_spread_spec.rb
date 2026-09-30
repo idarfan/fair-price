@@ -95,6 +95,28 @@ RSpec.describe "LEAPS 垂直價差", type: :request do
         .to start_with("150.00")
     end
 
+    it "4c. 口數 2（S3 第 8 點）：route → controller → service，卡片金額加倍，與 service 直接計算一致" do
+      expected = service_result(expiry: exp_near, short_strike: "150", contracts: "2")
+      get "/leaps/vertical_spread",
+          params: { symbol: "ORCL", user_strike: "100", expiry: exp_near, short_strike: "150", contracts: "2" }
+
+      html = Nokogiri::HTML(response.body)
+      net_cost = html.at_css("[data-vs-tour-anchor='net_cost'] [data-vs-value]").text
+      # 預設 100（mid 53）、150（mid 10）→ 淨成本 43 × 100 × 2
+      expect(net_cost).to eq("$8,600.00")
+      expect(net_cost).to eq(expected[:result][:cards][:net_cost][:mid])
+      expect(html.at_css("input[name='contracts']")["value"]).to eq("2")
+      expect(JSON.parse(html.at_css("[data-vs-payoff]")["data-vs-payoff-params"])).to include("contracts" => "2")
+    end
+
+    it "4d. 口數不是正整數：顯示錯誤，不顯示計算數字" do
+      stub_fetcher(chain)
+      get "/leaps/vertical_spread", params: { symbol: "ORCL", user_strike: "100", contracts: "-1" }
+
+      expect(response.body).to include("口數須為正整數：-1")
+      expect(response.body).not_to include("實付淨成本")
+    end
+
     it "5. 缺少 ticker 或價格：422" do
       get "/leaps/vertical_spread", params: { symbol: "ORCL" }
       expect(response).to have_http_status(:unprocessable_entity)
@@ -173,17 +195,45 @@ RSpec.describe "LEAPS 垂直價差", type: :request do
       Rails.cache = ActiveSupport::Cache::NullStore.new
     end
 
-    describe "payoff=1（P7 到期日預估股價）" do
-      let(:legs) { { payoff: "1", long_strike: "100.0", short_strike: "160.0", d_mid: "48.075" } }
+    describe "payoff=1（P7 到期日預估股價；tasks/leaps-vertical-fix.md S3）" do
+      # FX-1，費用 0
+      let(:legs) do
+        { payoff: "1", long_strike: "100.0", long_bid: "74.95", long_ask: "79.05", long_price: "77.0",
+          short_strike: "240.0", short_bid: "29.7", short_ask: "33.7", short_price: "31.7", spot: "150.0",
+          quote_date: "2026-09-30", expiry: "2028-12-15", dividend_annual: "0", contracts: "1" }
+      end
 
-      it "回傳到期損益片段，不觸發抓取、不做 CDP 預檢" do
+      before { allow(LeapsVerticalSpreadService::Config).to receive(:fee_per_contract_leg).and_return(BigDecimal("0")) }
+
+      it "回傳平倉＋到期損益片段，不觸發抓取、不做 CDP 預檢" do
         expect(LeapsCallChainFetcher).not_to receive(:new)
         expect_any_instance_of(LeapsRecommendationsController).not_to receive(:cdp_online?)
 
-        get "/leaps/vertical_spread", params: legs.merge(target_price: "155")
+        get "/leaps/vertical_spread", params: legs.merge(target_price: "200", close_date: "2028-12-15")
 
         expect(response).to have_http_status(:ok)
-        expect(Nokogiri::HTML.fragment(response.body).text).to eq("→ 到期損益 +$692.50（+14.40%）")
+        expect(Nokogiri::HTML.fragment(response.body).text)
+          .to eq("→ 平倉理論損益 +$5,470.00（保守 +$4,660.00）｜到期損益 +$5,470.00（+120.75%）")
+      end
+
+      it "平倉日 = 報價日：平倉損益低於到期損益 5,470" do
+        get "/leaps/vertical_spread", params: legs.merge(target_price: "200", close_date: "2026-09-30")
+
+        close = Nokogiri::HTML.fragment(response.body).at_css("[data-vs-close-pnl]").text
+        expect(close.delete("+$,").to_d).to be_between(0, 5470).exclusive
+      end
+
+      it "IV 調整超出範圍：422" do
+        get "/leaps/vertical_spread", params: legs.merge(target_price: "200", iv_shift: "60")
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it "不接受費率參數：費率一律讀設定檔" do
+        allow(LeapsVerticalSpreadService::Config).to receive(:fee_per_contract_leg).and_return(BigDecimal("0.05"))
+        get "/leaps/vertical_spread", params: legs.merge(target_price: "300", close_date: "2028-12-15", fee_per_leg: "0")
+
+        # 到期損益 = 9,470 − 開倉 0.10 − 平倉 0.10
+        expect(Nokogiri::HTML.fragment(response.body).at_css("[data-vs-expiry-pnl]").text).to eq("+$9,469.80")
       end
 
       it "預估價空白：200、空片段" do

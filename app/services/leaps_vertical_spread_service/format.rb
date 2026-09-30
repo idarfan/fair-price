@@ -75,5 +75,25 @@ class LeapsVerticalSpreadService
         risk_reward:  "1 : #{num(values[:risk_reward])}"
       }
     end
+
+    # 反推 IV（小數）→ "IV 60.9%"（S3 第 6 點：小數一位）。
+    def iv(value) = "IV #{ActiveSupport::NumberHelper.number_to_rounded(value * 100, precision: 1, round_mode: :half_up)}%"
+
+    CARD_KEYS = %i[net_cost max_profit max_loss breakeven risk_reward].freeze
+
+    # 五張指標卡的 mid／保守顯示值（tasks/leaps-vertical-fix.md S3 第 1 點），含口數與費用。
+    # 沒有保守基準（有一腳用盤後參考價）時每格都顯示 NO_NAT。
+    def cards(metrics)
+      mid, nat = metrics.values_at(:mid, :conservative)
+      CARD_KEYS.index_with do |key|
+        { mid: card_value(mid, key), conservative: nat ? card_value(nat, key) : NO_NAT }
+      end
+    end
+
+    def card_value(basis, key)
+      return money(basis[key]) unless key == :risk_reward
+
+      basis[:risk_reward].nil? ? "—" : "1 : #{num(basis[:risk_reward])}"
+    end
   end
 end

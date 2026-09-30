@@ -11,11 +11,14 @@ class LeapsVerticalSpreadService
   CONTRACT_MULTIPLIER = 100
   FETCH_FAILURE_CODES = %i[stalled fetch_failed session_expired].freeze
 
-  def initialize(ticker:, long_strike:, expiry: nil, short_strike: nil, fetcher: nil)
+  CONTRACTS_FORMAT = /\A[1-9]\d*\z/ # 口數：只接受正整數（tasks/leaps-vertical-fix.md S3 第 8 點）
+
+  def initialize(ticker:, long_strike:, expiry: nil, short_strike: nil, contracts: nil, fetcher: nil)
     @symbol = LeapsCallChainFetcher.normalize(ticker)
     @long_strike_raw = long_strike.to_s.strip
     @expiry = expiry.presence
     @short_strike_raw = short_strike.to_s.strip.presence
+    @contracts_raw = contracts.to_s.strip.presence || "1"
     @fetcher = fetcher
   end
 
@@ -41,7 +44,9 @@ class LeapsVerticalSpreadService
     long_options = long_options_for(chain, k_l)
     return failure(:strike_not_found, strike_not_found_message(chain, k_l)) if long_options.empty?
 
-    base = { symbol: @symbol, long_strike: k_l, spot: @spot, long_options: long_options }
+    # 現價取自最新一次爬取的 chain（LeapsCallChainFetcher#build_result），它的爬取時間用來判斷 stale_quote。
+    @spot_quoted_at = chain[:expirations].filter_map { |e| e[:fetched_at] }.max
+    base = { symbol: @symbol, long_strike: k_l, spot: @spot, long_options: long_options, contracts: @contracts_raw }
     if long_options.all? { |o| o[:disabled] }
       return base.merge(failure(:no_quote, "履約價 #{Format.num(k_l)} 在所有 LEAPS 到期日都沒有有效報價"))
     end
@@ -49,7 +54,8 @@ class LeapsVerticalSpreadService
     long = select_long(long_options, k_l)
     expiry_data = chain[:expirations].find { |e| e[:expiry] == long[:expiry] }
     short_options = short_options_for(expiry_data, k_l)
-    base = base.merge(short_options: short_options, quoted_at: expiry_data[:fetched_at])
+    @quoted_at = expiry_data[:fetched_at]
+    base = base.merge(short_options: short_options, quoted_at: @quoted_at)
     finish(base, long, expiry_data, short_options, k_l)
   end
 
@@ -62,6 +68,9 @@ class LeapsVerticalSpreadService
 
     invalid = invalid_reason(long, short, k_l)
     return base.merge(selected: selected).merge(failure(:invalid_combo, invalid)) if invalid
+    unless @contracts_raw.match?(CONTRACTS_FORMAT)
+      return base.merge(selected: selected).merge(failure(:invalid_input, "口數須為正整數：#{@contracts_raw}"))
+    end
 
     base.merge(selected: selected, result: compute(long, short, k_l), error: nil)
   end
@@ -159,8 +168,52 @@ class LeapsVerticalSpreadService
       breakeven: k_l + d_mid,
       risk_reward: (width - d_mid) / d_mid,
       after_hours_legs: [ (:long if long[:source] == :last), (:short if short[:source] == :last) ].compact
-    }.merge(explanation_values(long, short, k_l, d_mid))
-    values.merge(display: Format.result(values))
+    }.merge(explanation_values(long, short, k_l, d_mid)).merge(spread_values(long, short))
+    values.merge(display: Format.result(values), cards: Format.cards(values[:metrics]))
+  end
+
+  # ── S1～S3：雙基準指標（含口數、費用）與平倉計算需要的參數（tasks/leaps-vertical-fix.md）──
+  # display／既有欄位維持「每口、不含費用」，供 Explanation 的算式使用；卡片數字改用 metrics。
+  def spread_values(long, short)
+    contracts = @contracts_raw.to_i
+    fee = Config.fee_per_contract_leg
+    legs = { long: quote_leg(long), short: quote_leg(short) }
+    close_out = @spot && CloseOut.new(**legs, spot: @spot, quote_date: quote_date,
+                                      expiry: Date.parse(long[:expiry][0, 10]), contracts: contracts,
+                                      fee_per_leg: fee, dividend_annual: dividend_annual,
+                                      spot_quoted_at: @spot_quoted_at, option_quoted_at: @quoted_at)
+    {
+      contracts: contracts, fee_per_leg: fee,
+      metrics: Metrics.dual(**legs, contracts: contracts, fee_per_leg: fee),
+      ivs: close_out&.ivs, close_out_error: close_out ? close_out.error : CloseOut::IV_FAILURE,
+      flags: close_out&.quote_flags || {},
+      payoff_params: close_out && payoff_params(legs, long, contracts)
+    }
+  end
+
+  # 兩腳都有買賣價才帶 bid／ask（盤後以 last 為價的腳沒有保守基準，與 compute 的 d_nat 一致）。
+  def quote_leg(leg)
+    both_quoted = leg[:source] == :mid
+    { strike: leg[:strike], price: leg[:price], **(both_quoted ? leg.slice(:bid, :ask) : {}) }
+  end
+
+  # 報價日以美東日期計（到期日是美股日期）；T = 日曆天數 ÷ 365。
+  def quote_date = (@quoted_at || Time.current).in_time_zone("America/New_York").to_date
+
+  # 股息：fundamentals.dividend_annual（Barchart 前瞻年股息）；沒有資料 → nil → CloseOut 回 dividend_unknown。
+  def dividend_annual
+    @dividend_annual ||= [ Fundamental.where(symbol: @symbol).order(snapshot_date: :desc).pick(:dividend_annual) ]
+    @dividend_annual.first
+  end
+
+  # 預估股價片段（payoff=1）要帶回伺服器的參數：BigDecimal 原值，不經顯示四捨五入。
+  def payoff_params(legs, long, contracts)
+    leg_params = legs.flat_map { |side, leg| leg.map { |k, v| [ :"#{side}_#{k}", v.to_s("F") ] } }.to_h
+    leg_params.merge(
+      spot: @spot.to_s("F"), quote_date: quote_date.iso8601, expiry: long[:expiry][0, 10],
+      dividend_annual: dividend_annual&.to_s("F"), contracts: contracts.to_s,
+      spot_quoted_at: @spot_quoted_at&.utc&.iso8601, option_quoted_at: @quoted_at&.utc&.iso8601
+    ).compact
   end
 
   # P6 說明用的衍生值（公式只寫在這個 service）。

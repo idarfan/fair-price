@@ -113,7 +113,9 @@ RSpec.describe LeapsRecommendations::VerticalSpreadSection do
   it "盤後參考價：黃色標籤寫出是哪一腳，選項旁也標註" do
     html = render_html(outcome: outcome_for(chain, expiry: "2029-01-19-m", short_strike: "200"))
 
-    expect(html.at_css(".bg-yellow-50").text).to include(described_class::AFTER_HOURS_BADGE, "賣出腳")
+    # S3 起黃色框還有旗標警示（dividend_unknown 等），要找寫著盤後參考價的那一個
+    badge = html.css(".bg-yellow-50").map(&:text).find { |t| t.include?(described_class::AFTER_HOURS_BADGE) }
+    expect(badge).to include("賣出腳")
     expect(html.at_css('select[name="short_strike"] option[selected]').text).to include("（盤後參考價）")
   end
 
@@ -133,13 +135,15 @@ RSpec.describe LeapsRecommendations::VerticalSpreadSection do
 
     it "位在選單與結果卡之間、置中；帶著 service 算好的兩腳參數，結果一開始是空的" do
       row = html.at_css("[data-vs-payoff]")
-      expect(row["class"]).to include("justify-center")
+      expect(row.at_css("[data-vs-payoff-inputs]")["class"]).to include("justify-center")
       expect(row.at_css("input#vs-target-price")["value"]).to be_nil
       expect(row.at_css("label[for='vs-target-price']").text).to eq("到期日預估股價")
       expect(row.at_css("[data-vs-payoff-result]").text).to eq("")
-      # 預設：買入腳 100（mid 53）、賣出腳 170（mid 5）→ 淨成本 48
-      expect(row.to_h.slice("data-long-strike", "data-short-strike", "data-d-mid"))
-        .to eq("data-long-strike" => "100.0", "data-short-strike" => "170.0", "data-d-mid" => "48.0")
+      # 預設：買入腳 100（bid 52／ask 54）、賣出腳 170（bid 4／ask 6）
+      params = JSON.parse(row["data-vs-payoff-params"])
+      expect(params).to include("long_strike" => "100.0", "long_price" => "53.0", "long_bid" => "52.0",
+                                "long_ask" => "54.0", "short_strike" => "170.0", "short_price" => "5.0",
+                                "expiry" => "2027-10-15", "quote_date" => "2026-09-25", "contracts" => "1")
 
       body = html.to_html
       expect(body.index("data-vs-form")).to be < body.index("data-vs-payoff")
@@ -155,23 +159,154 @@ RSpec.describe LeapsRecommendations::VerticalSpreadSection do
   describe LeapsRecommendations::VerticalSpreadPayoff do
     def render_payoff(result) = Nokogiri::HTML.fragment(described_class.new(result: result).call)
 
-    it "獲利：綠字、正號、報酬率" do
-      frag = render_payoff(LeapsVerticalSpreadService::Payoff.call(long_strike: "100", short_strike: "160",
-                                                                   d_mid: "48.075", target_price: "155"))
-      expect(frag.text).to eq("→ 到期損益 +$692.50（+14.40%）")
-      expect(frag.at_css(".vs-tone-profit").text).to eq("+$692.50（+14.40%）")
+    # FX-1（費用 0）
+    let(:fx1) do
+      { long_strike: "100", long_bid: "74.95", long_ask: "79.05", long_price: "77", short_strike: "240",
+        short_bid: "29.7", short_ask: "33.7", short_price: "31.7", spot: "150", quote_date: "2026-09-30",
+        expiry: "2028-12-15", dividend_annual: "0", contracts: "1" }
+    end
+
+    before { allow(LeapsVerticalSpreadService::Config).to receive(:fee_per_contract_leg).and_return(BigDecimal("0")) }
+
+    def payoff_for(**params) = LeapsVerticalSpreadService::Payoff.call(fx1.merge(params))
+
+    it "S3 第 4 點格式：→ 平倉理論損益 +$X（保守 +$Y）｜到期損益 +$X（+Y%）" do
+      frag = render_payoff(payoff_for(target_price: "200", close_date: "2028-12-15"))
+      expect(frag.at_css("[data-vs-payoff-line]").text)
+        .to eq("→ 平倉理論損益 +$5,470.00（保守 +$4,660.00）｜到期損益 +$5,470.00（+120.75%）")
+      expect(frag.at_css("[data-vs-close-pnl]").text).to eq("+$5,470.00")
+      expect(frag.at_css("[data-vs-expiry-pnl]").text).to eq("+$5,470.00")
+      expect(frag.css(".vs-tone-profit").size).to eq(2)
     end
 
     it "虧損：紅字" do
-      frag = render_payoff(LeapsVerticalSpreadService::Payoff.call(long_strike: "100", short_strike: "160",
-                                                                   d_mid: "48.075", target_price: "90"))
-      expect(frag.at_css(".vs-tone-loss").text).to eq("-$4,807.50（-100.00%）")
+      frag = render_payoff(payoff_for(target_price: "90", close_date: "2028-12-15"))
+      expect(frag.at_css("[data-vs-expiry-pnl]").text).to eq("-$4,530.00")
+      expect(frag.at_css("[data-vs-expiry-pnl]")["class"]).to include("vs-tone-loss")
+    end
+
+    it "反推 IV 失敗：平倉部分顯示固定訊息，到期損益照常" do
+      frag = render_payoff(payoff_for(target_price: "200", long_bid: "49", long_ask: "51", long_price: "50"))
+      expect(frag.text).to start_with("→ 無法反推 IV，平倉損益不可用｜到期損益 ")
+    end
+
+    it "early_assignment_risk：顯示固定警示文字" do
+      frag = render_payoff(payoff_for(target_price: "250", dividend_annual: "1"))
+      expect(frag.text).to include("賣出腳為價內且標的有配息，到期前可能在除息前被提前指派")
+      expect(render_payoff(payoff_for(target_price: "200", dividend_annual: "1")).text).not_to include("提前指派")
     end
 
     it "nil：空白；錯誤：紅字訊息" do
       expect(render_payoff(nil).text).to eq("")
       expect(render_payoff({ error: "預估股價格式錯誤：abc" }).at_css(".vs-tone-loss").text)
         .to eq("預估股價格式錯誤：abc")
+    end
+  end
+
+  # tasks/leaps-vertical-fix.md S3：FX-1（LC 100 74.95／79.05、SC 240 29.70／33.70、S₀ 150、費用 0、q 0）。
+  describe "S3 雙基準與平倉日（FX-1）" do
+    let(:fx1_chain) do
+      { status: :ok, symbol: "ORCL", spot: d(150), expirations: [
+        { expiry: "2028-12-15-m", dte: 807, fetched_at: Time.zone.parse("2026-09-30 14:00 UTC"),
+          calls: [ quote(100, bid: "74.95", ask: "79.05", delta: 0.84), quote(240, bid: "29.70", ask: "33.70", delta: 0.5) ] }
+      ] }
+    end
+
+    before do
+      allow(LeapsVerticalSpreadService::Config).to receive(:fee_per_contract_leg).and_return(BigDecimal("0"))
+      Fundamental.create!(symbol: "ORCL", snapshot_date: Date.new(2026, 9, 30), fetched_at: Time.current, dividend_annual: 0)
+    end
+
+    def fx1_html(chain: fx1_chain, **params) = render_html(outcome: outcome_for(chain, **params))
+
+    def card(html, key) = html.at_css("[data-vs-tour-anchor='#{key}']")
+
+    it "五張卡同時出現 mid 與保守的數值（S1 表格）" do
+      html = fx1_html
+      {
+        net_cost: [ "$4,530.00", "保守 $4,935.00" ], max_profit: [ "$9,470.00", "保守 $9,065.00" ],
+        max_loss: [ "$4,530.00", "保守 $4,935.00" ], breakeven: [ "$145.30", "保守 $149.35" ],
+        risk_reward: [ "1 : 2.09", "保守 1 : 1.84" ]
+      }.each do |key, (mid, nat)|
+        expect(card(html, key).at_css("[data-vs-value]").text).to eq(mid)
+        expect(card(html, key).at_css("[data-vs-conservative]").text).to eq(nat)
+      end
+      expect(card(html, :width).at_css("[data-vs-conservative]")).to be_nil
+    end
+
+    it "口數 2 → 淨成本卡 $9,060.00，口數欄的值是 2" do
+      html = fx1_html(contracts: "2")
+      expect(card(html, :net_cost).at_css("[data-vs-value]").text).to eq("$9,060.00")
+      expect(html.at_css("input[name='contracts']")["value"]).to eq("2")
+    end
+
+    it "口數欄：預設 1、只接受正整數" do
+      input = fx1_html.at_css("form[data-vs-form] input[name='contracts']")
+      expect(input.to_h.slice("type", "min", "step", "value")).to eq("type" => "number", "min" => "1", "step" => "1", "value" => "1")
+      expect(fx1_html(contracts: "0").text).to include("口數須為正整數：0")
+    end
+
+    it "保守淨成本 ≥ 寬度：最大獲利卡顯示「保守成交下無獲利空間」" do
+      chain = fx1_chain.deep_dup
+      chain[:expirations][0][:calls] = [ quote(100, bid: "74.95", ask: "160", delta: 0.84),
+                                         quote(240, bid: "10", ask: "33.70", delta: 0.5) ]
+      html = fx1_html(chain: chain)
+      expect(card(html, :max_profit).text).to include("保守成交下無獲利空間")
+    end
+
+    it "平倉日欄：預設報價日，範圍報價日～到期日；IV 調整欄：預設 0，−50～+50" do
+      html = fx1_html
+      expect(html.at_css("input[data-vs-close-date]").to_h.slice("type", "value", "min", "max"))
+        .to eq("type" => "date", "value" => "2026-09-30", "min" => "2026-09-30", "max" => "2028-12-15")
+      expect(html.at_css("input[data-vs-iv-shift]").to_h.slice("type", "value", "min", "max"))
+        .to eq("type" => "number", "value" => "0", "min" => "-50", "max" => "50")
+    end
+
+    it "兩腳選單旁顯示反推的 IV" do
+      html = fx1_html
+      expect(html.at_css("[data-vs-tour-anchor='long_leg'] [data-vs-iv]").text).to eq("IV 60.9%")
+      expect(html.at_css("[data-vs-tour-anchor='short_leg'] [data-vs-iv]").text).to eq("IV 57.3%")
+    end
+
+    it "反推 IV 失敗：顯示固定訊息，其他欄位照常" do
+      chain = fx1_chain.deep_dup
+      chain[:expirations][0][:calls][0] = quote(100, bid: 49, ask: 51, delta: 0.84)
+      html = fx1_html(chain: chain)
+      expect(html.at_css("[data-vs-payoff]").text).to include("無法反推 IV，平倉損益不可用")
+      expect(card(html, :net_cost).at_css("[data-vs-value]").text).to eq("$1,830.00")
+    end
+
+    it "ⓘ 說明文字與常駐提示（固定文字）" do
+      html = fx1_html
+      expect(html.at_css("[data-vs-close-out-tip]")["title"]).to eq(
+        "理論值：以報價時兩腳中間價反推 IV，並假設各履約價的 IV 維持不變。股價大幅變動時 IV skew 會移動，" \
+        "實際平倉價可能與理論值有偏差，可用 IV 調整欄做情境測試。實際成交以買賣價為準。"
+      )
+      expect(html.at_css("[data-vs-expiry-hint]").text)
+        .to eq("到期時若股價介於兩履約價之間，買入腳會自動履約、需付款買股；建議到期前平倉")
+    end
+
+    it "stale_quote：兩個 chain 爬取時間差 16 分鐘 → 固定警示" do
+      chain = fx1_chain.deep_dup
+      chain[:expirations] << { expiry: "2029-01-19-m", dte: 842, fetched_at: Time.zone.parse("2026-09-30 14:16 UTC"),
+                               calls: [ quote(100, bid: 77, ask: 78, delta: 0.84) ] }
+      html = fx1_html(chain: chain, expiry: "2028-12-15-m")
+      expect(html.at_css("[data-vs-flag='stale_quote']").text).to eq("股價與期權報價時間不一致，IV 與平倉損益可能失真")
+      expect(fx1_html.at_css("[data-vs-flag]")).to be_nil
+    end
+
+    it "五張卡的 ⓘ 末尾補口數與費用說明（算式維持每口、不含費用）；價差寬度不補" do
+      html = fx1_html(contracts: "2")
+      note = "以上算式以 1 口、不含費用計算；卡片數字為 2 口，並計入每口每腳 $0.00 的監管費。"
+      %i[net_cost max_profit max_loss breakeven risk_reward].each do |key|
+        expect(JSON.parse(card(html, key)["data-tip-lines"]).last).to eq(note)
+      end
+      expect(JSON.parse(card(html, :width)["data-tip-lines"])).not_to include(note)
+    end
+
+    it "dividend_unknown：沒有股息資料 → 固定警示" do
+      Fundamental.delete_all
+      expect(fx1_html.at_css("[data-vs-flag='dividend_unknown']").text).to eq("未取得股息資料，以無股息計算")
     end
   end
 

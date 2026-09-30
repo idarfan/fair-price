@@ -55,6 +55,13 @@ class LeapsVerticalSpreadService
       BigDecimal(BlackScholes.call_price(spot: price, strike: strike, tau: tau, rate: @rate, q: @q, sigma: sigma).to_s)
     end
 
+    # 與股價、平倉日無關的旗標：區塊一載入就要顯示（S3 第 10 點）。
+    def quote_flags
+      spot_at, option_at = @quoted_at
+      { stale_quote: !!(spot_at && option_at && (spot_at - option_at).abs > STALE_AFTER),
+        dividend_unknown: @dividend_annual.nil? }
+    end
+
     private
 
     # T = 日曆天數 ÷ 365（通則 7）。
@@ -97,13 +104,10 @@ class LeapsVerticalSpreadService
     end
 
     def flags(price, date)
-      spot_at, option_at = @quoted_at
-      {
-        stale_quote: !!(spot_at && option_at && (spot_at - option_at).abs > STALE_AFTER),
-        dividend_unknown: @dividend_annual.nil?,
+      quote_flags.merge(
         early_assignment_risk: !!(@dividend_annual&.positive? && price > @legs[:short][:strike] &&
                                   (@expiry - date).to_i >= ASSIGNMENT_WINDOW_DAYS)
-      }
+      )
     end
   end
 end

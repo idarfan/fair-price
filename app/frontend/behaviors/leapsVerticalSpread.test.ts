@@ -17,6 +17,7 @@ const RESULT = `
       <input type="hidden" name="user_strike" value="100">
       <select name="expiry"><option value="2027-10-15-m">近</option><option value="2029-01-19-m" selected>遠</option></select>
       <select name="short_strike"><option value="200.00" selected>200</option><option value="230.00">230</option></select>
+      <input type="number" name="contracts" value="1">
     </form>
     <p>實付淨成本 $3,692.50</p>
   </div>`;
@@ -89,6 +90,26 @@ describe("leapsVerticalSpread", () => {
     expect(last.pathname).toBe("/leaps/vertical_spread");
     expect(last.searchParams.get("expiry")).toBe("2029-01-19-m");
     expect(last.searchParams.get("short_strike")).toBe("230.00");
+  });
+
+  it("改口數（S3 第 8 點）：帶整張表單重新取片段，兩腳選擇不變", async () => {
+    fetchMock.mockResolvedValue(htmlResponse(RESULT));
+    const root = mountFrame();
+    init(root);
+    await flush();
+
+    const contracts = root.querySelector<HTMLInputElement>(
+      'input[name="contracts"]',
+    );
+    if (!contracts) throw new Error("缺少口數欄");
+    contracts.value = "2";
+    contracts.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+
+    const last = new URL(fragmentCalls(fetchMock).at(-1) ?? "", "http://x");
+    expect(last.searchParams.get("contracts")).toBe("2");
+    expect(last.searchParams.get("expiry")).toBe("2029-01-19-m");
+    expect(last.searchParams.get("short_strike")).toBe("200.00");
   });
 
   it("換買入腳到期日：不帶賣出腳，讓伺服器重新套用預設值", async () => {
@@ -239,11 +260,20 @@ describe("leapsVerticalSpread", () => {
     });
   });
 
-  describe("到期日預估股價（P7）", () => {
+  describe("預估股價、平倉日、IV 調整（P7；S3）", () => {
+    const PARAMS = JSON.stringify({
+      long_strike: "100.0",
+      long_price: "77.0",
+      short_strike: "240.0",
+      short_price: "31.7",
+      contracts: "1",
+    }).replace(/"/g, "&quot;");
     const WITH_PAYOFF = `
       <div data-vs-section="true">
-        <div data-vs-payoff="true" data-long-strike="100.0" data-short-strike="160.0" data-d-mid="48.075">
+        <div data-vs-payoff="true" data-vs-payoff-params="${PARAMS}">
           <input id="vs-target-price" type="number" data-vs-target-price="true">
+          <input id="vs-close-date" type="date" value="2026-09-30" data-vs-close-date="true">
+          <input id="vs-iv-shift" type="number" value="0" data-vs-iv-shift="true">
           <span data-vs-payoff-result="true"></span>
         </div>
       </div>`;
@@ -286,12 +316,61 @@ describe("leapsVerticalSpread", () => {
       await flush();
 
       expect(payoffCalls()).toEqual([
-        "/leaps/vertical_spread?payoff=1&long_strike=100.0&short_strike=160.0&d_mid=48.075&target_price=155",
+        "/leaps/vertical_spread?payoff=1&long_strike=100.0&long_price=77.0&short_strike=240.0&short_price=31.7" +
+          "&contracts=1&target_price=155&close_date=2026-09-30&iv_shift=0",
       ]);
       expect(root.querySelector("[data-vs-payoff-result]")?.textContent).toBe(
         "→ 到期損益 +$692.50（+14.40%）",
       );
       expect(root.querySelector("[data-vs-target-price]")).not.toBeNull();
+    });
+
+    it("改平倉日或 IV 調整也會重取片段，帶上三欄目前的值", async () => {
+      const root = await mountWithPayoff();
+      fetchMock.mockResolvedValue(htmlResponse("結果"));
+      typePrice(root, "200");
+      await vi.advanceTimersByTimeAsync(300);
+
+      for (const [selector, value] of [
+        ["[data-vs-close-date]", "2028-12-15"],
+        ["[data-vs-iv-shift]", "10"],
+      ] as const) {
+        const input = root.querySelector<HTMLInputElement>(selector);
+        if (!input) throw new Error(`缺少 ${selector}`);
+        input.value = value;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        await vi.advanceTimersByTimeAsync(300);
+      }
+      await flush();
+
+      const last = new URL(payoffCalls().at(-1) ?? "", "http://x");
+      expect(payoffCalls()).toHaveLength(3);
+      expect(last.searchParams.get("target_price")).toBe("200");
+      expect(last.searchParams.get("close_date")).toBe("2028-12-15");
+      expect(last.searchParams.get("iv_shift")).toBe("10");
+    });
+
+    it("參數 JSON 壞掉：不丟例外，只帶三欄的值", async () => {
+      fetchMock.mockResolvedValueOnce(
+        htmlResponse(
+          WITH_PAYOFF.replace(
+            /data-vs-payoff-params="[^"]*"/,
+            'data-vs-payoff-params="{壞"',
+          ),
+        ),
+      );
+      const root = mountFrame();
+      init(root);
+      await flush();
+      fetchMock.mockResolvedValue(htmlResponse("錯誤"));
+
+      typePrice(root, "200");
+      await vi.advanceTimersByTimeAsync(300);
+      await flush();
+
+      expect(payoffCalls()).toEqual([
+        "/leaps/vertical_spread?payoff=1&target_price=200&close_date=2026-09-30&iv_shift=0",
+      ]);
     });
 
     it("較早送出的請求較晚回來時不覆蓋新結果", async () => {
