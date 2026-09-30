@@ -74,11 +74,58 @@ RSpec.describe "GET /leaps/price_context", type: :request do
     end
   end
 
+  # 2026-09-29 SHOP：VOLAP 停在 9/11、日線停在 9/10 仍一直回 ok，永遠不重抓。
+  # 超過 VolapSnapshot::FRESH_WINDOW（1 小時）要重抓，抓的期間先顯示舊資料。
+  context "有快照但已超過 1 小時" do
+    before do
+      create_volap.update!(scraped_at: 2.hours.ago)
+      create_bar
+      allow_any_instance_of(LeapsRecommendationsController).to receive(:cdp_online?).and_return(true)
+    end
+
+    it "排 job 重抓，回 pending 並附上舊資料的 HTML" do
+      expect(ScrapePriceContextJob).to receive(:perform_later).with(symbol).once
+
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      body = JSON.parse(response.body)
+      expect(body["status"]).to eq("pending")
+      expect(body["html"]).to include("data-pc-key=\"poi\"")
+    end
+
+    # 重抓結束但 VOLAP 沒更新（例如 Barchart 圖表 chart_not_ready）：job 回報 partial。
+    # 不能再回 pending 讓前端輪詢到逾時——停止、保留舊卡片並說明。
+    it "job 已結束但 VOLAP 沒更新（partial）：回 partial、附舊資料與說明，不再排 job" do
+      Rails.cache.write(ScrapePriceContextJob.cache_key(symbol), { status: "partial" })
+      expect(ScrapePriceContextJob).not_to receive(:perform_later)
+
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      body = JSON.parse(response.body)
+      expect(body["status"]).to eq("partial")
+      expect(body["message"]).to include("POI／52 週資料這次沒有更新成功")
+      expect(body["html"]).to include("data-pc-key=\"poi\"")
+    end
+  end
+
   # 2026-09-21 NOK：原本的 gate 是三塊 any?，日線一有值就回 ok、job 永遠排不出去，
   # POI 與 52 週停在「載入中…」直到天荒地老。舊測試只有「三塊全有」與「三塊全無」
   # 兩種情境，正好漏掉實務上最常見的這一種。
   context "只有日線、沒有 VOLAP（兩條供給線獨立）" do
     before { create_bar }
+
+    # 從沒抓到過 VOLAP 的標的：畫面上 POI／52 週是「暫無資料」，不能說「先顯示較早抓到的資料」。
+    it "job 已結束但 VOLAP 沒抓到（partial）：回 partial，說明暫時抓不到、會自動重試" do
+      Rails.cache.write(ScrapePriceContextJob.cache_key(symbol), { status: "partial" })
+      expect(ScrapePriceContextJob).not_to receive(:perform_later)
+
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      body = JSON.parse(response.body)
+      expect(body["status"]).to eq("partial")
+      expect(body["message"]).to include("POI／52 週資料暫時抓不到，約 1 小時後會自動重試")
+      expect(body["message"]).not_to include("較早抓到的資料")
+    end
 
     it "照樣排 job 去抓 VOLAP，不會因為日線有值就當成已經有資料" do
       allow_any_instance_of(LeapsRecommendationsController).to receive(:cdp_online?).and_return(true)

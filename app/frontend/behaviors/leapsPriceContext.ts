@@ -106,9 +106,11 @@ export function init(root: HTMLElement): void {
 
   bindCollapse(root);
 
-  // 伺服器端已經把資料畫出來了（有快照），不必再輪詢。
-  // 判斷依據是「有沒有量價長條」——空卡片只有標題與訊息。
-  if (root.querySelector("#leaps-poi-rows")) return;
+  // 伺服器端已經畫出卡片時仍要問一次端點：資料超過 1 小時由伺服器排重抓並回 pending，
+  // 前端繼續輪詢到拿到新資料為止；新鮮的話第一輪就回 ok。
+  // （2026-09-29 SHOP：原本「有量價長條就不輪詢」，舊資料一出現就永遠不會觸發重抓。）
+  // 已畫好的卡片先保留；pending 夾帶的 HTML 內容有變（例如日線先更新好）才換上。
+  let lastHtml: string | null = null;
 
   const userStrike = root.dataset["userStrike"] ?? "";
   const query = new URLSearchParams({ symbol });
@@ -116,8 +118,7 @@ export function init(root: HTMLElement): void {
 
   let attempts = 0;
   // pending 可能夾帶「已經有的那半邊」HTML。只套一次：每 5 秒重刷一次 DOM
-  // 會讓正在看當日區間的人一直閃，而內容其實沒變。
-  let partialShown = false;
+  // 會讓正在看當日區間的人一直閃，而內容其實沒變（lastHtml 宣告在上方，內容沒變就不重畫）。
 
   const poll = (): void => {
     attempts += 1;
@@ -158,9 +159,9 @@ export function init(root: HTMLElement): void {
         }
 
         // pending。夾帶的那半邊先畫出來，不要讓人對著三張空卡等 VOLAP。
-        if (html && !partialShown) {
+        if (html && html !== lastHtml) {
           applyHtml(root, html);
-          partialShown = true;
+          lastHtml = html;
         }
 
         if (attempts >= MAX_ATTEMPTS) {

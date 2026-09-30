@@ -9,11 +9,18 @@ RSpec.describe LeapsOptionChainSnapshot, type: :model do
     let(:base_attrs) do
       {
         symbol: "FWTEST", expiration_date: Date.new(2028, 1, 21),
-        strike: 10.0, option_type: "Call"
+        strike: 10.0, option_type: "Call", underlying_price: 12.0
       }
     end
 
     after { described_class.where(symbol: "FWTEST").delete_all }
+
+    # 2026-09-29 SHOP：現價全空的快照仍被當成新鮮，擋住一小時內的重新查詢。
+    it "excludes rows without underlying_price even inside the window" do
+      described_class.create!(base_attrs.merge(underlying_price: nil, scraped_at: 1.minute.ago))
+      expect(described_class.for_symbol("FWTEST").fresh.exists?).to be false
+      expect(described_class.fresh_for?("FWTEST")).to be false
+    end
 
     it "FRESH_WINDOW is 1 hour (single source of truth)" do
       expect(described_class::FRESH_WINDOW).to eq(1.hour)

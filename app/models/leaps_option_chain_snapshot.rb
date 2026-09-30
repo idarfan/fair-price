@@ -10,7 +10,8 @@ class LeapsOptionChainSnapshot < ApplicationRecord
 
   scope :for_symbol, ->(sym) { where(symbol: sym.upcase) }
   scope :calls,      -> { where(option_type: "Call") }
-  scope :fresh,      -> { where(scraped_at: FRESH_WINDOW.ago..) }
+  # 現價是空的快照不算新鮮（2026-09-29 SHOP：爬蟲讀不到現價，這批壞資料擋住了一小時內的重新查詢）。
+  scope :fresh,      -> { where(scraped_at: FRESH_WINDOW.ago..).where.not(underlying_price: nil) }
 
   # 時間新鮮不夠——還要確認目前存的候選是「為這次要求的中心履約價」爬的。
   # user_strike 每次查詢都可能不同（或這次留空要 auto 偵測、上次卻是手動指定），

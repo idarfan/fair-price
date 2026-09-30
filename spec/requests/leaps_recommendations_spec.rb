@@ -815,7 +815,7 @@ RSpec.describe "GET /leaps", type: :request do
     let(:base_attrs) do
       {
         symbol: symbol, expiration_date: Date.new(2028, 1, 21),
-        strike: 10.0, option_type: "Call"
+        strike: 10.0, option_type: "Call", underlying_price: 12.0 # 現價空的快照不算新鮮
       }
     end
 
@@ -885,7 +885,8 @@ RSpec.describe "GET /leaps", type: :request do
     def seed_snapshot(symbol, strike:, last_query_strike:)
       LeapsOptionChainSnapshot.create!(
         symbol: symbol, expiration_date: Date.new(2028, 1, 21),
-        strike: strike, option_type: "Call", scraped_at: Time.current
+        strike: strike, option_type: "Call", scraped_at: Time.current,
+        underlying_price: strike # 現價空的快照不算新鮮
       )
       StrikeChainSnapshot.upsert(
         { symbol: symbol, strikes: [ 7.0, 12.0 ], spot_price: strike,

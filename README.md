@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-09-29（二）— 修正：LEAPS 價格情境卡抓過一次就不再更新；空快照不算新鮮
+
+- `LeapsOptionChainSnapshot` 的 `fresh` 條件加上「現價不可為空」：現價全空的快照不再擋住一小時內的重新查詢。
+- `/leaps/price_context` 原本只要有 VOLAP 就回 ok（SHOP 停在 9/11）；改成 VOLAP 須在 `VolapSnapshot::FRESH_WINDOW`（15 分鐘 → **1 小時**，使用者裁示）內，太舊就排重抓，期間先顯示舊資料。
+- job 結束但 VOLAP 沒更新（例如 Barchart 圖表 `chart_not_ready`）時回 `partial` 停止輪詢並說明，不再輪詢到逾時。
+- 前端 `leapsPriceContext.ts`：已畫出卡片也會問一次端點；pending 夾帶的 HTML 內容有變才換上。
+
 ### 2026-09-29（二）— 修正：LEAPS 爬蟲抓不到現價（SHOP 顯示 126.60）
 
 - 根因：`leaps_scraper.py` 的 `UNDERLYING_JS` 原本兩條路都失效——Barchart 頁面的 angular `$root` 已拿不到，moneyness 反推對 SHOP 回傳 null（且反推值本身落後即時價）。現價變成 null 後，頁面退回 9/10 的日線收盤 126.60。

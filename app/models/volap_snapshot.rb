@@ -8,7 +8,8 @@ class VolapSnapshot < ApplicationRecord
   # 同一 symbol 在此時間窗內視為 fresh，直接讀 DB 不重新抓取。
   # 唯一權威定義：model 的 fresh scope、job 的 cache expires_in、controller 的
   # pending 判斷全部引用這裡，不各自寫一份（同 LeapsOptionChainSnapshot 的作法）。
-  FRESH_WINDOW = 15.minutes
+  # 2026-09-29 使用者裁示：超過 1 小時就重抓（原 15 分鐘，但 controller 從未檢查，實際上是抓過就永不更新）。
+  FRESH_WINDOW = 1.hour
 
   # 爬蟲固定切到的設定。VOLAP 是 periodType: "VisibleScreen"，
   # 不固定期間的話每次抓到的數字都不一樣，所以這兩個值寫死在這裡當唯一來源。

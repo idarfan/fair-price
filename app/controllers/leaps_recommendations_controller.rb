@@ -206,14 +206,17 @@ class LeapsRecommendationsController < ApplicationController
     # NOK 的 POI 與 52 週從上線起就停在「載入中…」，而且是**永遠不會結束**的載入
     # （前端收到 ok 就停止輪詢）。同 feedback_silent_guards_and_cache：
     # 一道過寬的防護把「沒抓到」偽裝成「不用抓」。
-    if payload.values_at(:poi, :week52).any?(&:present?)
+    # 2026-09-29 SHOP：原本只看「有沒有 VOLAP」，抓過一次就永遠回 ok（停在 9/11）。
+    # 必須同時在 FRESH_WINDOW（1 小時）內才算完成；太舊就重抓，期間先顯示舊資料。
+    if payload.values_at(:poi, :week52).any?(&:present?) && VolapSnapshot.fresh_for?(symbol)
       return render json: { status: "ok", html: render_price_context_html(payload) }
     end
 
-    # VOLAP 缺席。day_range 可能已經有了——那張卡要留著，不能被錯誤訊息洗掉。
-    has_partial = payload[:day_range].present?
+    # VOLAP 缺席或太舊。手上已有的卡片要留著，不能被錯誤訊息洗掉。
+    has_partial = payload.values_at(:poi, :week52, :day_range).any?(&:present?)
     job = Rails.cache.read(ScrapePriceContextJob.cache_key(symbol))
-    terminal = price_context_terminal_message(job&.dig(:status))
+    terminal = price_context_terminal_message(job&.dig(:status),
+                                              has_volap: payload.values_at(:poi, :week52).any?(&:present?))
 
     # 抓過而且確定拿不到：回終局訊息讓前端停止輪詢。
     return render json: price_context_stop(payload, has_partial, terminal) if terminal
@@ -255,7 +258,7 @@ class LeapsRecommendationsController < ApplicationController
   # VOLAP 抓取的終局狀態 → 使用者該做什麼。nil＝還在抓／還沒抓過，繼續等。
   # 三種原因的處置完全不同（去登入／去圖上掛指標／等一下再試），
   # 全部收斂成一句「抓取失敗」會讓人不知道該動哪裡。
-  def price_context_terminal_message(job_status)
+  def price_context_terminal_message(job_status, has_volap: false)
     case job_status
     when "barchart_session_expired"
       "請先登入 Barchart 後重新查詢。"
@@ -264,6 +267,15 @@ class LeapsRecommendationsController < ApplicationController
       "請加上後存成預設模板再重試。"
     when "error"
       "價格情境資料抓取失敗，請稍後重試。"
+    when "partial"
+      # 走到這裡代表 job 已結束但 VOLAP 沒更新（VOLAP 成功的話前面的 fresh gate 就回 ok 了）。
+      # 常見原因是 Barchart 圖表沒算完（chart_not_ready），1 小時後會再重試。
+      # 從沒抓到過 VOLAP 的標的畫面上是「暫無資料」，不能說「先顯示較早抓到的資料」。
+      if has_volap
+        "POI／52 週資料這次沒有更新成功，先顯示較早抓到的資料。"
+      else
+        "POI／52 週資料暫時抓不到，約 1 小時後會自動重試。"
+      end
     end
   end
 
