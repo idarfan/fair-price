@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-09-30（三）— 修正：rubyzip 路徑穿越漏洞（CVE-2026-85396）
+
+- CI `scan_ruby`（bundler-audit）擋下 rubyzip 3.2.2。這個 gem 是加裝 selenium-webdriver 時帶入的相依。以 `bundle update --conservative selenium-webdriver rubyzip` 升到 rubyzip 3.7.0、selenium-webdriver 4.49.0（僅 `:test` group），其他 gem 不變（審查 PASS）。
+
 ### 2026-09-30（三）— 修正：LEAPS 垂直價差到期作廢時不扣平倉費
 
 - `CloseOut` 的平倉損益改為：平倉日等於到期日、且價差價值為 0（兩腳都作廢）時，只扣開倉費，與到期損益（`Metrics`）一致（使用者裁示）。修改前股價 90 到期時兩者差 $0.04；到期前平倉照扣來回費用。規格 S2 第 2 點已同步補註（審查 PASS）。
