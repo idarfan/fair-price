@@ -1,5 +1,10 @@
 # FairPrice
 
+### 2026-09-30（三）— LEAPS 垂直價差修正規格 S1：中間價／保守價雙基準計算核心
+
+- 新增 `LeapsVerticalSpreadService::Metrics`：用同一組公式，分別以 mid 淨成本與保守淨成本（LC ask − SC bid）計算淨成本、最大獲利、最大虧損、兩平點、報酬比、到期損益；含口數、每口每腳費用、`no_profit_room` 旗標（審查 PASS）。
+- 新增 `LeapsVerticalSpreadService::Config` 讀取 `config/leaps_vertical.yml`。本階段還沒接進卡片，S3 才接上。
+
 ### 2026-09-30（三）— LEAPS 垂直價差修正規格 S0：盤點、參數設定檔、加裝 Capybara
 
 - 規格 `tasks/leaps-vertical-fix.md` S0 完成（審查 PASS）：填入路徑表與欄位盤點。Barchart IV 雖有爬到但沒有存下；沒有除息日資料，也沒有交易所報價時間。
