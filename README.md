@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-10-01（四）— CI：brakeman 拿掉 --ensure-latest
+
+- `bin/brakeman` 移除 Rails 預設的 `--ensure-latest`（使用者裁示）：brakeman 一出新版，CI `scan_ruby` 就會以 exit 5 失敗，跟程式有沒有安全問題無關。掃描規則不變，有警告仍會擋下；brakeman 升級改為手動 `bundle update brakeman`（審查 PASS）。
+
 ### 2026-10-01（四）— 修正：CI brakeman 不是最新版
 
 - brakeman 8.1.0 於 2026-10-01 發佈，`bin/brakeman` 帶有 `--ensure-latest`，8.0.6 會讓 CI `scan_ruby` 以 exit 5 失敗。以 `bundle update --conservative brakeman` 升到 8.1.0；掃描結果仍為 0 warnings（審查 PASS）。

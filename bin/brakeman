@@ -2,6 +2,7 @@
 require "rubygems"
 require "bundler/setup"
 
-ARGV.unshift("--ensure-latest")
+# 2026-10-01 使用者裁示：拿掉 Rails 預設的 --ensure-latest。brakeman 每出新版，它就讓 CI
+# scan_ruby 以 exit 5 失敗（例：8.1.0 發佈當天），跟程式有沒有問題無關。升級改為手動 bundle update。
 
 load Gem.bin_path("brakeman", "brakeman")
