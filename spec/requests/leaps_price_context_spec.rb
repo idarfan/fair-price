@@ -283,4 +283,45 @@ RSpec.describe "GET /leaps/price_context", type: :request do
       expect(Rails.cache.read(job_key)).to eq({ status: "error" })
     end
   end
+
+  # 2026-10-01 RKLB：job 先抓 VOLAP 再抓日線。VOLAP 一寫進 DB 就通過 fresh gate
+  # 回 ok，前端停止輪詢，日線約 14 秒後才寫進來，當日區間永遠停在「載入中…」。
+  describe "VOLAP 已新鮮時的 ok 判定" do
+    let(:job_key)  { ScrapePriceContextJob.cache_key(symbol) }
+    let(:lock_key) { "price_context_lock_#{symbol}" }
+
+    before { create_volap }
+
+    it "抓取還在跑（有鎖、沒有結果）：回 pending 並附上已有的卡片，不重複排程" do
+      Rails.cache.write(lock_key, true)
+      expect(ScrapePriceContextJob).not_to receive(:perform_later)
+
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      body = JSON.parse(response.body)
+      expect(body["status"]).to eq("pending")
+      expect(body["html"]).to include("data-pc-key=\"poi\"")
+    end
+
+    it "抓取跑完（有鎖、也有結果）：回 ok，三張卡都有" do
+      create_bar
+      Rails.cache.write(lock_key, true)
+      Rails.cache.write(job_key, { status: "success" })
+
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      body = JSON.parse(response.body)
+      expect(body["status"]).to eq("ok")
+      expect(body["html"]).to include("DAY&#39;S RANGE")
+    end
+
+    it "回 ok 但日線缺：空卡顯示「暫無資料」，不是永遠的「載入中…」" do
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      body = JSON.parse(response.body)
+      expect(body["status"]).to eq("ok")
+      expect(body["html"]).to include("暫無資料")
+      expect(body["html"]).not_to include("載入中")
+    end
+  end
 end

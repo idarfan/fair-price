@@ -218,13 +218,23 @@ class LeapsRecommendationsController < ApplicationController
     # 一道過寬的防護把「沒抓到」偽裝成「不用抓」。
     # 2026-09-29 SHOP：原本只看「有沒有 VOLAP」，抓過一次就永遠回 ok（停在 9/11）。
     # 必須同時在 FRESH_WINDOW（1 小時）內才算完成；太舊就重抓，期間先顯示舊資料。
+    has_partial = payload.values_at(:poi, :week52, :day_range).any?(&:present?)
+    job = Rails.cache.read(ScrapePriceContextJob.cache_key(symbol))
+
     if payload.values_at(:poi, :week52).any?(&:present?) && VolapSnapshot.fresh_for?(symbol)
-      return render json: { status: "ok", html: render_price_context_html(payload) }
+      # 2026-10-01 RKLB：job 先抓 VOLAP 再抓日線，VOLAP 一寫進來就會通過上面的
+      # fresh gate。這時回 ok 前端就停止輪詢，日線晚十幾秒進來也沒人看到。
+      # 有鎖沒結果＝job 還在跑，回 pending 讓前端繼續等。
+      if job.nil? && Rails.cache.exist?(price_context_lock_key(symbol))
+        return render json: { status: "pending", html: render_price_context_html(payload) }
+      end
+
+      # ok 是終局：這一輪不會再有東西進來，空卡不能再寫「載入中」。
+      return render json: { status: "ok",
+                            html:   render_price_context_html(payload, empty_message: "暫無資料") }
     end
 
     # VOLAP 缺席或太舊。手上已有的卡片要留著，不能被錯誤訊息洗掉。
-    has_partial = payload.values_at(:poi, :week52, :day_range).any?(&:present?)
-    job = Rails.cache.read(ScrapePriceContextJob.cache_key(symbol))
     terminal = price_context_terminal_message(job&.dig(:status),
                                               has_volap: payload.values_at(:poi, :week52).any?(&:present?))
 
