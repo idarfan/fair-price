@@ -4,7 +4,6 @@ require "rails_helper"
 
 RSpec.describe "GET /leaps", type: :request do
   let(:symbol) { "NOK" }
-
   let(:fake_candidates) do
     [
       {
@@ -19,7 +18,6 @@ RSpec.describe "GET /leaps", type: :request do
       }
     ]
   end
-
   let(:fake_flow_panel) do
     {
       status: :ok, date: Date.current,
@@ -27,7 +25,6 @@ RSpec.describe "GET /leaps", type: :request do
       large_orders: [], highlighted_trades: [], aggregate: {}
     }
   end
-
   # ── 1. 空白頁（未輸入 symbol） ────────────────────────────────────────────
 
   let(:stub_recommendation) do
@@ -52,6 +49,14 @@ RSpec.describe "GET /leaps", type: :request do
       time_value_pct: 0.098, bid_ask_spread_pct: 0.046
     }
   end
+
+  # 下面幾個 context 用 .with("leaps_last_errors_…") stub 特定 key；index 也會讀
+  # 價格情境 job 的結果（reset_unsuccessful_price_context），沒有預設值的話
+  # 那次讀取會被當成「非預期參數」直接炸掉。
+  before { allow(Rails.cache).to receive(:read).and_call_original }
+
+
+
 
   describe "without symbol" do
     it "returns 200 and renders the search form" do

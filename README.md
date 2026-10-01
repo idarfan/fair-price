@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-10-01（四）— 修正：LEAPS 價格情境抓取失敗後不會重抓
+
+- 抓取失敗的結果跟成功共用 1 小時快取，重新按「查詢」只會一直看到「價格情境資料抓取失敗，請稍後重試。」（RKLB 實際踩到）。現在每次載入 `/leaps?symbol=` 都會清掉上一輪沒有完整成功的結果與排程鎖，這次查詢一定重抓；成功的結果保留，輪詢端點不清（避免無限重抓）。實測 RKLB 查詢後重抓成功，三張卡都有資料（審查 PASS）。
+
 ### 2026-10-01（四）— CI：brakeman 拿掉 --ensure-latest
 
 - `bin/brakeman` 移除 Rails 預設的 `--ensure-latest`（使用者裁示）：brakeman 一出新版，CI `scan_ruby` 就會以 exit 5 失敗，跟程式有沒有安全問題無關。掃描規則不變，有警告仍會擋下；brakeman 升級改為手動 `bundle update brakeman`（審查 PASS）。

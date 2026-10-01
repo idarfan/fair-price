@@ -18,6 +18,7 @@ class LeapsRecommendationsController < ApplicationController
     @scrape_errors = []
 
     @user_strike = params[:user_strike].presence
+    reset_unsuccessful_price_context(@symbol) if @symbol.present?
 
     if @symbol.present?
       if fresh_data_exists?(@symbol, user_strike: @user_strike&.to_f)
@@ -258,6 +259,20 @@ class LeapsRecommendationsController < ApplicationController
     nil
   end
 
+  # 新的查詢一律重抓上一輪沒完整成功的價格情境。job 結果的快取只是讓那一輪
+  # 輪詢知道可以停了，失敗結果沒有保留的理由——2026-10-01 RKLB 兩支爬蟲都失敗後，
+  # 失敗結果跟成功共用 1 小時 TTL，重新查詢只會一直看到同一句「抓取失敗」。
+  # 只在這裡清、不在輪詢端點清：輪詢端點清的話每 5 秒就排一次新的抓取。
+  # 沒有結果代表 job 可能還在跑，排程鎖要留著擋重複排程。
+  def reset_unsuccessful_price_context(symbol)
+    job_key = ScrapePriceContextJob.cache_key(symbol)
+    status  = Rails.cache.read(job_key)&.dig(:status)
+    return if status.nil? || status == "success"
+
+    Rails.cache.delete(job_key)
+    Rails.cache.delete(price_context_lock_key(symbol))
+  end
+
   def render_price_context_html(payload, empty_message: nil)
     LeapsRecommendations::PriceContextComponent
       .new(**{ payload: payload, empty_message: empty_message }.compact)
@@ -300,8 +315,10 @@ class LeapsRecommendationsController < ApplicationController
       html:    render_price_context_html(payload, empty_message: "暫無資料") }
   end
 
+  def price_context_lock_key(symbol) = "price_context_lock_#{symbol}"
+
   def enqueue_price_context(symbol)
-    lock_key = "price_context_lock_#{symbol}"
+    lock_key = price_context_lock_key(symbol)
     return if Rails.cache.exist?(lock_key)
 
     Rails.cache.write(lock_key, true, expires_in: 3.minutes)

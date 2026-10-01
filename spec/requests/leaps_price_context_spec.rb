@@ -225,4 +225,62 @@ RSpec.describe "GET /leaps/price_context", type: :request do
       expect(message).to include("模板")
     end
   end
+
+  # 2026-10-01 RKLB：抓取失敗的結果跟成功共用 1 小時快取，使用者重新按「查詢」
+  # 也只會一直看到同一句「抓取失敗」，不會重抓。失敗結果沒有任何保留的理由——
+  # 它只是用來讓這一輪輪詢停下來。新的查詢（載入 /leaps?symbol=）就要清掉重抓。
+  describe "GET /leaps?symbol= 重置上一輪沒成功的抓取" do
+    let(:job_key)  { ScrapePriceContextJob.cache_key(symbol) }
+    let(:lock_key) { "price_context_lock_#{symbol}" }
+
+    %w[error partial barchart_session_expired no_volap_plot].each do |status|
+      it "上一輪是 #{status}：清掉結果與排程鎖" do
+        Rails.cache.write(job_key, { status: status })
+        Rails.cache.write(lock_key, true)
+
+        get "/leaps", params: { symbol: symbol }
+
+        expect(Rails.cache.read(job_key)).to be_nil
+        expect(Rails.cache.exist?(lock_key)).to be(false)
+      end
+    end
+
+    it "上一輪成功：結果保留，不重抓" do
+      Rails.cache.write(job_key, { status: "success" })
+
+      get "/leaps", params: { symbol: symbol }
+
+      expect(Rails.cache.read(job_key)).to eq({ status: "success" })
+    end
+
+    it "工作還在跑（沒有結果、只有鎖）：不動鎖，避免重複排程" do
+      Rails.cache.write(lock_key, true)
+
+      get "/leaps", params: { symbol: symbol }
+
+      expect(Rails.cache.exist?(lock_key)).to be(true)
+    end
+
+    it "清掉之後，下一次輪詢會重新排 job 而不是回舊的失敗訊息" do
+      allow_any_instance_of(LeapsRecommendationsController).to receive(:cdp_online?).and_return(true)
+      Rails.cache.write(job_key, { status: "error" })
+      Rails.cache.write(lock_key, true)
+
+      get "/leaps", params: { symbol: symbol }
+
+      expect(ScrapePriceContextJob).to receive(:perform_later).with(symbol).once
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      expect(JSON.parse(response.body)["status"]).to eq("pending")
+    end
+
+    it "輪詢端點本身不清失敗結果（否則會變成無限重抓）" do
+      Rails.cache.write(job_key, { status: "error" })
+
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      expect(JSON.parse(response.body)["status"]).to eq("error")
+      expect(Rails.cache.read(job_key)).to eq({ status: "error" })
+    end
+  end
 end
