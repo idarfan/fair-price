@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-10-01（四）— 修正：CI brakeman 不是最新版
+
+- brakeman 8.1.0 於 2026-10-01 發佈，`bin/brakeman` 帶有 `--ensure-latest`，8.0.6 會讓 CI `scan_ruby` 以 exit 5 失敗。以 `bundle update --conservative brakeman` 升到 8.1.0；掃描結果仍為 0 warnings（審查 PASS）。
+
 ### 2026-09-30（三）— 修正：rubyzip 路徑穿越漏洞（CVE-2026-85396）
 
 - CI `scan_ruby`（bundler-audit）擋下 rubyzip 3.2.2。這個 gem 是加裝 selenium-webdriver 時帶入的相依。以 `bundle update --conservative selenium-webdriver rubyzip` 升到 rubyzip 3.7.0、selenium-webdriver 4.49.0（僅 `:test` group），其他 gem 不變（審查 PASS）。
