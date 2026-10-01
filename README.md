@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-10-01（四）— 修正：價格情境爬蟲加外層逾時
+
+- `run_scraper` 原本以 `Open3.capture3` 執行爬蟲、沒有時限，CDP 無回應時會無限等，排程鎖跟著卡住。新增 `TimedCapture`（`popen3` + 獨立 process group，逾時先 TERM、寬限 5 秒後整組 KILL），只套在 volap（180 秒）與 price_history（120 秒），時限高於爬蟲內部等待總和；其他爬蟲不變。逾時回 `scraper_timeout` 並登記進 `FetchLog::STATUSES`。實測真的日線爬蟲 3 秒時限被砍且無殘留程序；COIN 正常抓取 25 秒完成未被誤砍（審查 PASS）。
+
 ### 2026-10-01（四）— 修正：LEAPS 價格情境排程鎖不再靠 3 分鐘 TTL
 
 - 排程鎖原本只靠 3 分鐘 TTL 消失，job 超過 3 分鐘就會被當成已結束而提早回 ok。現在 `ScrapePriceContextJob` 自己管鎖：job 結束（含出錯）時 `ensure` 解鎖，鎖的壽命＝job 的壽命；鎖記錄持有程序，server 重啟後舊鎖作廢，不會卡在 pending；TTL 改 30 分鐘只作清垃圾。重新查詢不再刪鎖（鎖在就是真的在跑）。實測 HOOD 鎖在抓取期間持續存在、結束即消失；PLTR 預置舊程序鎖仍正常排程（審查 PASS）。

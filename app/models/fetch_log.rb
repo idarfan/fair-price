@@ -14,7 +14,7 @@ class FetchLog < ApplicationRecord
     barchart_session_expired dom_structure_changed
     no_candidates invalid_strike
     charts_not_ready chart_not_ready no_volap_plot volap_timeout
-    symbol_not_found no_options
+    symbol_not_found no_options scraper_timeout
   ].freeze
 
   FETCH_TYPES = %w[

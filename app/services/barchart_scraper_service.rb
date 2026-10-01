@@ -19,6 +19,14 @@ class BarchartScraperService
   CDP_URL    = "http://127.0.0.1:9222"
   SCRIPT_DIR = Rails.root.join("lib", "barchart_scrapers")
 
+  # 外層逾時（秒）。只套在價格情境兩支：ScrapePriceContextJob 結束才會解排程鎖，
+  # 子程序卡死＝鎖卡住。數值要比爬蟲內部的等待上限長，正常路徑才不會被誤砍：
+  #   volap：prepare_page settle 8s + CHART_READY 45s + POLL 60s + 導航
+  #   price_history：POLL 45s + 導航
+  # 硬砍會跳過 volap 「切回原本期間」那一步，所以只能拿來收真正卡死的情況。
+  # 其他爬蟲不在表上＝不設時限（LEAPS 本來就要跑 3–5 分鐘）。
+  SCRAPER_TIMEOUTS_S = { "volap" => 180, "price_history" => 120 }.freeze
+
   def initialize(symbol)
     @symbol = symbol.upcase
     @today  = Date.today
@@ -508,10 +516,19 @@ class BarchartScraperService
 
   def run_scraper(type, extra_args: [])
     script = SCRIPT_DIR.join("#{type}_scraper.py")
-    stdout, stderr, status = Open3.capture3(
-      "python3", script.to_s, @symbol, *extra_args,
-      chdir: Rails.root.to_s
-    )
+    cmd    = [ "python3", script.to_s, @symbol, *extra_args ]
+
+    timeout_s = SCRAPER_TIMEOUTS_S[type]
+    if timeout_s
+      result = TimedCapture.call(*cmd, timeout: timeout_s, chdir: Rails.root.to_s)
+      if result.timed_out
+        Rails.logger.error("[#{type}] scraper timed out after #{timeout_s}s for #{@symbol}:\n#{result.stderr}")
+        return { status: "scraper_timeout", error: "爬蟲超過 #{timeout_s} 秒沒有結束，已強制中止" }
+      end
+      stdout, stderr, status = result.stdout, result.stderr, result.status
+    else
+      stdout, stderr, status = Open3.capture3(*cmd, chdir: Rails.root.to_s)
+    end
 
     if status.success?
       data = JSON.parse(stdout)
