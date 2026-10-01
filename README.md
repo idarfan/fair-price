@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-10-01（四）— 修正：Barchart 同時抓取上限明確化（並行化 S2）
+
+- 新增 `ScraperSlots`（`MAX_CONCURRENT = 3`），`run_scraper` 先取名額才啟動子程序，排隊時間不計入爬蟲時限。原本的上限是隱性的（Async 執行緒池 `max_threads = RAILS_MAX_THREADS`），調大 Puma 執行緒數就會連帶放大抓取數；現在兩者脫鉤。垂直價差 sidecar 跑在 HTTP 請求裡，依使用者裁示不算進上限。實測 5 個代號同時抓，Chrome 爬蟲分頁最多 3 個、後 2 個排隊後完成（審查 PASS）。
+
 ### 2026-10-01（四）— 修正：Barchart 爬蟲每次抓取開專屬分頁（並行化 S1）
 
 - `cdp_helper.get_target` 原本沒有完全符合的分頁時借用任一 Barchart 分頁再導航，不同代號同時抓取會搶同一分頁、互相導航走，導致失敗或讀到別的代號。改為每次開專屬 `about:blank` 分頁再走既有導航；正常結束、例外與 SIGTERM（轉 `SystemExit` 觸發 `atexit`）都會關掉；SIGKILL 留下的分頁靠 `tmp/cdp_tabs/` 追蹤檔，超過 30 分鐘於下次開分頁時清掉。實測 NOK／AMD／NVDA／TSLA 四支同時抓取各自正確、分頁 3→7→3；`TimedCapture` 砍掉後分頁亦關閉（審查 PASS）。

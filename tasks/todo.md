@@ -18,7 +18,7 @@
 | 階段 | 內容 | 審查 |
 |---|---|---|
 | S1 | 分頁隔離 | PASS（r1） |
-| S2 | 同時抓取上限＋排隊 | |
+| S2 | 同時抓取上限＋排隊 | PASS（r1） |
 | S3 | LEAPS 同代號共用 | |
 | S4 | 價格情境卡排隊狀態 | |
 
@@ -30,10 +30,14 @@
 - [x] 驗收：兩個不同代號同時抓取，各自資料正確；抓完 Chrome 不殘留分頁
 
 ### S2 同時抓取上限（`BarchartScraperService#run_scraper`）
-- [ ] 程序內計數號誌（上限 3，常數），所有爬蟲共用；超過的排隊
-- [ ] 排隊時間不計入 `TimedCapture` 的爬蟲時限（取得名額後才開始計時）
-- [ ] 前提同 `LOCK_MUTEX`：Puma single mode＋Async adapter（註解標明）
-- [ ] 驗收：同時發 5 個不同代號，Chrome 同一時間最多 3 個爬蟲分頁
+- [x] 程序內計數號誌（上限 3，常數），所有爬蟲共用；超過的排隊
+  （偏離一：垂直價差 sidecar 不算進上限——使用者裁示。它跑在 HTTP 請求裡，排隊會佔住 Puma 執行緒；
+   本身已被 Puma 3 個執行緒限制在最多 3 個。
+   偏離二：查證後上限原本就隱性存在——Async 執行緒池 max_threads＝RAILS_MAX_THREADS＝3。
+   本階段改為「明確化、與 Puma 執行緒數脫鉤」）
+- [x] 排隊時間不計入 `TimedCapture` 的爬蟲時限（取得名額後才開始計時）
+- [x] 前提同 `LOCK_MUTEX`：Puma single mode＋Async adapter（註解標明）
+- [x] 驗收：同時發 5 個不同代號，Chrome 同一時間最多 3 個爬蟲分頁
 
 ### S3 LEAPS 同代號共用（`LeapsRecommendationsController#analyze`）
 - [ ] 同代號＋同履約價已有進行中的 job → 回傳同一個 job_id，不再排第二個

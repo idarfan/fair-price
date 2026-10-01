@@ -28,7 +28,10 @@ RSpec.describe TimedCapture do
     pid_file = Rails.root.join("tmp", "timed_capture_child_#{SecureRandom.hex(4)}.pid")
     script = "pid = spawn('sleep', '30'); File.write('#{pid_file}', pid); sleep 30"
 
-    result = described_class.call(ruby, "-e", script, timeout: 2)
+    # 時限要夠讓子程序在高負載下也來得及衍生孫程序、寫出 pid 檔（原本 2 秒，
+    # 2026-10-01 load average 16 時子程序還沒寫檔就被砍，測試誤判失敗）。
+    # 這支測的是「整組砍掉」，不是速度。
+    result = described_class.call(ruby, "-e", script, timeout: 10)
 
     expect(result.timed_out).to be(true)
     grandchild = File.read(pid_file).to_i

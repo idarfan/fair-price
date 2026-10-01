@@ -514,21 +514,28 @@ class BarchartScraperService
     [ cli_expiry, strikes.to_s, volume_oi.to_s ]
   end
 
+  # 回 [stdout, stderr, status]；逾時時回 run_scraper 要直接往上傳的結果 Hash。
+  def execute_scraper(type, cmd)
+    timeout_s = SCRAPER_TIMEOUTS_S[type]
+    return Open3.capture3(*cmd, chdir: Rails.root.to_s) unless timeout_s
+
+    result = TimedCapture.call(*cmd, timeout: timeout_s, chdir: Rails.root.to_s)
+    if result.timed_out
+      Rails.logger.error("[#{type}] scraper timed out after #{timeout_s}s for #{@symbol}:\n#{result.stderr}")
+      return { status: "scraper_timeout", error: "爬蟲超過 #{timeout_s} 秒沒有結束，已強制中止" }
+    end
+    [ result.stdout, result.stderr, result.status ]
+  end
+
   def run_scraper(type, extra_args: [])
     script = SCRIPT_DIR.join("#{type}_scraper.py")
     cmd    = [ "python3", script.to_s, @symbol, *extra_args ]
 
-    timeout_s = SCRAPER_TIMEOUTS_S[type]
-    if timeout_s
-      result = TimedCapture.call(*cmd, timeout: timeout_s, chdir: Rails.root.to_s)
-      if result.timed_out
-        Rails.logger.error("[#{type}] scraper timed out after #{timeout_s}s for #{@symbol}:\n#{result.stderr}")
-        return { status: "scraper_timeout", error: "爬蟲超過 #{timeout_s} 秒沒有結束，已強制中止" }
-      end
-      stdout, stderr, status = result.stdout, result.stderr, result.status
-    else
-      stdout, stderr, status = Open3.capture3(*cmd, chdir: Rails.root.to_s)
-    end
+    # 先拿全站抓取名額再啟動子程序：排隊時間不算進爬蟲時限。
+    executed = ScraperSlots.with_slot { execute_scraper(type, cmd) }
+    return executed if executed.is_a?(Hash)
+
+    stdout, stderr, status = executed
 
     if status.success?
       data = JSON.parse(stdout)

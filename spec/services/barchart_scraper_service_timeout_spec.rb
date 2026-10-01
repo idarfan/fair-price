@@ -36,6 +36,32 @@ RSpec.describe BarchartScraperService, "#run_scraper" do
     end
   end
 
+  it "每次執行都先取得全站抓取名額（有時限與沒時限的爬蟲都一樣）" do
+    allow(TimedCapture).to receive(:call).and_return(ok_result('{"status":"success"}'))
+    allow(Open3).to receive(:capture3)
+      .and_return([ '{"status":"success"}', "", instance_double(Process::Status, success?: true) ])
+    expect(ScraperSlots).to receive(:with_slot).twice.and_call_original
+
+    service.send(:run_scraper, "volap")
+    service.send(:run_scraper, "leaps")
+  end
+
+  it "排隊等名額的時間不算進爬蟲時限：拿到名額之後才開始執行子程序" do
+    order = []
+    allow(ScraperSlots).to receive(:with_slot) do |&blk|
+      order << :slot_acquired
+      blk.call
+    end
+    allow(TimedCapture).to receive(:call) do
+      order << :subprocess_started
+      ok_result('{"status":"success"}')
+    end
+
+    service.send(:run_scraper, "volap")
+
+    expect(order).to eq(%i[slot_acquired subprocess_started])
+  end
+
   it "時限比爬蟲內部的等待上限長，正常路徑不會被誤砍" do
     expect(described_class::SCRAPER_TIMEOUTS_S.fetch("volap")).to be >= 8 + 45 + 60 + 30
     expect(described_class::SCRAPER_TIMEOUTS_S.fetch("price_history")).to be >= 45 + 30
