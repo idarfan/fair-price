@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-10-01（四）— 修正：價格情境前端輪詢上限與 job 最長時間同源
+
+- `leapsPriceContext.ts` 原本寫死 24 次 × 5 秒＝2 分鐘，job 最壞要跑到兩支爬蟲各自逾時加寬限期，前端會先顯示「逾時」而 job 仍在跑。新增 `ScrapePriceContextJob.poll_budget_s`（180＋120＋2×5＋60＝370 秒），由頁面 `data-poll-timeout-ms` 帶給前端；缺漏或不合法時退回 2 分鐘。HTML 回歸基準（`LeapsPageHtml.normalize`）比照既有慣例遮蔽此新屬性。實測 MSTR 頁面值 370000、載入新 chunk、24 秒三張卡齊全（審查 PASS）。
+
 ### 2026-10-01（四）— 修正：價格情境爬蟲加外層逾時
 
 - `run_scraper` 原本以 `Open3.capture3` 執行爬蟲、沒有時限，CDP 無回應時會無限等，排程鎖跟著卡住。新增 `TimedCapture`（`popen3` + 獨立 process group，逾時先 TERM、寬限 5 秒後整組 KILL），只套在 volap（180 秒）與 price_history（120 秒），時限高於爬蟲內部等待總和；其他爬蟲不變。逾時回 `scraper_timeout` 並登記進 `FetchLog::STATUSES`。實測真的日線爬蟲 3 秒時限被砍且無殘留程序；COIN 正常抓取 25 秒完成未被誤砍（審查 PASS）。

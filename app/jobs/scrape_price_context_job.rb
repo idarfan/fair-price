@@ -19,6 +19,16 @@ class ScrapePriceContextJob < ApplicationJob
   LOCK_TTL   = 30.minutes
   LOCK_OWNER = "#{Process.pid}-#{SecureRandom.hex(4)}".freeze
 
+  # 前端輪詢最多等多久（秒），由頁面 data-poll-timeout-ms 帶給 leapsPriceContext.ts。
+  # 跟 job 的最長時間同一個來源：兩支爬蟲各自跑滿外層逾時、各自再等砍程序的寬限期。
+  # 加 60 秒給排程延遲與 CDP 預檢，前端不會比 job 先放棄。
+  POLL_BUDGET_MARGIN_S = 60
+
+  def self.poll_budget_s
+    BarchartScraperService::SCRAPER_TIMEOUTS_S.values_at("volap", "price_history").sum +
+      (2 * TimedCapture::DEFAULT_KILL_GRACE_S) + POLL_BUDGET_MARGIN_S
+  end
+
   def self.cache_key(symbol) = "price_context_job_#{symbol.to_s.upcase}"
   def self.lock_key(symbol)  = "price_context_lock_#{symbol.to_s.upcase}"
 

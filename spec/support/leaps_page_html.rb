@@ -31,7 +31,15 @@ module LeapsPageHtml
     doc.css("[data-csrf]").each { |n| n["data-csrf"] = "CSRF" }
     doc.css("[nonce]").each { |n| n["nonce"] = "NONCE" }
     mask_release_notes(doc)
+    strip_poll_timeout(doc)
     canonical(doc.to_html)
+  end
+
+  # 2026-10-01 價格情境輪詢根節點新增 data-poll-timeout-ms（前端輪詢上限，
+  # 跟 ScrapePriceContextJob 的最長時間同源），與垂直價差無關。
+  # 值的正確性由 spec/requests/leaps_price_context_spec.rb 驗證。
+  def strip_poll_timeout(doc)
+    doc.css("#leaps-price-context[data-poll-timeout-ms]").each { |n| n.remove_attribute("data-poll-timeout-ms") }
   end
 
   # 全站 layout 的版本號與「版本更新說明」內容每次發版都會變（config/initializers/release_notes.rb），

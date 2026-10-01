@@ -42,6 +42,18 @@ RSpec.describe ScrapePriceContextJob do
     end
   end
 
+  # 前端輪詢的等待上限由這個值決定（頁面 data-poll-timeout-ms）。
+  # 原本前端寫死 24 次 × 5 秒＝2 分鐘，job 最壞要跑到兩支爬蟲各自逾時加寬限期，
+  # 前端會先放棄、顯示「逾時」，而 job 其實還在跑。
+  describe ".poll_budget_s" do
+    it "涵蓋兩支爬蟲逾時加上砍程序的寬限期，前端不會比 job 先放棄" do
+      worst_job = BarchartScraperService::SCRAPER_TIMEOUTS_S.values_at("volap", "price_history").sum +
+                  (2 * TimedCapture::DEFAULT_KILL_GRACE_S)
+
+      expect(described_class.poll_budget_s).to be > worst_job
+    end
+  end
+
   describe "#perform" do
     it "跑完就解鎖，並寫入結果" do
       allow(svc).to receive_messages(fetch_volap: { status: "success" },

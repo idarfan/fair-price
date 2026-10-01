@@ -71,4 +71,61 @@ describe("leapsPriceContext", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(root.querySelector("p")).toBe(firstNode); // 內容相同：沒有重畫
   });
+
+  // 2026-10-01：原本寫死 24 次 × 5 秒＝2 分鐘就放棄，但後端 job 最壞要跑約 5 分鐘
+  // （兩支爬蟲各自逾時＋寬限期），前端先顯示「逾時」而 job 還在跑。
+  // 上限改由伺服器帶在 data-poll-timeout-ms，跟 job 的時限同一個來源。
+  describe("輪詢上限", () => {
+    function mountWithBudget(ms: string | null): HTMLElement {
+      const attr = ms === null ? "" : ` data-poll-timeout-ms="${ms}"`;
+      document.body.innerHTML = `<div id="leaps-price-context" data-behavior="leaps-price-context"
+          data-symbol="SHOP"${attr}></div>`;
+      return document.getElementById("leaps-price-context") as HTMLElement;
+    }
+
+    it("照 data-poll-timeout-ms 等：超過 2 分鐘仍 pending 也不放棄", async () => {
+      fetchMock.mockImplementation(() =>
+        Promise.resolve(json({ status: "pending" })),
+      );
+      const root = mountWithBudget("330000"); // 5.5 分鐘
+
+      init(root);
+      await vi.advanceTimersByTimeAsync(4 * 60 * 1000);
+      await flush();
+
+      expect(root.textContent).not.toContain("逾時");
+      expect(fetchMock.mock.calls.length).toBeGreaterThan(24);
+    });
+
+    it("超過 data-poll-timeout-ms 才顯示逾時並停止輪詢", async () => {
+      fetchMock.mockImplementation(() =>
+        Promise.resolve(json({ status: "pending" })),
+      );
+      const root = mountWithBudget("30000"); // 30 秒＝6 次
+
+      init(root);
+      await vi.advanceTimersByTimeAsync(60 * 1000);
+      await flush();
+
+      expect(root.textContent).toContain("逾時");
+      expect(fetchMock).toHaveBeenCalledTimes(6);
+    });
+
+    it.each([null, "", "abc", "0", "-5"])(
+      "data-poll-timeout-ms 缺漏或不合法（%s）時退回預設 2 分鐘",
+      async (ms) => {
+        fetchMock.mockImplementation(() =>
+          Promise.resolve(json({ status: "pending" })),
+        );
+        const root = mountWithBudget(ms);
+
+        init(root);
+        await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+        await flush();
+
+        expect(fetchMock).toHaveBeenCalledTimes(24);
+        expect(root.textContent).toContain("逾時");
+      },
+    );
+  });
 });

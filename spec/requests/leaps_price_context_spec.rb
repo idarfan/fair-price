@@ -291,6 +291,13 @@ RSpec.describe "GET /leaps/price_context", type: :request do
     end
   end
 
+  it "LEAPS 頁把前端輪詢上限（毫秒）帶在輪詢根節點上，跟後端 job 最長時間同一個來源" do
+    get "/leaps", params: { symbol: symbol }
+
+    expected = ScrapePriceContextJob.poll_budget_s * 1000
+    expect(response.body).to match(/id="leaps-price-context"[^>]*data-poll-timeout-ms="#{expected}"/)
+  end
+
   # 2026-10-01 RKLB：job 先抓 VOLAP 再抓日線。VOLAP 一寫進 DB 就通過 fresh gate
   # 回 ok，前端停止輪詢，日線約 14 秒後才寫進來，當日區間永遠停在「載入中…」。
   describe "VOLAP 已新鮮時的 ok 判定" do

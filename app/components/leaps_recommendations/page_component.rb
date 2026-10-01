@@ -78,7 +78,8 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     div(id: "leaps-price-context",
         data: { behavior: "leaps-price-context",
                 symbol: @symbol,
-                user_strike: @user_strike.to_s }) do
+                user_strike: @user_strike.to_s,
+                poll_timeout_ms: ScrapePriceContextJob.poll_budget_s * 1000 }) do
       render LeapsRecommendations::PriceContextComponent.new(payload: @price_context)
     end
   end

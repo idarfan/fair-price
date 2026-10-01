@@ -15,8 +15,20 @@ import { applyDataStyles } from "./shared/dataStyles";
 import { str } from "./shared/json";
 
 const POLL_INTERVAL_MS = 5000;
-const MAX_ATTEMPTS = 24; // 約 2 分鐘
+// 頁面沒帶 data-poll-timeout-ms（或值不合法）時的後備值：約 2 分鐘。
+const DEFAULT_MAX_ATTEMPTS = 24;
 const STORAGE_PREFIX = "leaps-price-context:";
+
+/**
+ * 輪詢上限由伺服器帶在 data-poll-timeout-ms（ScrapePriceContextJob.poll_budget_s），
+ * 跟 job 的最長時間同一個來源。原本寫死 2 分鐘，job 最壞約 5 分鐘，
+ * 前端會先顯示「逾時」而 job 其實還在跑。
+ */
+function maxAttempts(root: HTMLElement): number {
+  const ms = Number(root.dataset["pollTimeoutMs"]);
+  if (!Number.isFinite(ms) || ms <= 0) return DEFAULT_MAX_ATTEMPTS;
+  return Math.ceil(ms / POLL_INTERVAL_MS);
+}
 
 /**
  * 讀寫 localStorage 都要包 try/catch：無痕視窗、封鎖 site data、
@@ -117,6 +129,7 @@ export function init(root: HTMLElement): void {
   if (userStrike) query.set("user_strike", userStrike);
 
   let attempts = 0;
+  const limit = maxAttempts(root);
   // pending 可能夾帶「已經有的那半邊」HTML。只套一次：每 5 秒重刷一次 DOM
   // 會讓正在看當日區間的人一直閃，而內容其實沒變（lastHtml 宣告在上方，內容沒變就不重畫）。
 
@@ -164,7 +177,7 @@ export function init(root: HTMLElement): void {
           lastHtml = html;
         }
 
-        if (attempts >= MAX_ATTEMPTS) {
+        if (attempts >= limit) {
           timedOut(root, "價格情境資料抓取逾時，請重新整理頁面再試一次。");
           return;
         }
@@ -172,7 +185,7 @@ export function init(root: HTMLElement): void {
       })
       .catch(() => {
         // 網路瞬斷不該直接放棄——還在次數內就繼續等下一輪。
-        if (attempts >= MAX_ATTEMPTS) {
+        if (attempts >= limit) {
           timedOut(root, "價格情境資料抓取失敗，請重新整理頁面再試一次。");
           return;
         }
