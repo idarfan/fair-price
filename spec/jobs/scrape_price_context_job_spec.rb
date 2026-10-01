@@ -1,0 +1,84 @@
+# frozen_string_literal: true
+
+require "rails_helper"
+
+# 排程鎖的壽命必須等於 job 的壽命。原本鎖只靠 3 分鐘 TTL 自己消失，
+# job 超過 3 分鐘時輪詢端點會誤以為已經跑完而提早回 ok；單純拉長 TTL 又會讓
+# server 重啟時被砍掉的 job 留下一把沒人解的鎖（Async adapter，job 跑在 Rails 程序裡）。
+RSpec.describe ScrapePriceContextJob do
+  let(:symbol) { "TSTX" }
+  let(:svc)    { instance_double(BarchartScraperService) }
+
+  around do |example|
+    original = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    example.run
+  ensure
+    Rails.cache = original
+  end
+
+  before { allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc) }
+
+  describe "排程鎖" do
+    it "acquire_lock 成功後 running? 為 true；同一程序第二次 acquire 失敗" do
+      expect(described_class.acquire_lock(symbol)).to be(true)
+      expect(described_class.running?(symbol)).to be(true)
+      expect(described_class.acquire_lock(symbol)).to be(false)
+    end
+
+    it "別的程序留下的鎖（server 重啟前的 job）視為無效，可以重新取得" do
+      Rails.cache.write(described_class.lock_key(symbol), "dead-process-owner")
+
+      expect(described_class.running?(symbol)).to be(false)
+      expect(described_class.acquire_lock(symbol)).to be(true)
+      expect(described_class.running?(symbol)).to be(true)
+    end
+
+    it "release_lock 之後 running? 為 false" do
+      described_class.acquire_lock(symbol)
+      described_class.release_lock(symbol)
+
+      expect(described_class.running?(symbol)).to be(false)
+    end
+  end
+
+  describe "#perform" do
+    it "跑完就解鎖，並寫入結果" do
+      allow(svc).to receive_messages(fetch_volap: { status: "success" },
+                                     fetch_price_history: { status: "success" })
+      described_class.acquire_lock(symbol)
+
+      described_class.perform_now(symbol)
+
+      expect(described_class.running?(symbol)).to be(false)
+      expect(Rails.cache.read(described_class.cache_key(symbol))[:status]).to eq("success")
+    end
+
+    it "跑超過 3 分鐘時鎖仍然在（不再靠 TTL 判斷是否跑完）" do
+      described_class.acquire_lock(symbol)
+      allow(svc).to receive(:fetch_volap) do
+        travel 5.minutes
+        expect(described_class.running?(symbol)).to be(true)
+        { status: "success" }
+      end
+      allow(svc).to receive(:fetch_price_history).and_return({ status: "success" })
+
+      described_class.perform_now(symbol)
+
+      expect(described_class.running?(symbol)).to be(false)
+    end
+
+    it "爬蟲炸到 job 外層也一樣解鎖" do
+      allow(svc).to receive_messages(fetch_volap: { status: "success" },
+                                     fetch_price_history: { status: "success" })
+      allow(Rails.cache).to receive(:write).and_call_original
+      allow(Rails.cache).to receive(:write)
+        .with(described_class.cache_key(symbol), anything, anything)
+        .and_raise(IOError, "disk full")
+      described_class.acquire_lock(symbol)
+
+      expect { described_class.perform_now(symbol) }.to raise_error(IOError)
+      expect(described_class.running?(symbol)).to be(false)
+    end
+  end
+end

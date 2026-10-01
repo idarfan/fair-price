@@ -230,19 +230,27 @@ RSpec.describe "GET /leaps/price_context", type: :request do
   # 也只會一直看到同一句「抓取失敗」，不會重抓。失敗結果沒有任何保留的理由——
   # 它只是用來讓這一輪輪詢停下來。新的查詢（載入 /leaps?symbol=）就要清掉重抓。
   describe "GET /leaps?symbol= 重置上一輪沒成功的抓取" do
-    let(:job_key)  { ScrapePriceContextJob.cache_key(symbol) }
-    let(:lock_key) { "price_context_lock_#{symbol}" }
+    let(:job_key) { ScrapePriceContextJob.cache_key(symbol) }
 
     %w[error partial barchart_session_expired no_volap_plot].each do |status|
-      it "上一輪是 #{status}：清掉結果與排程鎖" do
+      it "上一輪是 #{status}：清掉結果" do
         Rails.cache.write(job_key, { status: status })
-        Rails.cache.write(lock_key, true)
 
         get "/leaps", params: { symbol: symbol }
 
         expect(Rails.cache.read(job_key)).to be_nil
-        expect(Rails.cache.exist?(lock_key)).to be(false)
       end
+    end
+
+    # 鎖由 job 結束時自己解，還在就代表真的有 job 在跑；刪掉會重複排程。
+    it "上一輪失敗、但新一輪 job 正在跑：清結果、不動鎖" do
+      Rails.cache.write(job_key, { status: "error" })
+      ScrapePriceContextJob.acquire_lock(symbol)
+
+      get "/leaps", params: { symbol: symbol }
+
+      expect(Rails.cache.read(job_key)).to be_nil
+      expect(ScrapePriceContextJob.running?(symbol)).to be(true)
     end
 
     it "上一輪成功：結果保留，不重抓" do
@@ -254,17 +262,16 @@ RSpec.describe "GET /leaps/price_context", type: :request do
     end
 
     it "工作還在跑（沒有結果、只有鎖）：不動鎖，避免重複排程" do
-      Rails.cache.write(lock_key, true)
+      ScrapePriceContextJob.acquire_lock(symbol)
 
       get "/leaps", params: { symbol: symbol }
 
-      expect(Rails.cache.exist?(lock_key)).to be(true)
+      expect(ScrapePriceContextJob.running?(symbol)).to be(true)
     end
 
     it "清掉之後，下一次輪詢會重新排 job 而不是回舊的失敗訊息" do
       allow_any_instance_of(LeapsRecommendationsController).to receive(:cdp_online?).and_return(true)
       Rails.cache.write(job_key, { status: "error" })
-      Rails.cache.write(lock_key, true)
 
       get "/leaps", params: { symbol: symbol }
 
@@ -287,13 +294,12 @@ RSpec.describe "GET /leaps/price_context", type: :request do
   # 2026-10-01 RKLB：job 先抓 VOLAP 再抓日線。VOLAP 一寫進 DB 就通過 fresh gate
   # 回 ok，前端停止輪詢，日線約 14 秒後才寫進來，當日區間永遠停在「載入中…」。
   describe "VOLAP 已新鮮時的 ok 判定" do
-    let(:job_key)  { ScrapePriceContextJob.cache_key(symbol) }
-    let(:lock_key) { "price_context_lock_#{symbol}" }
+    let(:job_key) { ScrapePriceContextJob.cache_key(symbol) }
 
     before { create_volap }
 
     it "抓取還在跑（有鎖、沒有結果）：回 pending 並附上已有的卡片，不重複排程" do
-      Rails.cache.write(lock_key, true)
+      ScrapePriceContextJob.acquire_lock(symbol)
       expect(ScrapePriceContextJob).not_to receive(:perform_later)
 
       get "/leaps/price_context", params: { symbol: symbol }
@@ -303,9 +309,17 @@ RSpec.describe "GET /leaps/price_context", type: :request do
       expect(body["html"]).to include("data-pc-key=\"poi\"")
     end
 
-    it "抓取跑完（有鎖、也有結果）：回 ok，三張卡都有" do
+    it "鎖是 server 重啟前的程序留下的：不當成還在跑，回 ok" do
       create_bar
-      Rails.cache.write(lock_key, true)
+      Rails.cache.write(ScrapePriceContextJob.lock_key(symbol), "dead-process-owner")
+
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      expect(JSON.parse(response.body)["status"]).to eq("ok")
+    end
+
+    it "抓取跑完（job 已解鎖、有結果）：回 ok，三張卡都有" do
+      create_bar
       Rails.cache.write(job_key, { status: "success" })
 
       get "/leaps/price_context", params: { symbol: symbol }

@@ -224,8 +224,8 @@ class LeapsRecommendationsController < ApplicationController
     if payload.values_at(:poi, :week52).any?(&:present?) && VolapSnapshot.fresh_for?(symbol)
       # 2026-10-01 RKLB：job 先抓 VOLAP 再抓日線，VOLAP 一寫進來就會通過上面的
       # fresh gate。這時回 ok 前端就停止輪詢，日線晚十幾秒進來也沒人看到。
-      # 有鎖沒結果＝job 還在跑，回 pending 讓前端繼續等。
-      if job.nil? && Rails.cache.exist?(price_context_lock_key(symbol))
+      # job 還在跑就回 pending 讓前端繼續等。
+      if ScrapePriceContextJob.running?(symbol)
         return render json: { status: "pending", html: render_price_context_html(payload) }
       end
 
@@ -273,14 +273,13 @@ class LeapsRecommendationsController < ApplicationController
   # 輪詢知道可以停了，失敗結果沒有保留的理由——2026-10-01 RKLB 兩支爬蟲都失敗後，
   # 失敗結果跟成功共用 1 小時 TTL，重新查詢只會一直看到同一句「抓取失敗」。
   # 只在這裡清、不在輪詢端點清：輪詢端點清的話每 5 秒就排一次新的抓取。
-  # 沒有結果代表 job 可能還在跑，排程鎖要留著擋重複排程。
+  # 排程鎖不在這裡動：job 結束時自己解鎖，鎖還在就代表真的有 job 在跑。
   def reset_unsuccessful_price_context(symbol)
     job_key = ScrapePriceContextJob.cache_key(symbol)
     status  = Rails.cache.read(job_key)&.dig(:status)
     return if status.nil? || status == "success"
 
     Rails.cache.delete(job_key)
-    Rails.cache.delete(price_context_lock_key(symbol))
   end
 
   def render_price_context_html(payload, empty_message: nil)
@@ -325,14 +324,16 @@ class LeapsRecommendationsController < ApplicationController
       html:    render_price_context_html(payload, empty_message: "暫無資料") }
   end
 
-  def price_context_lock_key(symbol) = "price_context_lock_#{symbol}"
-
   def enqueue_price_context(symbol)
-    lock_key = price_context_lock_key(symbol)
-    return if Rails.cache.exist?(lock_key)
+    return unless ScrapePriceContextJob.acquire_lock(symbol)
 
-    Rails.cache.write(lock_key, true, expires_in: 3.minutes)
-    ScrapePriceContextJob.perform_later(symbol)
+    begin
+      ScrapePriceContextJob.perform_later(symbol)
+    rescue
+      # 沒排進去的話鎖沒有 job 會解，留著會讓輪詢一直以為在跑。
+      ScrapePriceContextJob.release_lock(symbol)
+      raise
+    end
   rescue => e
     # 排不進去不該讓輪詢端點 500——前端會繼續輪詢，下一輪再試。
     Rails.logger.warn("[price_context] enqueue failed for #{symbol}: #{e.message}")

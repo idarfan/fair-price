@@ -10,7 +10,29 @@
 class ScrapePriceContextJob < ApplicationJob
   CACHE_TTL = VolapSnapshot::FRESH_WINDOW
 
+  # 排程鎖：擋輪詢造成的重複排程，也是輪詢端點判斷「job 還在跑」的依據。
+  # 鎖的壽命＝job 的壽命：job 結束時自己解鎖，不靠 TTL 猜它跑完沒
+  # （原本 3 分鐘 TTL，job 跑超過 3 分鐘就會被當成已結束）。
+  # Async adapter 的 job 跑在 Rails 程序裡，server 重啟時 job 會被砍掉、
+  # 鎖沒人解，所以鎖記下排程它的程序；程序換了，舊鎖直接作廢。
+  # TTL 只用來清垃圾（job 卡死在同一個程序裡的最後保險），不參與判斷。
+  LOCK_TTL   = 30.minutes
+  LOCK_OWNER = "#{Process.pid}-#{SecureRandom.hex(4)}".freeze
+
   def self.cache_key(symbol) = "price_context_job_#{symbol.to_s.upcase}"
+  def self.lock_key(symbol)  = "price_context_lock_#{symbol.to_s.upcase}"
+
+  def self.running?(symbol) = Rails.cache.read(lock_key(symbol)) == LOCK_OWNER
+
+  # 已經有本程序的 job 在跑就回 false；別的（已死）程序留下的鎖直接覆蓋。
+  def self.acquire_lock(symbol)
+    return false if running?(symbol)
+
+    Rails.cache.write(lock_key(symbol), LOCK_OWNER, expires_in: LOCK_TTL)
+    true
+  end
+
+  def self.release_lock(symbol) = Rails.cache.delete(lock_key(symbol))
 
   def perform(symbol)
     symbol = symbol.to_s.upcase
@@ -19,11 +41,14 @@ class ScrapePriceContextJob < ApplicationJob
     volap = run_isolated("volap")         { svc.fetch_volap }
     daily = run_isolated("price_history") { svc.fetch_price_history }
 
+    # 先寫結果再解鎖：輪詢端點看到「沒鎖」時結果一定已經在了。
     Rails.cache.write(
       self.class.cache_key(symbol),
       { status: overall_status(volap, daily), volap: volap, daily: daily },
       expires_in: CACHE_TTL
     )
+  ensure
+    self.class.release_lock(symbol)
   end
 
   private
