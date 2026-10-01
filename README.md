@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-10-01（四）— 修正：價格情境排程鎖的競態
+
+- `ScrapePriceContextJob.acquire_lock` 原為「讀 → 判斷 → 寫」，同時進來的輪詢請求可能各排一個 job。改以程序內 `LOCK_MUTEX` 序列化 acquire／release（前提：Puma single mode＋Async adapter，改 cluster mode 時須換跨程序鎖，註解已標明）。併發測試 8 執行緒搶鎖由 8 個成功降為 1 個，重跑 10 次皆過；實測 ARM 同秒 8 個請求只排 1 個 job（審查 PASS）。
+
 ### 2026-10-01（四）— 修正：價格情境前端輪詢上限與 job 最長時間同源
 
 - `leapsPriceContext.ts` 原本寫死 24 次 × 5 秒＝2 分鐘，job 最壞要跑到兩支爬蟲各自逾時加寬限期，前端會先顯示「逾時」而 job 仍在跑。新增 `ScrapePriceContextJob.poll_budget_s`（180＋120＋2×5＋60＝370 秒），由頁面 `data-poll-timeout-ms` 帶給前端；缺漏或不合法時退回 2 分鐘。HTML 回歸基準（`LeapsPageHtml.normalize`）比照既有慣例遮蔽此新屬性。實測 MSTR 頁面值 370000、載入新 chunk、24 秒三張卡齊全（審查 PASS）。

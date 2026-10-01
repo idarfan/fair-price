@@ -34,6 +34,22 @@ RSpec.describe ScrapePriceContextJob do
       expect(described_class.running?(symbol)).to be(true)
     end
 
+    # 原本 acquire_lock 是「讀 → 判斷 → 寫」，兩個輪詢請求同時進來時，
+    # 兩邊都可能在對方寫入前讀到「沒鎖」，各排一個 job。
+    # 讀與寫之間刻意插入延遲，把競態窗口撐開到每次都會撞上。
+    it "多個執行緒同時搶鎖，只有一個拿得到" do
+      original_read = Rails.cache.method(:read)
+      allow(Rails.cache).to receive(:read) do |*args, **kw|
+        value = original_read.call(*args, **kw)
+        sleep 0.05
+        value
+      end
+
+      results = Array.new(8) { Thread.new { described_class.acquire_lock(symbol) } }.map(&:value)
+
+      expect(results.count(true)).to eq(1)
+    end
+
     it "release_lock 之後 running? 為 false" do
       described_class.acquire_lock(symbol)
       described_class.release_lock(symbol)

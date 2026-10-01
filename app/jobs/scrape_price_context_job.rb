@@ -32,17 +32,29 @@ class ScrapePriceContextJob < ApplicationJob
   def self.cache_key(symbol) = "price_context_job_#{symbol.to_s.upcase}"
   def self.lock_key(symbol)  = "price_context_lock_#{symbol.to_s.upcase}"
 
+  # 「讀 → 判斷 → 寫」必須是原子的，否則同時進來的兩個輪詢請求都會讀到「沒鎖」
+  # 各排一個 job。Rails.cache 的 unless_exist: 不能用：它不能覆蓋已死程序的舊鎖，
+  # FileStore 的實作本身也是先 exist? 再寫。
+  # 程序內 Mutex 就夠：Puma 是 single mode（config/puma.rb 沒有 workers），
+  # job 走 Async adapter 也在同一個程序裡，會搶這把鎖的只有本程序的執行緒。
+  # ⚠️ 改成 cluster mode 或換成獨立的 job 程序時，這裡要換成跨程序的鎖。
+  LOCK_MUTEX = Mutex.new
+
   def self.running?(symbol) = Rails.cache.read(lock_key(symbol)) == LOCK_OWNER
 
   # 已經有本程序的 job 在跑就回 false；別的（已死）程序留下的鎖直接覆蓋。
   def self.acquire_lock(symbol)
-    return false if running?(symbol)
+    LOCK_MUTEX.synchronize do
+      return false if running?(symbol)
 
-    Rails.cache.write(lock_key(symbol), LOCK_OWNER, expires_in: LOCK_TTL)
-    true
+      Rails.cache.write(lock_key(symbol), LOCK_OWNER, expires_in: LOCK_TTL)
+      true
+    end
   end
 
-  def self.release_lock(symbol) = Rails.cache.delete(lock_key(symbol))
+  def self.release_lock(symbol)
+    LOCK_MUTEX.synchronize { Rails.cache.delete(lock_key(symbol)) }
+  end
 
   def perform(symbol)
     symbol = symbol.to_s.upcase
