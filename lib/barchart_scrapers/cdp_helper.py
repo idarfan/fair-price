@@ -6,11 +6,32 @@ Key: Windows Chrome suspends background tabs. Always call activate_target()
 before eval to wake the tab from suspension.
 """
 import asyncio
+import atexit
 import json
+import signal
+import sys
+import time
 import urllib.request
+from pathlib import Path
+
 import websockets
 
 CDP_BASE = "http://127.0.0.1:9222"
+
+# 每次抓取開自己的專屬分頁（2026-10-01）。原本借用任一 Barchart 分頁再導航，
+# 兩個不同代號的抓取同時進行時會搶到同一個分頁、把對方導航走——失敗，
+# 或讀到別的代號的資料。
+#
+# 分頁要在爬蟲結束時關掉：正常結束與例外走 atexit；TimedCapture 逾時先送
+# SIGTERM，Python 預設直接死、不跑 atexit，所以把 SIGTERM 轉成 SystemExit。
+# SIGKILL 誰都攔不到，靠追蹤檔：每開一個分頁寫一個檔，下次開分頁前把
+# 超過 ORPHAN_AGE_S 的關掉。
+TAB_TRACK_DIR = Path(__file__).resolve().parents[2] / "tmp" / "cdp_tabs"
+# LEAPS 爬蟲沒有外層時限、實測 3–5 分鐘；不能把還在跑的分頁當孤兒關掉。
+ORPHAN_AGE_S = 30 * 60
+
+_OWNED_TABS = []
+_EXIT_HANDLERS_INSTALLED = False
 
 
 def _list_targets():
@@ -25,29 +46,81 @@ def _open_blank_tab():
     return json.loads(urllib.request.urlopen(request, timeout=5).read())
 
 
+def _close_tab(target_id):
+    urllib.request.urlopen(f"{CDP_BASE}/json/close/{target_id}", timeout=5).read()
+
+
+def _forget_tab(target_id):
+    try:
+        (TAB_TRACK_DIR / target_id).unlink()
+    except FileNotFoundError:
+        pass
+
+
+def close_owned_tabs():
+    """關掉本程序開過的分頁。一個關不掉（已被關、Chrome 斷線）不影響其他的。"""
+    while _OWNED_TABS:
+        target_id = _OWNED_TABS.pop(0)
+        try:
+            _close_tab(target_id)
+        except (OSError, ValueError):
+            pass
+        _forget_tab(target_id)
+
+
+def _sweep_orphan_tabs():
+    """關掉被 SIGKILL 的爬蟲留下的分頁（追蹤檔超過 ORPHAN_AGE_S）。"""
+    if not TAB_TRACK_DIR.is_dir():
+        return
+    cutoff = time.time() - ORPHAN_AGE_S
+    for entry in TAB_TRACK_DIR.iterdir():
+        try:
+            if entry.stat().st_mtime >= cutoff:
+                continue
+        except FileNotFoundError:
+            continue
+        try:
+            _close_tab(entry.name)
+        except (OSError, ValueError):
+            pass   # 分頁早就不在了也一樣要清追蹤檔
+        _forget_tab(entry.name)
+
+
+def _exit_on_sigterm(signum, frame):
+    sys.exit(128 + signum)
+
+
+def _install_exit_handlers():
+    """冪等：每次開分頁都呼叫，只有第一次真的安裝。"""
+    global _EXIT_HANDLERS_INSTALLED
+    if _EXIT_HANDLERS_INSTALLED:
+        return
+    atexit.register(close_owned_tabs)
+    signal.signal(signal.SIGTERM, _exit_on_sigterm)
+    _EXIT_HANDLERS_INSTALLED = True
+
+
 def get_target(symbol, page_type):
-    """Return (target_id, ws_url) for the matching page, or any barchart page as fallback."""
-    targets = _list_targets()
-    pattern = f"barchart.com/stocks/quotes/{symbol}/{page_type}"
-    # Exact match first
-    for t in targets:
-        if t.get("type") == "page" and pattern in t.get("url", ""):
-            return t["id"], t["webSocketDebuggerUrl"]
-    # Fallback: any barchart page (we'll navigate it)
-    for t in targets:
-        if t.get("type") == "page" and "barchart.com" in t.get("url", ""):
-            return t["id"], t["webSocketDebuggerUrl"]
-    # Last resort: any page tab (scraper will navigate to correct URL)
-    for t in targets:
-        if t.get("type") == "page":
-            return t["id"], t["webSocketDebuggerUrl"]
-    # No page at all: Chrome is alive but its window was closed (2026-09-25 ORCL).
-    # Open one ourselves instead of failing every scraper until someone notices.
+    """
+    開一個本次抓取專屬的分頁，回 (target_id, ws_url)；開不了回 (None, None)。
+    不看既有分頁——借用別人的分頁正是並行抓取互相干擾的原因。
+    symbol／page_type 保留在簽名上給呼叫端，導航由 prepare_page 負責。
+    """
+    _sweep_orphan_tabs()
     try:
         tab = _open_blank_tab()
     except (OSError, ValueError):
         return None, None
-    return tab["id"], tab["webSocketDebuggerUrl"]
+
+    target_id = tab["id"]
+    _install_exit_handlers()
+    _OWNED_TABS.append(target_id)
+    try:
+        TAB_TRACK_DIR.mkdir(parents=True, exist_ok=True)
+        (TAB_TRACK_DIR / target_id).write_text(f"{symbol} {page_type}")
+    except OSError:
+        pass   # 追蹤檔只是 SIGKILL 的保險，寫不了不能讓抓取失敗
+    return target_id, tab["webSocketDebuggerUrl"]
 
 
 def get_browser_ws():
@@ -147,8 +220,9 @@ async def cdp_navigate(ws_url, target_url, settle_ms=6000):
 
 async def prepare_page(symbol, page_type, settle_ms):
     """
-    Find or fallback to a barchart tab, activate it, navigate if needed.
-    Returns (target_id, ws_url).
+    開專屬分頁並導航到目標頁，回 (target_id, ws_url)。
+    分頁一律是新開的 about:blank，所以一定要導航（沿用原本「網址不對就導航」那條路徑，
+    等待時機不變）。分頁在爬蟲結束時由 close_owned_tabs 關掉。
     """
     target_id, ws_url = get_target(symbol, page_type)
     if not target_id:
@@ -159,16 +233,8 @@ async def prepare_page(symbol, page_type, settle_ms):
     await asyncio.sleep(1.5)
 
     target_url = f"https://www.barchart.com/stocks/quotes/{symbol}/{page_type}"
-
-    # Check current URL; navigate only if the exact target URL isn't loaded
-    try:
-        current_url = await cdp_eval(ws_url, "window.location.href", timeout=10)
-    except TimeoutError:
-        current_url = ""
-
-    if f"/quotes/{symbol}/" not in (current_url or "") or f"/{page_type}" not in (current_url or ""):
-        await cdp_navigate(ws_url, target_url, settle_ms=settle_ms)
-        # Re-activate after navigation (Chrome may have focused elsewhere)
-        await activate_target(target_id)
+    await cdp_navigate(ws_url, target_url, settle_ms=settle_ms)
+    # Re-activate after navigation (Chrome may have focused elsewhere)
+    await activate_target(target_id)
 
     return target_id, ws_url

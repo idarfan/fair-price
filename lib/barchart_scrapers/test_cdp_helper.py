@@ -10,9 +10,16 @@ cdp_helper.cdp_eval 的重試行為測試。
 重試決策，不是 CDP 協定本身。
 """
 import asyncio
+import os
+import signal
+import subprocess
 import sys
+import tempfile
+import textwrap
+import time
 import unittest
 import importlib.util
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 
@@ -132,45 +139,198 @@ class TestCdpEvalRetry(unittest.TestCase):
         once.assert_awaited_once_with("ws://url", "JS EXPR", 7)
 
 
-def _page(tid, url):
-    return {"id": tid, "type": "page", "url": url, "webSocketDebuggerUrl": f"ws://{tid}"}
+def _tab(tid):
+    return {"id": tid, "type": "page", "url": "about:blank", "webSocketDebuggerUrl": f"ws://{tid}"}
 
 
-class TestGetTarget(unittest.TestCase):
+class _TabStateMixin:
+    """每個測試用自己的追蹤目錄與乾淨的「本程序開過的分頁」清單。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._dir_patch = patch.object(helper, "TAB_TRACK_DIR", Path(self._tmp.name))
+        self._dir_patch.start()
+        helper._OWNED_TABS.clear()
+
+    def tearDown(self):
+        helper._OWNED_TABS.clear()
+        self._dir_patch.stop()
+        self._tmp.cleanup()
+
+
+class TestGetTarget(_TabStateMixin, unittest.TestCase):
     """
-    2026-09-25 ORCL 事故：9222 的 Chrome 程序還活著（/json/version 有回應），
-    但視窗被關掉、一個分頁都沒有，get_target 回 (None, None)，所有爬蟲都報
-    「No Chrome CDP page found」。沒有分頁時要自己開一個，不能直接放棄。
+    2026-10-01：原本沒有完全符合的分頁時會借用任一 Barchart 分頁再導航。
+    兩個不同代號的抓取同時進行時會搶到同一個分頁、把對方導航走——失敗，
+    或讀到別的代號的資料。改成每次抓取開自己的專屬分頁，抓完關掉。
     """
 
-    def test_prefers_exact_symbol_page(self):
-        targets = [_page("A", "https://www.barchart.com/stocks/quotes/MU/options"),
-                   _page("B", "https://www.barchart.com/stocks/quotes/ORCL/options")]
-        with patch.object(helper, "_list_targets", return_value=targets), \
-             patch.object(helper, "_open_blank_tab") as open_tab:
-            self.assertEqual(helper.get_target("ORCL", "options"), ("B", "ws://B"))
-        open_tab.assert_not_called()
-
-    def test_reuses_any_existing_page_without_opening_new_tab(self):
-        targets = [{"id": "X", "type": "iframe", "url": "https://x", "webSocketDebuggerUrl": "ws://X"},
-                   _page("P", "about:blank")]
-        with patch.object(helper, "_list_targets", return_value=targets), \
-             patch.object(helper, "_open_blank_tab") as open_tab:
-            self.assertEqual(helper.get_target("ORCL", "options"), ("P", "ws://P"))
-        open_tab.assert_not_called()
-
-    def test_opens_blank_tab_when_no_page_exists(self):
-        targets = [{"id": "U", "type": "browser_ui", "url": "chrome://omnibox-popup.top-chrome/",
-                    "webSocketDebuggerUrl": "ws://U"}]
-        with patch.object(helper, "_list_targets", return_value=targets), \
-             patch.object(helper, "_open_blank_tab", return_value=_page("N", "about:blank")) as open_tab:
+    def test_always_opens_a_dedicated_tab_even_if_exact_page_exists(self):
+        with patch.object(helper, "_list_targets") as list_targets, \
+             patch.object(helper, "_open_blank_tab", return_value=_tab("N")) as open_tab, \
+             patch.object(helper, "_sweep_orphan_tabs"):
             self.assertEqual(helper.get_target("ORCL", "options"), ("N", "ws://N"))
         open_tab.assert_called_once_with()
+        list_targets.assert_not_called()   # 不看既有分頁，也就不可能借到別人的
+
+    def test_records_the_tab_as_owned_and_writes_a_tracking_file(self):
+        with patch.object(helper, "_open_blank_tab", return_value=_tab("N")), \
+             patch.object(helper, "_sweep_orphan_tabs"):
+            helper.get_target("ORCL", "options")
+        self.assertEqual(helper._OWNED_TABS, ["N"])
+        self.assertTrue((helper.TAB_TRACK_DIR / "N").exists())
+
+    def test_sweeps_orphans_before_opening(self):
+        calls = []
+        with patch.object(helper, "_sweep_orphan_tabs", side_effect=lambda: calls.append("sweep")), \
+             patch.object(helper, "_open_blank_tab", side_effect=lambda: calls.append("open") or _tab("N")):
+            helper.get_target("ORCL", "options")
+        self.assertEqual(calls, ["sweep", "open"])
 
     def test_returns_none_when_opening_tab_fails(self):
-        with patch.object(helper, "_list_targets", return_value=[]), \
-             patch.object(helper, "_open_blank_tab", side_effect=OSError("refused")):
+        with patch.object(helper, "_open_blank_tab", side_effect=OSError("refused")), \
+             patch.object(helper, "_sweep_orphan_tabs"):
             self.assertEqual(helper.get_target("ORCL", "options"), (None, None))
+        self.assertEqual(helper._OWNED_TABS, [])
+
+    def test_installs_exit_handlers_once(self):
+        with patch.object(helper, "_open_blank_tab", side_effect=[_tab("A"), _tab("B")]), \
+             patch.object(helper, "_sweep_orphan_tabs"), \
+             patch.object(helper, "_install_exit_handlers") as install:
+            helper.get_target("ORCL", "options")
+            helper.get_target("ORCL", "volatility-greeks")
+        self.assertEqual(install.call_count, 2)   # 冪等：呼叫端不必記得只裝一次
+        self.assertEqual(helper._OWNED_TABS, ["A", "B"])
+
+
+class TestCloseOwnedTabs(_TabStateMixin, unittest.TestCase):
+
+    def test_closes_every_owned_tab_and_removes_tracking_files(self):
+        for tid in ("A", "B"):
+            helper._OWNED_TABS.append(tid)
+            (helper.TAB_TRACK_DIR / tid).write_text("0")
+        with patch.object(helper, "_close_tab") as close:
+            helper.close_owned_tabs()
+        self.assertEqual([c.args[0] for c in close.call_args_list], ["A", "B"])
+        self.assertEqual(helper._OWNED_TABS, [])
+        self.assertEqual(list(helper.TAB_TRACK_DIR.iterdir()), [])
+
+    def test_one_failing_close_does_not_stop_the_rest(self):
+        helper._OWNED_TABS.extend(["A", "B"])
+        with patch.object(helper, "_close_tab", side_effect=[OSError("gone"), None]) as close:
+            helper.close_owned_tabs()
+        self.assertEqual(close.call_count, 2)
+        self.assertEqual(helper._OWNED_TABS, [])
+
+    def test_close_tab_hits_cdp_base(self):
+        """leaps-call-spread-spec：cdp_helper 每個 urlopen 目標都必須以 {CDP_BASE} 開頭。"""
+        response = unittest.mock.MagicMock()
+        with patch.object(helper.urllib.request, "urlopen", return_value=response) as urlopen:
+            helper._close_tab("T9")
+        target = urlopen.call_args.args[0]
+        url = target.full_url if hasattr(target, "full_url") else target
+        self.assertEqual(url, f"{helper.CDP_BASE}/json/close/T9")
+
+
+class TestSweepOrphanTabs(_TabStateMixin, unittest.TestCase):
+    """被 SIGKILL 的爬蟲沒有機會關分頁；下次開分頁前清掉過期的。"""
+
+    def test_closes_only_tabs_older_than_orphan_age(self):
+        now = time.time()
+        old, fresh = helper.TAB_TRACK_DIR / "OLD", helper.TAB_TRACK_DIR / "FRESH"
+        old.write_text("x")
+        fresh.write_text("x")
+        os.utime(old, (now - helper.ORPHAN_AGE_S - 10,) * 2)
+        with patch.object(helper, "_close_tab") as close:
+            helper._sweep_orphan_tabs()
+        close.assert_called_once_with("OLD")
+        self.assertFalse(old.exists())
+        self.assertTrue(fresh.exists())
+
+    def test_orphan_age_exceeds_the_longest_scraper(self):
+        # LEAPS 爬蟲沒有外層時限、實測 3–5 分鐘；不能把還在跑的分頁當孤兒關掉。
+        self.assertGreaterEqual(helper.ORPHAN_AGE_S, 30 * 60)
+
+    def test_missing_directory_is_not_an_error(self):
+        with patch.object(helper, "TAB_TRACK_DIR", Path(self._tmp.name) / "nope"):
+            helper._sweep_orphan_tabs()
+
+
+class TestExitHandlers(_TabStateMixin, unittest.TestCase):
+
+    def test_sigterm_becomes_system_exit_so_atexit_runs(self):
+        """TimedCapture 逾時先送 TERM；Python 預設直接死、不跑 atexit，分頁就留著。"""
+        original = signal.getsignal(signal.SIGTERM)
+        try:
+            with patch.object(helper.atexit, "register"):
+                helper._EXIT_HANDLERS_INSTALLED = False
+                helper._install_exit_handlers()
+            handler = signal.getsignal(signal.SIGTERM)
+            with self.assertRaises(SystemExit):
+                handler(signal.SIGTERM, None)
+        finally:
+            signal.signal(signal.SIGTERM, original)
+            helper._EXIT_HANDLERS_INSTALLED = False
+
+
+class TestTabLifecycleInSubprocess(unittest.TestCase):
+    """
+    真的開一個子程序跑 cdp_helper，對它送 SIGTERM，確認 atexit 有把分頁關掉。
+    CDP 端點用本機假伺服器代替，記下收到的 /json/new 與 /json/close。
+    """
+
+    def test_sigterm_closes_the_tab(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / "requests.log"
+            script = textwrap.dedent(f"""
+                import http.server, threading, json, sys, time
+                sys.path.insert(0, {str(Path(__file__).parent)!r})
+                log = open({str(log)!r}, "a", buffering=1)
+                class H(http.server.BaseHTTPRequestHandler):
+                    def _reply(self):
+                        log.write(self.command + " " + self.path + "\\n")
+                        body = json.dumps({{"id": "T1", "type": "page", "url": "about:blank",
+                                            "webSocketDebuggerUrl": "ws://T1"}}).encode()
+                        self.send_response(200); self.end_headers(); self.wfile.write(body)
+                    do_GET = do_PUT = _reply
+                    def log_message(self, *a): pass
+                srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+                threading.Thread(target=srv.serve_forever, daemon=True).start()
+                import cdp_helper
+                cdp_helper.CDP_BASE = "http://127.0.0.1:%d" % srv.server_port
+                cdp_helper.TAB_TRACK_DIR = __import__("pathlib").Path({tmp!r}) / "tabs"
+                cdp_helper.get_target("ORCL", "options")
+                print("READY", flush=True)
+                time.sleep(30)
+            """)
+            proc = subprocess.Popen([sys.executable, "-c", script], stdout=subprocess.PIPE, text=True)
+            try:
+                self.assertEqual(proc.stdout.readline().strip(), "READY")
+                proc.send_signal(signal.SIGTERM)
+                proc.wait(timeout=10)
+            finally:
+                if proc.poll() is None:
+                    proc.kill()
+                    proc.wait()
+                proc.stdout.close()
+            lines = log.read_text().splitlines()
+            self.assertIn("PUT /json/new?about:blank", lines)
+            self.assertIn("GET /json/close/T1", lines)
+            self.assertEqual(list((Path(tmp) / "tabs").iterdir()), [])
+
+
+class TestPreparePage(_TabStateMixin, unittest.TestCase):
+
+    def test_navigates_the_dedicated_tab_to_the_target_url(self):
+        nav = AsyncMock()
+        with patch.object(helper, "get_target", return_value=("N", "ws://N")), \
+             patch.object(helper, "activate_target", new=AsyncMock()), \
+             patch.object(helper, "cdp_navigate", new=nav), \
+             patch.object(helper.asyncio, "sleep", new=AsyncMock()):
+            result = _run(helper.prepare_page("ORCL", "options", settle_ms=500))
+        self.assertEqual(result, ("N", "ws://N"))
+        nav.assert_awaited_once_with("ws://N", "https://www.barchart.com/stocks/quotes/ORCL/options",
+                                     settle_ms=500)
 
 
 class TestOpenBlankTab(unittest.TestCase):

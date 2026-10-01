@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-10-01（四）— 修正：Barchart 爬蟲每次抓取開專屬分頁（並行化 S1）
+
+- `cdp_helper.get_target` 原本沒有完全符合的分頁時借用任一 Barchart 分頁再導航，不同代號同時抓取會搶同一分頁、互相導航走，導致失敗或讀到別的代號。改為每次開專屬 `about:blank` 分頁再走既有導航；正常結束、例外與 SIGTERM（轉 `SystemExit` 觸發 `atexit`）都會關掉；SIGKILL 留下的分頁靠 `tmp/cdp_tabs/` 追蹤檔，超過 30 分鐘於下次開分頁時清掉。實測 NOK／AMD／NVDA／TSLA 四支同時抓取各自正確、分頁 3→7→3；`TimedCapture` 砍掉後分頁亦關閉（審查 PASS）。
+
 ### 2026-10-01（四）— 修正：價格情境排程鎖的競態
 
 - `ScrapePriceContextJob.acquire_lock` 原為「讀 → 判斷 → 寫」，同時進來的輪詢請求可能各排一個 job。改以程序內 `LOCK_MUTEX` 序列化 acquire／release（前提：Puma single mode＋Async adapter，改 cluster mode 時須換跨程序鎖，註解已標明）。併發測試 8 執行緒搶鎖由 8 個成功降為 1 個，重跑 10 次皆過；實測 ARM 同秒 8 個請求只排 1 個 job（審查 PASS）。

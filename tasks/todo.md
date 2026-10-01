@@ -1,3 +1,58 @@
+# Barchart 抓取並行化：分頁隔離＋同代號共用（2026-10-01）
+
+使用者裁示：快取有就直接回；同代號只抓一次、其他人共用結果；不同代號各開專屬分頁並行，
+同時抓取數設上限、超過排隊；仍只用一個 Chrome（9222）。
+
+## 現況（已查證）
+
+- 快取命中直接回：LEAPS `fresh_for?` → `ready`；價格情境 1 小時內 → `ok`。**已有，不動。**
+- 同代號去重：只有價格情境有（`ScrapePriceContextJob` 鎖）。LEAPS `analyze` 每次請求新開 job_id、
+  各排一個 3–5 分鐘的 `ScrapeLeapsJob`。
+- **不同代號互相干擾**：`cdp_helper.get_target` 沒有完全符合的分頁時，借用任一 Barchart 分頁再導航。
+  兩個抓取同時進行會搶同一分頁、把對方導航走 → 失敗或讀到別的代號。
+- 14 支爬蟲全部經 `prepare_page` 取分頁 → 分頁隔離只需改這一處。
+- 9222 Chrome 已帶 `--disable-renderer-backgrounding` 等參數，背景分頁持續繪製，並行可行。
+
+## 階段（每階段一個審查單位，PASS 才進下一個）
+
+| 階段 | 內容 | 審查 |
+|---|---|---|
+| S1 | 分頁隔離 | PASS（r1） |
+| S2 | 同時抓取上限＋排隊 | |
+| S3 | LEAPS 同代號共用 | |
+| S4 | 價格情境卡排隊狀態 | |
+
+### S1 分頁隔離（`lib/barchart_scrapers/cdp_helper.py`）
+- [x] `prepare_page` 每次開專屬新分頁（`PUT /json/new?about:blank`），再走原本的 `cdp_navigate` 導航；不再借用既有分頁
+  （偏離原計畫的「createTarget 直接載入目標網址」：沿用既有導航路徑，等待時機與改前相同）
+- [x] 爬蟲結束（正常、例外、被 `TimedCapture` 送 SIGTERM）都關掉自己的分頁：`atexit` ＋ SIGTERM 轉 `SystemExit`
+- [x] 被 SIGKILL 時無法收尾 → 開分頁時記錄 target id，下次開分頁前清掉逾時未關的孤兒分頁
+- [x] 驗收：兩個不同代號同時抓取，各自資料正確；抓完 Chrome 不殘留分頁
+
+### S2 同時抓取上限（`BarchartScraperService#run_scraper`）
+- [ ] 程序內計數號誌（上限 3，常數），所有爬蟲共用；超過的排隊
+- [ ] 排隊時間不計入 `TimedCapture` 的爬蟲時限（取得名額後才開始計時）
+- [ ] 前提同 `LOCK_MUTEX`：Puma single mode＋Async adapter（註解標明）
+- [ ] 驗收：同時發 5 個不同代號，Chrome 同一時間最多 3 個爬蟲分頁
+
+### S3 LEAPS 同代號共用（`LeapsRecommendationsController#analyze`）
+- [ ] 同代號＋同履約價已有進行中的 job → 回傳同一個 job_id，不再排第二個
+- [ ] job 結束（含失敗）即釋放，下一次查詢照常重抓（沿用今天的「失敗不保留」原則）
+- [ ] 驗收：兩個分頁同時查同一個未快取代號，log 只有一個 `ScrapeLeapsJob`，兩邊都拿到結果
+
+### S4 價格情境卡排隊狀態
+- [ ] 排隊中回 `queued`（與 `pending` 區分）；前端排隊時間不計入 `data-poll-timeout-ms`
+- [ ] 原因：S2 之後價格情境抓取可能排在 LEAPS（3–5 分鐘）後面，370 秒上限不再涵蓋排隊
+- [ ] 驗收：佔滿 3 個名額時查價格情境，畫面持續等待不顯示逾時，名額空出後完成
+
+## 不在本次範圍
+
+- 牛市價差（bpus／bcvs）、技術儀表板的同代號共用：S1／S2 已讓它們不互相干擾、受上限保護，
+  但同代號重複抓取仍會發生。要做再另開。
+- 多個 Chrome 實例。
+
+---
+
 # database_consistency 36 項處置計畫（2026-08-30）
 
 ## 盤點結論：24 項該修，12 項不該修
