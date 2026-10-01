@@ -152,9 +152,11 @@ class LeapsRecommendationsController < ApplicationController
       return render json: { status: "cdp_offline" }
     end
 
-    job_id = SecureRandom.hex(8)
-    Rails.cache.write("leaps_job_#{job_id}", { status: "pending" }, expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW)
-    ScrapeLeapsJob.perform_later(symbol, job_id, user_strike: user_strike)
+    # 同代號＋同履約價已在抓：共用同一個 job_id，不再排第二個（並行化 S3）。
+    job_id = ScrapeLeapsJob.join_or_start(symbol, user_strike) do |new_id|
+      Rails.cache.write("leaps_job_#{new_id}", { status: "pending" }, expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW)
+      ScrapeLeapsJob.perform_later(symbol, new_id, user_strike: user_strike)
+    end
 
     render json: { job_id: job_id, symbol: symbol, user_strike: user_strike }
   end

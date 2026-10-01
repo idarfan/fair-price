@@ -677,6 +677,55 @@ RSpec.describe "GET /leaps", type: :request do
         expect(ScrapeLeapsJob).to have_received(:perform_later)
       end
     end
+
+    # 並行化 S3：同代號＋同履約價已有進行中的抓取時，後來的人共用同一個 job_id。
+    context "when CDP is online, no fresh data, and the same symbol is already being scraped" do
+      before do
+        allow(LeapsOptionChainSnapshot)
+          .to receive_message_chain(:for_symbol, :fresh, :exists?)
+          .and_return(false)
+        allow_any_instance_of(LeapsRecommendationsController)
+          .to receive(:cdp_online?).and_return(true)
+        allow(ScrapeLeapsJob).to receive(:perform_later)
+      end
+
+      around do |example|
+        original = Rails.cache
+        Rails.cache = ActiveSupport::Cache::MemoryStore.new
+        example.run
+      ensure
+        Rails.cache = original
+      end
+
+      def analyze(params)
+        post "/leaps/analyze", params: params
+        JSON.parse(response.body)
+      end
+
+      it "第二個人查同一個代號：拿到同一個 job_id，只排一個 job" do
+        first  = analyze(symbol: symbol)
+        second = analyze(symbol: symbol)
+
+        expect(second["job_id"]).to eq(first["job_id"])
+        expect(ScrapeLeapsJob).to have_received(:perform_later).once
+      end
+
+      it "共用的 job 狀態可以照常輪詢（pending）" do
+        first = analyze(symbol: symbol)
+        analyze(symbol: symbol)
+
+        get "/leaps/status", params: { job_id: first["job_id"] }
+        expect(JSON.parse(response.body)["status"]).to eq("pending")
+      end
+
+      it "履約價不同：各自一個 job" do
+        a = analyze(symbol: symbol, user_strike: "10")
+        b = analyze(symbol: symbol, user_strike: "12")
+
+        expect(a["job_id"]).not_to eq(b["job_id"])
+        expect(ScrapeLeapsJob).to have_received(:perform_later).twice
+      end
+    end
   end
 
 

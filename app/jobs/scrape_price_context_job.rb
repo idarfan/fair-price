@@ -17,7 +17,7 @@ class ScrapePriceContextJob < ApplicationJob
   # 鎖沒人解，所以鎖記下排程它的程序；程序換了，舊鎖直接作廢。
   # TTL 只用來清垃圾（job 卡死在同一個程序裡的最後保險），不參與判斷。
   LOCK_TTL   = 30.minutes
-  LOCK_OWNER = "#{Process.pid}-#{SecureRandom.hex(4)}".freeze
+  LOCK_OWNER = ApplicationJob::PROCESS_TOKEN
 
   # 前端輪詢最多等多久（秒），由頁面 data-poll-timeout-ms 帶給 leapsPriceContext.ts。
   # 跟 job 的最長時間同一個來源：兩支爬蟲各自跑滿外層逾時、各自再等砍程序的寬限期。

@@ -19,7 +19,7 @@
 |---|---|---|
 | S1 | 分頁隔離 | PASS（r1） |
 | S2 | 同時抓取上限＋排隊 | PASS（r1） |
-| S3 | LEAPS 同代號共用 | |
+| S3 | LEAPS 同代號共用 | PASS（r1） |
 | S4 | 價格情境卡排隊狀態 | |
 
 ### S1 分頁隔離（`lib/barchart_scrapers/cdp_helper.py`）
@@ -40,9 +40,9 @@
 - [x] 驗收：同時發 5 個不同代號，Chrome 同一時間最多 3 個爬蟲分頁
 
 ### S3 LEAPS 同代號共用（`LeapsRecommendationsController#analyze`）
-- [ ] 同代號＋同履約價已有進行中的 job → 回傳同一個 job_id，不再排第二個
-- [ ] job 結束（含失敗）即釋放，下一次查詢照常重抓（沿用今天的「失敗不保留」原則）
-- [ ] 驗收：兩個分頁同時查同一個未快取代號，log 只有一個 `ScrapeLeapsJob`，兩邊都拿到結果
+- [x] 同代號＋同履約價已有進行中的 job → 回傳同一個 job_id，不再排第二個
+- [x] job 結束（含失敗）即釋放，下一次查詢照常重抓（沿用今天的「失敗不保留」原則）
+- [x] 驗收：兩個分頁同時查同一個未快取代號，log 只有一個 `ScrapeLeapsJob`，兩邊都拿到結果
 
 ### S4 價格情境卡排隊狀態
 - [ ] 排隊中回 `queued`（與 `pending` 區分）；前端排隊時間不計入 `data-poll-timeout-ms`

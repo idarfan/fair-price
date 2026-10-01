@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-10-01（四）— 功能：LEAPS 同代號查詢共用同一次抓取（並行化 S3）
+
+- 同代號＋同履約價已有進行中的 LEAPS 抓取時，`/leaps/analyze` 回傳同一個 job_id，不再排第二個（`ScrapeLeapsJob.join_or_start`，Mutex 保證原子）。抓取結束（含失敗）即取消登記，只取消自己的；登記記下 `ApplicationJob::PROCESS_TOKEN`，server 重啟後作廢。前端未改。實測兩個 UBER 查詢同秒送出只排 1 個 job、共用同一 job_id、131 秒後 success（審查 PASS）。
+
 ### 2026-10-01（四）— 修正：Barchart 同時抓取上限明確化（並行化 S2）
 
 - 新增 `ScraperSlots`（`MAX_CONCURRENT = 3`），`run_scraper` 先取名額才啟動子程序，排隊時間不計入爬蟲時限。原本的上限是隱性的（Async 執行緒池 `max_threads = RAILS_MAX_THREADS`），調大 Puma 執行緒數就會連帶放大抓取數；現在兩者脫鉤。垂直價差 sidecar 跑在 HTTP 請求裡，依使用者裁示不算進上限。實測 5 個代號同時抓，Chrome 爬蟲分頁最多 3 個、後 2 個排隊後完成（審查 PASS）。

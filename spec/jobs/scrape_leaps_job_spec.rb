@@ -149,4 +149,121 @@ RSpec.describe ScrapeLeapsJob, type: :job do
       expect { described_class.perform_now(symbol, job_id) }.not_to raise_error
     end
   end
+
+  # 並行化 S3：同代號＋同履約價同時只跑一個 LEAPS 抓取，後來的人共用同一個 job_id。
+  # 進行中的登記記下持有程序（ApplicationJob::PROCESS_TOKEN）：server 重啟砍掉
+  # Async job 後，舊登記作廢，不會讓所有人卡在一個已經死掉的 job 上。
+  describe ".join_or_start／進行中登記" do
+    around do |example|
+      original = Rails.cache
+      Rails.cache = ActiveSupport::Cache::MemoryStore.new
+      example.run
+    ensure
+      Rails.cache = original
+    end
+
+    def start(strike = nil)
+      started = []
+      id = described_class.join_or_start(symbol, strike) { |new_id| started << new_id }
+      [ id, started ]
+    end
+
+    it "第一次查詢：產生新 job_id 並交給區塊去排程" do
+      id, started = start
+
+      expect(id).to match(/\A\h{16}\z/)
+      expect(started).to eq([ id ])
+    end
+
+    it "同代號＋同履約價進行中：回同一個 job_id，不再排第二個" do
+      first, = start(10.0)
+      second, started = start(10.0)
+
+      expect(second).to eq(first)
+      expect(started).to be_empty
+    end
+
+    it "履約價不同就是不同的抓取（中心履約價不同，資料不能共用）" do
+      a, = start(10.0)
+      b, started = start(12.0)
+      auto, = start(nil)
+
+      expect([ a, b, auto ].uniq.size).to eq(3)
+      expect(started).to eq([ b ])
+    end
+
+    it "代號大小寫視為同一個" do
+      first = described_class.join_or_start("nok", nil) { nil }
+      second = described_class.join_or_start("NOK", nil) { nil }
+
+      expect(second).to eq(first)
+    end
+
+    it "server 重啟前的程序留下的登記作廢，重新開始" do
+      Rails.cache.write(described_class.inflight_key(symbol, nil), { job_id: "deadbeefdeadbeef", owner: "dead-process" })
+
+      id, started = start
+
+      expect(id).not_to eq("deadbeefdeadbeef")
+      expect(started).to eq([ id ])
+    end
+
+    it "排程失敗時取消登記，下一次查詢可以重新開始" do
+      expect { described_class.join_or_start(symbol, nil) { raise IOError, "queue down" } }.to raise_error(IOError)
+
+      _, started = start
+      expect(started.size).to eq(1)
+    end
+
+    it "多個執行緒同時查同一代號，只排一個" do
+      original_read = Rails.cache.method(:read)
+      allow(Rails.cache).to receive(:read) do |*args, **kw|
+        value = original_read.call(*args, **kw)
+        sleep 0.05
+        value
+      end
+      started = Concurrent::Array.new
+
+      ids = Array.new(6) { Thread.new { described_class.join_or_start(symbol, nil) { |id| started << id } } }.map(&:value)
+
+      expect(ids.uniq.size).to eq(1)
+      expect(started.size).to eq(1)
+    end
+
+    describe "#perform 結束就取消登記" do
+      let(:svc) { instance_double(BarchartScraperService, fetch_pmcc_short_calls: { status: "no_candidates" }) }
+
+      before { allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc) }
+
+      it "成功之後，下一次查詢重新開始（快取新鮮度由 fresh_for? 另外判斷）" do
+        allow(svc).to receive(:fetch_leaps).and_return({ status: "success", errors: [] })
+        id, = start
+
+        described_class.perform_now(symbol, id)
+
+        _, started = start
+        expect(started.size).to eq(1)
+      end
+
+      it "失敗（例外）也一樣取消，失敗結果不會讓後來的人共用" do
+        allow(svc).to receive(:fetch_leaps).and_raise(RuntimeError, "boom")
+        id, = start
+
+        described_class.perform_now(symbol, id)
+
+        _, started = start
+        expect(started.size).to eq(1)
+      end
+
+      it "只取消自己的登記：舊 job 晚結束時，不會把新一輪的登記清掉" do
+        allow(svc).to receive(:fetch_leaps).and_return({ status: "success", errors: [] })
+        Rails.cache.write(described_class.inflight_key(symbol, nil),
+                          { job_id: "newer0000000000a", owner: ApplicationJob::PROCESS_TOKEN })
+
+        described_class.perform_now(symbol, "older0000000000b")
+
+        expect(described_class.join_or_start(symbol, nil) { nil }).to eq("newer0000000000a")
+      end
+    end
+  end
 end
