@@ -1,5 +1,10 @@
 # FairPrice
 
+### 2026-10-02（五）— 版本 v20261002，更新版本說明
+
+- 版本更新說明新增 v20261002：POI／52 週／當日區間抓取失敗後重新查詢會重抓、當日區間不再停在「載入中…」、抓取卡住會自動中止、多人同時查詢不互相干擾、同一檔股票同一履約價的 LEAPS 查詢共用一次抓取、查詢人多時自動排隊不誤報逾時。
+- `.gitignore` 新增 `**/.claude/command-log.txt`、`**/.claude/.cc-writes/`：hook 會在子目錄寫出這兩種紀錄，原規則只對根目錄有效，auto-commit hook 的 `git add -A` 會把它們收進 commit。
+
 ### 2026-10-02（五）— 工具：審查用 MCP（rails-mcp-server 2.0.0、RuboCop MCP）
 
 - rails-mcp-server（全域 gem）由 1.5.1 升級至 2.0.0：1.5.1 的 `execute_ruby` 有官方已修正的主機任意指令執行路徑，2.0.0 已移除該工具、成為純查詢（routes／schema／models／檔案瀏覽）。

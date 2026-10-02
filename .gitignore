@@ -39,6 +39,11 @@ client_secret_*.json
 # Claude Code 本地設定
 .claude/settings.local.json
 .claude/command-log.txt
+# hook 會在指令碰過的子目錄寫出 .claude/（command-log.txt、.cc-writes/）；
+# 上一行只對根目錄有效，auto-commit hook 的 git add -A 會把子目錄的收進去。
+# 只排除這兩種紀錄，根目錄已進版控的 .claude/settings.json、skills 不受影響。
+**/.claude/command-log.txt
+**/.claude/.cc-writes/
 
 # 測試覆蓋率報告
 /coverage/
