@@ -85,6 +85,10 @@ group :development do
 
   # N+1 查詢偵測（只記錄不拋錯，設定見 config/initializers/bullet.rb）
   gem "bullet"
+
+  # `bundle exec rubocop --mcp`（RuboCop 1.85+ 的實驗性 MCP server，供審查用）需要它。
+  # rubocop 只要求 >= 0.6.0；鎖在目前維護中的 1.x（MCP 官方 Ruby SDK）。
+  gem "mcp", "~> 1.6", require: false
 end
 
 gem "ruby-lsp", "~> 0.26.8", group: :development

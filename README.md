@@ -1,5 +1,11 @@
 # FairPrice
 
+### 2026-10-02（五）— 工具：審查用 MCP（rails-mcp-server 2.0.0、RuboCop MCP）
+
+- rails-mcp-server（全域 gem）由 1.5.1 升級至 2.0.0：1.5.1 的 `execute_ruby` 有官方已修正的主機任意指令執行路徑，2.0.0 已移除該工具、成為純查詢（routes／schema／models／檔案瀏覽）。
+- Gemfile development 群組新增 `mcp ~> 1.6`（MCP 官方 Ruby SDK），`.mcp.json` 註冊 `rubocop`（`bundle exec rubocop --mcp`）。注意 `rubocop_autocorrection` 會改寫檔案，非唯讀。
+- 評估後不安裝 `rails_mcp_code_search`（GitHub repo 已封存）。bundler-audit 無漏洞（審查 PASS）。
+
 ### 2026-10-02（五）— 功能：價格情境卡區分排隊中與執行中（並行化 S4）
 
 - 抓取可能排在別人的 LEAPS 後面等名額。`BarchartScraperService` 新增可選 `phase:` 回呼（等名額前 `:queued`、拿到後 `:running`），`ScrapePriceContextJob` 記錄階段；輪詢端點進行中時回 `queued` 或 `pending`，且進行中不再做 CDP 預檢。前端只把 `pending` 算進 `data-poll-timeout-ms`。實測 NVDA／TSLA／META 佔滿名額時，PYPL 依序 queued → pending → queued（約 70 秒）→ pending → ok。同時更正 S2 的錯誤陳述：原本背景抓取上限是 5（Async 執行緒池預設），不是 3（審查 PASS）。

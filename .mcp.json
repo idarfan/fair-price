@@ -9,6 +9,17 @@
       "args": [],
       "env": {}
     },
+    "rubocop": {
+      "command": "/home/idarfan/.rbenv/shims/bundle",
+      "args": [
+        "exec",
+        "rubocop",
+        "--mcp"
+      ],
+      "env": {
+        "BUNDLE_GEMFILE": "/home/idarfan/fairprice/Gemfile"
+      }
+    },
     "code-review-graph": {
       "command": "uvx",
       "args": [
