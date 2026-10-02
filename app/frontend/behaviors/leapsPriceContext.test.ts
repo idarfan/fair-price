@@ -111,6 +111,44 @@ describe("leapsPriceContext", () => {
       expect(fetchMock).toHaveBeenCalledTimes(6);
     });
 
+    // 並行化 S4：S2 之後抓取可能排在別人的 LEAPS（3–5 分鐘）後面。
+    // 伺服器回 queued 時是在排隊，不能算進 data-poll-timeout-ms（那只涵蓋爬蟲執行時間）。
+    it("queued 不算進輪詢上限：排隊再久也不顯示逾時，輪到之後才開始計時", async () => {
+      let calls = 0;
+      fetchMock.mockImplementation(() => {
+        calls += 1;
+        // 前 40 次（200 秒）在排隊，之後才開始跑，跑完回 ok
+        if (calls <= 40) return Promise.resolve(json({ status: "queued" }));
+        if (calls <= 44) return Promise.resolve(json({ status: "pending" }));
+        return Promise.resolve(json({ status: "ok", html: "<p>done</p>" }));
+      });
+      const root = mountWithBudget("30000"); // 執行上限只有 30 秒＝6 次
+
+      init(root);
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+      await flush();
+
+      expect(root.textContent).not.toContain("逾時");
+      expect(root.textContent).toContain("done");
+      expect(fetchMock).toHaveBeenCalledTimes(45);
+    });
+
+    it("queued 夾帶的卡片照樣畫出來", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          json({ status: "queued", html: "<p>day range</p>" }),
+        )
+        .mockResolvedValue(
+          json({ status: "queued", html: "<p>day range</p>" }),
+        );
+      const root = mountWithBudget("30000");
+
+      init(root);
+      await flush();
+
+      expect(root.textContent).toContain("day range");
+    });
+
     it.each([null, "", "abc", "0", "-5"])(
       "data-poll-timeout-ms 缺漏或不合法（%s）時退回預設 2 分鐘",
       async (ms) => {

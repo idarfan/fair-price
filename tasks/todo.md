@@ -20,7 +20,8 @@
 | S1 | 分頁隔離 | PASS（r1） |
 | S2 | 同時抓取上限＋排隊 | PASS（r1） |
 | S3 | LEAPS 同代號共用 | PASS（r1） |
-| S4 | 價格情境卡排隊狀態 | |
+| S4 | 價格情境卡排隊狀態 | PASS（r1） |
+| S1hotfix | 孤兒清理遇到非追蹤檔讓爬蟲全掛 | PASS（r1） |
 
 ### S1 分頁隔離（`lib/barchart_scrapers/cdp_helper.py`）
 - [x] `prepare_page` 每次開專屬新分頁（`PUT /json/new?about:blank`），再走原本的 `cdp_navigate` 導航；不再借用既有分頁
@@ -33,8 +34,9 @@
 - [x] 程序內計數號誌（上限 3，常數），所有爬蟲共用；超過的排隊
   （偏離一：垂直價差 sidecar 不算進上限——使用者裁示。它跑在 HTTP 請求裡，排隊會佔住 Puma 執行緒；
    本身已被 Puma 3 個執行緒限制在最多 3 個。
-   偏離二：查證後上限原本就隱性存在——Async 執行緒池 max_threads＝RAILS_MAX_THREADS＝3。
-   本階段改為「明確化、與 Puma 執行緒數脫鉤」）
+   偏離二：送審時寫「上限原本就隱性存在——Async 執行緒池 max_threads＝RAILS_MAX_THREADS＝3」，**有誤**：
+   production 未設 RAILS_MAX_THREADS，Puma 預設 3、Async 執行緒池預設 5，原本實際上限是 5。
+   S4 實測時發現，2026-10-02 更正；ScraperSlots 實際把上限由 5 降為 3）
 - [x] 排隊時間不計入 `TimedCapture` 的爬蟲時限（取得名額後才開始計時）
 - [x] 前提同 `LOCK_MUTEX`：Puma single mode＋Async adapter（註解標明）
 - [x] 驗收：同時發 5 個不同代號，Chrome 同一時間最多 3 個爬蟲分頁
@@ -45,9 +47,21 @@
 - [x] 驗收：兩個分頁同時查同一個未快取代號，log 只有一個 `ScrapeLeapsJob`，兩邊都拿到結果
 
 ### S4 價格情境卡排隊狀態
-- [ ] 排隊中回 `queued`（與 `pending` 區分）；前端排隊時間不計入 `data-poll-timeout-ms`
-- [ ] 原因：S2 之後價格情境抓取可能排在 LEAPS（3–5 分鐘）後面，370 秒上限不再涵蓋排隊
-- [ ] 驗收：佔滿 3 個名額時查價格情境，畫面持續等待不顯示逾時，名額空出後完成
+- [x] 排隊中回 `queued`（與 `pending` 區分）；前端排隊時間不計入 `data-poll-timeout-ms`
+- [x] 原因：S2 之後價格情境抓取可能排在 LEAPS（3–5 分鐘）後面，370 秒上限不再涵蓋排隊
+- [x] 驗收：佔滿 3 個名額時查價格情境，畫面持續等待不顯示逾時，名額空出後完成
+
+## 回顧（2026-10-02）
+
+- 結果：S1 `0aa7312`、S2 `005e01a`、S3 `e7e2f46`、S1hotfix `499d4b6`、S4（本 commit），全部審查 PASS。
+- **S1 造成約 13 小時全面停擺**：hook 在 `tmp/cdp_tabs/` 建了 `.claude/`，孤兒清理滿 30 分鐘後刪它丟例外，
+  所有爬蟲開分頁前就失敗（2026-10-01 23:44 → 10-02 13:03，受影響僅測試查詢）。S1 驗收只在當下跑一次，
+  沒有跨過「過期門檻」再驗，所以沒抓到。教訓已記入 memory `feedback_hook_stray_claude_dirs`。
+- **S2 送審時事實陳述錯誤**：說原本隱性上限是 3，實際是 5（Puma 預設 3、Async 執行緒池預設 5，
+  production 未設 `RAILS_MAX_THREADS`）。只看 `puma.rb` 就套用到執行緒池，沒有查 activejob 的預設值。
+  S4 實測時發現並更正。
+- 未處理：server 重啟時正在等 LEAPS 結果的人，前端要輪詢到上限才顯示錯誤（S3 前即存在）。
+  牛市價差、技術儀表板的同代號共用（見下）。
 
 ## 不在本次範圍
 

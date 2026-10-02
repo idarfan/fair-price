@@ -83,13 +83,13 @@ RSpec.describe "GET /leaps/price_context", type: :request do
       allow_any_instance_of(LeapsRecommendationsController).to receive(:cdp_online?).and_return(true)
     end
 
-    it "排 job 重抓，回 pending 並附上舊資料的 HTML" do
+    it "排 job 重抓，回 queued（剛排、還沒開始跑） 並附上舊資料的 HTML" do
       expect(ScrapePriceContextJob).to receive(:perform_later).with(symbol).once
 
       get "/leaps/price_context", params: { symbol: symbol }
 
       body = JSON.parse(response.body)
-      expect(body["status"]).to eq("pending")
+      expect(body["status"]).to eq("queued")
       expect(body["html"]).to include("data-pc-key=\"poi\"")
     end
 
@@ -133,7 +133,7 @@ RSpec.describe "GET /leaps/price_context", type: :request do
 
       get "/leaps/price_context", params: { symbol: symbol }
 
-      expect(JSON.parse(response.body)["status"]).to eq("pending")
+      expect(JSON.parse(response.body)["status"]).to eq("queued")
     end
 
     it "pending 時夾帶已經有的當日區間，不讓使用者對著三張空卡等" do
@@ -177,13 +177,13 @@ RSpec.describe "GET /leaps/price_context", type: :request do
   end
 
   context "還沒有資料" do
-    it "CDP 連得上時排一次 job 並回 pending" do
+    it "CDP 連得上時排一次 job 並回 queued" do
       allow_any_instance_of(LeapsRecommendationsController).to receive(:cdp_online?).and_return(true)
       expect(ScrapePriceContextJob).to receive(:perform_later).with(symbol).once
 
       get "/leaps/price_context", params: { symbol: symbol }
 
-      expect(JSON.parse(response.body)["status"]).to eq("pending")
+      expect(JSON.parse(response.body)["status"]).to eq("queued")
     end
 
     it "連續輪詢只排一次 job（cache lock）" do
@@ -278,7 +278,7 @@ RSpec.describe "GET /leaps/price_context", type: :request do
       expect(ScrapePriceContextJob).to receive(:perform_later).with(symbol).once
       get "/leaps/price_context", params: { symbol: symbol }
 
-      expect(JSON.parse(response.body)["status"]).to eq("pending")
+      expect(JSON.parse(response.body)["status"]).to eq("queued")
     end
 
     it "輪詢端點本身不清失敗結果（否則會變成無限重抓）" do
@@ -305,8 +305,9 @@ RSpec.describe "GET /leaps/price_context", type: :request do
 
     before { create_volap }
 
-    it "抓取還在跑（有鎖、沒有結果）：回 pending 並附上已有的卡片，不重複排程" do
+    it "抓取還在跑（有鎖、沒有結果、執行中）：回 pending 並附上已有的卡片，不重複排程" do
       ScrapePriceContextJob.acquire_lock(symbol)
+      ScrapePriceContextJob.record_phase(symbol, :running)
       expect(ScrapePriceContextJob).not_to receive(:perform_later)
 
       get "/leaps/price_context", params: { symbol: symbol }
@@ -343,6 +344,61 @@ RSpec.describe "GET /leaps/price_context", type: :request do
       expect(body["status"]).to eq("ok")
       expect(body["html"]).to include("暫無資料")
       expect(body["html"]).not_to include("載入中")
+    end
+  end
+
+  # 並行化 S4：S2 之後抓取可能排在別人的 LEAPS（3–5 分鐘）後面。
+  # 進行中要分成 queued（排隊，不算進前端的逾時）與 pending（爬蟲真的在跑）。
+  describe "進行中的兩種狀態" do
+    before { ScrapePriceContextJob.acquire_lock(symbol) }
+
+    # 進行中不排新 job，所以不做 CDP 預檢；CDP 暫時離線也不能把正在跑的抓取說成失敗。
+    it "進行中時不做 CDP 預檢" do
+      ScrapePriceContextJob.record_phase(symbol, :running)
+      expect_any_instance_of(LeapsRecommendationsController).not_to receive(:cdp_online?)
+
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      expect(JSON.parse(response.body)["status"]).to eq("pending")
+    end
+
+    it "已排程但 job 還沒開始（沒有階段紀錄）：queued" do
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      expect(JSON.parse(response.body)["status"]).to eq("queued")
+    end
+
+    it "爬蟲在等抓取名額：queued" do
+      ScrapePriceContextJob.record_phase(symbol, :queued)
+
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      expect(JSON.parse(response.body)["status"]).to eq("queued")
+    end
+
+    it "爬蟲拿到名額、正在跑：pending" do
+      ScrapePriceContextJob.record_phase(symbol, :running)
+
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      expect(JSON.parse(response.body)["status"]).to eq("pending")
+    end
+
+    it "VOLAP 已新鮮、但日線那支還在排隊：queued，附上已有的卡片" do
+      create_volap
+      ScrapePriceContextJob.record_phase(symbol, :queued)
+
+      get "/leaps/price_context", params: { symbol: symbol }
+
+      body = JSON.parse(response.body)
+      expect(body["status"]).to eq("queued")
+      expect(body["html"]).to include("data-pc-key=\"poi\"")
+    end
+
+    it "排隊中不會重複排程" do
+      expect(ScrapePriceContextJob).not_to receive(:perform_later)
+
+      get "/leaps/price_context", params: { symbol: symbol }
     end
   end
 end

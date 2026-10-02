@@ -3,9 +3,11 @@
 # 全站同時執行的 Barchart 爬蟲上限。所有爬蟲共用一個 Chrome（9222），
 # 每支各開一個分頁（cdp_helper.get_target），同時太多會把 Chrome 壓垮。
 #
-# 原本的上限是隱性的：Async adapter 執行緒池 max_threads = RAILS_MAX_THREADS（3），
-# 剛好讓背景工作最多 3 個。但那個值也是 Puma 處理網頁請求的執行緒數，
-# 調大它抓取上限會跟著變大。這裡把上限寫死成自己的常數。
+# 原本沒有明確上限：Async adapter 執行緒池 max_threads 取 ENV["RAILS_MAX_THREADS"]，
+# 未設定時預設 **5**（activejob async_adapter.rb）；Puma 的預設則是 3（config/puma.rb）。
+# production 沒有設這個環境變數，所以背景抓取原本最多同時 5 個。
+# （2026-10-01 S2 送審時誤寫成「隱性上限 3」，S4 實測時發現、2026-10-02 更正。）
+# 這裡把上限寫死成自己的常數，也不再跟 Puma／執行緒池的設定連動。
 #
 # 程序內號誌就夠：Puma single mode＋Async adapter，所有爬蟲都在本程序啟動
 # （同 ScrapePriceContextJob::LOCK_MUTEX 的前提；改 cluster mode 時要換跨程序的做法）。

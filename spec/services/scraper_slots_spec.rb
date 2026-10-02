@@ -5,9 +5,9 @@ require "rails_helper"
 # 所有 Barchart 爬蟲共用一個 Chrome（9222）。同時開太多分頁會把它壓垮，
 # 所以同時執行的爬蟲數有明確上限。
 #
-# 原本的上限是隱性的：Async adapter 執行緒池 max_threads = RAILS_MAX_THREADS（3），
-# 剛好讓背景工作最多 3 個——但那個值也是 Puma 處理網頁請求的執行緒數，
-# 調大它抓取上限會跟著變大，沒有人會發現。
+# 原本沒有明確上限：Async adapter 執行緒池 max_threads 取 RAILS_MAX_THREADS，
+# production 未設定時預設 5（Puma 預設 3，兩者不同），背景抓取最多同時 5 個。
+# （S2 送審時誤寫成 3，2026-10-02 更正。）
 RSpec.describe ScraperSlots do
   it "上限是明確的常數 3，不跟 RAILS_MAX_THREADS 連動" do
     expect(described_class::MAX_CONCURRENT).to eq(3)

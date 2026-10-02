@@ -226,9 +226,9 @@ class LeapsRecommendationsController < ApplicationController
     if payload.values_at(:poi, :week52).any?(&:present?) && VolapSnapshot.fresh_for?(symbol)
       # 2026-10-01 RKLB：job 先抓 VOLAP 再抓日線，VOLAP 一寫進來就會通過上面的
       # fresh gate。這時回 ok 前端就停止輪詢，日線晚十幾秒進來也沒人看到。
-      # job 還在跑就回 pending 讓前端繼續等。
+      # job 還在跑就回 pending／queued 讓前端繼續等。
       if ScrapePriceContextJob.running?(symbol)
-        return render json: { status: "pending", html: render_price_context_html(payload) }
+        return render json: { status: price_context_progress(symbol), html: render_price_context_html(payload) }
       end
 
       # ok 是終局：這一輪不會再有東西進來，空卡不能再寫「載入中」。
@@ -243,6 +243,13 @@ class LeapsRecommendationsController < ApplicationController
     # 抓過而且確定拿不到：回終局訊息讓前端停止輪詢。
     return render json: price_context_stop(payload, has_partial, terminal) if terminal
 
+    # 已經有 job 在處理（排隊或執行中）：不排新的，也就不必做 CDP 預檢——
+    # CDP 暫時離線不能把正在跑的抓取說成失敗。
+    if ScrapePriceContextJob.running?(symbol)
+      return render json: { status: price_context_progress(symbol) }
+               .merge(has_partial ? { html: render_price_context_html(payload) } : {})
+    end
+
     # CLAUDE.md「CDP 預檢（全域強制）」：排 job 之前先確認 CDP 連得上，
     # 連不上就直接回報、不排 job，讓使用者 1–2 秒內看到可行動的訊息，
     # 而不是輪詢兩分鐘才逾時。
@@ -253,11 +260,17 @@ class LeapsRecommendationsController < ApplicationController
     enqueue_price_context(symbol)
 
     # 已經有 day_range 就連同那張卡一起回，使用者不必盯著三張空卡等 VOLAP。
-    render json: { status: "pending" }
+    render json: { status: price_context_progress(symbol) }
              .merge(has_partial ? { html: render_price_context_html(payload) } : {})
   end
 
   private
+
+  # 進行中的兩種狀態：爬蟲拿到抓取名額正在跑＝pending（算進前端逾時）；
+  # 其餘（job 還沒開始、或在等名額）＝queued（不算進前端逾時）。並行化 S4。
+  def price_context_progress(symbol)
+    ScrapePriceContextJob.phase(symbol) == "running" ? "pending" : "queued"
+  end
 
   # index 用：已經有快照就直接帶進畫面。抓取本身是 job 的事，這裡只讀 DB。
   def price_context_payload

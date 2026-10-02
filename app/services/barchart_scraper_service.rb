@@ -27,9 +27,12 @@ class BarchartScraperService
   # 其他爬蟲不在表上＝不設時限（LEAPS 本來就要跑 3–5 分鐘）。
   SCRAPER_TIMEOUTS_S = { "volap" => 180, "price_history" => 120 }.freeze
 
-  def initialize(symbol)
+  # phase：可選的回呼，每支爬蟲等抓取名額前收到 :queued、拿到名額後收到 :running。
+  # 價格情境卡用它分辨排隊中與執行中（前端的逾時只算執行時間；並行化 S4）。
+  def initialize(symbol, phase: nil)
     @symbol = symbol.upcase
     @today  = Date.today
+    @phase  = phase
   end
 
   # Full daily fetch: all four scraper types, all charts, updates contract snapshot.
@@ -532,7 +535,11 @@ class BarchartScraperService
     cmd    = [ "python3", script.to_s, @symbol, *extra_args ]
 
     # 先拿全站抓取名額再啟動子程序：排隊時間不算進爬蟲時限。
-    executed = ScraperSlots.with_slot { execute_scraper(type, cmd) }
+    @phase&.call(:queued)
+    executed = ScraperSlots.with_slot do
+      @phase&.call(:running)
+      execute_scraper(type, cmd)
+    end
     return executed if executed.is_a?(Hash)
 
     stdout, stderr, status = executed

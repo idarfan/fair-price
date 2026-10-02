@@ -56,9 +56,27 @@ class ScrapePriceContextJob < ApplicationJob
     LOCK_MUTEX.synchronize { Rails.cache.delete(lock_key(symbol)) }
   end
 
+  # 抓取階段：S2 之後爬蟲可能要等抓取名額（排在別人的 LEAPS 後面，3–5 分鐘）。
+  # 前端的逾時上限（poll_budget_s）只涵蓋爬蟲真的在跑的時間，所以要分得出
+  # 「排隊中」與「執行中」。沒有紀錄＝job 已排程但還沒開始，也算排隊中。並行化 S4。
+  PHASES = %w[queued running].freeze
+
+  def self.phase_key(symbol) = "price_context_phase_#{symbol.to_s.upcase}"
+
+  def self.phase(symbol) = Rails.cache.read(phase_key(symbol))
+
+  def self.record_phase(symbol, phase)
+    value = phase.to_s
+    raise ArgumentError, "unknown phase: #{phase.inspect}" unless PHASES.include?(value)
+
+    Rails.cache.write(phase_key(symbol), value, expires_in: LOCK_TTL)
+  end
+
+  def self.clear_phase(symbol) = Rails.cache.delete(phase_key(symbol))
+
   def perform(symbol)
     symbol = symbol.to_s.upcase
-    svc = BarchartScraperService.new(symbol)
+    svc = BarchartScraperService.new(symbol, phase: ->(p) { self.class.record_phase(symbol, p) })
 
     volap = run_isolated("volap")         { svc.fetch_volap }
     daily = run_isolated("price_history") { svc.fetch_price_history }
@@ -70,6 +88,7 @@ class ScrapePriceContextJob < ApplicationJob
       expires_in: CACHE_TTL
     )
   ensure
+    self.class.clear_phase(symbol)
     self.class.release_lock(symbol)
   end
 

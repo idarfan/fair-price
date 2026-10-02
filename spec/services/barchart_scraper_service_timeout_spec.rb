@@ -62,6 +62,30 @@ RSpec.describe BarchartScraperService, "#run_scraper" do
     expect(order).to eq(%i[slot_acquired subprocess_started])
   end
 
+  # 並行化 S4：價格情境卡要能分辨「排隊中」與「執行中」，前端的逾時只算執行時間。
+  it "有 phase 回呼時：等名額前通知 :queued，拿到名額後、啟動子程序前通知 :running" do
+    order = []
+    phased = described_class.new("TSTX", phase: ->(p) { order << p })
+    allow(ScraperSlots).to receive(:with_slot) do |&blk|
+      order << :slot_acquired
+      blk.call
+    end
+    allow(TimedCapture).to receive(:call) do
+      order << :subprocess_started
+      ok_result('{"status":"success"}')
+    end
+
+    phased.send(:run_scraper, "volap")
+
+    expect(order).to eq(%i[queued slot_acquired running subprocess_started])
+  end
+
+  it "沒有 phase 回呼時照舊（既有呼叫端不受影響）" do
+    allow(TimedCapture).to receive(:call).and_return(ok_result('{"status":"success"}'))
+
+    expect(service.send(:run_scraper, "volap")[:status]).to eq("success")
+  end
+
   it "時限比爬蟲內部的等待上限長，正常路徑不會被誤砍" do
     expect(described_class::SCRAPER_TIMEOUTS_S.fetch("volap")).to be >= 8 + 45 + 60 + 30
     expect(described_class::SCRAPER_TIMEOUTS_S.fetch("price_history")).to be >= 45 + 30

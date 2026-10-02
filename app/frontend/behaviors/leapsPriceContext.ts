@@ -134,7 +134,6 @@ export function init(root: HTMLElement): void {
   // 會讓正在看當日區間的人一直閃，而內容其實沒變（lastHtml 宣告在上方，內容沒變就不重畫）。
 
   const poll = (): void => {
-    attempts += 1;
     fetch(`/leaps/price_context?${query.toString()}`, {
       headers: { Accept: "application/json" },
     })
@@ -171,12 +170,15 @@ export function init(root: HTMLElement): void {
           return;
         }
 
-        // pending。夾帶的那半邊先畫出來，不要讓人對著三張空卡等 VOLAP。
+        // pending／queued。夾帶的那半邊先畫出來，不要讓人對著三張空卡等 VOLAP。
         if (html && html !== lastHtml) {
           applyHtml(root, html);
           lastHtml = html;
         }
 
+        // queued＝排在別人的抓取後面（並行化 S4），不算進 data-poll-timeout-ms：
+        // 那個上限只涵蓋爬蟲真的在跑的時間。排隊本身由伺服器端的鎖 TTL 兜底。
+        if (status !== "queued") attempts += 1;
         if (attempts >= limit) {
           timedOut(root, "價格情境資料抓取逾時，請重新整理頁面再試一次。");
           return;
@@ -185,6 +187,7 @@ export function init(root: HTMLElement): void {
       })
       .catch(() => {
         // 網路瞬斷不該直接放棄——還在次數內就繼續等下一輪。
+        attempts += 1;
         if (attempts >= limit) {
           timedOut(root, "價格情境資料抓取失敗，請重新整理頁面再試一次。");
           return;

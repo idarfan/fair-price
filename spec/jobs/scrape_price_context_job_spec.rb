@@ -17,7 +17,8 @@ RSpec.describe ScrapePriceContextJob do
     Rails.cache = original
   end
 
-  before { allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc) }
+  # S4 起 job 會傳 phase: 回呼，讓輪詢端點分辨排隊中與執行中。
+  before { allow(BarchartScraperService).to receive(:new).with(symbol, phase: kind_of(Proc)).and_return(svc) }
 
   describe "排程鎖" do
     it "acquire_lock 成功後 running? 為 true；同一程序第二次 acquire 失敗" do
@@ -67,6 +68,43 @@ RSpec.describe ScrapePriceContextJob do
                   (2 * TimedCapture::DEFAULT_KILL_GRACE_S)
 
       expect(described_class.poll_budget_s).to be > worst_job
+    end
+  end
+
+  # 並行化 S4：S2 之後價格情境抓取可能排在 LEAPS（3–5 分鐘）後面。前端的逾時上限
+  # （poll_budget_s）只涵蓋爬蟲真的在跑的時間，排隊時間要能跟它分開。
+  describe "抓取階段（排隊中／執行中）" do
+    it "爬蟲回報的階段寫進快取，讀得回來" do
+      phase_cb = nil
+      allow(BarchartScraperService).to receive(:new).with(symbol, phase: kind_of(Proc)) do |_, phase:|
+        phase_cb = phase
+        svc
+      end
+      seen = []
+      allow(svc).to receive(:fetch_volap) do
+        phase_cb.call(:queued)
+        seen << described_class.phase(symbol)
+        phase_cb.call(:running)
+        seen << described_class.phase(symbol)
+        { status: "success" }
+      end
+      allow(svc).to receive(:fetch_price_history).and_return({ status: "success" })
+
+      described_class.perform_now(symbol)
+
+      expect(seen).to eq(%w[queued running])
+    end
+
+    it "job 結束（含例外）就清掉階段" do
+      allow(svc).to receive(:fetch_volap) do
+        described_class.record_phase(symbol, :running)
+        raise IOError, "scraper blew up"
+      end
+      allow(svc).to receive(:fetch_price_history).and_return({ status: "success" })
+
+      described_class.perform_now(symbol)
+
+      expect(described_class.phase(symbol)).to be_nil
     end
   end
 

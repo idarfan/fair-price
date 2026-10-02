@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-10-02（五）— 功能：價格情境卡區分排隊中與執行中（並行化 S4）
+
+- 抓取可能排在別人的 LEAPS 後面等名額。`BarchartScraperService` 新增可選 `phase:` 回呼（等名額前 `:queued`、拿到後 `:running`），`ScrapePriceContextJob` 記錄階段；輪詢端點進行中時回 `queued` 或 `pending`，且進行中不再做 CDP 預檢。前端只把 `pending` 算進 `data-poll-timeout-ms`。實測 NVDA／TSLA／META 佔滿名額時，PYPL 依序 queued → pending → queued（約 70 秒）→ pending → ok。同時更正 S2 的錯誤陳述：原本背景抓取上限是 5（Async 執行緒池預設），不是 3（審查 PASS）。
+
 ### 2026-10-02（五）— 修正：孤兒分頁清理遇到非追蹤檔時讓所有爬蟲失敗（S1 熱修）
 
 - hook 在 `tmp/cdp_tabs/` 建了 `.claude/` 資料夾，S1 的孤兒清理滿 30 分鐘後試圖 `unlink` 它而丟 `IsADirectoryError`，自 2026-10-01 23:44 起所有 Barchart 爬蟲在開分頁前即失敗（受影響僅 10-02 13:03 的測試查詢）。清理改為只處理一般檔案、逐項吞掉例外並寫 stderr，`get_target` 呼叫清理也包在保護內。在資料夾仍存在的條件下實測 price_history DIS、leaps NOK、網站 DIS 價格情境皆成功（審查 PASS）。
@@ -10,7 +14,7 @@
 
 ### 2026-10-01（四）— 修正：Barchart 同時抓取上限明確化（並行化 S2）
 
-- 新增 `ScraperSlots`（`MAX_CONCURRENT = 3`），`run_scraper` 先取名額才啟動子程序，排隊時間不計入爬蟲時限。原本的上限是隱性的（Async 執行緒池 `max_threads = RAILS_MAX_THREADS`），調大 Puma 執行緒數就會連帶放大抓取數；現在兩者脫鉤。垂直價差 sidecar 跑在 HTTP 請求裡，依使用者裁示不算進上限。實測 5 個代號同時抓，Chrome 爬蟲分頁最多 3 個、後 2 個排隊後完成（審查 PASS）。
+- 新增 `ScraperSlots`（`MAX_CONCURRENT = 3`），`run_scraper` 先取名額才啟動子程序，排隊時間不計入爬蟲時限。原本沒有明確上限：Async 執行緒池 `max_threads` 取 `RAILS_MAX_THREADS`，production 未設定時預設 5，背景抓取最多同時 5 個（S2 送審時誤寫為 3，2026-10-02 更正）；現在固定為 3，且與 Puma／執行緒池設定脫鉤。垂直價差 sidecar 跑在 HTTP 請求裡，依使用者裁示不算進上限。實測 5 個代號同時抓，Chrome 爬蟲分頁最多 3 個、後 2 個排隊後完成（審查 PASS）。
 
 ### 2026-10-01（四）— 修正：Barchart 爬蟲每次抓取開專屬分頁（並行化 S1）
 
