@@ -53,8 +53,8 @@ def _close_tab(target_id):
 def _forget_tab(target_id):
     try:
         (TAB_TRACK_DIR / target_id).unlink()
-    except FileNotFoundError:
-        pass
+    except OSError:
+        pass   # 已經不在、權限、或根本不是檔案——追蹤檔只是保險，不能讓抓取失敗
 
 
 def close_owned_tabs():
@@ -69,21 +69,29 @@ def close_owned_tabs():
 
 
 def _sweep_orphan_tabs():
-    """關掉被 SIGKILL 的爬蟲留下的分頁（追蹤檔超過 ORPHAN_AGE_S）。"""
-    if not TAB_TRACK_DIR.is_dir():
+    """
+    關掉被 SIGKILL 的爬蟲留下的分頁（追蹤檔超過 ORPHAN_AGE_S）。
+
+    追蹤目錄是共用位置，裡面可能出現別人放的東西（2026-10-01：hook 建了 .claude/
+    資料夾，滿 30 分鐘後 unlink 一個資料夾丟 IsADirectoryError，**所有爬蟲**每次都失敗）。
+    所以只處理一般檔案、任何錯誤都吞掉——清理只是保險，絕不能讓抓取失敗。
+    """
+    try:
+        entries = list(TAB_TRACK_DIR.iterdir()) if TAB_TRACK_DIR.is_dir() else []
+    except OSError:
         return
     cutoff = time.time() - ORPHAN_AGE_S
-    for entry in TAB_TRACK_DIR.iterdir():
+    for entry in entries:
         try:
-            if entry.stat().st_mtime >= cutoff:
+            if not entry.is_file() or entry.stat().st_mtime >= cutoff:
                 continue
-        except FileNotFoundError:
-            continue
-        try:
-            _close_tab(entry.name)
-        except (OSError, ValueError):
-            pass   # 分頁早就不在了也一樣要清追蹤檔
-        _forget_tab(entry.name)
+            try:
+                _close_tab(entry.name)
+            except (OSError, ValueError):
+                pass   # 分頁早就不在了也一樣要清追蹤檔
+            _forget_tab(entry.name)
+        except Exception as e:   # noqa: BLE001 — 見上：清理失敗不能變成抓取失敗
+            print(f"[cdp_helper] orphan sweep skipped {entry.name}: {e}", file=sys.stderr)
 
 
 def _exit_on_sigterm(signum, frame):
@@ -106,7 +114,10 @@ def get_target(symbol, page_type):
     不看既有分頁——借用別人的分頁正是並行抓取互相干擾的原因。
     symbol／page_type 保留在簽名上給呼叫端，導航由 prepare_page 負責。
     """
-    _sweep_orphan_tabs()
+    try:
+        _sweep_orphan_tabs()
+    except Exception as e:   # noqa: BLE001 — 清理是保險，失敗不能擋住這次抓取
+        print(f"[cdp_helper] orphan sweep failed: {e}", file=sys.stderr)
     try:
         tab = _open_blank_tab()
     except (OSError, ValueError):

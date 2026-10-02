@@ -255,6 +255,35 @@ class TestSweepOrphanTabs(_TabStateMixin, unittest.TestCase):
         with patch.object(helper, "TAB_TRACK_DIR", Path(self._tmp.name) / "nope"):
             helper._sweep_orphan_tabs()
 
+    def test_foreign_directory_inside_track_dir_is_ignored(self):
+        """
+        2026-10-01 事故：hook 在 tmp/cdp_tabs/ 底下建了一個 .claude/ 資料夾。滿 30 分鐘後
+        清理把它當孤兒分頁，unlink 一個資料夾丟出 IsADirectoryError，**所有爬蟲**每次都失敗。
+        追蹤目錄是共用位置，裡面出現什麼都不能讓抓取失敗。
+        """
+        stray = helper.TAB_TRACK_DIR / ".claude"
+        (stray / ".cc-writes").mkdir(parents=True)
+        old = time.time() - helper.ORPHAN_AGE_S - 10
+        os.utime(stray, (old, old))
+        with patch.object(helper, "_close_tab") as close:
+            helper._sweep_orphan_tabs()
+        close.assert_not_called()
+        self.assertTrue(stray.is_dir())   # 不是我們的東西，不碰
+
+    def test_sweep_never_raises_on_filesystem_errors(self):
+        entry = helper.TAB_TRACK_DIR / "OLD"
+        entry.write_text("x")
+        old = time.time() - helper.ORPHAN_AGE_S - 10
+        os.utime(entry, (old, old))
+        with patch.object(helper, "_close_tab"), \
+             patch.object(helper, "_forget_tab", side_effect=PermissionError("denied")):
+            helper._sweep_orphan_tabs()   # 不得拋出
+
+    def test_get_target_still_opens_tab_when_sweep_blows_up(self):
+        with patch.object(helper, "_sweep_orphan_tabs", side_effect=OSError("boom")), \
+             patch.object(helper, "_open_blank_tab", return_value=_tab("N")):
+            self.assertEqual(helper.get_target("ORCL", "options"), ("N", "ws://N"))
+
 
 class TestExitHandlers(_TabStateMixin, unittest.TestCase):
 

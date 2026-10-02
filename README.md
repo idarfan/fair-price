@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-10-02（五）— 修正：孤兒分頁清理遇到非追蹤檔時讓所有爬蟲失敗（S1 熱修）
+
+- hook 在 `tmp/cdp_tabs/` 建了 `.claude/` 資料夾，S1 的孤兒清理滿 30 分鐘後試圖 `unlink` 它而丟 `IsADirectoryError`，自 2026-10-01 23:44 起所有 Barchart 爬蟲在開分頁前即失敗（受影響僅 10-02 13:03 的測試查詢）。清理改為只處理一般檔案、逐項吞掉例外並寫 stderr，`get_target` 呼叫清理也包在保護內。在資料夾仍存在的條件下實測 price_history DIS、leaps NOK、網站 DIS 價格情境皆成功（審查 PASS）。
+
 ### 2026-10-01（四）— 功能：LEAPS 同代號查詢共用同一次抓取（並行化 S3）
 
 - 同代號＋同履約價已有進行中的 LEAPS 抓取時，`/leaps/analyze` 回傳同一個 job_id，不再排第二個（`ScrapeLeapsJob.join_or_start`，Mutex 保證原子）。抓取結束（含失敗）即取消登記，只取消自己的；登記記下 `ApplicationJob::PROCESS_TOKEN`，server 重啟後作廢。前端未改。實測兩個 UBER 查詢同秒送出只排 1 個 job、共用同一 job_id、131 秒後 success（審查 PASS）。
