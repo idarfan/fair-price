@@ -88,7 +88,7 @@
 | 階段 | 解決 | 狀態 | 審查 | 證據位置 / 備註 |
 |---|---|---|---|---|
 | P0 | B1 B2 B5 | ✅ 通過 | r2 PASS（verdict-leaps-deep-itm-P0-r2.md）；P6 截圖須截到排行表區塊 | 本檔「附錄 P0」、`tmp/e2e/leaps-deep-itm/P0/`；B1 假設證實、B2 假設推翻，見 §0「P0 根因結論」 |
-| P1 | B1–B4 | 🔄 進行中 | 送審 r1 | T1 `test_leaps_scraper.py::TestAutoModeCoversDeepItmLeapsStrikes`、T2 `spec/requests/leaps_recommendations_spec.rb`、T3 `spec/services/pmcc_ranking_service_spec.rb`；P1/P3 已依 P0 結論與使用者裁示改寫（T1 移到 scraper 層、T2 改測過期訊息、T4 不適用） |
+| P1 | B1–B4 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P1-r1.md）；P2 須回應質詢 1（導航順序）、2（送出檔數與耗時） | T1 `test_leaps_scraper.py::TestAutoModeCoversDeepItmLeapsStrikes`、T2 `spec/requests/leaps_recommendations_spec.rb`、T3 `spec/services/pmcc_ranking_service_spec.rb`；P1/P3 已依 P0 結論與使用者裁示改寫（T1 移到 scraper 層、T2 改測過期訊息、T4 不適用） |
 | P2 | B1 B5 | ⬜ 未開始 | | |
 | P3 | B2 | ⬜ 未開始 | | |
 | P4 | B3 B4 | ⬜ 未開始 | | |
