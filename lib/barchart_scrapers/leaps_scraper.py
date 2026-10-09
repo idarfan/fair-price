@@ -475,6 +475,21 @@ async def main(symbol, user_strike=None):
             }))
             return
 
+        # 範圍內但第一個 LEAPS 到期日沒有掛牌（leaps-deep-itm-fix.md P3 T2b）。只在確實
+        # 讀到 LEAPS 鏈時判斷；退回近月清單時那份清單不是 LEAPS 鏈，不能拿來判斷掛牌。
+        # 文案與 StrikeChainSnapshot#unlisted_message 一致。
+        if leaps_exp_date and not any(abs(s - user_strike) < 1e-6 for s in all_strikes):
+            print(json.dumps({
+                "status":         "invalid_strike",
+                "message":        (
+                    f"Strike {user_strike} 不在 {symbol} 第一個 LEAPS 到期日（{leaps_exp_date}）"
+                    f"的期權鏈上（期權鏈無此履約價），請改選有掛牌的履約價，或留空讓系統自動偵測。"
+                ),
+                "chain_snapshot": chain_snapshot,
+                "rows":           [],
+            }))
+            return
+
     # ── Stage 1: pick candidate strikes ──────────────────────────────────────
     # BUG (2026-10-09 INTC, leaps-deep-itm-fix.md): auto mode picked from the
     # near-term `moneyness=10` window ($97–$107, $1 apart). Most of those strikes

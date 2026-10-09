@@ -78,12 +78,17 @@ class LeapsRecommendationsController < ApplicationController
           # 「抓取時發生未知錯誤」，其實 job 是 success。
           # 同 feedback_scraper_status_case 的教訓：狀態沒列進 case 就會
           # 掉到 else，只是這次掉錯方向（成功被當成錯誤）。
+          #
+          # 2026-10-09 INTC（leaps-deep-itm-fix.md P3）：兩小時前的
+          # job_status=success&user_strike=80 網址重開，資料已過期又被 auto 查詢
+          # 覆蓋，畫面卻說「履約價 80 沒有 Delta ≥ 0.60」；其實新鮮查詢 80 有
+          # 5 個候選。資料不新鮮＝結果已過期或被取代，請使用者重新查詢。
           errors = cached_errors(@symbol)
           if errors.any?
             @scrape_status = :partial_error
             @scrape_errors = errors
           else
-            @scrape_status = :no_candidates
+            @scrape_status = :stale_result
           end
         else
           @scrape_status = :error
@@ -140,6 +145,12 @@ class LeapsRecommendationsController < ApplicationController
         return render json: {
           status:  "invalid_strike",
           message: snap.invalid_message(symbol, user_strike)
+        }
+      end
+      if snap && !snap.listed?(user_strike)
+        return render json: {
+          status:  "invalid_strike",
+          message: snap.unlisted_message(symbol, user_strike, LeapsOptionChainSnapshot.first_leaps_expiration(symbol))
         }
       end
     end

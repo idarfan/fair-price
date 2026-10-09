@@ -192,11 +192,15 @@ RSpec.describe "GET /leaps", type: :request do
       response.body
     end
 
-    it "success 不再顯示「未知錯誤」" do
+    # leaps-deep-itm-fix.md P3（2026-10-09 使用者裁示）：success 但資料不新鮮＝
+    # 這筆結果已過期或被其他查詢取代，不是「沒有候選」。原本期望的「沒有符合
+    # 篩選條件的候選」會讓人以為條件太嚴，改成請使用者重新查詢。
+    it "success 不再顯示「未知錯誤」，也不說沒有候選，而是說結果已不是最新" do
       body = body_for("success")
 
       expect(body).not_to include("抓取時發生未知錯誤")
-      expect(body).to include("沒有符合篩選條件的候選")
+      expect(body).not_to include("沒有符合篩選條件的候選")
+      expect(body).to include("已不是最新")
     end
 
     # 測試環境的 cache_store 是 :null_store，Rails.cache.write 是空操作，
@@ -797,6 +801,17 @@ RSpec.describe "GET /leaps", type: :request do
       expect(response.body).to include("Delta 範圍")
       expect(response.body).not_to include("LEAPS 候選排行")
     end
+
+    # T2c（leaps-deep-itm-fix.md P3）：履約價有掛牌、資料也新鮮，只是所有到期日
+    # Δ 都 < 0.60（排名篩選後為空）→ 維持原本的 Delta 不足警告，不能被「已不是最新」取代。
+    it "T2c：user_strike 有資料但 Δ 不足時，維持 Delta 不足警告" do
+      allow(LeapsOptionChainSnapshot).to receive(:fresh_for?).and_return(true)
+
+      get "/leaps", params: { symbol: symbol, user_strike: "125", job_status: "success" }
+
+      expect(response.body).to include("含緩衝檔）在所有到期日都沒有符合 Delta ≥ 0.60")
+      expect(response.body).not_to include("已不是最新")
+    end
   end
 
 
@@ -852,6 +867,42 @@ RSpec.describe "GET /leaps", type: :request do
         expect(response).to have_http_status(:ok)
         body = JSON.parse(response.body)
         expect(body["status"]).not_to eq("invalid_strike")
+        expect(ScrapeLeapsJob).to have_received(:perform_later)
+      end
+    end
+
+    # T2b（leaps-deep-itm-fix.md P3，使用者裁示 (i)）：在範圍內、但第一個 LEAPS
+    # 到期日的鏈上沒有掛牌的履約價（每 5 一檔時的 81），要說「期權鏈無此履約價」，
+    # 而且講明是依第一個 LEAPS 到期日判斷；不能排 job 抓完才變成空結果或 Delta 不足。
+    context "snapshot exists + user_strike in range but not listed (T2b)" do
+      let(:leaps_exp) { Date.today + 434 }
+
+      before do
+        StrikeChainSnapshot.upsert(
+          { symbol: symbol, strikes: (70..130).step(5).map(&:to_f), spot_price: 106.76, scraped_at: Time.current },
+          unique_by: :symbol
+        )
+        create(:leaps_option_chain_snapshot, symbol: symbol, strike: 100.0, dte: 434, expiration_date: leaps_exp)
+        create(:leaps_option_chain_snapshot, symbol: symbol, strike: 100.0, dte: 800, expiration_date: Date.today + 800)
+      end
+
+      after { StrikeChainSnapshot.where(symbol: symbol).delete_all }
+
+      it "returns invalid_strike with the not-listed message and the first LEAPS expiration" do
+        expect(ScrapeLeapsJob).not_to receive(:perform_later)
+        post "/leaps/analyze", params: { symbol: symbol, user_strike: "81" }, as: :json
+
+        body = JSON.parse(response.body)
+        expect(body["status"]).to eq("invalid_strike")
+        expect(body["message"]).to include("期權鏈無此履約價")
+        expect(body["message"]).to include(leaps_exp.iso8601)
+        expect(body["message"]).not_to include("Delta")
+      end
+
+      it "listed strike still enqueues the job" do
+        post "/leaps/analyze", params: { symbol: symbol, user_strike: "80" }, as: :json
+
+        expect(JSON.parse(response.body)["status"]).not_to eq("invalid_strike")
         expect(ScrapeLeapsJob).to have_received(:perform_later)
       end
     end

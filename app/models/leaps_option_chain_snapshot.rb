@@ -36,6 +36,15 @@ class LeapsOptionChainSnapshot < ApplicationRecord
   # 那種 stub 會讓 for_symbol 回傳一個只認得 :fresh 的 double，
   # 任何接在它後面的新查詢都會炸成 "received unexpected message"。
   # 查詢放在 model 這層本來就比讓 service 自己組 scope 合理，順便避開這個地雷。
+  # 第一個 LEAPS 到期日（DTE ≥ LeapsRankingService::MIN_DTE）。「期權鏈無此履約價」
+  # 訊息用它講明判斷依據；沒有快照就回 nil，訊息改用不帶日期的說法。
+  # 同上，不走 for_symbol scope。
+  def self.first_leaps_expiration(symbol)
+    where(symbol: symbol.to_s.upcase)
+      .where("dte >= ?", LeapsRankingService::MIN_DTE)
+      .minimum(:expiration_date)
+  end
+
   def self.latest_underlying_price(symbol)
     where(symbol: symbol.to_s.upcase)
       .where.not(underlying_price: nil)

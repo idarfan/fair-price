@@ -515,6 +515,18 @@ class TestLeapsChainSnapshot(unittest.TestCase):
         result, _ = self._run_with_two_near_money_calls(user_strike=7.0)
         self.assertNotEqual(result.get("status"), "invalid_strike")
 
+    def test_strike_in_range_but_not_listed_on_leaps_chain_is_invalid(self):
+        """T2b（leaps-deep-itm-fix.md P3，使用者裁示 (i)）：$8 落在 LEAPS 鏈的範圍內、
+        也出現在近月，但第一個 LEAPS 到期日沒有掛牌 → 「期權鏈無此履約價」，訊息帶
+        出判斷依據的到期日。symbol 第一次查詢（DB 還沒有清單快照）時，controller 擋不到，
+        要靠這裡。"""
+        result, _ = self._run_with_two_near_money_calls(user_strike=8.0)
+        far_date = scraper.date.today() + scraper.timedelta(days=scraper.LEAPS_MIN_DTE + 30)
+        self.assertEqual(result["status"], "invalid_strike")
+        self.assertIn("期權鏈無此履約價", result["message"])
+        self.assertIn(far_date.strftime("%Y-%m-%d"), result["message"])
+        self.assertEqual(result["chain_snapshot"]["strikes"], [7.0, 10.0, 12.0])
+
     def test_strike_absent_from_both_chains_is_invalid(self):
         """Sanity check: a strike outside BOTH ladders is still correctly rejected."""
         result, _ = self._run_with_two_near_money_calls(user_strike=2.0)

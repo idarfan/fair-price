@@ -90,7 +90,7 @@
 | P0 | B1 B2 B5 | ✅ 通過 | r2 PASS（verdict-leaps-deep-itm-P0-r2.md）；P6 截圖須截到排行表區塊 | 本檔「附錄 P0」、`tmp/e2e/leaps-deep-itm/P0/`；B1 假設證實、B2 假設推翻，見 §0「P0 根因結論」 |
 | P1 | B1–B4 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P1-r1.md）；P2 須回應質詢 1（導航順序）、2（送出檔數與耗時） | T1 `test_leaps_scraper.py::TestAutoModeCoversDeepItmLeapsStrikes`、T2 `spec/requests/leaps_recommendations_spec.rb`、T3 `spec/services/pmcc_ranking_service_spec.rb`；P1/P3 已依 P0 結論與使用者裁示改寫（T1 移到 scraper 層、T2 改測過期訊息、T4 不適用） |
 | P2 | B1 B5 | ✅ 通過 | r2 PASS（verdict-leaps-deep-itm-P2-r2.md）；P6/P7 的 NOK 回歸須附 DOM 與排行表截圖 | `tmp/e2e/leaps-deep-itm/P2/`；LEAPS_MAX_DELTA 依使用者裁示改 0.90；INTC 23 檔、143 秒（基準 72–74 秒） |
-| P3 | B2 | ⬜ 未開始 | | |
+| P3 | B2 | 🔄 進行中 | 送審 r1 | `tmp/e2e/leaps-deep-itm/P3/`；T2b 依使用者裁示 (i) 以第一個 LEAPS 到期日的鏈判斷；附錄 P0 Q5 更正（server 實為 production、file_store） |
 | P4 | B3 B4 | ⬜ 未開始 | | |
 | P5 | 全部 | ⬜ 未開始 | | |
 | P6 | 全部 | ⬜ 未開始 | | |
@@ -420,6 +420,8 @@ NOK		10.2900	2026-10-01 14:51:58.45826	16	[1.0, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0, 1
 - **Q4**：`LeapsRankingService#call`（`:17-27`）只排序、不截斷，ranking table 也沒有 `.first`。PMCC 有截斷：`pmcc_ranking_service.rb:89,92` 的 LEAPS 腳近月、遠月各取 OI 前 3（`TOP_LEAPS_PER_GROUP = 3`），`:50` 每桶組合取前 5。
 - **Q5**：「共用結果」有兩層。
   1. **DB**：`leaps_option_chain_snapshots` 加上 `strike_chain_snapshots.last_query_strike`。key 是 (symbol, user_strike)，TTL 是 `FRESH_WINDOW` 1 小時（`leaps_option_chain_snapshot.rb:7,22`）。清除單一 symbol：`LeapsOptionChainSnapshot.where(symbol: "INTC").delete_all`。
-  2. **Rails.cache**：pm2 以 `RAILS_ENV=development` 執行，`config/environments/development.rb:29` 設定為 `memory_store`，存在 Puma 程序的記憶體裡。key 有 `leaps_job_<id>`、`leaps_last_errors_<SYM>`（1 小時），以及 `leaps_inflight_<SYM>_<strike>`（30 分鐘，`scrape_leaps_job.rb:11,15`）。`rails runner` 清不到，只能等 TTL 到期或 `pm2 restart fairprice-rails`。
+  2. **Rails.cache**：key 有 `leaps_job_<id>`、`leaps_last_errors_<SYM>`（1 小時），以及 `leaps_inflight_<SYM>_<strike>`（30 分鐘，`scrape_leaps_job.rb:11,15`）。
+     - **2026-10-09 P3 更正**：原本寫「pm2 以 development 執行、`memory_store`、`rails runner` 清不到、只能 `pm2 restart`」是錯的。pm2 的環境變數雖然是 development，但 `bin/start-rails.sh:7` 寫死了 `export RAILS_ENV=production`，所以 server 實際以 production 模式執行。`config/environments/production.rb:68` 的 `cache_store` 被註解掉，Rails 預設改用 `file_store`（`tmp/cache/`），存在磁碟上：`pm2 restart` 清不掉，`rails runner` 或 `Rails.cache.delete` 清得到。production 也不會自動重新載入 Ruby 程式碼，改了 Ruby 要重啟才會生效。
+     - B5 的結論不受影響：這一層只存 job 狀態與錯誤訊息，不存候選結果。
 
   兩層的 key 都**不含**抓取邏輯版本。
