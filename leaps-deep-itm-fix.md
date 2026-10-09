@@ -87,7 +87,7 @@
 
 | 階段 | 解決 | 狀態 | 審查 | 證據位置 / 備註 |
 |---|---|---|---|---|
-| P0 | B1 B2 B5 | 🔄 進行中 | 送審 r1 | 本檔「附錄 P0」；B1 假設證實、B2 假設推翻，見 §0「P0 根因結論」 |
+| P0 | B1 B2 B5 | 🔄 進行中 | r1 FAIL → 送審 r2 | 本檔「附錄 P0」、`tmp/e2e/leaps-deep-itm/P0/`；B1 假設證實、B2 假設推翻，見 §0「P0 根因結論」 |
 | P1 | B1–B4 | ⬜ 未開始 | | |
 | P2 | B1 B5 | ⬜ 未開始 | | |
 | P3 | B2 | ⬜ 未開始 | | |
@@ -123,7 +123,7 @@
 **P0 根因結論（2026-10-09 實查，證據見本檔「附錄 P0」）**
 
 - **B1／F4：假設證實（是窗口問題）**。但窗口不是「±N 檔」，而是「近月到期日的 `?moneyness=10` 視圖」。Stage 1 只從這張表（近月、現價附近）挑 Δ ≥ 0.60 的履約價，再上下各加一檔緩衝。INTC 當天的近月表是 $97–$107（每 $1 一檔），挑出 97–107 共 11 檔。其中只有 $100、$105 在 LEAPS 到期日有掛牌，所以排行只剩這兩檔。$80–$95 從來沒有送進 Stage 2。LEAPS 排行**沒有** top-N 截斷；PMCC 的 LEAPS 腳有 `TOP_LEAPS_PER_GROUP=3`，留給 P4 處理。
-- **B2／F1：假設推翻**。$80 其實有抓到：19:39 的 `user_strike=80` job 成功，rows=27。F1 的警告是 21:42 重新開啟**兩小時前**的 `…&job_status=success&user_strike=80` 網址造成的。當時資料已超過 `FRESH_WINDOW`（1 小時），21:43 的 auto 查詢又整批覆蓋了 INTC 快照。controller 把「job_status=success 但資料不新鮮」一律歸為 `:no_candidates`，畫面才顯示「含緩衝檔…沒有 Delta ≥ 0.60」。這是**誤導性訊息**，不是 Delta 判斷錯。
+- **B2／F1：假設推翻**。$80 其實有抓到：19:39 的 `user_strike=80` job 成功，rows=27；22:21 重新實跑，$80 在 5 個 LEAPS 到期日都有 Δ 0.789–0.801 的候選，頁面沒有警告（附錄 P0「E2E 實測」）。F1 的警告是 21:42:48（登入後）重新開啟**兩小時前**的 `…&job_status=success&user_strike=80` 網址造成的。當時資料已超過 `FRESH_WINDOW`（1 小時），21:43 的 auto 查詢又整批覆蓋了 INTC 快照。controller 把「job_status=success 但資料不新鮮」一律歸為 `:no_candidates`，畫面才顯示「含緩衝檔…沒有 Delta ≥ 0.60」。這是**誤導性訊息**，不是 Delta 判斷錯。
 - **F6（NOK）**：兩個修正都還在（`_pick_candidates` 的缺 Greeks 回退；chain_snapshot 改讀 LEAPS 到期日的完整履約價鏈）。本次不是回歸。
 - **F5／F9**：`LEAPS_DELTA_OK_MIN = 0.80` 只用來標記 ✅/⚠️。這是原本 PMCC v3 §2.3 刻意的「僅標記、不淘汰」。說明卡範例挑的是「第一個通過黃金法則的組合」，不看 Long Δ。
 
@@ -359,16 +359,48 @@ NOK		10.2900	2026-10-01 14:51:58.45826	16	[1.0, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0, 1
 19:39:15 POST /leaps/analyze                         → ScrapeLeapsJob("INTC", "0276abd9a16839c6", {user_strike: 80.0})
 19:39:51 fetch_logs#1100 leaps success rows=27       （user_strike=80 這一輪，$80 有抓到）
 19:40:54 GET /leaps?symbol=INTC&job_status=success&user_strike=80
-21:42:24 GET /leaps?symbol=INTC&job_status=success&user_strike=80   ← 兩小時後重開舊網址：資料不新鮮 → :no_candidates（F1）
-21:42:48 GET 同上
+21:42:01 GET /leaps?job_status=success&symbol=INTC&user_strike=80（34.162.191.81）→ 302 /login（enforce_auth_gate），未渲染
+21:42:24 GET /leaps?symbol=INTC&job_status=success&user_strike=80 → 302 /login（enforce_auth_gate），未渲染
+21:42:48 GET 同上 → 200（登入後）：兩小時前的舊網址、資料不新鮮 → :no_candidates → 顯示 F1 警告
 21:43:31 POST /leaps/analyze                         → ScrapeLeapsJob("INTC", "4e5a103ce1bbc550", {user_strike: nil})
 21:44:43 fetch_logs#1108 leaps success rows=119      （auto；job 開始到 leaps 完成約 72 秒，作為 P2 的耗時基準）
 21:45:53 GET /leaps?symbol=INTC&job_status=success   （F4：只有 100/105）
 ```
 
+### E2E 實測（P0 r2，2026-10-09 22:21–22:28 台北時間，Playwright 9224，從空白輸入框按「查詢」）
+
+證據目錄：`tmp/e2e/leaps-deep-itm/P0/`
+
+**1. `user_strike=80`**（22:21:18 POST /leaps/analyze → job `{user_strike: 80.0}` → fetch_logs#1110 leaps success rows=28 → 22:22:54 跳轉）
+
+- URL：`http://localhost:3003/leaps?symbol=INTC&job_status=success&user_strike=80`
+- DB（`sql-user_strike-80.txt`）：快照只有 80（22 列，到 2029-01-19）和 97（6 列，到 2026-10-30），`last_query_strike = 80`
+  ```
+  SELECT strike, expiration_date, dte, delta, extrinsic_value FROM leaps_option_chain_snapshots WHERE symbol='INTC' AND strike=80 AND dte>=364 ORDER BY expiration_date;
+  80  2027-12-17  434  0.789012  15.8050
+  80  2028-01-21  469  0.789279  16.5550
+  80  2028-06-16  616  0.791523  21.1300
+  80  2028-12-15  798  0.799921  25.1300
+  80  2029-01-19  833  0.801236  25.7800
+  ```
+  五列都符合 `leaps_ranking_service.rb:41-46`（dte ≥ 364、Δ ≥ 0.60、外在價值 ≥ 0）。
+- DOM（`dom-user_strike-80.json`）：候選表 5 列，全部是「80.00 ★ 你查詢的履約價」，Δ 0.7890–0.8012；`warning_present: false`
+- 截圖：`user_strike-80.png`
+
+→ **B2 推翻有直接證據**：新鮮查詢 80 會有候選。F1 只出現在資料過期的舊網址上。
+
+**2. auto（不填履約價，核心用例）**（22:25:49 POST → job `{user_strike: nil}` → fetch_logs#1112 leaps success rows=110，job 開始到 leaps 完成 74 秒 → 22:28:22 跳轉）
+
+- URL：`http://localhost:3003/leaps?symbol=INTC&job_status=success`
+- DB（`sql-auto.txt`）：快照 97–106 共 10 檔，只有 100、105 延伸到 2029-01-19
+- DOM（`dom-auto.json`）：候選表 10 列，`distinct_strikes: [100, 105]`，`min_strike: 100`
+- 截圖：`auto.png`（只截到可視範圍；整頁截圖逾時）
+
+→ **B1 重現**。同一輪 fetch_logs#1113 pmcc_short `partial_error`（`expired_at=2026-10-12 layer=volatility_greeks reason=page_load_timeout`），與本規格無關，只記錄。
+
 ### Q1–Q5
 
-- **Q1**：窗口是近月到期日 `?moneyness=10` 的 grid（`leaps_scraper.py:360`），以現價為中心，寬度由 Barchart 決定（INTC 當天是 97–107），沒有檔數上限。`_pick_candidates`（`:195-264`）在這個窗口內取 Δ ≥ 0.60，再加 ±1 緩衝。近月的 Δ 比 LEAPS 陡，又是 $1 一檔，挑出的 97–107 大多不在 LEAPS 鏈上，最後只剩 100、105。
+- **Q1**：窗口是近月到期日 `?moneyness=10` 的 grid（`leaps_scraper.py:360`），以現價為中心，寬度由 Barchart 決定（INTC 當天是 97–107），沒有檔數上限。`_pick_candidates`（`:195-264`）在這個窗口內取 Δ ≥ 0.60，再加 ±1 緩衝。候選只能從這個近月窗口裡挑；窗口裡除了 100、105 以外的履約價（97–99、101–104、106–107）在 LEAPS 到期日根本沒有掛牌（DB 中 max_exp ≤ 2026-11-27），所以最後只剩 100、105。落選和 Δ 高低無關，是窗口本身不在 LEAPS 鏈上。
 - **Q2**：$80 有抓到（user_strike 模式直接用 80 當中心點，`:226`）。F1 是 controller `:74-87` 把「job 成功但資料不新鮮」當成 no_candidates 造成的誤導訊息，見時間軸。
 - **Q3**：NOK 的兩個修正都還在：`leaps_scraper.py:228-243` 的缺 Greeks 回退，以及 `:391-433` 改讀 LEAPS 到期日的完整鏈（commit e361f6f）。不是回歸。
 - **Q4**：`LeapsRankingService#call`（`:17-27`）只排序、不截斷，ranking table 也沒有 `.first`。PMCC 有截斷：`pmcc_ranking_service.rb:89,92` 的 LEAPS 腳近月、遠月各取 OI 前 3（`TOP_LEAPS_PER_GROUP = 3`），`:50` 每桶組合取前 5。
