@@ -48,7 +48,7 @@
 | 1 | P0 | B1 B2 B5 | 不改碼。先重現問題、畫出資料流、確認根因與快取機制 |
 | 2 | P1 | B1–B4 | 先寫測試，而且測試必須先失敗 |
 | 3 | P2 | B1 B5 | 擴大履約價涵蓋範圍到 0.60 ≤ Δ ≤ 0.95，並清掉舊快取 |
-| 4 | P3 | B2 | `user_strike` 改用完整期權鏈判斷，並把「無此履約價」和「Delta 不足」兩種訊息分開 |
+| 4 | P3 | B2 | 資料過期／被其他查詢取代時顯示「已不是最新，請重新查詢」，不再誤報 Delta 不足；並把「無此履約價」和「Delta 不足」兩種訊息分開（2026-10-09 依 P0 結論改寫，使用者裁示：過期顯示訊息，不自動重抓） |
 | 5 | P4 | B3 B4 | PMCC 的 Long 腳強制 Δ ≥ 0.80（常數化），說明卡範例改從合格腳選 |
 | 6 | P5 | 全部 | Request spec 走完非同步全流程 |
 | 7 | P6 | 全部 | 正式環境 Playwright 實測，並和實測值交叉比對 |
@@ -58,8 +58,8 @@
 
 | ID | 單元/整合測試 | E2E 判定（P6） |
 |---|---|---|
-| B1 | T1：fixture 中所有 0.60 ≤ Δ ≤ 0.95 的履約價都要進候選 | INTC 候選表的最低履約價 ≤ 85，而且含 80 |
-| B2 | T2：`user_strike=80` 有候選。T2b：不存在的履約價出現「期權鏈無此履約價」。T2c：Δ 不足出現原本的警告 | `user_strike=80` 頁面沒有 Delta 不足的警告 |
+| B1 | T1：fixture 的 LEAPS 履約價鏈中，所有 0.60 ≤ Δ ≤ 0.95 的履約價都要送進 Stage 2（scraper 層） | INTC 候選表的最低履約價 ≤ 85，而且含 80 |
+| B2 | T2：`job_status=success` 但資料不新鮮時，不出現 Delta 不足警告，改出現「已不是最新」訊息。T2b：不存在的履約價出現「期權鏈無此履約價」。T2c：Δ 不足出現原本的警告 | `user_strike=80` 頁面沒有 Delta 不足的警告 |
 | B3 | T3：Long Δ < 0.80 不進通過清單。T3b：無合格腳時顯示指定訊息 | PMCC 通過組合的 Long Δ 最小值 ≥ 0.80 |
 | B4 | T3c：範例選用的 Long Δ ≥ 0.80 | 說明卡的 LEAPS 履約價 Δ ≥ 0.80 |
 | B5 | P2 驗證：清除後查快取確認已經沒有舊資料 | 從空白輸入框按「查詢」觸發新 job，結果符合上面各項 |
@@ -88,7 +88,7 @@
 | 階段 | 解決 | 狀態 | 審查 | 證據位置 / 備註 |
 |---|---|---|---|---|
 | P0 | B1 B2 B5 | ✅ 通過 | r2 PASS（verdict-leaps-deep-itm-P0-r2.md）；P6 截圖須截到排行表區塊 | 本檔「附錄 P0」、`tmp/e2e/leaps-deep-itm/P0/`；B1 假設證實、B2 假設推翻，見 §0「P0 根因結論」 |
-| P1 | B1–B4 | ⬜ 未開始 | | |
+| P1 | B1–B4 | 🔄 進行中 | 送審 r1 | T1 `test_leaps_scraper.py::TestAutoModeCoversDeepItmLeapsStrikes`、T2 `spec/requests/leaps_recommendations_spec.rb`、T3 `spec/services/pmcc_ranking_service_spec.rb`；P1/P3 已依 P0 結論與使用者裁示改寫（T1 移到 scraper 層、T2 改測過期訊息、T4 不適用） |
 | P2 | B1 B5 | ⬜ 未開始 | | |
 | P3 | B2 | ⬜ 未開始 | | |
 | P4 | B3 B4 | ⬜ 未開始 | | |
@@ -171,14 +171,15 @@
 ## P1 失敗測試先行
 
 **動作**：依 P0 證實的根因，先寫測試，而且這些測試**現在必須失敗**：
-- T1（篩選/排名 service 單元測試）：fixture 用一條完整期權鏈（現價 106.76，履約價 70–130，每 5 一檔，Delta 依價內程度遞減，$80 ≈ 0.80）。預期：Delta ≥ 0.60 的履約價全部進入候選，至少包含 80/85/90/95/100/105。
-- T2（user_strike 驗證）：同一份 fixture、`user_strike=80`，預期有候選，而且不會出現 F1 的警告。
+- T1（**scraper 候選挑選**，`lib/barchart_scrapers/test_leaps_scraper.py`）：fixture 是近月窗口（現價 106.76，$97–$107 每 $1 一檔）加上一條 LEAPS 到期日的完整期權鏈（履約價 70–130，每 5 一檔，Delta 依價內程度遞減，$80 ≈ 0.80，$70 > 0.95）。在 auto 模式跑 `main()`，預期：LEAPS 鏈上所有 0.60 ≤ Δ ≤ 0.95 的履約價都要送進 Stage 2（`?view=stacked&strike=X`），至少包含 80/85/90/95/100/105。
+  - 2026-10-09 依 P0 改寫：原本寫的是「篩選/排名 service 單元測試」，但 P0 證實 `LeapsRankingService` 不截斷，DB 裡有的列都會列出。根因在 scraper 只從近月窗口挑候選，所以 T1 放在 scraper 層。
+- T2（**資料不新鮮的訊息**，request spec）：`job_status=success&user_strike=80`，但資料不新鮮（`fresh_for?` 為 false）時，body 不得出現「含緩衝檔）在所有到期日都沒有符合」，要出現「已不是最新」的訊息。
+  - 2026-10-09 依 P0 改寫：P0 證實新鮮查詢 80 本來就有候選，F1 來自這條路徑。
 - T3（PMCC）：Long 腳 Delta < 0.80 的組合不得出現在通過清單，也不得被說明卡範例選用。
-- T4（scraper 窗口，如果根因在抓取層）：用存好的 Barchart HTML fixture，驗證解析出的履約價範圍有往下涵蓋到 Delta 0.60 的區域。
+- T4（scraper 窗口）：**不適用**。P0 證實 DOM 解析層已經抓到完整履約價鏈（`strike_chain_snapshots` 有 63 檔，含 80–95），問題在挑選層，已由 T1 涵蓋。
 
 **驗證**
-- [ ] `bundle exec rspec <T1~T3 檔案>` 輸出顯示**失敗**，而且失敗原因符合根因（不是語法錯或 fixture 錯）。貼出輸出原文
-- [ ] 如果有 T4：`pytest <T4 檔案>` 一樣要失敗，原因相符
+- [ ] `bundle exec rspec <T2、T3 檔案>` 與 `pytest <T1 檔案>` 輸出顯示**失敗**，而且失敗原因符合根因（不是語法錯或 fixture 錯）。貼出輸出原文
 - [ ] fixture 不准硬編 INTC 專屬邏輯
 
 ---
@@ -202,10 +203,12 @@
 
 ## P3 修正 user_strike 驗證
 
-**動作**：修 `user_strike` 的「緩衝檔」判定，讓它根據**完整抓到的期權鏈**判斷，而不是窗口 snapshot（同 F6 的原則）。
-- 履約價存在、而且至少一個到期日的 Delta ≥ 0.60：列出候選
+**動作**（2026-10-09 依 P0 結論改寫；P0 證實 user_strike 的 Delta 判斷本身沒錯，F1 來自 controller 把「job 成功但資料不新鮮」當成無候選）：
+- `job_status=success`（或 cached）但 `fresh_for?` 為 false：顯示「這筆查詢結果已不是最新（超過 1 小時，或已被其他查詢取代），請重新按查詢」，**不**顯示 Delta 不足警告。使用者裁示：只顯示訊息，不自動重抓。時間數字從 `LeapsOptionChainSnapshot::FRESH_WINDOW` 讀取，不准寫死。
+- 履約價存在、而且至少一個到期日的 Delta ≥ 0.60：列出候選（現況已正確，維持）
 - 履約價存在、但所有到期日 Delta 都 < 0.60：維持現有警告
 - 履約價根本不存在於期權鏈：顯示另一則訊息「期權鏈無此履約價」，不能和「Delta 不足」混用
+- 既有測試「success 不再顯示未知錯誤」（`spec/requests/leaps_recommendations_spec.rb`）目前期望 auto 模式「success 但不新鮮」時顯示「沒有符合篩選條件的候選」。這條期望與本節新規則衝突，P3 要一併改成新訊息（依使用者裁示，屬於測試本身要更新，不是為了讓測試通過而改）。
 
 **驗證**
 - [ ] T2 轉綠

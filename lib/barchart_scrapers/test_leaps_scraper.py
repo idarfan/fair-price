@@ -628,5 +628,97 @@ class TestUnderlyingJsHeader(unittest.TestCase):
         self.assertIsNone(self._run(None))
 
 
+class TestAutoModeCoversDeepItmLeapsStrikes(unittest.TestCase):
+    """
+    T1（leaps-deep-itm-fix.md P1，2026-10-09 INTC 實測）：auto 模式只從近月
+    `?moneyness=10` 窗口挑候選。近月窗口是現價附近每 $1 一檔，大多不在 LEAPS
+    到期日的履約價鏈上，深度價內的 $80–$95 從來沒有送進 Stage 2，排行只剩
+    100/105。LEAPS 鏈上 0.60 ≤ Δ ≤ 0.95 的履約價都必須送進 Stage 2。
+    """
+
+    # 規格 P2 的 LEAPS_MAX_DELTA 預設值。這裡刻意不讀 scraper 的常數：常數還不存在時，
+    # 測試要因為「沒抓到深度價內履約價」失敗，而不是因為 AttributeError 失敗。
+    MIN_DELTA = 0.60
+    MAX_DELTA = 0.95
+
+    # 近月窗口：現價 106.76 附近每 $1 一檔（短 DTE，Delta 隨履約價陡降）
+    NEAR_TERM_ROWS = [
+        {"strike": s, "delta": d, "iv": 0.6}
+        for s, d in [(97.0, 0.86), (98.0, 0.83), (99.0, 0.80), (100.0, 0.77),
+                     (101.0, 0.73), (102.0, 0.70), (103.0, 0.66), (104.0, 0.62),
+                     (105.0, 0.57), (106.0, 0.52), (107.0, 0.47)]
+    ]
+    # LEAPS 到期日的完整履約價鏈：70–130 每 5 一檔，Delta 依價內程度遞減
+    LEAPS_CHAIN_ROWS = [
+        {"strike": s, "delta": d, "iv": 0.6}
+        for s, d in [(70.0, 0.96), (75.0, 0.88), (80.0, 0.80), (85.0, 0.76),
+                     (90.0, 0.72), (95.0, 0.69), (100.0, 0.66), (105.0, 0.62),
+                     (110.0, 0.58), (115.0, 0.54), (120.0, 0.50), (125.0, 0.46),
+                     (130.0, 0.42)]
+    ]
+
+    def _stage2_strikes(self):
+        far_date = scraper.date.today() + scraper.timedelta(days=scraper.LEAPS_MIN_DTE + 30)
+        far_exp = [{"value": far_date.strftime("%Y-%m-%d") + "-m", "text": "far LEAPS"}]
+        near_money_calls = {"n": 0}
+
+        async def eval_side(ws, js, **kw):
+            if "bc-overlay-modal" in js:
+                return False
+            if "angular.element" in js:
+                return 106.76
+            if "querySelectorAll" in js:
+                return far_exp
+            return None
+
+        async def wait_s(ws, js, max_wait_s=30, **kw):
+            if "symbolType" in js and "bidPrice" not in js and "itmProbability" not in js:
+                near_money_calls["n"] += 1
+                # 第 1 次＝近月 NTM 頁，第 2 次＝LEAPS 到期日的完整鏈
+                return self.NEAR_TERM_ROWS if near_money_calls["n"] == 1 else self.LEAPS_CHAIN_ROWS
+            if "itmProbability" in js:
+                return GOOD_VG
+            if "bidPrice" in js:
+                return GOOD_OPTS
+            return None
+
+        navigate = AsyncMock()
+        buf = io.StringIO()
+        with (
+            patch("leaps_scraper.prepare_page", new=AsyncMock(return_value=("tid", "ws://fake"))),
+            patch("leaps_scraper.cdp_navigate", new=navigate),
+            patch("leaps_scraper.activate_target", new=AsyncMock()),
+            patch("leaps_scraper.cdp_eval", new=AsyncMock(side_effect=eval_side)),
+            patch("leaps_scraper._wait_for_grid", new=AsyncMock(side_effect=wait_s)),
+            patch("leaps_scraper.asyncio.sleep", new=AsyncMock()),
+            patch("sys.stdout", buf),
+        ):
+            _run(scraper.main("INTC"))
+
+        result = json.loads(buf.getvalue().strip())
+        urls = [c.args[1] for c in navigate.call_args_list]
+        strikes = {
+            float(u.split("view=stacked&strike=")[1])
+            for u in urls if "view=stacked&strike=" in u
+        }
+        return result, strikes
+
+    def test_every_leaps_strike_in_delta_band_is_sent_to_stage2(self):
+        result, strikes = self._stage2_strikes()
+        self.assertEqual(result["status"], "success")
+
+        expected = {
+            r["strike"] for r in self.LEAPS_CHAIN_ROWS
+            if self.MIN_DELTA <= r["delta"] <= self.MAX_DELTA
+        }
+        missing = sorted(expected - strikes)
+        self.assertEqual(missing, [], f"Stage 2 漏抓 LEAPS 鏈上 Δ 介於 0.60–0.95 的履約價：{missing}（實際送出 {sorted(strikes)}）")
+
+    def test_deep_itm_strikes_80_to_105_are_sent_to_stage2(self):
+        _, strikes = self._stage2_strikes()
+        for s in (80.0, 85.0, 90.0, 95.0, 100.0, 105.0):
+            self.assertIn(s, strikes, f"深度價內 {s} 沒有送進 Stage 2（實際送出 {sorted(strikes)}）")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

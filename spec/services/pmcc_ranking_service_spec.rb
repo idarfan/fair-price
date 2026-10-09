@@ -290,4 +290,37 @@ RSpec.describe PmccRankingService do
       expect(combo[:leaps_delta_ok]).to be false
     end
   end
+
+  # T3（leaps-deep-itm-fix.md P1）：2026-10-09 INTC 的建倉規範寫 Long Delta ≥ 0.80，
+  # 組合表的 Long Δ 卻是 0.671–0.732，說明卡範例也用了 Δ 0.671 的腳。
+  # 兩條 LEAPS 腳都能通過黃金法則；Δ 0.70 那條年化收租較高，現況會排在前面。
+  describe "T3 — Long 腳 Δ < 0.80 不得通過、不得當說明卡範例" do
+    before do
+      create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.70) # PL 5.75 < spread 7
+      create_leaps!(strike: 9.0,  bid: 6.20, ask: 6.30, dte: 564, delta: 0.85) # PL 6.25 < spread 8
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.30)
+    end
+
+    let(:all_combos) do
+      result = service.call
+      result[:summary][:expirations].flat_map { |k| result[k][:combos] }
+    end
+
+    it "通過清單裡沒有 Long Δ < 0.80 的組合" do
+      passing_deltas = all_combos.select { |c| c[:passes_golden_rule] }.map { |c| c[:long_leg][:delta].to_f }
+
+      expect(passing_deltas).not_to be_empty
+      expect(passing_deltas).to all(be >= 0.80)
+    end
+
+    it "說明卡範例選用的 Long 腳 Δ ≥ 0.80" do
+      host = Class.new do
+        include LeapsRecommendations::PmccEducation
+        def initialize(ranking) = @pmcc_ranking = ranking
+      end
+      pick = host.new(service.call).pmcc_edu_pick
+
+      expect(pick[:long_leg][:delta].to_f).to be >= 0.80
+    end
+  end
 end

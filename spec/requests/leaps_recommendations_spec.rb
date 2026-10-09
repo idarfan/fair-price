@@ -228,6 +228,16 @@ RSpec.describe "GET /leaps", type: :request do
       expect(body_for("session_expired")).to include("請先登入 Barchart")
       expect(body_for("cdp_offline")).to include("CDP 未連線")
     end
+
+    # T2（leaps-deep-itm-fix.md P1）：2026-10-09 INTC 重新開啟兩小時前的
+    # job_status=success&user_strike=80 網址，資料已過期又被 auto 查詢覆蓋，
+    # 畫面卻說「履約價 80 沒有 Delta ≥ 0.60」——其實新鮮查詢 80 有 5 個候選。
+    it "user_strike 的 success 但資料不新鮮時，不誤報 Delta 不足，改說結果已不是最新" do
+      get "/leaps", params: { symbol: symbol, job_status: "success", user_strike: "80" }
+
+      expect(response.body).not_to include("含緩衝檔）在所有到期日都沒有符合")
+      expect(response.body).to include("已不是最新")
+    end
   end
 
   # ── pmcc-tracker Phase 5：部位追蹤區塊 ────────────────────────────────────
