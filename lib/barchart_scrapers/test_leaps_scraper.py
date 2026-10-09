@@ -721,5 +721,31 @@ class TestAutoModeCoversDeepItmLeapsStrikes(unittest.TestCase):
             self.assertIn(s, strikes, f"深度價內 {s} 沒有送進 Stage 2（實際送出 {sorted(strikes)}）")
 
 
+class TestMissingGreeksRescueIsBoundedOnLeapsChain(TestAutoModeCoversDeepItmLeapsStrikes):
+    """
+    P2 r1 質詢 1（使用者同意加上限）：改從 LEAPS 完整鏈挑候選後，「缺 Greeks
+    （delta == 0 且 iv == 0）＋履約價 < 現價就合格」的回退會套用到整條鏈。
+    深度價內的 LEAPS 履約價如果 Barchart 沒算 Greeks，$1 到現價以下會全部被送進
+    Stage 2，耗時失控，也不受 LEAPS_MAX_DELTA 約束。從 LEAPS 鏈挑時，缺 Greeks 的
+    履約價不得低於「有算出 Δ 且落在區間內」的最低履約價。
+    （繼承的兩條 T1 測試在這份 fixture 上同樣成立，一併執行。）
+    """
+
+    UNCOMPUTED = (1.0, 3.0, 5.0, 10.0, 20.0, 30.0, 40.0, 50.0)
+    LEAPS_CHAIN_ROWS = [{"strike": s, "delta": 0.0, "iv": 0.0} for s in UNCOMPUTED] + [
+        {"strike": s, "delta": d, "iv": 0.6}
+        for s, d in [(55.0, 0.89), (60.0, 0.87), (65.0, 0.85), (70.0, 0.83),
+                     (75.0, 0.82), (80.0, 0.80), (85.0, 0.76), (90.0, 0.72),
+                     (95.0, 0.69), (100.0, 0.66), (105.0, 0.62), (110.0, 0.58),
+                     (115.0, 0.54)]
+    ]
+
+    def test_uncomputed_deep_itm_strikes_below_band_are_not_sent(self):
+        _, strikes = self._stage2_strikes()
+        # $50 是區間最低檔 $55 往下的 −1 緩衝檔，緩衝規則本來就會送出，不算在內。
+        runaway = sorted(strikes & {1.0, 3.0, 5.0, 10.0, 20.0, 30.0, 40.0})
+        self.assertEqual(runaway, [], f"缺 Greeks 的深度價內履約價被送進 Stage 2：{runaway}（實際送出 {sorted(strikes)}）")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

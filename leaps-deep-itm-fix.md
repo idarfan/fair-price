@@ -89,7 +89,7 @@
 |---|---|---|---|---|
 | P0 | B1 B2 B5 | ✅ 通過 | r2 PASS（verdict-leaps-deep-itm-P0-r2.md）；P6 截圖須截到排行表區塊 | 本檔「附錄 P0」、`tmp/e2e/leaps-deep-itm/P0/`；B1 假設證實、B2 假設推翻，見 §0「P0 根因結論」 |
 | P1 | B1–B4 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P1-r1.md）；P2 須回應質詢 1（導航順序）、2（送出檔數與耗時） | T1 `test_leaps_scraper.py::TestAutoModeCoversDeepItmLeapsStrikes`、T2 `spec/requests/leaps_recommendations_spec.rb`、T3 `spec/services/pmcc_ranking_service_spec.rb`；P1/P3 已依 P0 結論與使用者裁示改寫（T1 移到 scraper 層、T2 改測過期訊息、T4 不適用） |
-| P2 | B1 B5 | 🔄 進行中 | 送審 r1 | `tmp/e2e/leaps-deep-itm/P2/`；LEAPS_MAX_DELTA 依使用者裁示改 0.90；INTC 23 檔、143 秒（基準 72–74 秒） |
+| P2 | B1 B5 | 🔄 進行中 | r1 FAIL → 送審 r2 | `tmp/e2e/leaps-deep-itm/P2/`；LEAPS_MAX_DELTA 依使用者裁示改 0.90；INTC 23 檔、143 秒（基準 72–74 秒） |
 | P3 | B2 | ⬜ 未開始 | | |
 | P4 | B3 B4 | ⬜ 未開始 | | |
 | P5 | 全部 | ⬜ 未開始 | | |
@@ -187,7 +187,7 @@
 ## P2 修正履約價涵蓋範圍
 
 **動作**：照 P0 的根因修抓取、篩選窗口或截斷上限。規則如下：
-- 涵蓋範圍：每個到期日，所有 `0.60 ≤ Delta ≤ LEAPS_MAX_DELTA` 的履約價都要進入候選。`LEAPS_MAX_DELTA` 預設 0.95，放在設定常數裡，用來避免抓取一路延伸到 Delta≈1 的極深價內。往上（價外方向）以 Delta 跌破 0.60 為界。
+- 涵蓋範圍：以**第一個 DTE ≥ 364 的 LEAPS 到期日**的完整鏈為準，所有 `0.60 ≤ Delta ≤ LEAPS_MAX_DELTA` 的履約價，加上上下各一檔緩衝，都要進入候選。（2026-10-09 P2 r1 使用者裁示 (b)：原文為「每個到期日」。遠月 Δ 曲線較平，邊界外 Δ 0.60–0.66 或 0.89–0.90 的少數檔可能漏掉；若要涵蓋所有到期日，估計耗時 2.4–2.6 倍，超過 2 倍上限。）`LEAPS_MAX_DELTA` 預設 0.95，放在設定常數裡，用來避免抓取一路延伸到 Delta≈1 的極深價內。往上（價外方向）以 Delta 跌破 0.60 為界。
 - 如果根因是 top-N 截斷：要確保至少每個到期日都有 Δ ≥ 0.80 的履約價（只要期權鏈裡存在）進入候選，不能全被 OI 較高的 Δ 0.6–0.7 擠掉。
 - 如果是抓取層：還是只能用 DOM 解析。真的需要多抓一段，就要在 Barchart 頁面的 DOM 上操作（例如切換 strike 範圍的選單），不准打 API。
 - 抓取量增加的話，要記錄每次查詢多花的秒數。如果超過現行耗時 2 倍，就停下來回報，不准自行決定。
@@ -200,6 +200,7 @@
 - [ ] 如果快取 key 不含「抓取邏輯版本」：在 key 加入版本欄位，或在部署時清空 LEAPS 快取，二擇一並寫明。目的是確保之後改抓取範圍時，不會再讀到舊結果
 
 **P2 實作決定（2026-10-09）**
+- P2 r1 使用者裁示：(1) 候選以第一個 LEAPS 到期日為準（見上方涵蓋範圍）；(2) 從 LEAPS 鏈挑時，「缺 Greeks 回退」不得低於「有算出 Δ 且落在區間內」的最低履約價（`_pick_candidates(from_leaps_chain=True)`），近月窗口的回退行為不變；(3) 耗時 143 秒（基準 72–74 秒的 1.93–1.99 倍）接受。
 - `LEAPS_MAX_DELTA` 由 0.95 改為 **0.90**（使用者裁示）。實測 0.95：INTC 第一個 LEAPS 到期日（2027-12-17，DTE 434）的 Δ 曲線很平，0.60–0.95 從 $42 一路涵蓋到 $115，加上緩衝共 29 檔，LEAPS 抓取 174 秒，是基準 74 秒的 2.35 倍，超過上方「2 倍停下回報」的上限。證據：`tmp/e2e/leaps-deep-itm/P2/sql-leaps-exp-deltas.txt`、`dom-auto.json`（0.95 那一輪）。上方涵蓋範圍規則中的「預設 0.95」以本條為準。
 - 候選來源：auto 模式改從 Stage 1 已讀到的 LEAPS 到期日完整鏈（`?moneyness=100&expiration=<第一個 DTE ≥ 364>`）挑 `LEAPS_MIN_DELTA ≤ Δ ≤ LEAPS_MAX_DELTA` 的履約價，±1 緩衝與缺 Greeks 回退維持原樣。沒有 LEAPS 到期日時才退回近月窗口。user_strike 模式不變（P3 範圍）。**導航順序與次數不變**，沒有多抓頁面。
 - B5 採「部署時清空」，不在 key 加版本。理由：

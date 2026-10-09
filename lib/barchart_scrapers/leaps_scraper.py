@@ -197,7 +197,7 @@ def _fill_exp_dates(rows):
             r["expiration_date"] = _dte_to_date(r["dte"])
 
 
-def _pick_candidates(near_money_rows, user_strike=None, underlying_price=None):
+def _pick_candidates(near_money_rows, user_strike=None, underlying_price=None, from_leaps_chain=False):
     """
     Stage 1: determine which strikes to query in Stage 2.
 
@@ -248,6 +248,19 @@ def _pick_candidates(near_money_rows, user_strike=None, underlying_price=None):
             r["strike"] for r in near_money_rows
             if r.get("strike") is not None and _qualifies(r)
         })
+
+        # 從 LEAPS 完整鏈挑時（leaps-deep-itm-fix.md P2 r1 質詢 1），缺 Greeks 的
+        # 回退只能補區間內的空洞：不得低於「有算出 Δ 且落在區間內」的最低履約價。
+        # 否則深度價內沒算 Greeks 的 $1…現價以下會整段送進 Stage 2。近月窗口
+        # （NOK $7 的原始情境）維持原本行為。
+        if from_leaps_chain:
+            computed_in_band = [
+                r["strike"] for r in near_money_rows
+                if r.get("strike") is not None and r.get("delta") is not None
+                and LEAPS_MIN_DELTA <= r["delta"] <= LEAPS_MAX_DELTA
+            ]
+            floor = min(computed_in_band) if computed_in_band else None
+            center_strikes = [s for s in center_strikes if floor is not None and s >= floor]
         if not center_strikes:
             return []
 
@@ -470,8 +483,10 @@ async def main(symbol, user_strike=None):
     # LEAPS-dated chain read above (same page load, no extra navigation); the
     # near-term window is only the fallback when no LEAPS expiration exists.
     # Manual mode (user_strike) is unchanged.
-    pick_rows = leaps_chain_rows if (user_strike is None and leaps_chain_rows) else near_money_rows
-    candidate_strikes = _pick_candidates(pick_rows, user_strike, underlying_price)
+    use_leaps_chain   = user_strike is None and bool(leaps_chain_rows)
+    pick_rows         = leaps_chain_rows if use_leaps_chain else near_money_rows
+    candidate_strikes = _pick_candidates(pick_rows, user_strike, underlying_price,
+                                         from_leaps_chain=use_leaps_chain)
     if not candidate_strikes:
         # Auto mode: no LEAPS_MIN_DELTA..LEAPS_MAX_DELTA strikes in the chain
         print(json.dumps({"status": "no_candidates", "chain_snapshot": chain_snapshot}))
