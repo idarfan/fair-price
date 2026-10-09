@@ -89,7 +89,7 @@
 |---|---|---|---|---|
 | P0 | B1 B2 B5 | ✅ 通過 | r2 PASS（verdict-leaps-deep-itm-P0-r2.md）；P6 截圖須截到排行表區塊 | 本檔「附錄 P0」、`tmp/e2e/leaps-deep-itm/P0/`；B1 假設證實、B2 假設推翻，見 §0「P0 根因結論」 |
 | P1 | B1–B4 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P1-r1.md）；P2 須回應質詢 1（導航順序）、2（送出檔數與耗時） | T1 `test_leaps_scraper.py::TestAutoModeCoversDeepItmLeapsStrikes`、T2 `spec/requests/leaps_recommendations_spec.rb`、T3 `spec/services/pmcc_ranking_service_spec.rb`；P1/P3 已依 P0 結論與使用者裁示改寫（T1 移到 scraper 層、T2 改測過期訊息、T4 不適用） |
-| P2 | B1 B5 | ⬜ 未開始 | | |
+| P2 | B1 B5 | 🔄 進行中 | 送審 r1 | `tmp/e2e/leaps-deep-itm/P2/`；LEAPS_MAX_DELTA 依使用者裁示改 0.90；INTC 23 檔、143 秒（基準 72–74 秒） |
 | P3 | B2 | ⬜ 未開始 | | |
 | P4 | B3 B4 | ⬜ 未開始 | | |
 | P5 | 全部 | ⬜ 未開始 | | |
@@ -198,6 +198,16 @@
 - [ ] 記錄修正前後的查詢耗時（秒）
 - [ ] 依 P0 Q5 的結論，清除 INTC、NOK 的舊快取或舊 snapshot。貼出清除指令，以及清除後查詢的結果（確認快取裡已經沒有舊資料）
 - [ ] 如果快取 key 不含「抓取邏輯版本」：在 key 加入版本欄位，或在部署時清空 LEAPS 快取，二擇一並寫明。目的是確保之後改抓取範圍時，不會再讀到舊結果
+
+**P2 實作決定（2026-10-09）**
+- `LEAPS_MAX_DELTA` 由 0.95 改為 **0.90**（使用者裁示）。實測 0.95：INTC 第一個 LEAPS 到期日（2027-12-17，DTE 434）的 Δ 曲線很平，0.60–0.95 從 $42 一路涵蓋到 $115，加上緩衝共 29 檔，LEAPS 抓取 174 秒，是基準 74 秒的 2.35 倍，超過上方「2 倍停下回報」的上限。證據：`tmp/e2e/leaps-deep-itm/P2/sql-leaps-exp-deltas.txt`、`dom-auto.json`（0.95 那一輪）。上方涵蓋範圍規則中的「預設 0.95」以本條為準。
+- 候選來源：auto 模式改從 Stage 1 已讀到的 LEAPS 到期日完整鏈（`?moneyness=100&expiration=<第一個 DTE ≥ 364>`）挑 `LEAPS_MIN_DELTA ≤ Δ ≤ LEAPS_MAX_DELTA` 的履約價，±1 緩衝與缺 Greeks 回退維持原樣。沒有 LEAPS 到期日時才退回近月窗口。user_strike 模式不變（P3 範圍）。**導航順序與次數不變**，沒有多抓頁面。
+- B5 採「部署時清空」，不在 key 加版本。理由：
+  1. 「共用結果」只在 DB 快照，TTL 只有 1 小時（`FRESH_WINDOW`）。
+  2. Rails.cache 的 `leaps_job_<id>` 只存 job 狀態、不存結果，index 一律再經 `fresh_for?` 判斷，舊 job 狀態不會帶出舊候選。
+  3. 加版本欄位需要 migration 或改動 `fresh_for?` 的語意，超出本次範圍。
+
+  **部署步驟**：改了 `leaps_scraper.py` 的挑選邏輯後，執行 `DELETE FROM leaps_option_chain_snapshots WHERE symbol IN (…)`（或不帶條件清全部）。Python sidecar 每次查詢都重新啟動，不需要 `pm2 restart`。
 
 ---
 

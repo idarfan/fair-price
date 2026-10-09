@@ -51,6 +51,11 @@ VG_SETTLE      = 1500   # Stage 2 V&G initial settle; _wait_for_grid polls up to
 GRID_MAX_WAIT_S = 60
 LEAPS_MIN_DTE  = 364    # chain_snapshot must be built from a LEAPS-dated expiration (see fix below),
                         # matches LeapsRankingService::MIN_DTE
+LEAPS_MIN_DELTA = 0.60  # Stage 1 candidate band (auto mode), matches LeapsRankingService::DEFAULT_DELTA_MIN
+# 上限只用來擋「一路延伸到 Δ≈1 的極深價內」，排行層不設上限（leaps-deep-itm-fix.md P2）。
+# 規格原訂 0.95；2026-10-09 INTC 實測 0.95 涵蓋 $42–$115、29 檔、174 秒（基準 74 秒的 2.35 倍），
+# 使用者裁示改 0.90。
+LEAPS_MAX_DELTA = 0.90
 
 # ── Stage 1: Near the Money view — all Call strikes + Deltas ─────────────────
 NEAR_MONEY_JS = """
@@ -227,7 +232,7 @@ def _pick_candidates(near_money_rows, user_strike=None, underlying_price=None):
     else:
         def _qualifies(row):
             delta = row.get("delta")
-            if delta is not None and delta >= 0.60:
+            if delta is not None and LEAPS_MIN_DELTA <= delta <= LEAPS_MAX_DELTA:
                 return True
             greeks_computed = delta not in (None, 0) or row.get("iv") not in (None, 0)
             if greeks_computed:
@@ -237,7 +242,7 @@ def _pick_candidates(near_money_rows, user_strike=None, underlying_price=None):
             # regardless of what Barchart's (uncomputed) Delta field shows.
             return underlying_price is not None and row["strike"] < underlying_price
 
-        # Auto mode: Delta >= 0.60 from Near the Money view, with the
+        # Auto mode: LEAPS_MIN_DELTA <= Delta <= LEAPS_MAX_DELTA, with the
         # missing-Greeks fallback above.
         center_strikes = sorted({
             r["strike"] for r in near_money_rows
@@ -406,7 +411,8 @@ async def main(symbol, user_strike=None):
     # ladder for whichever expiration is loaded — verified live, larger values
     # plateau at the same set) — that is the chain a LEAPS user_strike actually
     # refers to.
-    leaps_exp_date = None
+    leaps_exp_date   = None
+    leaps_chain_rows = []
     for date_str in sorted(exp_value_map):
         y, m, d = (int(x) for x in date_str.split("-"))
         if (date(y, m, d) - date.today()).days >= LEAPS_MIN_DTE:
@@ -457,9 +463,17 @@ async def main(symbol, user_strike=None):
             return
 
     # ── Stage 1: pick candidate strikes ──────────────────────────────────────
-    candidate_strikes = _pick_candidates(near_money_rows, user_strike, underlying_price)
+    # BUG (2026-10-09 INTC, leaps-deep-itm-fix.md): auto mode picked from the
+    # near-term `moneyness=10` window ($97–$107, $1 apart). Most of those strikes
+    # are not listed at LEAPS expirations, so the ranking only ever showed $100/$105
+    # and deep-ITM $80–$95 never reached Stage 2. Auto mode now picks from the
+    # LEAPS-dated chain read above (same page load, no extra navigation); the
+    # near-term window is only the fallback when no LEAPS expiration exists.
+    # Manual mode (user_strike) is unchanged.
+    pick_rows = leaps_chain_rows if (user_strike is None and leaps_chain_rows) else near_money_rows
+    candidate_strikes = _pick_candidates(pick_rows, user_strike, underlying_price)
     if not candidate_strikes:
-        # Auto mode: no Delta>=0.60 strikes visible in near-money view
+        # Auto mode: no LEAPS_MIN_DELTA..LEAPS_MAX_DELTA strikes in the chain
         print(json.dumps({"status": "no_candidates", "chain_snapshot": chain_snapshot}))
         return
 

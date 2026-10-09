@@ -636,10 +636,11 @@ class TestAutoModeCoversDeepItmLeapsStrikes(unittest.TestCase):
     100/105。LEAPS 鏈上 0.60 ≤ Δ ≤ 0.95 的履約價都必須送進 Stage 2。
     """
 
-    # 規格 P2 的 LEAPS_MAX_DELTA 預設值。這裡刻意不讀 scraper 的常數：常數還不存在時，
-    # 測試要因為「沒抓到深度價內履約價」失敗，而不是因為 AttributeError 失敗。
+    # 規格 P2 的 LEAPS_MAX_DELTA（2026-10-09 使用者裁示由 0.95 改 0.90）。這裡刻意不讀
+    # scraper 的常數：常數還不存在時，測試要因為「沒抓到深度價內履約價」失敗，而不是
+    # 因為 AttributeError 失敗。
     MIN_DELTA = 0.60
-    MAX_DELTA = 0.95
+    MAX_DELTA = 0.90
 
     # 近月窗口：現價 106.76 附近每 $1 一檔（短 DTE，Delta 隨履約價陡降）
     NEAR_TERM_ROWS = [
@@ -712,7 +713,7 @@ class TestAutoModeCoversDeepItmLeapsStrikes(unittest.TestCase):
             if self.MIN_DELTA <= r["delta"] <= self.MAX_DELTA
         }
         missing = sorted(expected - strikes)
-        self.assertEqual(missing, [], f"Stage 2 漏抓 LEAPS 鏈上 Δ 介於 0.60–0.95 的履約價：{missing}（實際送出 {sorted(strikes)}）")
+        self.assertEqual(missing, [], f"Stage 2 漏抓 LEAPS 鏈上 Δ 介於 {self.MIN_DELTA}–{self.MAX_DELTA} 的履約價：{missing}（實際送出 {sorted(strikes)}）")
 
     def test_deep_itm_strikes_80_to_105_are_sent_to_stage2(self):
         _, strikes = self._stage2_strikes()
