@@ -391,6 +391,42 @@ RSpec.describe "GET /leaps", type: :request do
       expect(response.body).not_to include("尚無 Short Call 資料")
     end
 
+    # 另案 1（leaps-deep-itm-fix.md 結案報告）：指定履約價時快照只有該檔與緩衝檔，
+    # Δ 未達 0.80 就整塊空。要說清楚原因，並給一顆「不填履約價重新查詢」的按鈕。
+    context "指定履約價且沒有合格 Long 腳" do
+      before do
+        # 外層只 stub 了不帶履約價的 for_symbol.fresh 鏈；帶 user_strike 時走 fresh_for?
+        allow(LeapsOptionChainSnapshot).to receive(:fresh_for?).with(symbol, user_strike: 80.0).and_return(true)
+        allow(PmccRankingService).to receive(:new).with(symbol)
+          .and_return(instance_double(PmccRankingService, call: { status: :no_qualified_leaps, symbol: symbol }))
+        get "/leaps", params: { symbol: symbol, user_strike: "80" }
+      end
+
+      let(:doc) { Nokogiri::HTML(response.body) }
+
+      it "說明只查了指定履約價與緩衝檔" do
+        expect(response.body).to include("無符合 Long Δ ≥ 0.80 的 LEAPS")
+        expect(response.body).to include("這次只查了履約價 80 與緩衝檔")
+      end
+
+      it "提供「不填履約價重新查詢」按鈕，不是連結（要走 analyze 才會重抓）" do
+        btn = doc.at_css("button[data-leaps-requery-auto]")
+        expect(btn).to be_present
+        expect(btn["type"]).to eq("button")
+        expect(btn.text).to include("不填履約價重新查詢")
+      end
+    end
+
+    it "不指定履約價時只顯示原訊息，沒有改查按鈕" do
+      allow(PmccRankingService).to receive(:new).with(symbol)
+        .and_return(instance_double(PmccRankingService, call: { status: :no_qualified_leaps, symbol: symbol }))
+
+      get "/leaps", params: { symbol: symbol }
+
+      expect(response.body).not_to include("這次只查了履約價")
+      expect(Nokogiri::HTML(response.body).at_css("[data-leaps-requery-auto]")).to be_nil
+    end
+
     # P4：建倉規範卡的數字要從常數讀，改常數畫面就跟著變，文字與邏輯不會再脫鉤。
     it "建倉規範卡的 Long Delta 門檻取自 PmccRankingService::LEAPS_DELTA_OK_MIN" do
       stub_const("PmccRankingService::LEAPS_DELTA_OK_MIN", 0.85)

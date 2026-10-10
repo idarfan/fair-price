@@ -20,6 +20,7 @@ const PAGE = `
   <div id="leaps-strike-error" class="hidden"></div>
   <div data-leaps-status-alert>❌ 抓取時發生未知錯誤，請稍後重試。</div>
   <div id="unrelated">其他區塊</div>
+  <button type="button" data-leaps-requery-auto>不填履約價重新查詢</button>
 `;
 
 function submit(): void {
@@ -51,6 +52,24 @@ describe("leapsLoading", () => {
     expect(
       document.getElementById("leaps-loading")?.classList.contains("hidden"),
     ).toBe(false);
+  });
+
+  // 另案 1：指定履約價時 PMCC 可能整塊空，按鈕要清掉履約價、照一般查詢流程送出
+  it("按「不填履約價重新查詢」會清空履約價並以不帶履約價送出 analyze", () => {
+    const strike = document.getElementById(
+      "leaps-strike-input",
+    ) as HTMLInputElement;
+    strike.value = "80";
+    (
+      document.querySelector("[data-leaps-requery-auto]") as HTMLButtonElement
+    ).click();
+
+    expect(strike.value).toBe("");
+    const fetchMock = vi.mocked(fetch);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, opts] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe("/leaps/analyze");
+    expect(JSON.parse(String(opts?.body))).toEqual({ symbol: "ORCL" });
   });
 
   it("不動其他區塊", () => {
