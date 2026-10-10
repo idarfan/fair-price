@@ -266,7 +266,8 @@ def _pick_candidates(near_money_rows, user_strike=None, underlying_price=None, f
 
     candidates = set(center_strikes)
 
-    # +/-1 buffer using the near-money strike list
+    # +/-1 buffer using the strike list we picked from (the LEAPS chain when
+    # one was read, otherwise the near-money list)
     if all_strikes:
         lo = min(center_strikes)
         hi = max(center_strikes)
@@ -499,11 +500,12 @@ async def main(symbol, user_strike=None):
     # and deep-ITM $80–$95 never reached Stage 2. Auto mode now picks from the
     # LEAPS-dated chain read above (same page load, no extra navigation); the
     # near-term window is only the fallback when no LEAPS expiration exists.
-    # Manual mode (user_strike) is unchanged.
-    use_leaps_chain   = user_strike is None and bool(leaps_chain_rows)
-    pick_rows         = leaps_chain_rows if use_leaps_chain else near_money_rows
+    # Manual mode (user_strike) uses the same LEAPS chain for its ±1 buffer
+    # strikes (另案 2: INTC 80 used to get $95 from the near-term window instead
+    # of the LEAPS neighbours $75/$85). The missing-Greeks floor stays auto-only.
+    pick_rows         = leaps_chain_rows if leaps_chain_rows else near_money_rows
     candidate_strikes = _pick_candidates(pick_rows, user_strike, underlying_price,
-                                         from_leaps_chain=use_leaps_chain)
+                                         from_leaps_chain=user_strike is None and bool(leaps_chain_rows))
     if not candidate_strikes:
         # Auto mode: no LEAPS_MIN_DELTA..LEAPS_MAX_DELTA strikes in the chain
         print(json.dumps({"status": "no_candidates", "chain_snapshot": chain_snapshot}))
