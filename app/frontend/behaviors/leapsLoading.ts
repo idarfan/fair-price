@@ -35,6 +35,17 @@ export function init(root: HTMLElement): void {
     }
   });
 
+  // 另案 1：PMCC 在指定履約價時可能沒有合格 Long 腳，按鈕清掉履約價後走同一個查詢流程。
+  // 按鈕是伺服器端整頁渲染出來的，init 時已在 DOM 裡，直接綁定即可。
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-leaps-requery-auto]")
+    .forEach((requery) => {
+      requery.addEventListener("click", () => {
+        if (strikeInp) strikeInp.value = "";
+        form.requestSubmit();
+      });
+    });
+
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const symbol = inp ? inp.value.trim().toUpperCase() : "";

@@ -41,9 +41,7 @@ module LeapsRecommendations::PmccSection
 
       case status
       when :no_qualified_leaps
-        div(class: "px-4 py-6 text-center text-sm text-gray-500") do
-          plain "無符合 Long Δ ≥ #{sprintf('%.2f', PmccRankingService::LEAPS_DELTA_OK_MIN)} 的 LEAPS"
-        end
+        render_pmcc_no_qualified_leaps
       when :no_leaps, :no_short, :no_data
         div(class: "px-4 py-6 text-center text-sm text-gray-400") { plain "尚無 Short Call 資料，請重新查詢" }
       when :ok
@@ -58,6 +56,27 @@ module LeapsRecommendations::PmccSection
           end
         end
       end
+    end
+  end
+
+
+  # 另案 1（leaps-deep-itm-fix.md 結案報告）：指定履約價時快照只有該檔與緩衝檔，
+  # Δ 未達門檻就整塊空——不是這檔股票沒有合格腳。說明原因，並給一顆按鈕
+  # 清掉履約價、走原本的查詢流程（leapsLoading.ts 的 data-leaps-requery-auto）。
+  # 用 button 不用連結：直接連到 /leaps?symbol= 只會讀現有快照，不會重抓。
+  def render_pmcc_no_qualified_leaps
+    div(class: "px-4 py-6 text-center text-sm text-gray-500 space-y-3") do
+      p { plain "無符合 Long Δ ≥ #{sprintf('%.2f', PmccRankingService::LEAPS_DELTA_OK_MIN)} 的 LEAPS" }
+      next if @user_strike.blank?
+
+      p(class: "text-xs text-gray-500") do
+        plain "這次只查了履約價 #{@user_strike} 與緩衝檔，Δ 都未達門檻；" \
+              "PMCC 需要更深度價內的 Long 腳，不填履約價查詢會從 LEAPS 鏈挑選。"
+      end
+      button(
+        type: "button", data_leaps_requery_auto: "true",
+        class: "px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
+      ) { plain "不填履約價重新查詢" }
     end
   end
 
