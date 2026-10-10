@@ -94,7 +94,7 @@
 | P4 | B3 B4 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P4-r1.md）；P5 前回應質詢 1（migration 後先以擁有者跑 `RAILS_ENV=test bin/rails db:test:prepare`，核對 `schema_sha1` 與 `sha1sum db/schema.rb` 一致再送審）；P7 附 options_flow→leaps 耗時對照 143 秒；P6 截圖要看得到 PMCC 組合表 | `tmp/e2e/leaps-deep-itm/P4/`；併做 P3 r1 質詢 1（清單快照 1 天內才判斷）、3（新增 `chain_expiration_date`）。**另案**：Short 腳 Δ 0.20–0.35 與 DTE 19–45 目前只做標記（✅/⚠️、「建議區間」），沒有篩選 |
 | P5 | 全部 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P5-r1.md）；P6 前由使用者跑 `setup-fp-test.sh` 讓 fp_test 重新擁有 fairprice_test（P4 migration 後被 mygame 重建） | `spec/requests/leaps_async_flow_spec.rb`（3 條，含 P3 質詢 2 的不 stub 排名 T2c） |
 | P6 | 全部 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P6-r1.md）；P7 結案報告列入已知限制：user_strike 模式 PMCC 可能整塊空、緩衝檔取自近月窗口 | `tmp/e2e/leaps-deep-itm/P6/`（三頁 DOM JSON＋元素截圖）；8 項全 ✅ |
-| P7 | 全部 | 🔄 進行中 | r1 FAIL → 送審 r2 | 本檔「結案報告」；`tmp/e2e/leaps-deep-itm/P7/` |
+| P7 | 全部 | ✅ 通過 | r1 FAIL → r2 PASS（verdict-leaps-deep-itm-P7-r2.md） | 本檔「結案報告」；`tmp/e2e/leaps-deep-itm/P7/` |
 
 狀態值只能填：⬜ 未開始 / 🔄 進行中 / ✅ 通過 / ❌ 卡關（附原因）
 
