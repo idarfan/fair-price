@@ -1,5 +1,14 @@
 # FairPrice
 
+### 2026-10-10（六）— 修正：LEAPS 候選遺漏深度價內履約價、PMCC Long Δ ≥ 0.80 未落實（leaps-deep-itm-fix.md）
+
+- LEAPS 不填履約價查詢：候選改從第一個 LEAPS 到期日的完整鏈挑 0.60 ≤ Δ ≤ 0.90（`LEAPS_MAX_DELTA`）。原本只從近月 `moneyness=10` 窗口挑，INTC 只剩 $100／$105，現在是 $55–$115。抓取時間約 120–143 秒（原 72–74 秒，使用者已接受）。
+- 「期權鏈無此履約價」與「Delta 不足」分開顯示；過期的 `job_status=success` 網址改顯示「已不是最新，請重新查詢」，不再誤報 Delta 不足。
+- PMCC：Long Δ ≥ 0.80 由「只標記」改為篩選（先篩再取 OI 前 3），沒有合格腳時顯示「無符合 Long Δ ≥ 0.80 的 LEAPS」；建倉規範卡數字改讀 `PmccRankingService::LEAPS_DELTA_OK_MIN`；說明卡範例改用合格的腳。
+- migration：`strike_chain_snapshots.chain_expiration_date`（判斷掛牌用的到期日；清單快照 1 天內才在 controller 判斷）。
+- **部署注意**：改了 `leaps_scraper.py` 的挑選邏輯後，要清空 `leaps_option_chain_snapshots`（舊快照不含新範圍）。有新 migration 時，請跑 `~/fairprice-review/setup-fp-test.sh` 讓 fp_test 重新擁有 fairprice_test。
+- 另案：user_strike 模式的 PMCC 候選與緩衝檔、Short 腳 Δ／DTE 規則只標記未篩選。
+
 ### 2026-10-02（五）— 版本 v20261002，更新版本說明
 
 - 版本更新說明新增 v20261002：POI／52 週／當日區間抓取失敗後重新查詢會重抓、當日區間不再停在「載入中…」、抓取卡住會自動中止、多人同時查詢不互相干擾、同一檔股票同一履約價的 LEAPS 查詢共用一次抓取、查詢人多時自動排隊不誤報逾時。

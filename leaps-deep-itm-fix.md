@@ -94,7 +94,7 @@
 | P4 | B3 B4 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P4-r1.md）；P5 前回應質詢 1（migration 後先以擁有者跑 `RAILS_ENV=test bin/rails db:test:prepare`，核對 `schema_sha1` 與 `sha1sum db/schema.rb` 一致再送審）；P7 附 options_flow→leaps 耗時對照 143 秒；P6 截圖要看得到 PMCC 組合表 | `tmp/e2e/leaps-deep-itm/P4/`；併做 P3 r1 質詢 1（清單快照 1 天內才判斷）、3（新增 `chain_expiration_date`）。**另案**：Short 腳 Δ 0.20–0.35 與 DTE 19–45 目前只做標記（✅/⚠️、「建議區間」），沒有篩選 |
 | P5 | 全部 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P5-r1.md）；P6 前由使用者跑 `setup-fp-test.sh` 讓 fp_test 重新擁有 fairprice_test（P4 migration 後被 mygame 重建） | `spec/requests/leaps_async_flow_spec.rb`（3 條，含 P3 質詢 2 的不 stub 排名 T2c） |
 | P6 | 全部 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P6-r1.md）；P7 結案報告列入已知限制：user_strike 模式 PMCC 可能整塊空、緩衝檔取自近月窗口 | `tmp/e2e/leaps-deep-itm/P6/`（三頁 DOM JSON＋元素截圖）；8 項全 ✅ |
-| P7 | 全部 | ⬜ 未開始 | | |
+| P7 | 全部 | 🔄 進行中 | 送審 r1 | 本檔「結案報告」；`tmp/e2e/leaps-deep-itm/P7/` |
 
 狀態值只能填：⬜ 未開始 / 🔄 進行中 / ✅ 通過 / ❌ 卡關（附原因）
 
@@ -425,3 +425,74 @@ NOK		10.2900	2026-10-01 14:51:58.45826	16	[1.0, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0, 1
      - B5 的結論不受影響：這一層只存 job 狀態與錯誤訊息，不存候選結果。
 
   兩層的 key 都**不含**抓取邏輯版本。
+
+---
+
+## 結案報告（P7，2026-10-10）
+
+### 1. 核心用例（預設查詢，不帶參數）有沒有端到端跑過？
+
+有。P6 在正式環境（port 3003，production）用 Playwright 從空白輸入框查 INTC，走完 F7 全流程：14:14:18 POST analyze → job → 14:17:15 跳轉。
+
+- URL：`http://localhost:3003/leaps?symbol=INTC&job_status=success`
+- 截圖：`tmp/e2e/leaps-deep-itm/P6/intc-auto-ranking.png`（排行表）、`intc-auto-pmcc.png`（PMCC 區塊，「總組合 336 / 通過 150」）、`intc-auto-pmcc-passing-bucket.png`、`intc-auto-pmcc-edu.png`
+- DOM：`tmp/e2e/leaps-deep-itm/P6/dom-intc-auto.json`（候選 $55–$115 共 22 檔、含 $80；$80C 2028-12-15 Δ 0.7962；PMCC 通過組合 Long Δ 最小 0.857）
+- P6 交叉比對 8 項全數 ✅。
+
+### 2. 根因是什麼？（引用 P0 結論）
+
+- **B1／F4**：auto 模式只從近月到期日的 `?moneyness=10` 窗口挑 Δ ≥ 0.60 的履約價。INTC 當天的窗口是 $97–$107、每 $1 一檔，其中只有 $100、$105 在 LEAPS 到期日有掛牌。完整的 LEAPS 履約價鏈其實已經抓到（63 檔），只是沒有拿來挑候選。
+- **B2／F1**：不是 Delta 判斷錯。新鮮查詢 80 本來就有 5 個候選；F1 是重開兩小時前的 `job_status=success` 網址，資料已過期又被 auto 查詢覆蓋，controller 把「成功但不新鮮」歸成 `:no_candidates`，才顯示 Delta 不足。
+- **B3／B4（F5／F9）**：`LEAPS_DELTA_OK_MIN = 0.80` 依原 PMCC v3 §2.3 只用來標記、不淘汰；說明卡範例挑「第一個通過黃金法則的組合」，不看 Long Δ。
+- **B5**：「共用結果」在 DB 快照（`fresh_for?`：1 小時內且中心履約價相同），key 不含抓取邏輯版本。
+
+### 3. 修改了哪些檔案？
+
+```
+$ /usr/bin/git diff --stat main...fix/leaps-deep-itm
+ .../leaps_recommendations/page_header.rb           |  10 +
+ .../leaps_recommendations/pmcc_education.rb        |   2 +-
+ .../leaps_recommendations/pmcc_section.rb          |   4 +
+ .../leaps_recommendations_controller.rb            |  13 +-
+ app/models/strike_chain_snapshot.rb                |  26 ++
+ app/services/barchart_scraper_service.rb           |   6 +-
+ app/services/pmcc_ranking_service.rb               |  18 +-
+ ...in_expiration_date_to_strike_chain_snapshots.rb |  10 +
+ db/schema.rb                                       |   3 +-
+ leaps-deep-itm-fix.md                              | （本檔）
+ lib/barchart_scrapers/leaps_scraper.py             |  60 ++-
+ lib/barchart_scrapers/test_leaps_scraper.py        | 140 +++++++
+ spec/models/strike_chain_snapshot_spec.rb          |  34 ++
+ spec/requests/leaps_async_flow_spec.rb             | 143 +++++++
+ spec/requests/leaps_recommendations_spec.rb        | 109 +++++-
+ spec/services/pmcc_ranking_service_spec.rb         |  70 +++-
+```
+另加 README.md 變更記錄（P7）。
+
+### 4. 查詢耗時變化（LEAPS 抓取：job 開始或 options_flow 完成 → fetch_logs 的 leaps success）
+
+| 輪次 | Stage 2 檔數 | 耗時 | 對 74 秒 |
+|---|---|---|---|
+| 修正前（P0，#1108／#1112） | 10–11 | 72／74 秒 | — |
+| P2 0.95 版（#1114） | 29 | 174 秒 | 2.35 倍 → 停下詢問，使用者裁示改 0.90 |
+| P2 0.90 定案（#1118） | 23 | 143 秒 | 1.93 倍（使用者接受） |
+| P4 實跑（#1126，10-10 週六，options_flow 完成 04:27:28 → 04:30:44） | 22 | 196 秒 | 2.65 倍（原因未查） |
+| **P6 核心用例（#1134，06:14:18 → 06:16:18；當天已抓過 options_flow）** | 22 | **120 秒** | **1.62 倍** |
+
+最新一次的實測（120 秒）在使用者接受的 143 秒以內。P4 那次 196 秒的原因沒有查明，是同一份程式、同樣 22 檔，判斷是 Barchart 頁面當下的載入時間差異（`_wait_for_grid` 最多等 60 秒，見檔頭註解）。
+
+### 5. 尚未解決或刻意延後的問題
+
+使用者已裁示**另案**：
+1. **user_strike 模式的 PMCC 可能整塊空**：指定履約價時，LEAPS 快照只有該檔與緩衝檔。INTC 80 的 Δ 是 0.786–0.797，PMCC 顯示「無符合 Long Δ ≥ 0.80 的 LEAPS」；但 auto 模式同一檔有 $55–$75 合格腳。（P6 質詢 1）
+2. **user_strike 模式的緩衝檔仍取自近月窗口**：INTC 80 的緩衝檔是 $95，不是 LEAPS 鏈上的 $77.5／$82.5。（P6 質詢 2）
+3. **Short 腳規則只標記、未篩選**：Δ 0.20–0.35 與 DTE 19–45 目前只做 ✅／⚠️ 與「建議區間」標記。（P4）
+
+刻意的取捨（使用者裁示，已寫入 P2）：
+4. 候選以**第一個** LEAPS 到期日的鏈為準，不是每個到期日；遠月 Δ 曲線較平，邊界外 Δ 0.60–0.66 或 0.89–0.90 的少數檔可能漏掉。
+5. `LEAPS_MAX_DELTA` 由規格原訂 0.95 改為 0.90。
+
+範圍外的觀察（未處理）：
+6. $80 各列都被標成「近期無成交 🚫 不建議」，但 F2 顯示當天 Options Flow 有大單；快照的 Volume 欄是 0–2。
+7. `pytest lib/barchart_scrapers` 整個目錄一起跑時，`test_pmcc_short_call_scraper.py` 有 14 條因為「no current event loop」失敗（測試檔之間共用 event loop 互相干擾）。`main` 上一樣是 14 failed，單檔跑全部通過，與本次修改無關。pipx 的 pytest 環境缺 `websockets`，`test_cdp_helper.py` 改用系統 python3 的 unittest 跑。
+8. P7 的「沒有新增 API 呼叫」grep 輸出**不是空的**，有 3 行命中，都是誤判（見 P7 送審紀錄），交由使用者裁示。
