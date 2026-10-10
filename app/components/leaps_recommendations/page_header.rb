@@ -106,6 +106,9 @@ module LeapsRecommendations::PageHeader
         "這個履約價 #{@user_strike}（含緩衝檔）在所有到期日都沒有符合 Delta ≥ 0.60 的候選。請嘗試其他履約價，或留空讓系統自動偵測。" :
         "目前沒有符合篩選條件的候選，請嘗試調整 Delta 範圍或手動輸入履約價後重試。"
       render_alert("bg-orange-50 border border-orange-300 text-orange-800", "⚠️ #{msg}")
+    when :stale_result
+      render_alert("bg-blue-50 border border-blue-300 text-blue-800",
+        "ℹ️ 這筆查詢結果已不是最新（超過 #{fresh_window_label}，或已被其他查詢取代），請重新按「查詢」。")
     when :invalid_strike
       msg = @scrape_errors.first.presence || "履約價不在有效範圍，請重新輸入。"
       render_alert("bg-red-50 border border-red-300 text-red-800", "❌ #{msg}")
@@ -113,6 +116,13 @@ module LeapsRecommendations::PageHeader
       render_alert("bg-blue-50 border border-blue-300 text-blue-800",
         "ℹ️ 尚未取得 #{@symbol} 的 LEAPS 資料，請點「查詢」開始抓取。")
     end
+  end
+
+
+  # 數字只從 FRESH_WINDOW 來，不在文案裡寫死。
+  def fresh_window_label
+    minutes = LeapsOptionChainSnapshot::FRESH_WINDOW.in_minutes.to_i
+    (minutes % 60).zero? ? "#{minutes / 60} 小時" : "#{minutes} 分鐘"
   end
 
 

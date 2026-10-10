@@ -515,6 +515,25 @@ class TestLeapsChainSnapshot(unittest.TestCase):
         result, _ = self._run_with_two_near_money_calls(user_strike=7.0)
         self.assertNotEqual(result.get("status"), "invalid_strike")
 
+    def test_chain_snapshot_records_the_leaps_expiration_it_was_read_from(self):
+        """P3 r1 質詢 3（使用者裁示：新增欄位存判斷用到期日）：chain_snapshot 要帶出
+        strikes 來自哪個到期日，controller 的訊息才能和 scraper 用同一個日期。"""
+        result, _ = self._run_with_two_near_money_calls(user_strike=10.0)
+        far_date = scraper.date.today() + scraper.timedelta(days=scraper.LEAPS_MIN_DTE + 30)
+        self.assertEqual(result["chain_snapshot"]["expiration"], far_date.strftime("%Y-%m-%d"))
+
+    def test_strike_in_range_but_not_listed_on_leaps_chain_is_invalid(self):
+        """T2b（leaps-deep-itm-fix.md P3，使用者裁示 (i)）：$8 落在 LEAPS 鏈的範圍內、
+        也出現在近月，但第一個 LEAPS 到期日沒有掛牌 → 「期權鏈無此履約價」，訊息帶
+        出判斷依據的到期日。symbol 第一次查詢（DB 還沒有清單快照）時，controller 擋不到，
+        要靠這裡。"""
+        result, _ = self._run_with_two_near_money_calls(user_strike=8.0)
+        far_date = scraper.date.today() + scraper.timedelta(days=scraper.LEAPS_MIN_DTE + 30)
+        self.assertEqual(result["status"], "invalid_strike")
+        self.assertIn("期權鏈無此履約價", result["message"])
+        self.assertIn(far_date.strftime("%Y-%m-%d"), result["message"])
+        self.assertEqual(result["chain_snapshot"]["strikes"], [7.0, 10.0, 12.0])
+
     def test_strike_absent_from_both_chains_is_invalid(self):
         """Sanity check: a strike outside BOTH ladders is still correctly rejected."""
         result, _ = self._run_with_two_near_money_calls(user_strike=2.0)
@@ -548,6 +567,8 @@ class TestLeapsChainSnapshot(unittest.TestCase):
 
         result = json.loads(buf.getvalue().strip())
         self.assertEqual(result["chain_snapshot"]["strikes"], [8.0, 9.0])
+        # 退回近月清單時，這份清單不是 LEAPS 鏈，不能帶到期日（controller 據此不判斷掛牌）
+        self.assertIsNone(result["chain_snapshot"]["expiration"])
 
 
 
@@ -626,6 +647,125 @@ class TestUnderlyingJsHeader(unittest.TestCase):
 
     def test_no_header_falls_back_to_null_when_nothing_else(self):
         self.assertIsNone(self._run(None))
+
+
+class TestAutoModeCoversDeepItmLeapsStrikes(unittest.TestCase):
+    """
+    T1（leaps-deep-itm-fix.md P1，2026-10-09 INTC 實測）：auto 模式只從近月
+    `?moneyness=10` 窗口挑候選。近月窗口是現價附近每 $1 一檔，大多不在 LEAPS
+    到期日的履約價鏈上，深度價內的 $80–$95 從來沒有送進 Stage 2，排行只剩
+    100/105。LEAPS 鏈上 0.60 ≤ Δ ≤ 0.95 的履約價都必須送進 Stage 2。
+    """
+
+    # 規格 P2 的 LEAPS_MAX_DELTA（2026-10-09 使用者裁示由 0.95 改 0.90）。這裡刻意不讀
+    # scraper 的常數：常數還不存在時，測試要因為「沒抓到深度價內履約價」失敗，而不是
+    # 因為 AttributeError 失敗。
+    MIN_DELTA = 0.60
+    MAX_DELTA = 0.90
+
+    # 近月窗口：現價 106.76 附近每 $1 一檔（短 DTE，Delta 隨履約價陡降）
+    NEAR_TERM_ROWS = [
+        {"strike": s, "delta": d, "iv": 0.6}
+        for s, d in [(97.0, 0.86), (98.0, 0.83), (99.0, 0.80), (100.0, 0.77),
+                     (101.0, 0.73), (102.0, 0.70), (103.0, 0.66), (104.0, 0.62),
+                     (105.0, 0.57), (106.0, 0.52), (107.0, 0.47)]
+    ]
+    # LEAPS 到期日的完整履約價鏈：70–130 每 5 一檔，Delta 依價內程度遞減
+    LEAPS_CHAIN_ROWS = [
+        {"strike": s, "delta": d, "iv": 0.6}
+        for s, d in [(70.0, 0.96), (75.0, 0.88), (80.0, 0.80), (85.0, 0.76),
+                     (90.0, 0.72), (95.0, 0.69), (100.0, 0.66), (105.0, 0.62),
+                     (110.0, 0.58), (115.0, 0.54), (120.0, 0.50), (125.0, 0.46),
+                     (130.0, 0.42)]
+    ]
+
+    def _stage2_strikes(self):
+        far_date = scraper.date.today() + scraper.timedelta(days=scraper.LEAPS_MIN_DTE + 30)
+        far_exp = [{"value": far_date.strftime("%Y-%m-%d") + "-m", "text": "far LEAPS"}]
+        near_money_calls = {"n": 0}
+
+        async def eval_side(ws, js, **kw):
+            if "bc-overlay-modal" in js:
+                return False
+            if "angular.element" in js:
+                return 106.76
+            if "querySelectorAll" in js:
+                return far_exp
+            return None
+
+        async def wait_s(ws, js, max_wait_s=30, **kw):
+            if "symbolType" in js and "bidPrice" not in js and "itmProbability" not in js:
+                near_money_calls["n"] += 1
+                # 第 1 次＝近月 NTM 頁，第 2 次＝LEAPS 到期日的完整鏈
+                return self.NEAR_TERM_ROWS if near_money_calls["n"] == 1 else self.LEAPS_CHAIN_ROWS
+            if "itmProbability" in js:
+                return GOOD_VG
+            if "bidPrice" in js:
+                return GOOD_OPTS
+            return None
+
+        navigate = AsyncMock()
+        buf = io.StringIO()
+        with (
+            patch("leaps_scraper.prepare_page", new=AsyncMock(return_value=("tid", "ws://fake"))),
+            patch("leaps_scraper.cdp_navigate", new=navigate),
+            patch("leaps_scraper.activate_target", new=AsyncMock()),
+            patch("leaps_scraper.cdp_eval", new=AsyncMock(side_effect=eval_side)),
+            patch("leaps_scraper._wait_for_grid", new=AsyncMock(side_effect=wait_s)),
+            patch("leaps_scraper.asyncio.sleep", new=AsyncMock()),
+            patch("sys.stdout", buf),
+        ):
+            _run(scraper.main("INTC"))
+
+        result = json.loads(buf.getvalue().strip())
+        urls = [c.args[1] for c in navigate.call_args_list]
+        strikes = {
+            float(u.split("view=stacked&strike=")[1])
+            for u in urls if "view=stacked&strike=" in u
+        }
+        return result, strikes
+
+    def test_every_leaps_strike_in_delta_band_is_sent_to_stage2(self):
+        result, strikes = self._stage2_strikes()
+        self.assertEqual(result["status"], "success")
+
+        expected = {
+            r["strike"] for r in self.LEAPS_CHAIN_ROWS
+            if self.MIN_DELTA <= r["delta"] <= self.MAX_DELTA
+        }
+        missing = sorted(expected - strikes)
+        self.assertEqual(missing, [], f"Stage 2 漏抓 LEAPS 鏈上 Δ 介於 {self.MIN_DELTA}–{self.MAX_DELTA} 的履約價：{missing}（實際送出 {sorted(strikes)}）")
+
+    def test_deep_itm_strikes_80_to_105_are_sent_to_stage2(self):
+        _, strikes = self._stage2_strikes()
+        for s in (80.0, 85.0, 90.0, 95.0, 100.0, 105.0):
+            self.assertIn(s, strikes, f"深度價內 {s} 沒有送進 Stage 2（實際送出 {sorted(strikes)}）")
+
+
+class TestMissingGreeksRescueIsBoundedOnLeapsChain(TestAutoModeCoversDeepItmLeapsStrikes):
+    """
+    P2 r1 質詢 1（使用者同意加上限）：改從 LEAPS 完整鏈挑候選後，「缺 Greeks
+    （delta == 0 且 iv == 0）＋履約價 < 現價就合格」的回退會套用到整條鏈。
+    深度價內的 LEAPS 履約價如果 Barchart 沒算 Greeks，$1 到現價以下會全部被送進
+    Stage 2，耗時失控，也不受 LEAPS_MAX_DELTA 約束。從 LEAPS 鏈挑時，缺 Greeks 的
+    履約價不得低於「有算出 Δ 且落在區間內」的最低履約價。
+    （繼承的兩條 T1 測試在這份 fixture 上同樣成立，一併執行。）
+    """
+
+    UNCOMPUTED = (1.0, 3.0, 5.0, 10.0, 20.0, 30.0, 40.0, 50.0)
+    LEAPS_CHAIN_ROWS = [{"strike": s, "delta": 0.0, "iv": 0.0} for s in UNCOMPUTED] + [
+        {"strike": s, "delta": d, "iv": 0.6}
+        for s, d in [(55.0, 0.89), (60.0, 0.87), (65.0, 0.85), (70.0, 0.83),
+                     (75.0, 0.82), (80.0, 0.80), (85.0, 0.76), (90.0, 0.72),
+                     (95.0, 0.69), (100.0, 0.66), (105.0, 0.62), (110.0, 0.58),
+                     (115.0, 0.54)]
+    ]
+
+    def test_uncomputed_deep_itm_strikes_below_band_are_not_sent(self):
+        _, strikes = self._stage2_strikes()
+        # $50 是區間最低檔 $55 往下的 −1 緩衝檔，緩衝規則本來就會送出，不算在內。
+        runaway = sorted(strikes & {1.0, 3.0, 5.0, 10.0, 20.0, 30.0, 40.0})
+        self.assertEqual(runaway, [], f"缺 Greeks 的深度價內履約價被送進 Stage 2：{runaway}（實際送出 {sorted(strikes)}）")
 
 
 if __name__ == "__main__":

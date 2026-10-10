@@ -51,6 +51,11 @@ VG_SETTLE      = 1500   # Stage 2 V&G initial settle; _wait_for_grid polls up to
 GRID_MAX_WAIT_S = 60
 LEAPS_MIN_DTE  = 364    # chain_snapshot must be built from a LEAPS-dated expiration (see fix below),
                         # matches LeapsRankingService::MIN_DTE
+LEAPS_MIN_DELTA = 0.60  # Stage 1 candidate band (auto mode), matches LeapsRankingService::DEFAULT_DELTA_MIN
+# 上限只用來擋「一路延伸到 Δ≈1 的極深價內」，排行層不設上限（leaps-deep-itm-fix.md P2）。
+# 規格原訂 0.95；2026-10-09 INTC 實測 0.95 涵蓋 $42–$115、29 檔、174 秒（基準 74 秒的 2.35 倍），
+# 使用者裁示改 0.90。
+LEAPS_MAX_DELTA = 0.90
 
 # ── Stage 1: Near the Money view — all Call strikes + Deltas ─────────────────
 NEAR_MONEY_JS = """
@@ -192,7 +197,7 @@ def _fill_exp_dates(rows):
             r["expiration_date"] = _dte_to_date(r["dte"])
 
 
-def _pick_candidates(near_money_rows, user_strike=None, underlying_price=None):
+def _pick_candidates(near_money_rows, user_strike=None, underlying_price=None, from_leaps_chain=False):
     """
     Stage 1: determine which strikes to query in Stage 2.
 
@@ -227,7 +232,7 @@ def _pick_candidates(near_money_rows, user_strike=None, underlying_price=None):
     else:
         def _qualifies(row):
             delta = row.get("delta")
-            if delta is not None and delta >= 0.60:
+            if delta is not None and LEAPS_MIN_DELTA <= delta <= LEAPS_MAX_DELTA:
                 return True
             greeks_computed = delta not in (None, 0) or row.get("iv") not in (None, 0)
             if greeks_computed:
@@ -237,12 +242,25 @@ def _pick_candidates(near_money_rows, user_strike=None, underlying_price=None):
             # regardless of what Barchart's (uncomputed) Delta field shows.
             return underlying_price is not None and row["strike"] < underlying_price
 
-        # Auto mode: Delta >= 0.60 from Near the Money view, with the
+        # Auto mode: LEAPS_MIN_DELTA <= Delta <= LEAPS_MAX_DELTA, with the
         # missing-Greeks fallback above.
         center_strikes = sorted({
             r["strike"] for r in near_money_rows
             if r.get("strike") is not None and _qualifies(r)
         })
+
+        # 從 LEAPS 完整鏈挑時（leaps-deep-itm-fix.md P2 r1 質詢 1），缺 Greeks 的
+        # 回退只能補區間內的空洞：不得低於「有算出 Δ 且落在區間內」的最低履約價。
+        # 否則深度價內沒算 Greeks 的 $1…現價以下會整段送進 Stage 2。近月窗口
+        # （NOK $7 的原始情境）維持原本行為。
+        if from_leaps_chain:
+            computed_in_band = [
+                r["strike"] for r in near_money_rows
+                if r.get("strike") is not None and r.get("delta") is not None
+                and LEAPS_MIN_DELTA <= r["delta"] <= LEAPS_MAX_DELTA
+            ]
+            floor = min(computed_in_band) if computed_in_band else None
+            center_strikes = [s for s in center_strikes if floor is not None and s >= floor]
         if not center_strikes:
             return []
 
@@ -406,7 +424,8 @@ async def main(symbol, user_strike=None):
     # ladder for whichever expiration is loaded — verified live, larger values
     # plateau at the same set) — that is the chain a LEAPS user_strike actually
     # refers to.
-    leaps_exp_date = None
+    leaps_exp_date   = None
+    leaps_chain_rows = []
     for date_str in sorted(exp_value_map):
         y, m, d = (int(x) for x in date_str.split("-"))
         if (date(y, m, d) - date.today()).days >= LEAPS_MIN_DTE:
@@ -431,7 +450,9 @@ async def main(symbol, user_strike=None):
             if (r.get("strike") or r.get("strikePrice")) is not None
         })
 
-    chain_snapshot = {"strikes": all_strikes, "spot_price": underlying_price}
+    # expiration：strikes 讀自哪個 LEAPS 到期日；退回近月清單時為 None（那份不是 LEAPS 鏈，
+    # controller 據此不拿它判斷掛牌）。leaps-deep-itm-fix.md P3 r1 質詢 3。
+    chain_snapshot = {"strikes": all_strikes, "spot_price": underlying_price, "expiration": leaps_exp_date}
 
     # ── Stage 1 post-check: validate user_strike against actual chain ─────────
     if user_strike is not None and all_strikes:
@@ -456,10 +477,35 @@ async def main(symbol, user_strike=None):
             }))
             return
 
+        # 範圍內但第一個 LEAPS 到期日沒有掛牌（leaps-deep-itm-fix.md P3 T2b）。只在確實
+        # 讀到 LEAPS 鏈時判斷；退回近月清單時那份清單不是 LEAPS 鏈，不能拿來判斷掛牌。
+        # 文案與 StrikeChainSnapshot#unlisted_message 一致。
+        if leaps_exp_date and not any(abs(s - user_strike) < 1e-6 for s in all_strikes):
+            print(json.dumps({
+                "status":         "invalid_strike",
+                "message":        (
+                    f"Strike {user_strike} 不在 {symbol} 第一個 LEAPS 到期日（{leaps_exp_date}）"
+                    f"的期權鏈上（期權鏈無此履約價），請改選有掛牌的履約價，或留空讓系統自動偵測。"
+                ),
+                "chain_snapshot": chain_snapshot,
+                "rows":           [],
+            }))
+            return
+
     # ── Stage 1: pick candidate strikes ──────────────────────────────────────
-    candidate_strikes = _pick_candidates(near_money_rows, user_strike, underlying_price)
+    # BUG (2026-10-09 INTC, leaps-deep-itm-fix.md): auto mode picked from the
+    # near-term `moneyness=10` window ($97–$107, $1 apart). Most of those strikes
+    # are not listed at LEAPS expirations, so the ranking only ever showed $100/$105
+    # and deep-ITM $80–$95 never reached Stage 2. Auto mode now picks from the
+    # LEAPS-dated chain read above (same page load, no extra navigation); the
+    # near-term window is only the fallback when no LEAPS expiration exists.
+    # Manual mode (user_strike) is unchanged.
+    use_leaps_chain   = user_strike is None and bool(leaps_chain_rows)
+    pick_rows         = leaps_chain_rows if use_leaps_chain else near_money_rows
+    candidate_strikes = _pick_candidates(pick_rows, user_strike, underlying_price,
+                                         from_leaps_chain=use_leaps_chain)
     if not candidate_strikes:
-        # Auto mode: no Delta>=0.60 strikes visible in near-money view
+        # Auto mode: no LEAPS_MIN_DELTA..LEAPS_MAX_DELTA strikes in the chain
         print(json.dumps({"status": "no_candidates", "chain_snapshot": chain_snapshot}))
         return
 

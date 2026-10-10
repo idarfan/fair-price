@@ -784,8 +784,10 @@ class BarchartScraperService
     spot    = snap["spot_price"]&.to_f
     return if strikes.empty?
 
-    values      = { symbol: @symbol, strikes: strikes, spot_price: spot, scraped_at: Time.current }
-    update_cols = %i[strikes spot_price scraped_at]
+    # chain_expiration_date：strikes 讀自哪個 LEAPS 到期日；近月退路為 nil（P3 r1 質詢 3）
+    values      = { symbol: @symbol, strikes: strikes, spot_price: spot, scraped_at: Time.current,
+                    chain_expiration_date: snap["expiration"].presence }
+    update_cols = %i[strikes spot_price scraped_at chain_expiration_date]
     unless user_strike == :unset
       values[:last_query_strike] = user_strike
       update_cols << :last_query_strike

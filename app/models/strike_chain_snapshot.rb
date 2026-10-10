@@ -22,6 +22,32 @@ class StrikeChainSnapshot < ApplicationRecord
     s >= (min_strike - tolerance) && s <= (max_strike + tolerance)
   end
 
+  # strikes 是第一個 LEAPS 到期日的完整履約價鏈（leaps_scraper.py 的 chain_snapshot）。
+  # valid_strike? 只看範圍；範圍內但沒掛牌的履約價（每 5 一檔時的 81）要另外擋，
+  # 否則排 job 抓完只會得到空結果（leaps-deep-itm-fix.md P3 T2b）。
+  LISTED_EPSILON = 1e-6
+  # 掛牌一天內很少變動；超過就交給 scraper 用當下的鏈判斷（P3 r1 質詢 1，使用者裁示）。
+  LISTING_FRESH_WINDOW = 1.day
+
+  # 只有「來自 LEAPS 鏈（chain_expiration_date 有值）而且夠新」的快照，才能斷定沒掛牌。
+  # NULL＝退回近月清單，或 07-08 修正前、本欄位新增前寫入的舊快照。
+  def listing_judgeable?
+    chain_expiration_date.present? && scraped_at.present? && scraped_at > LISTING_FRESH_WINDOW.ago
+  end
+
+  def listed?(user_strike)
+    s = user_strike.to_f
+    strikes.any? { |k| (k.to_f - s).abs < LISTED_EPSILON }
+  end
+
+  # 判斷依據是第一個 LEAPS 到期日的鏈（使用者裁示 (i)），訊息要講明，
+  # 以免只在更遠到期日掛牌的履約價被誤會成「整條鏈都沒有」。
+  # 日期取自本快照的 chain_expiration_date，與 scraper 判斷用的是同一個來源（P3 r1 質詢 3）。
+  def unlisted_message(symbol, user_strike)
+    "Strike #{user_strike} 不在 #{symbol} 第一個 LEAPS 到期日（#{chain_expiration_date.iso8601}）的期權鏈上（期權鏈無此履約價），" \
+      "請改選有掛牌的履約價，或留空讓系統自動偵測。"
+  end
+
   def invalid_message(symbol, user_strike)
     p = spot_price ? "$#{format('%.2f', spot_price)}" : "不明"
     "Strike #{user_strike} 不在 #{symbol} 的履約價範圍" \
