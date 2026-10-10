@@ -91,7 +91,7 @@
 | P1 | B1–B4 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P1-r1.md）；P2 須回應質詢 1（導航順序）、2（送出檔數與耗時） | T1 `test_leaps_scraper.py::TestAutoModeCoversDeepItmLeapsStrikes`、T2 `spec/requests/leaps_recommendations_spec.rb`、T3 `spec/services/pmcc_ranking_service_spec.rb`；P1/P3 已依 P0 結論與使用者裁示改寫（T1 移到 scraper 層、T2 改測過期訊息、T4 不適用） |
 | P2 | B1 B5 | ✅ 通過 | r2 PASS（verdict-leaps-deep-itm-P2-r2.md）；P6/P7 的 NOK 回歸須附 DOM 與排行表截圖 | `tmp/e2e/leaps-deep-itm/P2/`；LEAPS_MAX_DELTA 依使用者裁示改 0.90；INTC 23 檔、143 秒（基準 72–74 秒） |
 | P3 | B2 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P3-r1.md）；待 P4/P5 回應質詢 1（controller 採信舊清單快照）、2（P5 補不 stub 排名的 T2c）、3（訊息日期來源） | `tmp/e2e/leaps-deep-itm/P3/`；T2b 依使用者裁示 (i) 以第一個 LEAPS 到期日的鏈判斷；附錄 P0 Q5 更正（server 實為 production、file_store） |
-| P4 | B3 B4 | 🔄 進行中 | 送審 r1 | `tmp/e2e/leaps-deep-itm/P4/`；併做 P3 r1 質詢 1（清單快照 1 天內才判斷）、3（新增 `chain_expiration_date`）。**另案**：Short 腳 Δ 0.20–0.35 與 DTE 19–45 目前只做標記（✅/⚠️、「建議區間」），沒有篩選 |
+| P4 | B3 B4 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P4-r1.md）；P5 前回應質詢 1（migration 後先以擁有者跑 `RAILS_ENV=test bin/rails db:test:prepare`，核對 `schema_sha1` 與 `sha1sum db/schema.rb` 一致再送審）；P7 附 options_flow→leaps 耗時對照 143 秒；P6 截圖要看得到 PMCC 組合表 | `tmp/e2e/leaps-deep-itm/P4/`；併做 P3 r1 質詢 1（清單快照 1 天內才判斷）、3（新增 `chain_expiration_date`）。**另案**：Short 腳 Δ 0.20–0.35 與 DTE 19–45 目前只做標記（✅/⚠️、「建議區間」），沒有篩選 |
 | P5 | 全部 | ⬜ 未開始 | | |
 | P6 | 全部 | ⬜ 未開始 | | |
 | P7 | 全部 | ⬜ 未開始 | | |
