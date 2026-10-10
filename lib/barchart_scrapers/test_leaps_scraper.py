@@ -515,6 +515,13 @@ class TestLeapsChainSnapshot(unittest.TestCase):
         result, _ = self._run_with_two_near_money_calls(user_strike=7.0)
         self.assertNotEqual(result.get("status"), "invalid_strike")
 
+    def test_chain_snapshot_records_the_leaps_expiration_it_was_read_from(self):
+        """P3 r1 質詢 3（使用者裁示：新增欄位存判斷用到期日）：chain_snapshot 要帶出
+        strikes 來自哪個到期日，controller 的訊息才能和 scraper 用同一個日期。"""
+        result, _ = self._run_with_two_near_money_calls(user_strike=10.0)
+        far_date = scraper.date.today() + scraper.timedelta(days=scraper.LEAPS_MIN_DTE + 30)
+        self.assertEqual(result["chain_snapshot"]["expiration"], far_date.strftime("%Y-%m-%d"))
+
     def test_strike_in_range_but_not_listed_on_leaps_chain_is_invalid(self):
         """T2b（leaps-deep-itm-fix.md P3，使用者裁示 (i)）：$8 落在 LEAPS 鏈的範圍內、
         也出現在近月，但第一個 LEAPS 到期日沒有掛牌 → 「期權鏈無此履約價」，訊息帶
@@ -560,6 +567,8 @@ class TestLeapsChainSnapshot(unittest.TestCase):
 
         result = json.loads(buf.getvalue().strip())
         self.assertEqual(result["chain_snapshot"]["strikes"], [8.0, 9.0])
+        # 退回近月清單時，這份清單不是 LEAPS 鏈，不能帶到期日（controller 據此不判斷掛牌）
+        self.assertIsNone(result["chain_snapshot"]["expiration"])
 
 
 

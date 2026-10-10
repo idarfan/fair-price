@@ -83,7 +83,7 @@ module LeapsRecommendations::PmccEducation
         span(class: "text-xs text-[#7A6555]") { plain "PMCC · 黃金法則" }
       end
       div(class: "grid grid-cols-2 gap-2 text-xs") do
-        div(class: "text-[#3A70C0]") { plain "Long Delta ≥ 0.80" }
+        div(class: "text-[#3A70C0]") { plain "Long Delta ≥ #{sprintf('%.2f', PmccRankingService::LEAPS_DELTA_OK_MIN)}" }
         div(class: "text-[#3A70C0]") { plain "Long DTE ≥ 180 天" }
         div(class: "text-[#D04040]") { plain "Short Delta 0.20–0.35" }
         div(class: "text-[#D04040]") { plain "Short DTE 19–45 天" }

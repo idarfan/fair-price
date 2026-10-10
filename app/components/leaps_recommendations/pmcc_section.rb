@@ -40,6 +40,10 @@ module LeapsRecommendations::PmccSection
       end
 
       case status
+      when :no_qualified_leaps
+        div(class: "px-4 py-6 text-center text-sm text-gray-500") do
+          plain "無符合 Long Δ ≥ #{sprintf('%.2f', PmccRankingService::LEAPS_DELTA_OK_MIN)} 的 LEAPS"
+        end
       when :no_leaps, :no_short, :no_data
         div(class: "px-4 py-6 text-center text-sm text-gray-400") { plain "尚無 Short Call 資料，請重新查詢" }
       when :ok

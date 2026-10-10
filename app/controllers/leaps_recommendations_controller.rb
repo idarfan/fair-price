@@ -147,10 +147,10 @@ class LeapsRecommendationsController < ApplicationController
           message: snap.invalid_message(symbol, user_strike)
         }
       end
-      if snap && !snap.listed?(user_strike)
+      if snap&.listing_judgeable? && !snap.listed?(user_strike)
         return render json: {
           status:  "invalid_strike",
-          message: snap.unlisted_message(symbol, user_strike, LeapsOptionChainSnapshot.first_leaps_expiration(symbol))
+          message: snap.unlisted_message(symbol, user_strike)
         }
       end
     end

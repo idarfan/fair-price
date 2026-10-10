@@ -450,7 +450,9 @@ async def main(symbol, user_strike=None):
             if (r.get("strike") or r.get("strikePrice")) is not None
         })
 
-    chain_snapshot = {"strikes": all_strikes, "spot_price": underlying_price}
+    # expiration：strikes 讀自哪個 LEAPS 到期日；退回近月清單時為 None（那份不是 LEAPS 鏈，
+    # controller 據此不拿它判斷掛牌）。leaps-deep-itm-fix.md P3 r1 質詢 3。
+    chain_snapshot = {"strikes": all_strikes, "spot_price": underlying_price, "expiration": leaps_exp_date}
 
     # ── Stage 1 post-check: validate user_strike against actual chain ─────────
     if user_strike is not None and all_strikes:

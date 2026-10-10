@@ -281,13 +281,22 @@ RSpec.describe PmccRankingService do
     end
   end
 
-  describe "leaps_delta_ok marking (>= 0.80, mark-only)" do
-    it "marks true at 0.85 and false at 0.65" do
+  # leaps-deep-itm-fix.md P4：Long Δ ≥ 0.80 由「僅標記」改為篩選條件（原 PMCC v3 §2.3
+  # 的 mark-only 規則作廢）。Δ 0.65 的腳不再以 leaps_delta_ok=false 留在組合裡，而是
+  # 根本不進組合；進得來的組合 leaps_delta_ok 一律為 true。
+  describe "leaps_delta_ok（>= 0.80 由標記改為篩選）" do
+    it "Δ 0.65 的腳不進組合" do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.65)
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.30)
+      expect(service.call[:status]).to eq(:no_qualified_leaps)
+    end
+
+    it "Δ 0.85 的腳進組合且標記為 true" do
+      create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85)
       create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.30)
       result = service.call
       combo  = result.dig(result[:summary][:expirations].first, :combos).first
-      expect(combo[:leaps_delta_ok]).to be false
+      expect(combo[:leaps_delta_ok]).to be true
     end
   end
 
@@ -313,6 +322,17 @@ RSpec.describe PmccRankingService do
       expect(passing_deltas).to all(be >= 0.80)
     end
 
+    it "Long 腳在取 OI 前 N 名之前就先篩 Δ ≥ 0.80（高 OI 的低 Δ 腳不能把合格腳擠掉）" do
+      # Δ 0.70 的腳 OI 遠高於 Δ 0.85 的腳；TOP_LEAPS_PER_GROUP 截斷前沒先篩的話，
+      # 合格腳可能被擠出候選。
+      stub_const("PmccRankingService::TOP_LEAPS_PER_GROUP", 1)
+      LeapsOptionChainSnapshot.where(symbol: "NOK", strike: 10.0).update_all(open_interest: 999_999)
+      LeapsOptionChainSnapshot.where(symbol: "NOK", strike: 9.0).update_all(open_interest: 1)
+
+      long_strikes = all_combos.map { |c| c[:long_leg][:strike].to_f }.uniq
+      expect(long_strikes).to eq([ 9.0 ])
+    end
+
     it "說明卡範例選用的 Long 腳 Δ ≥ 0.80" do
       host = Class.new do
         include LeapsRecommendations::PmccEducation
@@ -321,6 +341,17 @@ RSpec.describe PmccRankingService do
       pick = host.new(service.call).pmcc_edu_pick
 
       expect(pick[:long_leg][:delta].to_f).to be >= 0.80
+    end
+  end
+
+  describe "T3b — 沒有任何 Δ ≥ 0.80 的 Long 腳" do
+    before do
+      create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.70)
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.30)
+    end
+
+    it "回傳 :no_qualified_leaps，不回空表也不混成 :no_leaps" do
+      expect(service.call[:status]).to eq(:no_qualified_leaps)
     end
   end
 end

@@ -378,6 +378,30 @@ RSpec.describe "GET /leaps", type: :request do
       get "/leaps", params: { symbol: symbol }
       expect(response).to have_http_status(:ok)
     end
+
+    # T3b（leaps-deep-itm-fix.md P4）：沒有任何 Δ ≥ 0.80 的 LEAPS 時要明說，
+    # 不能顯示空表，也不能誤說成「尚無 Short Call 資料」。
+    it "T3b：沒有合格 Long 腳時顯示「無符合 Long Δ ≥ 0.80 的 LEAPS」" do
+      allow(PmccRankingService).to receive(:new).with(symbol)
+        .and_return(instance_double(PmccRankingService, call: { status: :no_qualified_leaps, symbol: symbol }))
+
+      get "/leaps", params: { symbol: symbol }
+
+      expect(response.body).to include("無符合 Long Δ ≥ 0.80 的 LEAPS")
+      expect(response.body).not_to include("尚無 Short Call 資料")
+    end
+
+    # P4：建倉規範卡的數字要從常數讀，改常數畫面就跟著變，文字與邏輯不會再脫鉤。
+    it "建倉規範卡的 Long Delta 門檻取自 PmccRankingService::LEAPS_DELTA_OK_MIN" do
+      stub_const("PmccRankingService::LEAPS_DELTA_OK_MIN", 0.85)
+      allow(PmccRankingService).to receive(:new).with(symbol)
+        .and_return(instance_double(PmccRankingService, call: fake_pmcc_ranking))
+
+      get "/leaps", params: { symbol: symbol }
+
+      expect(response.body).to include("Long Delta ≥ 0.85")
+      expect(response.body).not_to include("Long Delta ≥ 0.80")
+    end
   end
 
   describe "PMCC combo table renders a mutually-exclusive sort toggle row (not per-column headers)" do
@@ -879,10 +903,12 @@ RSpec.describe "GET /leaps", type: :request do
 
       before do
         StrikeChainSnapshot.upsert(
-          { symbol: symbol, strikes: (70..130).step(5).map(&:to_f), spot_price: 106.76, scraped_at: Time.current },
+          { symbol: symbol, strikes: (70..130).step(5).map(&:to_f), spot_price: 106.76,
+            scraped_at: Time.current, chain_expiration_date: leaps_exp },
           unique_by: :symbol
         )
-        create(:leaps_option_chain_snapshot, symbol: symbol, strike: 100.0, dte: 434, expiration_date: leaps_exp)
+        # P3 r1 質詢 3：候選列只有較遠的到期日（user_strike 模式下該檔沒在第一個 LEAPS
+        # 到期日掛牌）。訊息的日期必須取自清單快照，不能從這裡推算。
         create(:leaps_option_chain_snapshot, symbol: symbol, strike: 100.0, dte: 800, expiration_date: Date.today + 800)
       end
 
@@ -901,6 +927,24 @@ RSpec.describe "GET /leaps", type: :request do
 
       it "listed strike still enqueues the job" do
         post "/leaps/analyze", params: { symbol: symbol, user_strike: "80" }, as: :json
+
+        expect(JSON.parse(response.body)["status"]).not_to eq("invalid_strike")
+        expect(ScrapeLeapsJob).to have_received(:perform_later)
+      end
+
+      # P3 r1 質詢 1（使用者裁示：1 天內才判斷）：舊快照、或不是來自 LEAPS 鏈的快照，
+      # 交給 scraper 用當下的鏈判斷
+      it "does not judge listing when the chain snapshot is older than a day; enqueues the job instead" do
+        StrikeChainSnapshot.where(symbol: symbol).update_all(scraped_at: 2.days.ago)
+        post "/leaps/analyze", params: { symbol: symbol, user_strike: "81" }, as: :json
+
+        expect(JSON.parse(response.body)["status"]).not_to eq("invalid_strike")
+        expect(ScrapeLeapsJob).to have_received(:perform_later)
+      end
+
+      it "does not judge listing when the chain snapshot did not come from a LEAPS chain; enqueues the job instead" do
+        StrikeChainSnapshot.where(symbol: symbol).update_all(chain_expiration_date: nil)
+        post "/leaps/analyze", params: { symbol: symbol, user_strike: "81" }, as: :json
 
         expect(JSON.parse(response.body)["status"]).not_to eq("invalid_strike")
         expect(ScrapeLeapsJob).to have_received(:perform_later)

@@ -19,8 +19,11 @@ class PmccRankingService
   TOP_LEAPS_PER_GROUP       = 3
   MIN_DTE_GAP               = 180
 
-  # §2.3 建議標記門檻（僅標記、不淘汰——跟上面的粗篩門檻是兩條互不取代的規則）
+  # Long 腳門檻：**篩選**條件（leaps-deep-itm-fix.md P4，2026-10-09）。原 §2.3 是
+  # 「僅標記、不淘汰」，結果 INTC 組合表的 Long Δ 全是 0.671–0.732，跟建倉規範卡寫的
+  # 「Long Delta ≥ 0.80」矛盾。規範卡的數字也從這個常數讀，兩邊不會再脫鉤。
   LEAPS_DELTA_OK_MIN = 0.80
+  # §2.3 Short 腳建議標記門檻（僅標記、不淘汰——跟上面的 DELTA_SHORT_* 粗篩是兩條規則）
   SHORT_DELTA_OK_MIN = 0.20
   SHORT_DELTA_OK_MAX = 0.35
 
@@ -29,8 +32,11 @@ class PmccRankingService
   end
 
   def call
-    leaps_candidates = fetch_leaps_candidates
-    return { status: :no_leaps, symbol: @symbol } if leaps_candidates.empty?
+    all_leaps = LeapsRankingService.new(@symbol).call
+    return { status: :no_leaps, symbol: @symbol } if all_leaps.empty?
+
+    leaps_candidates = select_leaps_candidates(all_leaps)
+    return { status: :no_qualified_leaps, symbol: @symbol } if leaps_candidates.empty?
 
     short_buckets = fetch_short_candidates
     return { status: :no_short, symbol: @symbol } if short_buckets.empty?
@@ -79,8 +85,10 @@ class PmccRankingService
   # §7 step1：LEAPS 候選沿用 LeapsRankingService（同一套流動性分級/Delta 篩選，
   # 不重寫）。近天期/遠天期邊界沿用 LeapsRecommendationService 既有常數
   # （NEAR_DTE_MIN/MAX=364/550、FAR_DTE_MIN=550），不另造第二份定義。
-  def fetch_leaps_candidates
-    all = LeapsRankingService.new(@symbol).call
+  # P4：先篩 Long Δ ≥ LEAPS_DELTA_OK_MIN，再取 OI 前 TOP_LEAPS_PER_GROUP——順序反過來的話，
+  # OI 較高的 Δ 0.6–0.7 腳會把合格腳擠出候選。
+  def select_leaps_candidates(all_leaps)
+    all = all_leaps.select { |c| c[:delta].present? && c[:delta].to_f >= LEAPS_DELTA_OK_MIN }
     return [] if all.empty?
 
     near = all.select do |c|
