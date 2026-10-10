@@ -679,7 +679,7 @@ class TestAutoModeCoversDeepItmLeapsStrikes(unittest.TestCase):
                      (130.0, 0.42)]
     ]
 
-    def _stage2_strikes(self):
+    def _stage2_strikes(self, user_strike=None):
         far_date = scraper.date.today() + scraper.timedelta(days=scraper.LEAPS_MIN_DTE + 30)
         far_exp = [{"value": far_date.strftime("%Y-%m-%d") + "-m", "text": "far LEAPS"}]
         near_money_calls = {"n": 0}
@@ -715,7 +715,7 @@ class TestAutoModeCoversDeepItmLeapsStrikes(unittest.TestCase):
             patch("leaps_scraper.asyncio.sleep", new=AsyncMock()),
             patch("sys.stdout", buf),
         ):
-            _run(scraper.main("INTC"))
+            _run(scraper.main("INTC", user_strike=user_strike))
 
         result = json.loads(buf.getvalue().strip())
         urls = [c.args[1] for c in navigate.call_args_list]
@@ -740,6 +740,24 @@ class TestAutoModeCoversDeepItmLeapsStrikes(unittest.TestCase):
         _, strikes = self._stage2_strikes()
         for s in (80.0, 85.0, 90.0, 95.0, 100.0, 105.0):
             self.assertIn(s, strikes, f"深度價內 {s} 沒有送進 Stage 2（實際送出 {sorted(strikes)}）")
+
+
+class TestUserStrikeBufferFromLeapsChain(TestAutoModeCoversDeepItmLeapsStrikes):
+    """
+    另案 2（leaps-deep-itm-fix.md 結案報告，P6 實測 INTC 80 → 緩衝檔 $95）：
+    指定履約價時，緩衝檔原本取自近月 `moneyness=10` 窗口（$97–$107），
+    比 80 低的一檔不存在、比 80 高的一檔跳到窗口最低檔，不是 LEAPS 鏈上的相鄰檔。
+    緩衝檔要取 LEAPS 鏈上的相鄰履約價：80 → 75、85。
+    """
+
+    def test_buffer_strikes_are_leaps_chain_neighbours(self):
+        result, strikes = self._stage2_strikes(user_strike=80.0)
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(sorted(strikes), [75.0, 80.0, 85.0])
+
+    def test_highest_leaps_strike_gets_only_lower_buffer(self):
+        _, strikes = self._stage2_strikes(user_strike=130.0)
+        self.assertEqual(sorted(strikes), [125.0, 130.0])
 
 
 class TestMissingGreeksRescueIsBoundedOnLeapsChain(TestAutoModeCoversDeepItmLeapsStrikes):
