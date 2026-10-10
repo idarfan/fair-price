@@ -94,7 +94,7 @@
 | P4 | B3 B4 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P4-r1.md）；P5 前回應質詢 1（migration 後先以擁有者跑 `RAILS_ENV=test bin/rails db:test:prepare`，核對 `schema_sha1` 與 `sha1sum db/schema.rb` 一致再送審）；P7 附 options_flow→leaps 耗時對照 143 秒；P6 截圖要看得到 PMCC 組合表 | `tmp/e2e/leaps-deep-itm/P4/`；併做 P3 r1 質詢 1（清單快照 1 天內才判斷）、3（新增 `chain_expiration_date`）。**另案**：Short 腳 Δ 0.20–0.35 與 DTE 19–45 目前只做標記（✅/⚠️、「建議區間」），沒有篩選 |
 | P5 | 全部 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P5-r1.md）；P6 前由使用者跑 `setup-fp-test.sh` 讓 fp_test 重新擁有 fairprice_test（P4 migration 後被 mygame 重建） | `spec/requests/leaps_async_flow_spec.rb`（3 條，含 P3 質詢 2 的不 stub 排名 T2c） |
 | P6 | 全部 | ✅ 通過 | r1 PASS（verdict-leaps-deep-itm-P6-r1.md）；P7 結案報告列入已知限制：user_strike 模式 PMCC 可能整塊空、緩衝檔取自近月窗口 | `tmp/e2e/leaps-deep-itm/P6/`（三頁 DOM JSON＋元素截圖）；8 項全 ✅ |
-| P7 | 全部 | 🔄 進行中 | 送審 r1 | 本檔「結案報告」；`tmp/e2e/leaps-deep-itm/P7/` |
+| P7 | 全部 | 🔄 進行中 | r1 FAIL → 送審 r2 | 本檔「結案報告」；`tmp/e2e/leaps-deep-itm/P7/` |
 
 狀態值只能填：⬜ 未開始 / 🔄 進行中 / ✅ 通過 / ❌ 卡關（附原因）
 
@@ -304,7 +304,9 @@ Barchart 抓取在 sidecar 邊界用 fixture 替換，**不准 mock 掉 service 
 **動作 / 驗證**
 - [ ] `bundle exec rspec` 全套綠燈（貼出總結那一行）
 - [ ] `pytest lib/barchart_scrapers` 全套綠燈
-- [ ] `git diff main...fix/leaps-deep-itm | grep -nE '^\+.*(proxies|/api/|fetch\(|requests\.(get|post)|httpx|urllib)'` 輸出為空，證明這次修改沒有新增任何 API 呼叫。貼出指令和輸出原文
+  - 2026-10-10 P7 r1 使用者裁示 (a)：**例外**——`test_pmcc_short_call_scraper.py` 在整個目錄一起跑時有 14 條 `RuntimeError: There is no current event loop`，`main`（e711fd5）上同樣是 14 failed，單檔跑 40 passed，本分支沒有改動該檔。這 14 條不計入本條，測試隔離問題另案處理。其餘須全綠，且每個測試檔分開跑都要全綠。
+- [ ] `/usr/bin/git diff main...fix/leaps-deep-itm -- . ':(exclude)*.md' ':(exclude)spec/' | grep -nE '^\+.*(proxies|/api/|fetch\(|requests\.(get|post)|httpx|urllib)'` 輸出為空，證明這次修改沒有新增任何 API 呼叫。貼出指令和輸出原文
+  - 2026-10-10 P7 r1 使用者裁示 (b)：原指令是 `git diff main...fix/leaps-deep-itm | grep …`。(1) 一定要用 `/usr/bin/git`：rtk hook 會把 `git diff` 改寫成精簡格式，行首沒有 `+`，`^\+` 永遠比對不到，結果會是空轉的「輸出為空」；(2) 排除 `*.md`（規格檔本身含這條指令字串）與 `spec/`（測試裡的 Ruby `Hash#fetch` 會誤中 `fetch\(`）。檢查對象只剩產品程式。跑之前先用 `| grep -c '^+'` 確認新增行數不是 0。
 - [ ] 結案報告依序回答：
   1. 核心用例（預設查詢，不帶參數）有沒有端到端跑過？附 URL 和截圖
   2. 根因是什麼（引用 P0 的結論）
@@ -479,7 +481,7 @@ $ /usr/bin/git diff --stat main...fix/leaps-deep-itm
 | P4 實跑（#1126，10-10 週六，options_flow 完成 04:27:28 → 04:30:44） | 22 | 196 秒 | 2.65 倍（原因未查） |
 | **P6 核心用例（#1134，06:14:18 → 06:16:18；當天已抓過 options_flow）** | 22 | **120 秒** | **1.62 倍** |
 
-最新一次的實測（120 秒）在使用者接受的 143 秒以內。P4 那次 196 秒的原因沒有查明，是同一份程式、同樣 22 檔，判斷是 Barchart 頁面當下的載入時間差異（`_wait_for_grid` 最多等 60 秒，見檔頭註解）。
+最新一次的實測（120 秒）在使用者接受的 143 秒以內。P4 那次 196 秒是同一份程式、同樣 22 檔，**原因未查明**；推測可能是 Barchart 頁面當下的載入時間差異（`_wait_for_grid` 每頁最多等 60 秒），**未驗證**。耗時會有波動。
 
 ### 5. 尚未解決或刻意延後的問題
 
@@ -494,5 +496,5 @@ $ /usr/bin/git diff --stat main...fix/leaps-deep-itm
 
 範圍外的觀察（未處理）：
 6. $80 各列都被標成「近期無成交 🚫 不建議」，但 F2 顯示當天 Options Flow 有大單；快照的 Volume 欄是 0–2。
-7. `pytest lib/barchart_scrapers` 整個目錄一起跑時，`test_pmcc_short_call_scraper.py` 有 14 條因為「no current event loop」失敗（測試檔之間共用 event loop 互相干擾）。`main` 上一樣是 14 failed，單檔跑全部通過，與本次修改無關。pipx 的 pytest 環境缺 `websockets`，`test_cdp_helper.py` 改用系統 python3 的 unittest 跑。
-8. P7 的「沒有新增 API 呼叫」grep 輸出**不是空的**，有 3 行命中，都是誤判（見 P7 送審紀錄），交由使用者裁示。
+7. **另案（P7 r1 使用者裁示 (a)）**：`pytest lib/barchart_scrapers` 整個目錄一起跑時，`test_pmcc_short_call_scraper.py` 有 14 條因為「no current event loop」失敗（測試檔之間共用 event loop 互相干擾）。`main` 上一樣是 14 failed，單檔跑全部通過，與本次修改無關。另外，pipx 的 pytest 環境缺 `websockets`，`test_cdp_helper.py` 改用系統 python3 的 unittest 跑。
+8. P7 的「沒有新增 API 呼叫」grep：原指令實際命中 3 行，都是誤判（規格檔本身的指令字串、spec 裡的 Ruby `Hash#fetch`），而且經過 rtk 時會空轉。依使用者裁示 (b) 改寫指令（`/usr/bin/git`、排除 `*.md` 與 `spec/`），重跑結果為空（產品程式新增 286 行，0 命中）。
