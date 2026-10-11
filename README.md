@@ -1,5 +1,10 @@
 # FairPrice
 
+### 2026-10-11（日）— 修正：PMCC Short Call Δ 粗篩全擋掉時誤報「尚無資料」
+
+- `PmccRankingService` 新增 `:no_short_in_delta_range`：19–45 天內有 Short Call，但 Δ 全在 0.05–0.60 粗篩之外（或缺值）時回傳，不再混成 `:no_short`。
+- PMCC 區塊對應顯示「Short DTE 19–45 天的 Short Call Δ 都不在 0.05–0.60 範圍內」，數字讀常數。
+
 ### 2026-10-10（六）— 修正：PMCC Short 腳 DTE 19–45 由標記改為篩選（另案 3）
 
 - `PmccRankingService` 只把 Short DTE 19–45 天（`SHORT_DTE_MIN`／`SHORT_DTE_MAX`）的到期日放進桶，區間外的到期日不再列出。Short Delta 0.20–0.35 維持只標記 ✅/⚠️，因為寬階梯標的（BTI）在這個區間常常整桶 0 檔。

@@ -46,6 +46,12 @@ module LeapsRecommendations::PmccSection
         div(class: "px-4 py-6 text-center text-sm text-gray-500") do
           plain "無 Short DTE #{PmccRankingService::SHORT_DTE_MIN}–#{PmccRankingService::SHORT_DTE_MAX} 天的 Short Call 到期日"
         end
+      when :no_short_in_delta_range
+        div(class: "px-4 py-6 text-center text-sm text-gray-500") do
+          plain "Short DTE #{PmccRankingService::SHORT_DTE_MIN}–#{PmccRankingService::SHORT_DTE_MAX} 天的 Short Call " \
+                "Δ 都不在 #{sprintf('%.2f', PmccRankingService::DELTA_SHORT_MIN)}–" \
+                "#{sprintf('%.2f', PmccRankingService::DELTA_SHORT_MAX)} 範圍內"
+        end
       when :no_leaps, :no_short, :no_data
         div(class: "px-4 py-6 text-center text-sm text-gray-400") { plain "尚無 Short Call 資料，請重新查詢" }
       when :ok
