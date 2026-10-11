@@ -44,12 +44,7 @@ class PmccRankingService
     return { status: :no_qualified_leaps, symbol: @symbol } if leaps_candidates.empty?
 
     short_buckets = fetch_short_candidates
-    if short_buckets.empty?
-      # 有資料、但沒有一筆落在 19–45 天 → 明說是 DTE 區間的關係；區間內有資料只是 Δ
-      # 粗篩全被擋掉，維持原本的 :no_short。
-      status = latest_short_rows.any? && short_rows_in_window.empty? ? :no_short_in_window : :no_short
-      return { status: status, symbol: @symbol }
-    end
+    return { status: empty_short_status, symbol: @symbol } if short_buckets.empty?
 
     bucket_keys = short_buckets.keys # 升序 ISO 日期字串，來自 fetch_short_candidates 已排序
 
@@ -131,8 +126,7 @@ class PmccRankingService
     end
   end
 
-  # 最新一批 Short Call 快照（未經 DTE／Delta 篩選）。call 也用它分辨
-  # 「完全沒資料」(:no_short) 與「有資料但沒有 19–45 天的到期日」(:no_short_in_window)。
+  # 最新一批 Short Call 快照（未經 DTE／Delta 篩選）。empty_short_status 也用它分辨沒有桶的原因。
   def latest_short_rows
     @latest_short_rows ||= begin
       latest_at = PmccShortCallSnapshot.for_symbol(@symbol).maximum(:scraped_at)
@@ -142,6 +136,17 @@ class PmccRankingService
 
   def short_rows_in_window
     latest_short_rows.select { |r| r.dte.to_i.between?(SHORT_DTE_MIN, SHORT_DTE_MAX) }
+  end
+
+  # 沒有任何桶時，分辨是哪一關擋掉的，畫面才說得出實際原因：
+  #   完全沒資料 → :no_short；有資料但沒有 19–45 天的到期日 → :no_short_in_window；
+  #   區間內有資料、但 Δ 全在 DELTA_SHORT_MIN..MAX 粗篩之外（或 Δ 缺值）→ :no_short_in_delta_range
+  #   （審查 pmcc-short-dte-filter r1 質詢 3，使用者裁示另案處理）。
+  def empty_short_status
+    return :no_short if latest_short_rows.empty?
+    return :no_short_in_window if short_rows_in_window.empty?
+
+    :no_short_in_delta_range
   end
 
   def build_short_leg(row)

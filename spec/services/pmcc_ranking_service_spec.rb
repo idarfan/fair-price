@@ -276,9 +276,20 @@ RSpec.describe PmccRankingService do
       create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 20, delta: 0.02) # below 0.05
     end
 
-    it "never reaches cross_and_filter, so no combos exist for this expiration" do
+    # 審查 pmcc-short-dte-filter r1 質詢 3：區間內有資料、只是 Δ 不合，不能說成「尚無資料」。
+    it "never reaches cross_and_filter; status says the Δ coarse filter emptied the window" do
       result = service.call
-      expect(result[:status]).to eq(:no_short)
+      expect(result[:status]).to eq(:no_short_in_delta_range)
+    end
+
+    it "Δ 缺值的列也算被粗篩擋掉，回 :no_short_in_delta_range" do
+      create_short!(strike: 18.0, mid_price: 0.30, bid: 0.28, ask: 0.32, dte: 27, delta: nil)
+      expect(service.call[:status]).to eq(:no_short_in_delta_range)
+    end
+
+    it "區間外的列不影響判斷：19–45 天內全被 Δ 擋掉、區間外 Δ 合格，仍回 :no_short_in_delta_range" do
+      create_short!(strike: 18.0, mid_price: 0.30, bid: 0.28, ask: 0.32, dte: 10, delta: 0.30)
+      expect(service.call[:status]).to eq(:no_short_in_delta_range)
     end
   end
 

@@ -402,6 +402,17 @@ RSpec.describe "GET /leaps", type: :request do
       expect(response.body).not_to include("尚無 Short Call 資料")
     end
 
+    # 審查 pmcc-short-dte-filter r1 質詢 3：區間內有資料、但 Δ 粗篩全擋掉時說明實際原因。
+    it "19–45 天內的 Short Call Δ 全被粗篩擋掉時顯示對應訊息" do
+      allow(PmccRankingService).to receive(:new).with(symbol)
+        .and_return(instance_double(PmccRankingService, call: { status: :no_short_in_delta_range, symbol: symbol }))
+
+      get "/leaps", params: { symbol: symbol }
+
+      expect(response.body).to include("Short DTE 19–45 天的 Short Call Δ 都不在 0.05–0.60 範圍內")
+      expect(response.body).not_to include("尚無 Short Call 資料")
+    end
+
     it "建倉規範卡的 Short Delta／DTE 數字取自 PmccRankingService 常數" do
       stub_const("PmccRankingService::SHORT_DTE_MIN", 21)
       stub_const("PmccRankingService::SHORT_DTE_MAX", 40)
