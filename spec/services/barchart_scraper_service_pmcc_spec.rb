@@ -36,7 +36,7 @@ RSpec.describe BarchartScraperService, "#fetch_pmcc_short_calls" do
   describe "success" do
     before do
       allow(service).to receive(:run_scraper)
-        .with("pmcc_short_call")
+        .with("pmcc_short_call", extra_args: [])
         .and_return({ status: "success", data: { "rows" => [ good_row ] } })
     end
 
@@ -68,7 +68,7 @@ RSpec.describe BarchartScraperService, "#fetch_pmcc_short_calls" do
 
     before do
       allow(service).to receive(:run_scraper)
-        .with("pmcc_short_call")
+        .with("pmcc_short_call", extra_args: [])
         .and_return({ status: "success", data: { "rows" => [ diverging_mid_row ] } })
     end
 
@@ -85,7 +85,7 @@ RSpec.describe BarchartScraperService, "#fetch_pmcc_short_calls" do
 
     before do
       allow(service).to receive(:run_scraper)
-        .with("pmcc_short_call")
+        .with("pmcc_short_call", extra_args: [])
         .and_return({ status: "success", data: { "rows" => [ no_mid_row ] } })
     end
 
@@ -101,7 +101,7 @@ RSpec.describe BarchartScraperService, "#fetch_pmcc_short_calls" do
 
     before do
       allow(service).to receive(:run_scraper)
-        .with("pmcc_short_call")
+        .with("pmcc_short_call", extra_args: [])
         .and_return({ status: "success", data: { "rows" => [ no_bid_row ] } })
     end
 
@@ -117,7 +117,7 @@ RSpec.describe BarchartScraperService, "#fetch_pmcc_short_calls" do
   describe "barchart_session_expired" do
     before do
       allow(service).to receive(:run_scraper)
-        .with("pmcc_short_call")
+        .with("pmcc_short_call", extra_args: [])
         .and_return({ status: "barchart_session_expired" })
     end
 
@@ -129,7 +129,7 @@ RSpec.describe BarchartScraperService, "#fetch_pmcc_short_calls" do
   describe "no_candidates" do
     before do
       allow(service).to receive(:run_scraper)
-        .with("pmcc_short_call")
+        .with("pmcc_short_call", extra_args: [])
         .and_return({ status: "no_candidates" })
     end
 
@@ -151,7 +151,7 @@ RSpec.describe BarchartScraperService, "#fetch_pmcc_short_calls" do
 
     before do
       allow(service).to receive(:run_scraper)
-        .with("pmcc_short_call")
+        .with("pmcc_short_call", extra_args: [])
         .and_return({ status: "partial", data: partial_data })
     end
 
@@ -173,7 +173,7 @@ RSpec.describe BarchartScraperService, "#fetch_pmcc_short_calls" do
   describe "error" do
     before do
       allow(service).to receive(:run_scraper)
-        .with("pmcc_short_call")
+        .with("pmcc_short_call", extra_args: [])
         .and_return({ status: "error", error: "No Chrome CDP page found" })
     end
 
@@ -190,7 +190,7 @@ RSpec.describe BarchartScraperService, "#fetch_pmcc_short_calls" do
 
     before do
       allow(service).to receive(:run_scraper)
-        .with("pmcc_short_call")
+        .with("pmcc_short_call", extra_args: [])
         .and_return({ status: "success", data: { "rows" => [ good_row ] } })
     end
 
@@ -206,12 +206,39 @@ RSpec.describe BarchartScraperService, "#fetch_pmcc_short_calls" do
 
     before do
       allow(service).to receive(:run_scraper)
-        .with("pmcc_short_call")
+        .with("pmcc_short_call", extra_args: [])
         .and_return({ status: "success", data: { "rows" => [ bad_row ] } })
     end
 
     it "raises a human-readable error instead of inserting incomplete rows" do
       expect { service.fetch_pmcc_short_calls }.to raise_error(/資料不完整/)
+    end
+  end
+
+  # 另案 3：爬蟲只抓 Short DTE 19–45 天，持有中的短腳 < 19 天時要靠 --expirations 帶進來
+  describe "held short leg expirations" do
+    let(:ok) { { status: "no_candidates" } }
+
+    it "passes open short legs of active NOK positions via --expirations, sorted and de-duplicated" do
+      near = Date.current + 5
+      far  = Date.current + 30
+      create(:pmcc_short_leg, short_expiration: far,  position: create(:pmcc_position, ticker: "NOK"))
+      create(:pmcc_short_leg, short_expiration: near, position: create(:pmcc_position, ticker: "NOK"))
+      create(:pmcc_short_leg, short_expiration: near, position: create(:pmcc_position, ticker: "NOK"))
+
+      expect(service).to receive(:run_scraper)
+        .with("pmcc_short_call", extra_args: [ "--expirations", "#{near.iso8601},#{far.iso8601}" ])
+        .and_return(ok)
+      service.fetch_pmcc_short_calls
+    end
+
+    it "ignores closed legs, closed positions and other symbols" do
+      create(:pmcc_short_leg, status: "rolled", position: create(:pmcc_position, ticker: "NOK"))
+      create(:pmcc_short_leg, position: create(:pmcc_position, ticker: "NOK", status: "closed"))
+      create(:pmcc_short_leg, position: create(:pmcc_position, ticker: "AAPL"))
+
+      expect(service).to receive(:run_scraper).with("pmcc_short_call", extra_args: []).and_return(ok)
+      service.fetch_pmcc_short_calls
     end
   end
 end

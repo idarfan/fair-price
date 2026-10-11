@@ -58,8 +58,14 @@ GRID_MAX_WAIT_S = 60
 # 上限 8：週選標的（如 BE）7 天一檔，前 6 個只到 DTE 38，會把 45–60 那段整個切掉
 # ——實測 BE 的 DTE≤60 共 7 個，落在 45–60 的只有 2026-10-16（DTE 45）那一個。
 # 每多一個到期日就多一輪導覽＋等表格，8 是「覆蓋得到 60 天」與「抓取時間」的取捨點。
+# 另案 3（2026-10-11）：Short DTE 由標記改為篩選，PmccRankingService 只收 19–45 天。
+# 原本從 DTE 0 起取前 8 個，每日／一週多檔到期的標的（AMD、SPY）8 個名額在 19 天前就用完，
+# 篩完整區是空的。改成只在 19–45 天裡取，名額全落在會被用到的到期日。
+# 這兩個數字必須等於 PmccRankingService::SHORT_DTE_MIN／SHORT_DTE_MAX，
+# spec/services/pmcc_ranking_service_spec.rb 會讀這個檔案比對。
 MAX_EXPIRATIONS = 8
-MAX_SHORT_DTE   = 60   # 涵蓋建議區間 19–45，並往上留到 60 天
+MIN_SHORT_DTE   = 19
+MAX_SHORT_DTE   = 45
 EXPIRATIONS_MAX_WAIT_S = 10  # dropdown 輪詢上限（見 _wait_for_grid 用法）
 
 def select_expirations(expirations, today=None, extra=None):
@@ -67,15 +73,16 @@ def select_expirations(expirations, today=None, extra=None):
     從 Expiration 下拉挑出要抓的到期日。
 
     下拉值形如 "2026-07-17-m" / "2026-07-24-w"，前 10 碼是日期，DOM 順序已按日期升序。
-    規則：DTE <= MAX_SHORT_DTE 的取前 MAX_EXPIRATIONS 個。
+    規則：MIN_SHORT_DTE <= DTE <= MAX_SHORT_DTE 的取前 MAX_EXPIRATIONS 個。
 
-    一個都不符合時（首個到期日就超過 60 天，例如只有月選且剛過期一輪的標的）
-    退回取第一個——spec §3「若下拉僅 1–2 個，有幾個抓幾個」的精神是不要因為
-    門檻而回傳空結果，讓整個 PMCC 區塊變成 no_candidates。
+    一個都不符合時（例如只有季選的標的，19–45 天剛好沒有到期日）退回取第一個
+    DTE >= MIN_SHORT_DTE 的到期日。它會被 PmccRankingService 的區間篩掉，
+    但抓取仍會成功、覆寫舊快照，畫面顯示 :no_short_in_window；回傳空清單的話
+    爬蟲回 no_candidates、不覆寫，畫面會沿用上一批的舊資料。
 
     `extra`（pmcc-tracker Phase 0）：明確指定的到期日，用 "YYYY-MM-DD" 比對，
-    不受 MAX_SHORT_DTE 與 MAX_EXPIRATIONS 限制。用途是把 PMCC 部位的**長腳**
-    到期日一起帶進來抓報價——長腳是 DTE 數百天的 LEAPS，永遠不會被 60 天門檻選中。
+    不受 DTE 區間與 MAX_EXPIRATIONS 限制。用途是把 PMCC 部位的長腳到期日、
+    以及持有中的短腳到期日（< 19 天時不在區間內）一起帶進來抓報價。
 
     這裡刻意不新增第二支爬蟲：下面的抓取迴圈本身完全不看 DTE，只是拿到什麼
     到期日就讀 `?expiration=<值>&moneyness=100` 的全鏈，能力一直都在
@@ -84,17 +91,23 @@ def select_expirations(expirations, today=None, extra=None):
     """
     today = today or _date.today()
     picked = []
+    fallback = None
     for value in expirations:
         try:
             exp = _date.fromisoformat(str(value)[:10])
         except ValueError:
             continue
-        if (exp - today).days <= MAX_SHORT_DTE:
+        dte = (exp - today).days
+        if dte < MIN_SHORT_DTE:
+            continue
+        if fallback is None:
+            fallback = value
+        if dte <= MAX_SHORT_DTE:
             picked.append(value)
         if len(picked) >= MAX_EXPIRATIONS:
             break
-    if not picked and expirations:
-        picked = [expirations[0]]
+    if not picked and fallback is not None:
+        picked = [fallback]
 
     # 額外到期日接在後面，保持原本的日期升序不被打亂；已在清單裡就不重複加。
     wanted = {str(e)[:10] for e in (extra or [])}
@@ -496,7 +509,7 @@ async def main(symbol, extra_expirations=None):
 
 if __name__ == "__main__":
     # 用法：python3 pmcc_short_call_scraper.py BE [--expirations 2028-01-21,2027-06-17]
-    # --expirations 是 PMCC 部位長腳的到期日，不受 60 天門檻限制（見 select_expirations）
+    # --expirations 是 PMCC 部位長腳／持有中短腳的到期日，不受 DTE 區間限制（見 select_expirations）
     args = sys.argv[1:]
     sym = args[0] if args and not args[0].startswith("--") else "NOK"
     extra = []

@@ -85,10 +85,17 @@ module LeapsRecommendations::PmccEducation
       div(class: "grid grid-cols-2 gap-2 text-xs") do
         div(class: "text-[#3A70C0]") { plain "Long Delta ≥ #{sprintf('%.2f', PmccRankingService::LEAPS_DELTA_OK_MIN)}" }
         div(class: "text-[#3A70C0]") { plain "Long DTE ≥ 180 天" }
-        div(class: "text-[#D04040]") { plain "Short Delta 0.20–0.35" }
-        div(class: "text-[#D04040]") { plain "Short DTE 19–45 天" }
+        div(class: "text-[#D04040]") do
+          plain "Short Delta #{sprintf('%.2f', PmccRankingService::SHORT_DELTA_OK_MIN)}–#{sprintf('%.2f', PmccRankingService::SHORT_DELTA_OK_MAX)}"
+        end
+        div(class: "text-[#D04040]") do
+          plain "Short DTE #{PmccRankingService::SHORT_DTE_MIN}–#{PmccRankingService::SHORT_DTE_MAX} 天"
+        end
       end
-      p(class: "text-[11px] text-[#7A6555] mt-2") { plain "本表抓 DTE 60 天以內的到期日（最多 8 個），涵蓋上面的建議區間。" }
+      p(class: "text-[11px] text-[#7A6555] mt-2") do
+        plain "本表只列 Short DTE #{PmccRankingService::SHORT_DTE_MIN}–#{PmccRankingService::SHORT_DTE_MAX} 天的到期日；" \
+              "Short Delta 不在建議區間的組合仍會列出，以 ⚠️ 標示。"
+      end
     end
   end
 
@@ -116,12 +123,12 @@ module LeapsRecommendations::PmccEducation
 
           render_pmcc_bullet(1, "買100股成本 $#{fmt_int(cost_100_shares.round)}")
           render_pmcc_bullet(2, "LEAPS 成本 $#{fmt_int(leaps_cost.round)}")
-          render_pmcc_bullet(3, "短期虛值 SC：60 天內到期日、Delta 0.20–0.35、收租 $#{fmt_int(short_premium.round)}")
+          render_pmcc_bullet(3, "#{pmcc_short_call_rule}、收租 $#{fmt_int(short_premium.round)}")
           render_pmcc_bullet(4, "資金比例 #{capital_ratio ? fmt_pmcc_pct(capital_ratio) : '—'}")
         else
           render_pmcc_bullet(1, "買100股成本 —")
           render_pmcc_bullet(2, "LEAPS 成本 —")
-          render_pmcc_bullet(3, "短期虛值 SC：60 天內到期日、Delta 0.20–0.35、收租 —")
+          render_pmcc_bullet(3, "#{pmcc_short_call_rule}、收租 —")
           render_pmcc_bullet(4, "資金比例 —")
         end
       end
@@ -129,6 +136,12 @@ module LeapsRecommendations::PmccEducation
     end
   end
 
+
+  # 概念卡第 3 點與建倉規範卡同源（另案 3 審查 r1 問題 2：原本寫死「60 天內」）
+  def pmcc_short_call_rule
+    "短期虛值 SC：DTE #{PmccRankingService::SHORT_DTE_MIN}–#{PmccRankingService::SHORT_DTE_MAX} 天到期日、" \
+      "Delta #{sprintf('%.2f', PmccRankingService::SHORT_DELTA_OK_MIN)}–#{sprintf('%.2f', PmccRankingService::SHORT_DELTA_OK_MAX)}"
+  end
 
   def render_pmcc_bullet(num, text)
     div(class: "flex items-start gap-2") do

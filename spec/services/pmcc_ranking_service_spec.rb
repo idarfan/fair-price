@@ -34,11 +34,37 @@ RSpec.describe PmccRankingService do
     end
   end
 
+  # 另案 3（leaps-deep-itm-fix.md 結案報告，使用者裁示 2026-10-10）：Short 腳 DTE 19–45
+  # 由「標記」改為篩選；Δ 0.20–0.35 維持標記（寬階梯標的會整桶空，見 DELTA_SHORT_* 註解）。
+  describe "Short 腳 DTE 19–45 篩選" do
+    before { create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85) }
+
+    it "只有 DTE 落在 SHORT_DTE_MIN..SHORT_DTE_MAX 的到期日進桶（含兩端）" do
+      [ 13, 18, 19, 45, 46, 55 ].each_with_index do |dte, i|
+        create_short!(strike: 17.0 + i, mid_price: 0.42, bid: 0.40, ask: 0.44,
+                      dte: dte, delta: 0.30, expiration_date: Date.today + dte)
+      end
+
+      result = service.call
+      dtes   = result[:summary][:expirations].map { |k| result[k][:short_dte] }
+      expect(dtes).to eq([ 19, 45 ])
+    end
+
+    it "有 Short Call 資料但全部不在 19–45 天時回 :no_short_in_window，不混成 :no_short" do
+      [ 6, 13, 52 ].each do |dte|
+        create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44,
+                      dte: dte, delta: 0.30, expiration_date: Date.today + dte)
+      end
+
+      expect(service.call[:status]).to eq(:no_short_in_window)
+    end
+  end
+
   describe "§12 Example A — passes golden rule" do
     before do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85)
-      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.30,
-                    expiration_date: Date.today + 6)
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 20, delta: 0.30,
+                    expiration_date: Date.today + 20)
     end
 
     it "computes spread/net_debit/max_profit/premium_yield per the golden rule formulas" do
@@ -50,7 +76,8 @@ RSpec.describe PmccRankingService do
       expect(combo[:max_profit_no_sc]).to be_within(0.001).of(1.25)
       expect(combo[:max_profit]).to be_within(0.001).of(1.67)
       expect(combo[:premium_yield]).to be_within(0.05).of(7.88)
-      expect(combo[:premium_yield_ann]).to be_within(2.0).of(479.9)
+      # Short DTE 20（另案 3 起 DTE < 19 不進桶，原範例的 6 天改 20 天）：7.88% / 20 × 365
+      expect(combo[:premium_yield_ann]).to be_within(1.0).of(143.9)
       expect(combo[:passes_golden_rule]).to be true
       expect(combo[:fail_reason]).to be_nil
     end
@@ -59,7 +86,7 @@ RSpec.describe PmccRankingService do
   describe "§12 Example B — pre-check (a) KS<=KL eliminates by reason, not by omission" do
     before do
       create_leaps!(strike: 260.0, bid: 51.0, ask: 52.0, dte: 564, delta: 0.85) # PL mid=51.5
-      create_short!(strike: 250.0, mid_price: 4.24, bid: 4.20, ask: 4.28, dte: 6, delta: 0.30)
+      create_short!(strike: 250.0, mid_price: 4.24, bid: 4.20, ask: 4.28, dte: 20, delta: 0.30)
     end
 
     it "keeps the combo but marks it failed with the KS<=KL reason" do
@@ -92,7 +119,7 @@ RSpec.describe PmccRankingService do
   describe "numeric fail: PL >= spread (both pre-checks pass)" do
     before do
       create_leaps!(strike: 10.0, bid: 7.90, ask: 8.10, dte: 564, delta: 0.85) # PL mid = 8.00
-      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.30)
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 20, delta: 0.30)
       # spread = 7, PL = 8 >= 7 -> fail
     end
 
@@ -108,7 +135,7 @@ RSpec.describe PmccRankingService do
   describe "§12 Example D — mid missing is skipped, not shown as 0" do
     before do
       create_leaps!(strike: 10.0, bid: nil, ask: nil, dte: 564, delta: 0.85) # mid -> nil
-      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.30)
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 20, delta: 0.30)
     end
 
     it "produces zero combos for this pairing (excluded, not defaulted to 0)" do
@@ -122,12 +149,12 @@ RSpec.describe PmccRankingService do
   describe "three-expiration bucketing" do
     before do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85)
-      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.30,
-                    expiration_date: Date.today + 6)
-      create_short!(strike: 18.0, mid_price: 0.60, bid: 0.58, ask: 0.62, dte: 13, delta: 0.28,
-                    expiration_date: Date.today + 13)
-      create_short!(strike: 19.0, mid_price: 0.75, bid: 0.72, ask: 0.78, dte: 20, delta: 0.25,
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 20, delta: 0.30,
                     expiration_date: Date.today + 20)
+      create_short!(strike: 18.0, mid_price: 0.60, bid: 0.58, ask: 0.62, dte: 27, delta: 0.28,
+                    expiration_date: Date.today + 27)
+      create_short!(strike: 19.0, mid_price: 0.75, bid: 0.72, ask: 0.78, dte: 34, delta: 0.25,
+                    expiration_date: Date.today + 34)
     end
 
     it "buckets combos into three expirations in ascending date order" do
@@ -141,12 +168,13 @@ RSpec.describe PmccRankingService do
     end
   end
 
-  # 2026-09-01：到期日上限從 3 提高到 6（scraper 端已用 DTE≤60 篩過），
-  # 讓 45–60 天那一段真的有候選可看。
+  # 2026-09-01：到期日上限從 3 提高到 6（scraper 端已用 DTE≤60 篩過）。
+  # 另案 3 起只收 DTE 19–45；每日到期的標的在這個區間仍可能超過上限，所以上限保留。
+  # （原「45–60 天那段會進桶」的測試隨使用者裁示作廢，改由「Short 腳 DTE 19–45 篩選」涵蓋。）
   describe "multi-expiration bucketing（上限 SC_EXPIRATION_COUNT）" do
     before do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85)
-      [ 6, 13, 20, 27, 34, 41, 48, 55, 62 ].each_with_index do |dte, i|
+      (19..30).each_with_index do |dte, i|
         create_short!(strike: 17.0 + i, mid_price: 0.42, bid: 0.40, ask: 0.44,
                       dte: dte, delta: 0.30, expiration_date: Date.today + dte)
       end
@@ -157,14 +185,6 @@ RSpec.describe PmccRankingService do
 
       expect(keys.size).to eq(PmccRankingService::SC_EXPIRATION_COUNT)
       expect(keys).to eq(keys.sort)
-    end
-
-    it "45–60 天那段的到期日會進桶（舊的固定三桶取不到）" do
-      result = service.call
-      dtes   = result[:summary][:expirations].map { |k| result[k][:short_dte] }
-
-      expect(dtes).to include(55)
-      expect(dtes.max).to be >= 45
     end
 
     it "near/mid/far_term 別名仍對應前三桶" do
@@ -183,7 +203,7 @@ RSpec.describe PmccRankingService do
     before do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85) # PL=5.75, net_debit=5.33
       create_leaps!(strike: 9.0,  bid: 5.95, ask: 6.05, dte: 570, delta: 0.88) # PL=6.00, net_debit=5.58, spread=8 -> max_profit 2.42（高於 KL=10 的 1.67）
-      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.30)
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 20, delta: 0.30)
     end
 
     it "ranks by annualized premium yield, not by the spread-inflated max_profit" do
@@ -207,11 +227,11 @@ RSpec.describe PmccRankingService do
     before do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85) # PL=5.75
       # 極價外：spread 大 -> max_profit 高，但 Delta 0.07 不在 0.20-0.35 建議區間
-      create_short!(strike: 40.0, mid_price: 0.38, bid: 0.36, ask: 0.40, dte: 6, delta: 0.07,
-                    expiration_date: Date.today + 6)
+      create_short!(strike: 40.0, mid_price: 0.38, bid: 0.36, ask: 0.40, dte: 20, delta: 0.07,
+                    expiration_date: Date.today + 20)
       # 建議區間內：spread 小 -> max_profit 低，但 Delta 0.30 合格
-      create_short!(strike: 17.0, mid_price: 2.03, bid: 2.00, ask: 2.06, dte: 6, delta: 0.30,
-                    expiration_date: Date.today + 6)
+      create_short!(strike: 17.0, mid_price: 2.03, bid: 2.00, ask: 2.06, dte: 20, delta: 0.30,
+                    expiration_date: Date.today + 20)
     end
 
     it "ranks the short_delta_ok combo first even though its max_profit is lower" do
@@ -234,7 +254,7 @@ RSpec.describe PmccRankingService do
   describe "Delta two-band coexistence (§2.3): 0.17 is listed but not flagged ✅" do
     before do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85)
-      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.17)
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 20, delta: 0.17)
     end
 
     it "is included in the combo list (within 0.05-0.60 coarse filter)" do
@@ -253,7 +273,7 @@ RSpec.describe PmccRankingService do
   describe "Short Call Delta grade filter excludes out-of-range rows entirely" do
     before do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85)
-      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.02) # below 0.05
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 20, delta: 0.02) # below 0.05
     end
 
     it "never reaches cross_and_filter, so no combos exist for this expiration" do
@@ -265,8 +285,8 @@ RSpec.describe PmccRankingService do
   describe "annualized premium yield differs meaningfully across DTE at similar raw yield" do
     before do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85)
-      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.30,
-                    expiration_date: Date.today + 6)
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 20, delta: 0.30,
+                    expiration_date: Date.today + 20)
       create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 45, delta: 0.30,
                     expiration_date: Date.today + 45)
     end
@@ -277,7 +297,8 @@ RSpec.describe PmccRankingService do
       far_combo  = result.dig(result[:summary][:expirations][1], :combos).first
 
       expect(near_combo[:premium_yield]).to be_within(0.001).of(far_combo[:premium_yield])
-      expect(near_combo[:premium_yield_ann]).to be > far_combo[:premium_yield_ann] * 5
+      # 20 天 vs 45 天：年化約差 45/20 = 2.25 倍（另案 3 起 DTE < 19 不進桶，原本 6 天改 20 天）
+      expect(near_combo[:premium_yield_ann]).to be > far_combo[:premium_yield_ann] * 2
     end
   end
 
@@ -287,13 +308,13 @@ RSpec.describe PmccRankingService do
   describe "leaps_delta_ok（>= 0.80 由標記改為篩選）" do
     it "Δ 0.65 的腳不進組合" do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.65)
-      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.30)
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 20, delta: 0.30)
       expect(service.call[:status]).to eq(:no_qualified_leaps)
     end
 
     it "Δ 0.85 的腳進組合且標記為 true" do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.85)
-      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.30)
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 20, delta: 0.30)
       result = service.call
       combo  = result.dig(result[:summary][:expirations].first, :combos).first
       expect(combo[:leaps_delta_ok]).to be true
@@ -307,7 +328,7 @@ RSpec.describe PmccRankingService do
     before do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.70) # PL 5.75 < spread 7
       create_leaps!(strike: 9.0,  bid: 6.20, ask: 6.30, dte: 564, delta: 0.85) # PL 6.25 < spread 8
-      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.30)
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 20, delta: 0.30)
     end
 
     let(:all_combos) do
@@ -347,11 +368,26 @@ RSpec.describe PmccRankingService do
   describe "T3b — 沒有任何 Δ ≥ 0.80 的 Long 腳" do
     before do
       create_leaps!(strike: 10.0, bid: 5.70, ask: 5.80, dte: 564, delta: 0.70)
-      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 6, delta: 0.30)
+      create_short!(strike: 17.0, mid_price: 0.42, bid: 0.40, ask: 0.44, dte: 20, delta: 0.30)
     end
 
     it "回傳 :no_qualified_leaps，不回空表也不混成 :no_leaps" do
       expect(service.call[:status]).to eq(:no_qualified_leaps)
+    end
+  end
+
+  # 審查 r1 問題 1：爬蟲只抓 Short DTE 區間內的到期日，兩邊的數字必須同源；
+  # 只改一邊的話，不是抓了用不到，就是該列的到期日沒抓到。
+  describe "Short DTE 區間與 pmcc_short_call_scraper.py 一致" do
+    let(:scraper_src) { Rails.root.join("lib/barchart_scrapers/pmcc_short_call_scraper.py").read }
+
+    def py_const(src, name)
+      src[/^#{name}\s*=\s*(\d+)/, 1]&.to_i
+    end
+
+    it "MIN_SHORT_DTE／MAX_SHORT_DTE 等於 SHORT_DTE_MIN／SHORT_DTE_MAX" do
+      expect(py_const(scraper_src, "MIN_SHORT_DTE")).to eq(described_class::SHORT_DTE_MIN)
+      expect(py_const(scraper_src, "MAX_SHORT_DTE")).to eq(described_class::SHORT_DTE_MAX)
     end
   end
 end

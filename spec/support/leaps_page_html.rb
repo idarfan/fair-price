@@ -32,7 +32,24 @@ module LeapsPageHtml
     doc.css("[nonce]").each { |n| n["nonce"] = "NONCE" }
     mask_release_notes(doc)
     strip_poll_timeout(doc)
+    strip_build_rules_note(doc)
     canonical(doc.to_html)
+  end
+
+  # 2026-10-10 另案 3：建倉規範卡底下那行說明從「本表抓 DTE 60 天以內…」改成
+  # 「本表只列 Short DTE 19–45 天…」（Short DTE 由標記改為篩選），與垂直價差無關。
+  # 概念卡第 3 點同理（審查 r1 問題 2：「60 天內到期日」改讀常數），只遮蔽文字、保留節點。
+  # 內容由 spec/requests/leaps_recommendations_spec.rb 的建倉規範卡測試驗證。
+  # 審查 r1 質詢 2：只動 .pmcc-edu-root 內的這兩處，別的「本表…」段落（concept_cards 等）照常比對。
+  def strip_build_rules_note(doc)
+    doc.css(".pmcc-edu-root p").select { |p| p.text.start_with?("本表抓 DTE", "本表只列 Short DTE") }.each do |p|
+      # 基準檔是排版過的 HTML，說明後面跟著一個換行文字節點；一起拿掉，兩邊才一致。
+      p.next_sibling.remove if p.next_sibling&.text? && p.next_sibling.text.strip.empty?
+      p.remove
+    end
+    doc.css(".pmcc-edu-root span").select { |s| s.text.start_with?("短期虛值 SC：") }.each do |s|
+      s.content = "SHORT_CALL_RULE"
+    end
   end
 
   # 2026-10-01 價格情境輪詢根節點新增 data-poll-timeout-ms（前端輪詢上限，
