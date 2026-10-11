@@ -391,6 +391,34 @@ RSpec.describe "GET /leaps", type: :request do
       expect(response.body).not_to include("尚無 Short Call 資料")
     end
 
+    # 另案 3：有 Short Call 資料但沒有 19–45 天的到期日時要明說，不能說成「尚無 Short Call 資料」。
+    it "沒有 Short DTE 19–45 天的到期日時顯示對應訊息" do
+      allow(PmccRankingService).to receive(:new).with(symbol)
+        .and_return(instance_double(PmccRankingService, call: { status: :no_short_in_window, symbol: symbol }))
+
+      get "/leaps", params: { symbol: symbol }
+
+      expect(response.body).to include("無 Short DTE 19–45 天的 Short Call 到期日")
+      expect(response.body).not_to include("尚無 Short Call 資料")
+    end
+
+    it "建倉規範卡的 Short Delta／DTE 數字取自 PmccRankingService 常數" do
+      stub_const("PmccRankingService::SHORT_DTE_MIN", 21)
+      stub_const("PmccRankingService::SHORT_DTE_MAX", 40)
+      stub_const("PmccRankingService::SHORT_DELTA_OK_MIN", 0.25)
+      allow(PmccRankingService).to receive(:new).with(symbol)
+        .and_return(instance_double(PmccRankingService, call: fake_pmcc_ranking))
+
+      get "/leaps", params: { symbol: symbol }
+
+      expect(response.body).to include("Short DTE 21–40 天")
+      expect(response.body).to include("Short Delta 0.25–0.35")
+      expect(response.body).to include("本表只列 Short DTE 21–40 天的到期日")
+      # 審查 r1 問題 2：概念卡第 3 點原本寫死「60 天內到期日、Delta 0.20–0.35」
+      expect(response.body).to include("短期虛值 SC：DTE 21–40 天到期日、Delta 0.25–0.35")
+      expect(response.body).not_to include("60 天內到期日")
+    end
+
     # 另案 1（leaps-deep-itm-fix.md 結案報告）：指定履約價時快照只有該檔與緩衝檔，
     # Δ 未達 0.80 就整塊空。要說清楚原因，並給一顆「不填履約價重新查詢」的按鈕。
     context "指定履約價且沒有合格 Long 腳" do
@@ -516,14 +544,14 @@ RSpec.describe "GET /leaps", type: :request do
         expect(response.body.scan(/data-sortable="true"/).size).to eq(3)
       end
 
-      # 位置式標籤（近/中/遠月）在六桶下只標得到前三個，改成依 DTE 標示
-      it "標籤依 DTE 給：19–45 是建議區間、>45 偏遠、<19 不另標" do
+      # 另案 3：Short DTE 19–45 由標記改為篩選（PmccRankingService 不再產生區間外的桶），
+      # 依 DTE 給的「建議區間／偏遠」標籤與 < 19 天警示 badge 一併移除。
+      it "到期日桶不再顯示 DTE 標籤與 < 19 天警示 badge" do
         get "/leaps", params: { symbol: symbol }
         body = response.body
 
-        expect(body).to include("建議區間")
-        expect(body).to include("偏遠")
-        expect(body).to include("⚠️ 短於 lesson9 建議區間")
+        expect(body).not_to include("偏遠")
+        expect(body).not_to include("⚠️ 短於 lesson9 建議區間")
         expect(body).not_to include("近月")
       end
     end

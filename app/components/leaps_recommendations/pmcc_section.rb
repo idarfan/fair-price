@@ -42,6 +42,10 @@ module LeapsRecommendations::PmccSection
       case status
       when :no_qualified_leaps
         render_pmcc_no_qualified_leaps
+      when :no_short_in_window
+        div(class: "px-4 py-6 text-center text-sm text-gray-500") do
+          plain "無 Short DTE #{PmccRankingService::SHORT_DTE_MIN}–#{PmccRankingService::SHORT_DTE_MAX} 天的 Short Call 到期日"
+        end
       when :no_leaps, :no_short, :no_data
         div(class: "px-4 py-6 text-center text-sm text-gray-400") { plain "尚無 Short Call 資料，請重新查詢" }
       when :ok
@@ -81,17 +85,6 @@ module LeapsRecommendations::PmccSection
   end
 
 
-  # 到期日桶從固定三個（近/中/遠月）改成最多六個之後，位置式標籤只標得到前三個，
-  # 第 4–6 桶會完全沒有標籤。改成依 DTE 給標籤，跟 lesson9 的建議區間對齊：
-  # < 19 天不另標（本來就有橘色警示 badge）、19–45 是建議區間、> 45 偏遠。
-  def pmcc_term_label(short_dte)
-    dte = short_dte.to_i
-    return nil unless dte.positive?
-    return nil if dte < 19
-    dte <= 45 ? "建議區間" : "偏遠"
-  end
-
-
   # 每桶用原生 details/summary 收摺（沿用 concept_cards 的做法，零 JS，
   # 也避開 Phlex 2.x 封鎖 on* 屬性的問題）。第一桶預設展開，其餘收起——
   # 六個到期日全展開會把畫面撐得太長。
@@ -103,14 +96,9 @@ module LeapsRecommendations::PmccSection
         h3(class: "text-sm font-semibold text-gray-700") do
           plain "#{bucket[:expiration]} · #{bucket[:short_dte]} DTE"
         end
-        term = pmcc_term_label(bucket[:short_dte])
-        span(class: "text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500") { plain term } if term
+        # 另案 3 起只列 Short DTE 19–45 天的桶（PmccRankingService::SHORT_DTE_*），
+        # 原本依 DTE 給的「建議區間／偏遠」標籤與 < 19 天警示 badge 已不會出現，一併移除。
         span(class: "text-xs text-gray-400") { plain "#{bucket[:combos].size} 組" }
-        if bucket[:short_dte].to_i.positive? && bucket[:short_dte].to_i < 19
-          span(class: "text-xs px-2 py-0.5 rounded-full bg-orange-50 text-orange-800 border border-orange-300") do
-            plain "⚠️ 短於 lesson9 建議區間（19–45 天）：Gamma 風險高、被指派機率陡增、收租金額低"
-          end
-        end
       end
 
       div(class: "mt-2") do

@@ -26,6 +26,11 @@ class PmccRankingService
   # §2.3 Short 腳建議標記門檻（僅標記、不淘汰——跟上面的 DELTA_SHORT_* 粗篩是兩條規則）
   SHORT_DELTA_OK_MIN = 0.20
   SHORT_DELTA_OK_MAX = 0.35
+  # Short 腳 DTE：**篩選**條件（另案 3，使用者裁示 2026-10-10）。原 §3 是 < 19 天加
+  # 警示 badge、> 45 天標「偏遠」但照常列出；改成區間外的到期日不進桶。Δ 仍只標記，
+  # 因為寬階梯標的（BTI）在 0.20–0.35 常常整桶 0 檔。建倉規範卡的數字也讀這兩個常數。
+  SHORT_DTE_MIN = 19
+  SHORT_DTE_MAX = 45
 
   def initialize(symbol)
     @symbol = symbol.upcase
@@ -39,7 +44,12 @@ class PmccRankingService
     return { status: :no_qualified_leaps, symbol: @symbol } if leaps_candidates.empty?
 
     short_buckets = fetch_short_candidates
-    return { status: :no_short, symbol: @symbol } if short_buckets.empty?
+    if short_buckets.empty?
+      # 有資料、但沒有一筆落在 19–45 天 → 明說是 DTE 區間的關係；區間內有資料只是 Δ
+      # 粗篩全被擋掉，維持原本的 :no_short。
+      status = latest_short_rows.any? && short_rows_in_window.empty? ? :no_short_in_window : :no_short
+      return { status: status, symbol: @symbol }
+    end
 
     bucket_keys = short_buckets.keys # 升序 ISO 日期字串，來自 fetch_short_candidates 已排序
 
@@ -105,11 +115,9 @@ class PmccRankingService
   # §7 step2：Short Call 候選——最新 batch，按到期日分桶（升序，取前 3），每桶
   # Delta 0.15–0.40 粗篩後 OI 降序取前 8。這裡只做粗篩（是否列入運算），不做
   # 0.20–0.35 的「建議標記」篩選——那是列出後才標 ✅/⚠️ 的事，見 §2.3。
+  # 另案 3：分桶前先只留 DTE SHORT_DTE_MIN..SHORT_DTE_MAX 的列。
   def fetch_short_candidates
-    latest_at = PmccShortCallSnapshot.for_symbol(@symbol).maximum(:scraped_at)
-    return {} unless latest_at
-
-    rows = PmccShortCallSnapshot.for_symbol(@symbol).where(scraped_at: latest_at).to_a
+    rows = short_rows_in_window
     return {} if rows.empty?
 
     grouped = rows.group_by { |r| r.expiration_date.to_s }
@@ -121,6 +129,19 @@ class PmccRankingService
       sorted = filtered.sort_by { |r| -(r.open_interest || 0) }.first(TOP_SHORT_PER_EXPIRATION)
       acc[exp_key] = sorted.map { |r| build_short_leg(r) } unless sorted.empty?
     end
+  end
+
+  # 最新一批 Short Call 快照（未經 DTE／Delta 篩選）。call 也用它分辨
+  # 「完全沒資料」(:no_short) 與「有資料但沒有 19–45 天的到期日」(:no_short_in_window)。
+  def latest_short_rows
+    @latest_short_rows ||= begin
+      latest_at = PmccShortCallSnapshot.for_symbol(@symbol).maximum(:scraped_at)
+      latest_at ? PmccShortCallSnapshot.for_symbol(@symbol).where(scraped_at: latest_at).to_a : []
+    end
+  end
+
+  def short_rows_in_window
+    latest_short_rows.select { |r| r.dte.to_i.between?(SHORT_DTE_MIN, SHORT_DTE_MAX) }
   end
 
   def build_short_leg(row)

@@ -1,5 +1,15 @@
 # FairPrice
 
+### 2026-10-10（六）— 修正：PMCC Short 腳 DTE 19–45 由標記改為篩選（另案 3）
+
+- `PmccRankingService` 只把 Short DTE 19–45 天（`SHORT_DTE_MIN`／`SHORT_DTE_MAX`）的到期日放進桶，區間外的到期日不再列出。Short Delta 0.20–0.35 維持只標記 ✅/⚠️，因為寬階梯標的（BTI）在這個區間常常整桶 0 檔。
+- 有 Short Call 資料、但沒有 19–45 天的到期日時，新狀態 `:no_short_in_window` 會顯示「無 Short DTE 19–45 天的 Short Call 到期日」。
+- 移除到期日桶的「建議區間／偏遠」標籤與 < 19 天警示 badge；建倉規範卡的 Short Delta／DTE 數字改讀常數。
+- `pmcc-golden-rule-spec-v3.md` §3「DTE 警示（不過濾）」標為作廢。
+- `pmcc_short_call_scraper.py` 改為只抓 DTE 19–45 天的到期日（最多 8 個），原本從 DTE 0 起抓，AMD、SPY 這類每日到期的標的在篩選後會整區空掉。Python 與 Ruby 的區間常數用 rspec 鎖住一致。
+- 有效 PMCC 部位的 open 短腳到期日由 `BarchartScraperService#pmcc_held_short_expiration_args` 以 `--expirations` 帶給爬蟲，短腳進入 < 19 天後部位追蹤仍抓得到報價。
+- 概念卡第 3 點「60 天內到期日」改讀 Short DTE／Delta 常數。
+
 ### 2026-10-10（六）— 修正：指定履約價時緩衝檔取自近月窗口（另案 2）
 
 - 指定履約價查詢時，±1 緩衝檔改從第一個 LEAPS 到期日的履約價鏈取相鄰檔（INTC 80 → $75、$85）。原本取自近月 `moneyness=10` 窗口，INTC 80 只會多抓 $95。沒有 LEAPS 到期日時仍退回近月清單。

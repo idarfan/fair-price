@@ -62,39 +62,47 @@ class TestSelectExpirations(unittest.TestCase):
     def _values(self, *dtes):
         return [f"{(self.TODAY + timedelta(days=d)).isoformat()}-w" for d in dtes]
 
-    def test_keeps_only_expirations_within_60_days(self):
-        vals = self._values(7, 14, 35, 56, 91, 182)
+    # 另案 3（2026-10-11）：只在 Short DTE 19–45 天裡取，跟 PmccRankingService 的篩選同源。
+    def test_keeps_only_expirations_within_19_to_45_days(self):
+        vals = self._values(7, 14, 20, 35, 56, 91)
         picked = scraper.select_expirations(vals, today=self.TODAY)
-        self.assertEqual(picked, vals[:4])
+        self.assertEqual(picked, self._values(20, 35))
 
-    def test_caps_at_max_even_when_all_within_60_days(self):
-        vals = self._values(3, 7, 10, 14, 21, 28, 35, 42, 49, 56)
+    def test_window_matches_ranking_service_constants(self):
+        self.assertEqual((scraper.MIN_SHORT_DTE, scraper.MAX_SHORT_DTE), (19, 45))
+
+    def test_caps_at_max_even_when_all_within_window(self):
+        vals = self._values(19, 22, 25, 28, 31, 34, 37, 40, 43, 45)
         picked = scraper.select_expirations(vals, today=self.TODAY)
         self.assertEqual(len(picked), scraper.MAX_EXPIRATIONS)
         self.assertEqual(picked, vals[:scraper.MAX_EXPIRATIONS])
 
-    # 迴歸（實測 BE）：週選 7 天一檔，上限 6 只到 DTE 38，會把 45–60 整段切掉。
-    def test_weekly_ladder_still_reaches_the_45_to_60_band(self):
-        vals = self._values(3, 10, 17, 24, 31, 38, 45, 80)
+    # 迴歸（審查 r1 問題 1，實測 AMD）：每日到期的標的，舊做法 8 個名額全落在 DTE 1–17，
+    # 19–45 天一個都沒抓到。
+    def test_daily_ladder_does_not_spend_the_cap_before_19_days(self):
+        vals = self._values(*range(1, 46))
         picked = scraper.select_expirations(vals, today=self.TODAY)
         dtes = [(date.fromisoformat(v[:10]) - self.TODAY).days for v in picked]
-        self.assertIn(45, dtes)
-        self.assertLessEqual(max(dtes), scraper.MAX_SHORT_DTE)
+        self.assertEqual(dtes, list(range(19, 19 + scraper.MAX_EXPIRATIONS)))
 
-    def test_boundary_60_is_included_61_is_not(self):
-        vals = self._values(60, 61)
+    def test_boundaries_19_and_45_included_18_and_46_not(self):
+        vals = self._values(18, 19, 45, 46)
         picked = scraper.select_expirations(vals, today=self.TODAY)
-        self.assertEqual(picked, vals[:1])
+        self.assertEqual(picked, self._values(19, 45))
 
-    # 只有月選、且剛好過完一輪的標的，首個到期日就可能超過 60 天。
-    # 這時退回取第一個，不能讓整個 PMCC 區塊變成 no_candidates。
-    def test_falls_back_to_first_when_nothing_is_within_60_days(self):
-        vals = self._values(75, 110)
+    # 19–45 天沒有到期日（例如只有季選）：退回取第一個 DTE >= 19 的到期日，
+    # 讓抓取成功、覆寫舊快照（畫面顯示 :no_short_in_window），不回 no_candidates 沿用舊資料。
+    def test_falls_back_to_first_beyond_window_when_window_is_empty(self):
+        vals = self._values(5, 75, 110)
         picked = scraper.select_expirations(vals, today=self.TODAY)
-        self.assertEqual(picked, vals[:1])
+        self.assertEqual(picked, self._values(75))
 
-    def test_fewer_than_six_gives_what_there_is(self):
-        vals = self._values(7, 14)
+    def test_only_expirations_under_19_days_gives_empty(self):
+        vals = self._values(3, 10)
+        self.assertEqual(scraper.select_expirations(vals, today=self.TODAY), [])
+
+    def test_fewer_than_cap_gives_what_there_is(self):
+        vals = self._values(21, 28)
         self.assertEqual(scraper.select_expirations(vals, today=self.TODAY), vals)
 
     def test_empty_dropdown_gives_empty(self):
@@ -103,34 +111,41 @@ class TestSelectExpirations(unittest.TestCase):
     # ── pmcc-tracker Phase 0：長腳到期日 ──────────────────────────────────
     # 長腳是 DTE 數百天的 LEAPS，永遠不會被 60 天門檻選中，必須明確指定。
     def test_extra_expiration_is_added_even_when_far_beyond_60_days(self):
-        vals = self._values(7, 14, 508)
+        vals = self._values(21, 28, 508)
         picked = scraper.select_expirations(vals, today=self.TODAY, extra=[self._values(508)[0][:10]])
 
         self.assertIn(self._values(508)[0], picked)
         self.assertEqual(len(picked), 3)
 
     def test_extra_expiration_keeps_ascending_order_of_the_dropdown(self):
-        vals = self._values(7, 14, 508)
+        vals = self._values(21, 28, 508)
         picked = scraper.select_expirations(vals, today=self.TODAY, extra=[self._values(508)[0][:10]])
 
         self.assertEqual(picked, vals)
 
     def test_extra_expiration_already_selected_is_not_duplicated(self):
-        vals = self._values(7, 14)
-        picked = scraper.select_expirations(vals, today=self.TODAY, extra=[self._values(7)[0][:10]])
+        vals = self._values(21, 28)
+        picked = scraper.select_expirations(vals, today=self.TODAY, extra=[self._values(21)[0][:10]])
 
         self.assertEqual(picked, vals)
         self.assertEqual(len(picked), len(set(picked)))
 
     def test_extra_expiration_not_in_the_dropdown_is_ignored(self):
-        vals = self._values(7, 14)
+        vals = self._values(21, 28)
         picked = scraper.select_expirations(vals, today=self.TODAY, extra=["2099-01-15"])
 
         self.assertEqual(picked, vals)
 
+    # 審查 r1 問題 1 附帶：持有中的短腳進入 < 19 天後不在區間內，靠 extra 帶進來才有報價
+    def test_extra_expiration_under_19_days_is_added(self):
+        vals = self._values(7, 21, 28)
+        picked = scraper.select_expirations(vals, today=self.TODAY, extra=[self._values(7)[0][:10]])
+
+        self.assertEqual(picked, self._values(21, 28, 7))
+
     # 額外到期日不佔 MAX_EXPIRATIONS 的額度，否則長腳會把短腳候選擠掉
     def test_extra_expiration_does_not_consume_the_cap(self):
-        vals = self._values(3, 10, 17, 24, 31, 38, 45, 52, 508)
+        vals = self._values(19, 22, 25, 28, 31, 34, 37, 40, 43, 508)
         picked = scraper.select_expirations(vals, today=self.TODAY, extra=["2099-01-01", self._values(508)[0][:10]])
 
         self.assertEqual(len(picked), scraper.MAX_EXPIRATIONS + 1)
@@ -143,9 +158,9 @@ class TestSelectExpirations(unittest.TestCase):
                          scraper.select_expirations(vals, today=self.TODAY, extra=[]))
 
     def test_unparsable_value_is_skipped_not_fatal(self):
-        vals = ["not-a-date"] + self._values(7)
+        vals = ["not-a-date"] + self._values(21)
         picked = scraper.select_expirations(vals, today=self.TODAY)
-        self.assertEqual(picked, self._values(7))
+        self.assertEqual(picked, self._values(21))
 
 
 class TestFillExpDate(unittest.TestCase):
@@ -318,8 +333,19 @@ GOOD_VG = [
 ]
 
 
+# 另案 3 起 select_expirations 只取 DTE 19–45；GOOD_EXPIRATIONS 是寫死的日期，
+# 固定「今天」讓三個到期日落在 21／28／35 天，測試不隨實際日期失效。
+GOOD_EXPIRATIONS_TODAY = date(2026, 6, 26)
+_real_select_expirations = scraper.select_expirations
+
+
+def _select_expirations_on_fixture_day(expirations, today=None, extra=None):
+    return _real_select_expirations(expirations, today=GOOD_EXPIRATIONS_TODAY, extra=extra)
+
+
 def _capture_main(cdp_eval_mock, wait_mock=None, confirm_mock=None):
     patches = [
+        patch("pmcc_short_call_scraper.select_expirations", new=_select_expirations_on_fixture_day),
         patch("pmcc_short_call_scraper.prepare_page", new=AsyncMock(return_value=("tid", "ws://fake"))),
         patch("pmcc_short_call_scraper.cdp_navigate", new=AsyncMock()),
         patch("pmcc_short_call_scraper.activate_target", new=AsyncMock()),

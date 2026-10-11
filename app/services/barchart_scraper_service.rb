@@ -160,7 +160,7 @@ class BarchartScraperService
       return result
     end
 
-    fetch_result = run_scraper("pmcc_short_call")
+    fetch_result = run_scraper("pmcc_short_call", extra_args: pmcc_held_short_expiration_args)
 
     case fetch_result[:status]
     when "barchart_session_expired"
@@ -702,6 +702,21 @@ class BarchartScraperService
       LeapsOptionChainSnapshot.where(symbol: @symbol).delete_all
       LeapsOptionChainSnapshot.insert_all(records)
     end
+  end
+
+  # 另案 3：爬蟲只抓 Short DTE 19–45 天，持有中的短腳進入 < 19 天（正要考慮滾倉）
+  # 就不在區間內，部位追蹤的 short_leg_quote 會查不到報價。把各使用者這個代號
+  # 有效部位的 open 短腳到期日用 --expirations 帶給爬蟲（不佔 8 個名額）；
+  # PmccRankingService 照樣只取 19–45 天，這些列不會出現在排行表。
+  def pmcc_held_short_expiration_args
+    dates = PmccShortLeg.open_legs
+                        .joins(:position)
+                        .merge(PmccPosition.active_positions.for_symbol(@symbol))
+                        .distinct
+                        .pluck(:short_expiration)
+                        .compact
+                        .sort
+    dates.empty? ? [] : [ "--expirations", dates.map(&:iso8601).join(",") ]
   end
 
   def persist_pmcc_short_calls(data)
