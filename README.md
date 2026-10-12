@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-10-12（一）— 新增：LEAPS 履約價輸入列下方提示垂直價差顯示條件
+
+`/leaps` 搜尋表單的輸入列下方，固定顯示「未輸入履約價時 LEAPS Vertical Spread 垂直價差 功能區塊不會顯現」
+（`#leaps-strike-hint`）。顯示條件本身沒有改，仍然是 leaps-call-spread-spec 功能定義 0。
+P3 的 HTML 回歸比對（`spec/support/leaps_page_html.rb`、`e2e/leaps_vertical_spread.e2e.mjs`）排除這個節點，
+內容改由 `spec/requests/leaps_recommendations_spec.rb` 驗證。
+
 ### 2026-10-11（日）— 修正：PMCC Short Call Δ 粗篩全擋掉時誤報「尚無資料」
 
 - `PmccRankingService` 新增 `:no_short_in_delta_range`：19–45 天內有 Short Call，但 Δ 全在 0.05–0.60 粗篩之外（或缺值）時回傳，不再混成 `:no_short`。

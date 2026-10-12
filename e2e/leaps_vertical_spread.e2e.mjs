@@ -135,8 +135,13 @@ try {
     await page.goto(`${BASE}${path}`, { waitUntil: "load" });
     if (await page.locator("#leaps_vertical_spread").count()) await waitForResult(page);
     await page.waitForLoadState("networkidle");
+    // 2026-10-12 新增的履約價提示（#leaps-strike-hint）與垂直價差無關，同 spec/support/leaps_page_html.rb 排除。
     const blocks = await page.evaluate(() => [...document.getElementById("leaps-export-root").children]
-      .filter((el) => el.id !== "leaps_vertical_spread").map((el) => el.outerHTML));
+      .filter((el) => el.id !== "leaps_vertical_spread").map((el) => {
+        const clone = el.cloneNode(true);
+        clone.querySelector("#leaps-strike-hint")?.remove();
+        return clone.outerHTML;
+      }));
     const base = readFileSync(`spec/fixtures/leaps_vertical_spread/baseline/${name}.html`, "utf8")
       .trimEnd().split("\n<!-- ===== block ===== -->\n");
     const differing = base.map((b, i) => (mask(b) === mask(blocks[i] ?? "") ? null : i)).filter((i) => i !== null);

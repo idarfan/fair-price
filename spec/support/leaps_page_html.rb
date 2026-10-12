@@ -33,7 +33,14 @@ module LeapsPageHtml
     mask_release_notes(doc)
     strip_poll_timeout(doc)
     strip_build_rules_note(doc)
+    strip_strike_hint(doc)
     canonical(doc.to_html)
+  end
+
+  # 2026-10-12 搜尋表單新增履約價提示（未填履約價時不顯示垂直價差區塊），與既有區塊無關。
+  # 內容由 spec/requests/leaps_recommendations_spec.rb 的履約價提示測試驗證。
+  def strip_strike_hint(doc)
+    doc.css("#leaps-strike-hint").each(&:remove)
   end
 
   # 2026-10-10 另案 3：建倉規範卡底下那行說明從「本表抓 DTE 60 天以內…」改成
