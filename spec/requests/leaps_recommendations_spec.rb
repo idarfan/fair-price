@@ -69,6 +69,14 @@ RSpec.describe "GET /leaps", type: :request do
       expect(LeapsOptionsFlowPanelService).not_to receive(:new)
       get "/leaps"
     end
+
+    # 2026-10-12 使用者要求：履約價那排下面提示「沒填履約價就不會出現垂直價差區塊」
+    # （顯示條件見 leaps-call-spread-spec 功能定義 0）。
+    it "履約價輸入列下方提示未填履約價時不顯示垂直價差區塊" do
+      get "/leaps"
+      hint = Nokogiri::HTML(response.body).at_css("#leaps-form #leaps-strike-hint")
+      expect(hint&.text).to eq("未輸入履約價時 LEAPS Vertical Spread 垂直價差 功能區塊不會顯現")
+    end
   end
 
   # ── 2. symbol 有值但 DB 沒有 fresh 資料 ──────────────────────────────────

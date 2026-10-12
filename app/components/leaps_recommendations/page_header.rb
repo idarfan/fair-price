@@ -73,6 +73,11 @@ module LeapsRecommendations::PageHeader
         div(class: "w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin")
         plain "抓取資料中，請稍候…（約 3–5 分鐘）"
       end
+      # basis-full 讓提示在 flex-wrap 表單裡自成一排，落在輸入列正下方。
+      # 垂直價差的顯示條件見 PageComponent#render_vertical_spread_frame。
+      p(id: "leaps-strike-hint", class: "basis-full text-xs text-gray-500") do
+        plain "未輸入履約價時 LEAPS Vertical Spread 垂直價差 功能區塊不會顯現"
+      end
     end
     div(id: "leaps-strike-error",
         class: "hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-1")
