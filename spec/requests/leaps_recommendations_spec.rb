@@ -197,7 +197,7 @@ RSpec.describe "GET /leaps", type: :request do
 
     def body_for(status)
       get "/leaps", params: { symbol: symbol, job_status: status }
-      response.body
+      WithoutReleaseNotes.html(response.body)
     end
 
     # leaps-deep-itm-fix.md P3（2026-10-09 使用者裁示）：success 但資料不新鮮＝
@@ -246,9 +246,10 @@ RSpec.describe "GET /leaps", type: :request do
     # 畫面卻說「履約價 80 沒有 Delta ≥ 0.60」——其實新鮮查詢 80 有 5 個候選。
     it "user_strike 的 success 但資料不新鮮時，不誤報 Delta 不足，改說結果已不是最新" do
       get "/leaps", params: { symbol: symbol, job_status: "success", user_strike: "80" }
+      body = WithoutReleaseNotes.html(response.body)
 
-      expect(response.body).not_to include("含緩衝檔）在所有到期日都沒有符合")
-      expect(response.body).to include("已不是最新")
+      expect(body).not_to include("含緩衝檔）在所有到期日都沒有符合")
+      expect(body).to include("已不是最新")
     end
   end
 
@@ -915,9 +916,10 @@ RSpec.describe "GET /leaps", type: :request do
       allow(LeapsOptionChainSnapshot).to receive(:fresh_for?).and_return(true)
 
       get "/leaps", params: { symbol: symbol, user_strike: "125", job_status: "success" }
+      body = WithoutReleaseNotes.html(response.body)
 
-      expect(response.body).to include("含緩衝檔）在所有到期日都沒有符合 Delta ≥ 0.60")
-      expect(response.body).not_to include("已不是最新")
+      expect(body).to include("含緩衝檔）在所有到期日都沒有符合 Delta ≥ 0.60")
+      expect(body).not_to include("已不是最新")
     end
   end
 
