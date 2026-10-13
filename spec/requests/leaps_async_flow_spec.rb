@@ -86,7 +86,7 @@ RSpec.describe "LEAPS 非同步全流程", type: :request do
 
     get "/leaps", params: { symbol: symbol, job_status: "success", **params }
     expect(response).to have_http_status(:ok)
-    Nokogiri::HTML(response.body)
+    WithoutReleaseNotes.doc(response.body)
   end
 
   def ranking_strikes(doc)
