@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-10-17（六）— 新增：投資名人堂 P0–P1（盤點與資料表）
+
+依 `hall-of-fame-spec.md` 建立投資名人堂的資料層：六張 `hof_` 表（`hof_officials`、`hof_filings`、
+`hof_holdings`、`hof_transactions`、`hof_option_details`、`hof_sync_runs`），model 放 `app/models/hall_of_fame/`
+（交易 model 為 `HallOfFame::Trade`，避免蓋掉 ActiveRecord#transaction）。名單只來自
+`config/hall_of_fame.yml`，`bin/rails hall_of_fame:seed_officials` 冪等同步（11 位）。尚無頁面與排程。
+
 ### 2026-10-12（一）— 版本 v20261012，更新版本說明
 
 - 版本更新說明新增 v20261012（涵蓋 10/10～10/12）：LEAPS 不填履約價時候選改從完整鏈挑 Δ 0.60–0.90、「期權鏈無此履約價」與「Delta 不足」分開顯示、舊結果網址顯示「已不是最新」、PMCC Long Δ ≥ 0.80 與 Short DTE 19–45 改為篩選、PMCC 無合格組合時說明擋下的規則、指定履約價時提供「不填履約價重新查詢」與 LEAPS 到期日的緩衝檔、履約價欄下方提示垂直價差顯示條件。

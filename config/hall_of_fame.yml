@@ -1,0 +1,15 @@
+# 投資名人堂名單（hall-of-fame-spec.md §2）。程式內禁止硬編人名（§1-6）。
+# 改完執行 bin/rails hall_of_fame:seed_officials 同步至 hof_officials。
+congress:            # 第一期，source: house
+  - { slug: pelosi,     last: Pelosi,     first: Nancy,     district: CA11 }
+  - { slug: khanna,     last: Khanna,     first: Ro,        district: CA17 }
+  - { slug: mccaul,     last: McCaul,     first: Michael,   district: TX10 }
+  - { slug: gottheimer, last: Gottheimer, first: Josh,      district: NJ05 }
+  - { slug: crenshaw,   last: Crenshaw,   first: Daniel,    district: TX02 }
+  - { slug: shreve,     last: Shreve,     first: Jefferson, district: IN06 }
+executive:           # 第二期，source: oge
+  - { slug: trump,   last: Trump,   first: Donald, title: 總統 }
+  - { slug: vance,   last: Vance,   first: JD,     title: 副總統 }
+  - { slug: bessent, last: Bessent, first: Scott,  title: 財政部長 }
+  - { slug: lutnick, last: Lutnick, first: Howard, title: 商務部長 }
+  - { slug: burgum,  last: Burgum,  first: Doug,   title: 內政部長 }
