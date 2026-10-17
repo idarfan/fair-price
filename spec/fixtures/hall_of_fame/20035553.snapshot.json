@@ -1,0 +1,20 @@
+{
+  "status": "parsed",
+  "reasons": [],
+  "marker_count": 1,
+  "rows": [
+    {
+      "owner": "SP",
+      "asset_name": "REOF XXX, LLC [AB]",
+      "ticker": null,
+      "asset_type_code": "AB",
+      "tx_type": "P",
+      "tx_date": "2026-09-08",
+      "notified_date": "2026-09-08",
+      "amount_label": "$500,001 - $1,000,000",
+      "amount_min": 500001,
+      "amount_max": 1000000,
+      "description": "Investment in LLC which is acquiring and managing a commercial office property at 225 Bush Street in San Francisco, CA."
+    }
+  ]
+}

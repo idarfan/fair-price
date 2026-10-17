@@ -11,7 +11,7 @@
 | P0 | 現況盤點與決策 | 完成 | r1 PASS | 路由：頁面 `/hall_of_fame`（與 `/ownership` 同層）、API `api/v1/hall_of_fame/*`，`TICKER_CONSTRAINT` 在 `config/routes.rb:3`。React 模式：`entrypoints/ownership.tsx` 掛 `#ownership-root`，controller render Phlex `Ownership::PageComponent` 只輸出 root div；layout `application.html.erb:78-96` 依 controller_name 掛 entrypoint（→ §1-0 增列 layout）。sidebar：`app/components/fair_value/app_switcher_component.rb:4-21` `APP_LINKS`，第 88 行分隔線在倒數第二項後，加在最末位會讓分隔線改在名人堂前。pm2 TZ=UTC（`/proc/<pid>/environ`）。psql：`.env` `DATABASE_URL` → fairprice_production、user mygame。curl：2026FD.zip `HTTP/2 200` `application/x-zip-compressed`；20004433.pdf `HTTP/2 200` `application/pdf`。ZIP 含 `2026FD.xml`，`<Member>` 1782。差異：pdfplumber 未安裝、repo 無 venv／requirements（P3 處理）。 | 2026-10-17 |
 | P1 | Schema | 完成 | r1 PASS | migrate 至 fairprice_production，6 張 hof_ 表；rollback STEP=1 → migrate 來回成功；seed 兩次皆 11；model／seeder spec 27 examples 0 failures；完整 rspec 1428 passed／1 failed（technical_dashboards_spec:24，既有時段性失敗，TZ=UTC 重跑 9 passed）。差異：hof_sync_runs 加 http_validators（§1-10）；交易 model 名 HallOfFame::Trade。 | 2026-10-17 |
 | P2 | House 索引同步 | 完成 | r1 PASS | `hall_of_fame:sync_house_index` 首跑 run#1 新增 87、錯誤 0（crenshaw 1／gottheimer 23／khanna 22／mccaul 20／pelosi 8／shreve 13；StateDst 全符，yml 未改）；重跑 run#2 新增 0、兩年皆 304，hof_filings 仍 87；隨機 3 筆 pdf_url 皆 HTTP/2 200 application/pdf。House IIS 需同時帶 If-None-Match＋If-Modified-Since 才回 304。spec 13 examples 0 failures；完整 rspec 1441 passed／1 failed（timed_capture_spec:27 負載偶發，單獨重跑 3 次皆過）。解壓用系統 unzip（rubyzip 僅 test 群組）。 | 2026-10-17 |
-| P3 | House PDF 解析 | 待辦 | | | |
+| P3 | House PDF 解析 | 完成 | r2 PASS | `hall_of_fame:parse_house_pdfs` 全量 87 份：parsed 44（ptr 42、annual 2）、needs_review 43、failed 0、pending 0；hof_transactions 1246、hof_holdings 779。needs_review：42 份掃描檔（文字層 0 字，Khanna PTR 21＋年報、McCaul PTR 19＋年報，皆 8/9 開頭紙本申報）、10075701 第 59 列 `Undetermined`。自洽檢查：有文字層 45 份列數＝標記數 45/45（FS 標記與年報 Schedule A `[XX]` 皆獨立計數，Schedule A→B 相鄰檢查全過）。夾具：20035553（Pelosi 最新 PTR）snapshot、20004433 舊格式回歸、8221120 掃描檔、10075701 年報。人工比對：20035553 唯一 1 列＋20035143 前 5 列與 PDF 一致。pytest 25 passed；rspec 1454 examples 0 failures。差異：Ruby 寫 DB、Python 只解析（使用者裁示 psql＝PostgreSQL）；§3 擴充 None／$1 - $1,000／精確金額；不寫 hof_sync_runs（避免覆蓋 P2 validators）；`.gitignore` 加 `/lib/hall_of_fame/venv/`；CI 無 venv，真 sidecar example skip、pytest 未接 CI。 | 2026-10-17 |
 | P3b | 期權解析＋口數反推 | 待辦 | | | |
 | P4 | 每日排程（pm2） | 待辦 | | | |
 | P5 | 第一期 UI（國會分頁） | 待辦 | | | |
@@ -43,7 +43,7 @@
 2. 每個接進 controller 的 service 必須同時交 request spec（route → service 完整 HTTP 路徑），與 unit test 同級。
 3. 資料源為公開政府網站，以一般 HTTP 下載為主；僅 OGE 列表頁若需 JS 才可用 Playwright。不得呼叫任何第三方彙整 API（Apify、Quiver、Capitol Trades 等）。
 4. 金額一律存區間上下限兩欄，**禁止存單一估算值當真值**。無上限區間（如 Over $50,000,000）`max = NULL`。
-5. 解析失敗或欄位不全 → `parse_status = needs_review`，不得靜默跳過或丟棄。
+5. 解析失敗或欄位不全 → `parse_status = needs_review`，不得靜默跳過或丟棄。界線（2026-10-17 P3 審查質詢 4）：needs_review＝PDF 內容問題（掃描檔、列數不符、未知標籤／代碼）；failed＝程式或環境錯誤（sidecar 崩潰、IO、未預期例外），修好後以 `bin/rails hall_of_fame:retry_failed_house_pdfs` 改回 pending 重跑，不自動重試；下載失敗維持 pending，下次排程重試。
 6. 名單只來自設定檔 `config/hall_of_fame.yml`，程式內禁止硬編人名。
 7. 頁尾固定聲明（繁中）：「資料來源：美國眾議院書記處、美國政府倫理辦公室公開申報。金額為申報區間，佔比為估算值。依 Ethics in Government Act，本資料不得用於商業、信用評等或募款用途。」
 8. 「完成」宣告須附端到端證據：實際 URL、DOM 擷取值、與下方已知值比對結果；只有測試數字不算完成。
@@ -87,6 +87,11 @@ district 以 House 索引實際值為準；P2 驗證若對不上，修正 yml �
 | Over $50,000,000 | 50000001 | NULL |
 | Spouse/DC Over $1,000,000 | 1000001 | NULL |
 | None (or less than $1,001) | 0 | 1000 |
+| None | 0 | 0 |
+| $1 - $1,000 | 1 | 1000 |
+| 精確金額（如 `$15.00`） | 無條件捨去 | 無條件進位 |
+
+（後三列為 2026-10-17 P3 使用者裁示擴充：年報 Schedule A 實際出現「None」293 列、「$1 - $1,000」5 列，PTR 20033725 有精確金額 `$15.00`。`Undetermined` 刻意不列，維持 needs_review。）
 
 對照表放 `config/hall_of_fame_ranges.yml`，Ruby/Python 共讀。未知標籤 → needs_review。
 
@@ -176,7 +181,7 @@ Rake：`hall_of_fame:seed_officials` 由 yml 同步 `hof_officials`（冪等）�
 5. 金額標籤依 §3 對照；跨行的 asset 名稱需合併。
 
 驗證：
-- [ ] 自洽檢查（§1-11）實作：PTR 列數 = PDF 文字層中 `FILING STATUS` 出現次數（不分大小寫）；全量跑完後通過率寫入證據欄。
+- [ ] 自洽檢查（§1-11）實作：PTR 列數 = PDF 文字層中 `FILING STATUS` 出現次數（不分大小寫）；全量跑完後通過率寫入證據欄。（2026-10-17 patch：新格式的小型大寫在文字層只剩首字母＋`\x00`，字面 `FILING STATUS` 出現 0 次，改比對 `F\x00{5} S\x00{5} :` 模式；舊格式比對大小寫混雜原字 `FIlINg STaTuS:`。計數對整份文字層獨立進行，不受表格範圍判斷影響。年報以 Schedule A 標題至下一個 Schedule 標題之間全部行的 `[XX]` 代碼數為標記數，且 Schedule A 之後必須緊接 Schedule B，否則 needs_review。）
 - [ ] 現行格式夾具：取 Pelosi 2026 年最新一份 PTR 存 `spec/fixtures/hall_of_fame/`，其解析結果 snapshot 存 JSON；snapshot 首次產生後須通過自洽檢查才可提交。
 - [ ] 舊格式回歸夾具（pytest）：`20004433.pdf` 解出兩筆，其一為 `asset 含 "Treasury Bills"、tx_type=P、tx_date=2015-12-15、notified_date=2015-12-31、amount_min=1000001、amount_max=5000000`；另一筆 owner=SP、`amount_min=1000001、amount_max=NULL`。
 - [ ] 全量跑完：`SELECT parse_status, count(*) FROM hof_filings WHERE source='house' GROUP BY 1`，`failed = 0`；needs_review 筆數與原因列入證據欄。
@@ -235,7 +240,7 @@ Rake：`hall_of_fame:seed_officials` 由 yml 同步 `hof_officials`（冪等）�
    - 持股表切換：「全部資產」｜「僅有價證券」（ticker 非空者）；佔比分母隨切換重算。
    - 交易表（近 12 個月 PTR）：日期、資產、ticker、買/賣、區間、申報日；可依買賣篩選；交易佔比表（§4）。
    - 期權列加欄：Call/Put、履約價、到期日、買入金額區間、口數（有申報寫「申報 N 口」；反推的寫「約 N₁～N₂ 口」）、每股權利金（區間或參考價）、資料來源標籤（申報／Barchart 當日收盤／模型估算）。hover 顯示 calc_note。
-   - 每列「原始 PDF」連結。needs_review 列加警示標記。
+   - 每列「原始 PDF」連結。needs_review 列加警示標記。needs_review filing 的資料列可能含不合 model 驗證的值（未知 owner 代碼、空 asset_name；P3 以 `insert_all` 寫入、保留原值供人工檢查），UI 須照原值顯示並標示，不得當成合法值計算或隱藏（P3 審查質詢 5）。
 3. 頁尾聲明（§1-7）。
 4. sidebar 最末位入口。
 5. request spec：GET 頁面 200、含「國會議員」分頁、含 Pelosi 名字；GET 行政政要分頁 200。

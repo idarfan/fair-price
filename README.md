@@ -1,5 +1,14 @@
 # FairPrice
 
+### 2026-10-17（六）— 新增：投資名人堂 P3（House PDF 解析）
+
+`bin/rails hall_of_fame:parse_house_pdfs` 下載 `parse_status=pending` 的 House PDF 到
+`storage/hall_of_fame/house/{year}/`（記 sha256），交給 Python sidecar `lib/hall_of_fame/house_parser.py`
+（pdfplumber，專用 venv，見 `lib/hall_of_fame/requirements.txt`）解析，PTR 寫入 `hof_transactions`、年報
+Schedule A 寫入 `hof_holdings`。列數對不上標記數、掃描檔、未知金額標籤 → needs_review；程式／環境錯誤 → failed，
+修好後執行 `bin/rails hall_of_fame:retry_failed_house_pdfs`。金額對照表 `config/hall_of_fame_ranges.yml`。
+首跑 87 份：parsed 44、needs_review 43（42 份為掃描檔，Khanna／McCaul 全為紙本申報）、failed 0。
+
 ### 2026-10-17（六）— 新增：投資名人堂 P2（House 索引同步）
 
 `HallOfFame::HouseIndexSync` 下載眾議院當年＋前一年的 `{year}FD.zip`，依名單（Last 完全相同＋First 前綴）

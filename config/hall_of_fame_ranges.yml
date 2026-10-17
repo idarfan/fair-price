@@ -1,0 +1,17 @@
+# 名人堂金額區間對照（規格 §3）。Ruby 與 Python sidecar 共讀；未知標籤一律 needs_review。
+# max 為 null 表示無上限。精確金額（如 "$15.00"）不列表，由程式取 min=無條件捨去、max=無條件進位。
+# None、$1 - $1,000 為 2026-10-17 使用者裁示擴充（年報 Schedule A 實際出現）；Undetermined 刻意不列，維持 needs_review。
+- { label: "$1,001 - $15,000",             min: 1001,     max: 15000 }
+- { label: "$15,001 - $50,000",            min: 15001,    max: 50000 }
+- { label: "$50,001 - $100,000",           min: 50001,    max: 100000 }
+- { label: "$100,001 - $250,000",          min: 100001,   max: 250000 }
+- { label: "$250,001 - $500,000",          min: 250001,   max: 500000 }
+- { label: "$500,001 - $1,000,000",        min: 500001,   max: 1000000 }
+- { label: "$1,000,001 - $5,000,000",      min: 1000001,  max: 5000000 }
+- { label: "$5,000,001 - $25,000,000",     min: 5000001,  max: 25000000 }
+- { label: "$25,000,001 - $50,000,000",    min: 25000001, max: 50000000 }
+- { label: "Over $50,000,000",             min: 50000001, max: null }
+- { label: "Spouse/DC Over $1,000,000",    min: 1000001,  max: null }
+- { label: "None (or less than $1,001)",   min: 0,        max: 1000 }
+- { label: "None",                         min: 0,        max: 0 }
+- { label: "$1 - $1,000",                  min: 1,        max: 1000 }

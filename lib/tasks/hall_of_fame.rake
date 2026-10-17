@@ -13,4 +13,19 @@ namespace :hall_of_fame do
     puts "hall_of_fame:sync_house_index run##{run.id} 新增 #{run.new_filings_count} 筆，錯誤 #{run.error_count}"
     puts run.error_log if run.error_log.present?
   end
+
+  desc "下載並解析 parse_status=pending 的 House PDF（PTR→hof_transactions、年報→hof_holdings）"
+  task parse_house_pdfs: :environment do
+    summary = HallOfFame::HousePdfParse.new.call
+    puts "hall_of_fame:parse_house_pdfs #{summary.counts.sort.map { |s, n| "#{s} #{n}" }.join('、').presence || '無 pending'}"
+    puts summary.errors if summary.errors.any?
+  end
+
+  desc "把 parse_status=failed 的 House filing 改回 pending 並重新解析（修好程式／環境錯誤後手動執行）"
+  task retry_failed_house_pdfs: :environment do
+    reset = HallOfFame::Filing.where(source: HallOfFame::HouseIndexSync::SOURCE, parse_status: "failed")
+                              .update_all(parse_status: "pending", parse_error: nil, updated_at: Time.current)
+    puts "hall_of_fame:retry_failed_house_pdfs 改回 pending #{reset} 筆"
+    Rake::Task["hall_of_fame:parse_house_pdfs"].invoke
+  end
 end

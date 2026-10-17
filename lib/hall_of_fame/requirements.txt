@@ -1,0 +1,8 @@
+# 名人堂 Python sidecar 專用 venv（lib/hall_of_fame/venv）。建立：
+#   python3 -m venv lib/hall_of_fame/venv && lib/hall_of_fame/venv/bin/pip install -r lib/hall_of_fame/requirements.txt
+pdfplumber==0.11.10
+pdfminer.six==20260107
+pypdfium2==5.14.0
+pillow==13.0.0
+PyYAML==6.0.3
+pytest==9.1.1
