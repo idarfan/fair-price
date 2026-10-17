@@ -10,7 +10,7 @@
 |---|---|---|---|---|---|
 | P0 | 現況盤點與決策 | 完成 | r1 PASS | 路由：頁面 `/hall_of_fame`（與 `/ownership` 同層）、API `api/v1/hall_of_fame/*`，`TICKER_CONSTRAINT` 在 `config/routes.rb:3`。React 模式：`entrypoints/ownership.tsx` 掛 `#ownership-root`，controller render Phlex `Ownership::PageComponent` 只輸出 root div；layout `application.html.erb:78-96` 依 controller_name 掛 entrypoint（→ §1-0 增列 layout）。sidebar：`app/components/fair_value/app_switcher_component.rb:4-21` `APP_LINKS`，第 88 行分隔線在倒數第二項後，加在最末位會讓分隔線改在名人堂前。pm2 TZ=UTC（`/proc/<pid>/environ`）。psql：`.env` `DATABASE_URL` → fairprice_production、user mygame。curl：2026FD.zip `HTTP/2 200` `application/x-zip-compressed`；20004433.pdf `HTTP/2 200` `application/pdf`。ZIP 含 `2026FD.xml`，`<Member>` 1782。差異：pdfplumber 未安裝、repo 無 venv／requirements（P3 處理）。 | 2026-10-17 |
 | P1 | Schema | 完成 | r1 PASS | migrate 至 fairprice_production，6 張 hof_ 表；rollback STEP=1 → migrate 來回成功；seed 兩次皆 11；model／seeder spec 27 examples 0 failures；完整 rspec 1428 passed／1 failed（technical_dashboards_spec:24，既有時段性失敗，TZ=UTC 重跑 9 passed）。差異：hof_sync_runs 加 http_validators（§1-10）；交易 model 名 HallOfFame::Trade。 | 2026-10-17 |
-| P2 | House 索引同步 | 待辦 | | | |
+| P2 | House 索引同步 | 完成 | r1 PASS | `hall_of_fame:sync_house_index` 首跑 run#1 新增 87、錯誤 0（crenshaw 1／gottheimer 23／khanna 22／mccaul 20／pelosi 8／shreve 13；StateDst 全符，yml 未改）；重跑 run#2 新增 0、兩年皆 304，hof_filings 仍 87；隨機 3 筆 pdf_url 皆 HTTP/2 200 application/pdf。House IIS 需同時帶 If-None-Match＋If-Modified-Since 才回 304。spec 13 examples 0 failures；完整 rspec 1441 passed／1 failed（timed_capture_spec:27 負載偶發，單獨重跑 3 次皆過）。解壓用系統 unzip（rubyzip 僅 test 群組）。 | 2026-10-17 |
 | P3 | House PDF 解析 | 待辦 | | | |
 | P3b | 期權解析＋口數反推 | 待辦 | | | |
 | P4 | 每日排程（pm2） | 待辦 | | | |

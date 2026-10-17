@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-10-17（六）— 新增：投資名人堂 P2（House 索引同步）
+
+`HallOfFame::HouseIndexSync` 下載眾議院當年＋前一年的 `{year}FD.zip`，依名單（Last 完全相同＋First 前綴）
+寫入 `hof_filings`（PTR／年報／修正，附 PDF 網址）。下載前以 `If-None-Match`＋`If-Modified-Since` 條件式請求，
+304 即跳過；已存在的 doc_id 不重寫。執行：`bin/rails hall_of_fame:sync_house_index`，紀錄在 `hof_sync_runs`。
+首跑 6 位議員共 87 筆。尚無排程與頁面。
+
 ### 2026-10-17（六）— 新增：投資名人堂 P0–P1（盤點與資料表）
 
 依 `hall-of-fame-spec.md` 建立投資名人堂的資料層：六張 `hof_` 表（`hof_officials`、`hof_filings`、
