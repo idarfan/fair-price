@@ -6,3 +6,4 @@ pypdfium2==5.14.0
 pillow==13.0.0
 PyYAML==6.0.3
 pytest==9.1.1
+websockets==16.0

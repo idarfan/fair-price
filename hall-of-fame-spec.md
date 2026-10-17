@@ -12,7 +12,7 @@
 | P1 | Schema | 完成 | r1 PASS | migrate 至 fairprice_production，6 張 hof_ 表；rollback STEP=1 → migrate 來回成功；seed 兩次皆 11；model／seeder spec 27 examples 0 failures；完整 rspec 1428 passed／1 failed（technical_dashboards_spec:24，既有時段性失敗，TZ=UTC 重跑 9 passed）。差異：hof_sync_runs 加 http_validators（§1-10）；交易 model 名 HallOfFame::Trade。 | 2026-10-17 |
 | P2 | House 索引同步 | 完成 | r1 PASS | `hall_of_fame:sync_house_index` 首跑 run#1 新增 87、錯誤 0（crenshaw 1／gottheimer 23／khanna 22／mccaul 20／pelosi 8／shreve 13；StateDst 全符，yml 未改）；重跑 run#2 新增 0、兩年皆 304，hof_filings 仍 87；隨機 3 筆 pdf_url 皆 HTTP/2 200 application/pdf。House IIS 需同時帶 If-None-Match＋If-Modified-Since 才回 304。spec 13 examples 0 failures；完整 rspec 1441 passed／1 failed（timed_capture_spec:27 負載偶發，單獨重跑 3 次皆過）。解壓用系統 unzip（rubyzip 僅 test 群組）。 | 2026-10-17 |
 | P3 | House PDF 解析 | 完成 | r2 PASS | `hall_of_fame:parse_house_pdfs` 全量 87 份：parsed 44（ptr 42、annual 2）、needs_review 43、failed 0、pending 0；hof_transactions 1246、hof_holdings 779。needs_review：42 份掃描檔（文字層 0 字，Khanna PTR 21＋年報、McCaul PTR 19＋年報，皆 8/9 開頭紙本申報）、10075701 第 59 列 `Undetermined`。自洽檢查：有文字層 45 份列數＝標記數 45/45（FS 標記與年報 Schedule A `[XX]` 皆獨立計數，Schedule A→B 相鄰檢查全過）。夾具：20035553（Pelosi 最新 PTR）snapshot、20004433 舊格式回歸、8221120 掃描檔、10075701 年報。人工比對：20035553 唯一 1 列＋20035143 前 5 列與 PDF 一致。pytest 25 passed；rspec 1454 examples 0 failures。差異：Ruby 寫 DB、Python 只解析（使用者裁示 psql＝PostgreSQL）；§3 擴充 None／$1 - $1,000／精確金額；不寫 hof_sync_runs（避免覆蓋 P2 validators）；`.gitignore` 加 `/lib/hall_of_fame/venv/`；CI 無 venv，真 sidecar example skip、pytest 未接 CI。 | 2026-10-17 |
-| P3b | 期權解析＋口數反推 | 待辦 | | | |
+| P3b | 期權解析＋口數反推 | 完成 | r2 PASS | `hall_of_fame:analyze_options` 正式庫 50 筆期權列：barchart_dom 4（MSFT 2026-08-14 四個合約，335C Dec 165.02／量 50 經使用者手動核對一致）、bs_model 22、stated_contracts 14、空值 10（履約列 8 只記期權資料不反推、Crenshaw META「10 puts at $X」2 筆 needs_review）；filings needs_review 44、parsed 43。夾具 20034836：INTC 200 口 50.00～250.00、UBER 25.00～50.00。CDP 離線 2 秒內回報、error_log 以 CDP_OFFLINE_MESSAGE 開頭、不走 bs_model。rspec 1482 examples 0 failures。差異：`hof_sync_runs.kind`（index／pdf_parse／options，保護 P2 validators）；Barchart 無成交日（lastPrice=0 或 volume 0／null）不採用；`[期權] ` 原因前綴；bs_model 參數在 `config/hall_of_fame_option_patterns.yml`；重新解析時先刪 option_details（r1 問題 1）；UI「模型估算」驗收延到 P5。 | 2026-10-17 |
 | P4 | 每日排程（pm2） | 待辦 | | | |
 | P5 | 第一期 UI（國會分頁） | 待辦 | | | |
 | P6 | 第一期 E2E 驗收 | 待辦 | | | |
@@ -205,6 +205,13 @@ Rake：`hall_of_fame:seed_officials` 由 yml 同步 `hof_officials`（冪等）�
      2. **bs_model**：Black-Scholes 理論價。S = 成交日標的收盤價；σ = 成交日前 30 個交易日的歷史波動率；r 取設定檔值。股價由名人堂自己的 service 取得（可唯讀呼叫既有報價 service，不得修改它；不讀其他功能的資料表）。UI 標「模型估算」。
    - A 列也要抓 premium_ref（同 B 的來源順序），用來交叉檢查：premium_ref 落在 premium_implied 區間外 → calc_note 註記「申報口數與市價不符」，不改數值。
 4. 每列都存 calc_note，寫明算式與資料來源。
+5. （2026-10-17 P3b 使用者裁示與實測，patch）
+   - 履約列（描述以 `Exercised N call options …` 開頭，金額為取得股票的價值）：照樣寫 option_right／strike／expiration／contracts_stated，**不反推權利金、不抓 premium_ref**，calc_note 註明「履約交易」。
+   - `hof_sync_runs` 加 `kind`（index／pdf_parse／options，既有列為 index）；P2 只讀 kind=index 的 validators，期權批次寫 kind=options，CDP 離線訊息寫在該筆的 error_log。
+   - Barchart price-history 實測：存續合約約 3 個月、已到期合約 0 列；無成交日 `lastPrice=0`（畫面 N/A）或 volume 為 0／null 而價格沿用前一日。**只有成交日當天 volume>0 且 lastPrice>0 才算 barchart_dom 收盤**，否則視同不在可見範圍，走 bs_model。格線在 shadow DOM 內，截圖只能證明頁面為該合約。
+   - 期權造成的 needs_review 原因以 `[期權] ` 開頭寫入 filing.parse_error，重算時整批替換；premium_ref 為 NULL 的期權列每次執行都會重算（CDP 離線待重試、Barchart 讀取失敗皆由此自動重試）。
+   - bs_model 參數 `risk_free_rate: 0.04`、`volatility_window: 30` 放在 `config/hall_of_fame_option_patterns.yml` 的 `bs_model`；股價唯讀呼叫 `YahooFinanceService#chart(range: "5y")`。
+   - 「bs_model 列 UI 顯示『模型估算』」的驗證項於 P5 實作 UI 時一併驗收。
 
 驗證：
 - [ ] 夾具 `20034836.pdf`：
@@ -241,6 +248,7 @@ Rake：`hall_of_fame:seed_officials` 由 yml 同步 `hof_officials`（冪等）�
    - 交易表（近 12 個月 PTR）：日期、資產、ticker、買/賣、區間、申報日；可依買賣篩選；交易佔比表（§4）。
    - 期權列加欄：Call/Put、履約價、到期日、買入金額區間、口數（有申報寫「申報 N 口」；反推的寫「約 N₁～N₂ 口」）、每股權利金（區間或參考價）、資料來源標籤（申報／Barchart 當日收盤／模型估算）。hover 顯示 calc_note。
    - 每列「原始 PDF」連結。needs_review 列加警示標記。needs_review filing 的資料列可能含不合 model 驗證的值（未知 owner 代碼、空 asset_name；P3 以 `insert_all` 寫入、保留原值供人工檢查），UI 須照原值顯示並標示，不得當成合法值計算或隱藏（P3 審查質詢 5）。
+   - 「資料更新時間」取 `hof_sync_runs.finished_at`（對應 kind），不得用 `hof_option_details.updated_at`：premium_ref 為 NULL 的期權列（履約列、無法解析列）每次批次都會重算，值不變時不寫入，updated_at 不代表批次時間（P3b 審查質詢 2）。
 3. 頁尾聲明（§1-7）。
 4. sidebar 最末位入口。
 5. request spec：GET 頁面 200、含「國會議員」分頁、含 Pelosi 名字；GET 行政政要分頁 200。

@@ -1,5 +1,14 @@
 # FairPrice
 
+### 2026-10-17（六）— 新增：投資名人堂 P3b（期權解析＋口數反推）
+
+`bin/rails hall_of_fame:analyze_options` 解析 House 期權交易描述（`config/hall_of_fame_option_patterns.yml`），
+寫入 `hof_option_details`。有申報口數 → 反推每股權利金區間（stated_contracts）；沒有口數 → 以成交日參考價反推口數區間，
+參考價先取 Barchart 合約 price-history 頁 DOM 的當日收盤（barchart_dom，只讀 DOM、當天無成交不採用），
+頁面沒有該日才用 Black-Scholes 估算（bs_model，Yahoo 收盤＋前 30 交易日波動率）。CDP 離線時不估算、留待重試，
+並在 `hof_sync_runs`（新增 `kind` 欄位）記錄 CDP 未連線訊息。履約列只記期權資料，不反推。
+House PDF 重新解析時會先清除該份的期權明細，下次 `analyze_options` 重算。
+
 ### 2026-10-17（六）— 新增：投資名人堂 P3（House PDF 解析）
 
 `bin/rails hall_of_fame:parse_house_pdfs` 下載 `parse_status=pending` 的 House PDF 到

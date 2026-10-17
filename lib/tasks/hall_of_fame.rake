@@ -21,6 +21,14 @@ namespace :hall_of_fame do
     puts summary.errors if summary.errors.any?
   end
 
+  desc "期權列解析＋口數／權利金反推（Barchart DOM／Black-Scholes），寫入 hof_option_details"
+  task analyze_options: :environment do
+    run = HallOfFame::OptionAnalysis.new.call
+    sources = HallOfFame::OptionDetail.group(:premium_source).count.map { |s, n| "#{s || '無'} #{n}" }.join("、")
+    puts "hall_of_fame:analyze_options run##{run.id} 錯誤 #{run.error_count}；premium_source：#{sources}"
+    puts run.error_log if run.error_log.present?
+  end
+
   desc "把 parse_status=failed 的 House filing 改回 pending 並重新解析（修好程式／環境錯誤後手動執行）"
   task retry_failed_house_pdfs: :environment do
     reset = HallOfFame::Filing.where(source: HallOfFame::HouseIndexSync::SOURCE, parse_status: "failed")

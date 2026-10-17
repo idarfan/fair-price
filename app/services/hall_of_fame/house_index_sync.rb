@@ -26,7 +26,7 @@ module HallOfFame
 
     # 回傳本次的 SyncRun。
     def call
-      run       = SyncRun.create!(source: SOURCE, started_at: Time.current)
+      run       = SyncRun.create!(source: SOURCE, kind: "index", started_at: Time.current)
       previous  = previous_validators
       officials = Official.where(source: SOURCE, active: true).to_a
       results   = @years.map { |year| sync_year(year, previous, officials) }
@@ -40,9 +40,9 @@ module HallOfFame
 
     private
 
-    # 每次 run 都會把 validators 帶到下一次，所以取最近一筆已結束的 run 即可。
+    # 每次 run 都會把 validators 帶到下一次，所以取最近一筆已結束的索引 run 即可（期權等其他 kind 不帶 validators）。
     def previous_validators
-      SyncRun.where(source: SOURCE).where.not(finished_at: nil)
+      SyncRun.where(source: SOURCE, kind: "index").where.not(finished_at: nil)
              .order(started_at: :desc).limit(1).pick(:http_validators) || {}
     end
 

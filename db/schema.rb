@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_17_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_17_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -197,11 +197,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_17_120000) do
     t.text "error_log"
     t.datetime "finished_at"
     t.jsonb "http_validators", default: {}, null: false
+    t.string "kind", default: "index", null: false
     t.integer "new_filings_count", default: 0, null: false
     t.string "source", null: false
     t.datetime "started_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["source", "started_at"], name: "index_hof_sync_runs_on_source_and_started_at"
+    t.index ["source", "kind", "started_at"], name: "index_hof_sync_runs_on_source_and_kind_and_started_at"
   end
 
   create_table "hof_transactions", force: :cascade do |t|

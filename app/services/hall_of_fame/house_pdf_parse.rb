@@ -77,6 +77,8 @@ module HallOfFame
     def save_result(filing, path, result)
       rows = result.fetch("rows")
       Filing.transaction do
+        # option_details 外鍵指向 trades（P3b）；先刪，重新解析後由 analyze_options 依 premium_ref IS NULL 重算。
+        OptionDetail.where(transaction_id: filing.trades.select(:id)).delete_all
         filing.trades.delete_all
         filing.holdings.delete_all
         insert_rows(filing, rows)

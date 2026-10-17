@@ -160,6 +160,19 @@ RSpec.describe HallOfFame::HousePdfParse do
     expect(ptr.trades.pluck(:asset_name)).to eq([ "REOF XXX, LLC [AB]" ])
   end
 
+  it "re-parses a filing whose trades already have option details (P3b r1 問題 1)" do
+    stale = create(:hof_trade, filing: ptr, asset_name: "MSFT option")
+    create(:hof_option_detail, trade: stale, premium_ref: 12.5)
+    other = create(:hof_option_detail, trade: create(:hof_trade, filing: create(:hof_filing, parse_status: "parsed")))
+    sidecar_returns
+
+    summary = service.call
+
+    expect(summary.counts).to eq("parsed" => 1)
+    expect(ptr.reload.parse_status).to eq("parsed")
+    expect(HallOfFame::OptionDetail.pluck(:id)).to eq([ other.id ])
+  end
+
   describe "with the real Python sidecar" do
     before do
       skip "名人堂 venv 未建立（lib/hall_of_fame/requirements.txt）" unless File.exist?(HallOfFame::HouseParserSidecar::PYTHON)
