@@ -16,7 +16,7 @@
 | P4 | 每日排程（pm2） | 待補驗（隔日 cron） | r1 PASS（質詢 1：cron 證據補齊前不得標完成） | pm2 app `hall-of-fame-sync`（cron `30 0 * * *` UTC = 台北 08:30，autorestart false），ecosystem diff 只含此 app；`pm2 start` 首跑 run#6–8、`pm2 restart` 觸發 run#9–11（finished_at 皆非 NULL）；模擬新 filing：刪 20026770（先備份）＋清 run#6 validators 後重新出現、parsed、交易列與備份一致；`pm2 save` 後 dump 含此 app。rspec 1488 examples 0 failures。差異（使用者裁示）：sync_house 加跑 analyze_options、P3 解析寫 kind=pdf_parse 紀錄、各步隔離錯誤＋結束碼 1。**待補**：一組 started_at 落在台北 08:30 前後、由 cron 觸發的 index／pdf_parse／options run（附 id、started_at、finished_at、當時 `uptime -s`）；2026-10-18 08:30 電腦關機未觸發。 | 2026-10-18 |
 | P5 | 第一期 UI（國會分頁） | 完成 | r2 PASS | 頁面 `/hall_of_fame`（Phlex 掛載點＋React `HallOfFameApp`），API `api/v1/hall_of_fame/officials`（index／show）；sidebar 最末位入口。正式站（Playwright 9224）從 sidebar 點入：6 張人物卡；Pelosi 持股 68 列（Undetermined 1 列照原字串顯示、不列入佔比；None 7 列顯示 None）、圓餅 11 片、交易 29 列（BE 期權「申報 100 口｜$50.00～$100.00｜申報」）；Gottheimer 模型估算列「約 29～57 口｜$87.54｜模型估算」，hover 顯示 calc_note。佔比 service spec 手算一致（含 max=NULL），估算佔比加總 100 ± 0.1。rspec 1503 examples 0 failures；vitest 7 passed；tsc／eslint／rubocop 無錯。差異（使用者裁示）：只排除問題列；§1-0 例外更新 price_in_spec 一行與 leaps_page_html 一個 strip；持股 PDF 連結放表頭。截圖 `tmp/hall_of_fame/p5/`。 | 2026-10-18 |
 | P6 | 第一期 E2E 驗收 | 完成 | r1 PASS | 正式站 Playwright 9224（2026-10-18 22:47）：首頁 → app switcher 最末列點入，URL `http://localhost:3003/hall_of_fame`（無參數，referrer 首頁）；點 Pelosi 持股 68 列、交易 29 列；交易表第 1 列 `2026-09-08｜REOF XXX, LLC [AB]｜—｜配偶｜買｜$500,001 - $1,000,000｜2026-09-08` 與 P3 快照 20035553 及 PDF 原文逐欄一致；「原始 PDF」新分頁 200、application/pdf（Filing ID #20035553）。截圖 `tmp/hall_of_fame/p6/01_sidebar_entry.png`、`02_page_from_sidebar.png`、`03_pelosi_first_trade.png`、`04_original_pdf.png`。注意：P4 cron 證據補齊前，第一期不宣告完成（P6 質詢 1）。 | 2026-10-18 |
-| Q1 | OGE 索引探勘＋同步 | 待辦 | | | |
+| Q1 | OGE 索引探勘＋同步 | 完成 | r2 PASS | `hall_of_fame:sync_oge_index`（`HallOfFame::OgeIndexSync`）：Index view 條件式請求當關卡（帶 validators 回 304），有變動才用 OGE REST API `Presiden.nsf/API.xsp/v3/rest` 依姓查詢。正式庫 run#12 新增 39（trump 278e 3／278t 20、vance 2／0、bessent 2／2、lutnick 1／2、burgum 1／6），警示 1（Lutnick Annual 2026 需書面申請）；run#13 新增 0（304）。3 個樣本 UNID 皆在；5 位皆 ≥1 筆 oge_278e（裁示 2：Nominee 278 計入）；隨機 3 筆 PDF HEAD 200 application/pdf。有人查詢失敗時保留舊 validators，下次必重查（r1 問題 1）。spec 8 examples；完整 rspec 1511／1 failure（technical_dashboards_spec:24 台北日界既有時段性失敗，TZ=UTC 9 passed）。差異：filing_type 依 API 類型欄判定（非檔名）；尚未接入每日排程（Q4）。 | 2026-10-19 |
 | Q2 | OGE 278e 年報解析 | 待辦 | | | |
 | Q3 | OGE 278-T 交易解析（OCR） | 待辦 | | | |
 | Q3b | OGE 資產名稱→ticker 對照 | 待辦 | | | |
@@ -304,7 +304,14 @@ Rake：`hall_of_fame:seed_officials` 由 yml 同步 `hof_officials`（冪等）�
 - [ ] 5 位政要皆至少 1 筆 `oge_278e`；查無者狀態表註明原因（例：尚未公開）並經使用者確認才可繼續。
 - [ ] 重跑 new_filings_count = 0。
 
-探勘結果：（Q1 執行時填寫）
+探勘結果（2026-10-18）：
+- 第 0 步可用但不夠：`Presiden.nsf/PAS+Index?ReadViewEntries`（JSON／XML 皆 200）是依人物分類的 view，220 個分類，只有 Bessent、Burgum、Lutnick；Trump、Vance 在 `Presiden.nsf/Index`（4127 個分類，`Count` 上限 1000，用 `&Start=` 分頁）。文件層（`&Expand=<position>`）有 UNID、`$8` 類型（Annual 2026、278 Transaction、Nominee 278、Termination…）、`$6` 機關、`$7` 職稱、`$0` 報告日、`$1` 收件日，**但沒有 PDF 檔名**；`?OpenDocument` 只回系統安全聲明頁。view 回應帶 ETag／Last-Modified，帶回去會回 304。
+- `PAS Index?OpenView` 會轉址到 `www.oge.gov/web/oge.nsf/Officials Individual Disclosures Search Collection?OpenForm`。該頁的 DataTables（serverSide）資料源是 OGE 自家的 REST API：`https://extapps2.oge.gov/201/Presiden.nsf/API.xsp/v3/rest`。參數用 DataTables 慣例：`draw`、`start`、`length`、`search[value]`；欄位篩選 `columns[i][search][value]` 不生效，只有全域 search 有效。回傳 `{recordsTotal, recordsFiltered, data:[{docDate, title, type, name, agency, level, amended}]}`，`type` 為 HTML：有線上 PDF 時是 `<a href='…/PAS+Index/{UNID}/$FILE/{檔名}.pdf'>{類型}</a>`，沒有時是「{類型} (<a …201 Request…>Request this Document</a>)」。API 沒有 ETag／Last-Modified。
+- 5 位（2026-10-18）可下載的 278 類報告：Trump Annual 2025／2026、Termination 2021，278-T 20 份；Vance Annual 2025／2026；Bessent Annual 2026、Nominee 278，278-T 2 份；Lutnick Nominee 278，278-T 2 份（Annual 2026 只能書面申請）；Burgum Nominee 278，278-T 6 份（沒有 Annual）。
+- 使用者裁示（2026-10-18）：
+  1. 索引：Index view（`Count=1`）當條件式請求的關卡（§1-10），304 即結束；有變動才用 REST API 依 yml 姓氏查詢、取 UNID 與 PDF URL。比對規則同 House（Last 完全相同＋First 前綴相同，Doug → Douglas J）。
+  2. oge_278e＝Annual／Nominee 278／Termination／New Entrant（皆為 OGE Form 278e）；oge_278t＝278 Transaction。Q2 持股表優先取最新 Annual，沒有才用 Nominee 278。
+  3. 沒有線上 PDF 的 278 類報告不寫入 hof_filings，列在 sync run 的 error_log 當警示；Ethics Agreement、Certification、Divestiture、Waiver、候選人報告等其他文件一律忽略。
 
 ## Q2 OGE 278e 年報解析
 

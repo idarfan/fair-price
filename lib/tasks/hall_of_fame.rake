@@ -14,6 +14,13 @@ namespace :hall_of_fame do
     puts run.error_log if run.error_log.present?
   end
 
+  desc "同步 OGE 行政高層公開申報清單至 hof_filings（Index view 條件式請求，有變動才查 REST API）"
+  task sync_oge_index: :environment do
+    run = HallOfFame::OgeIndexSync.new.call
+    puts "hall_of_fame:sync_oge_index run##{run.id} 新增 #{run.new_filings_count} 筆，錯誤 #{run.error_count}"
+    puts run.error_log if run.error_log.present?
+  end
+
   desc "下載並解析 parse_status=pending 的 House PDF（PTR→hof_transactions、年報→hof_holdings）"
   task parse_house_pdfs: :environment do
     summary = HallOfFame::HousePdfParse.new.call

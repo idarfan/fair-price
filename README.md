@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-10-19（一）— 新增：投資名人堂 Q1（OGE 索引同步）
+
+`bin/rails hall_of_fame:sync_oge_index` 同步行政政要（Trump、Vance、Bessent、Lutnick、Burgum）的 OGE 公開申報清單到
+`hof_filings`（source = oge，doc_id = UNID）：先對 `Presiden.nsf/Index` view 做條件式請求，304 即結束；有變動才用 OGE 搜尋頁的
+REST API 依姓查詢，Annual／Nominee 278／Termination／New Entrant 記為 `oge_278e`，278 Transaction 記為 `oge_278t`。
+只能書面申請（沒有線上 PDF）的報告不寫入，記在 `hof_sync_runs.error_log`。尚未接入每日排程。
+
 ### 2026-10-18（日）— 驗收：投資名人堂 P6（第一期 E2E）
 
 正式站從 sidebar 進入 `/hall_of_fame`，點 Pelosi 後交易表第 1 列與 P3 人工比對值（PTR 20035553）及 PDF 原文逐欄一致，
