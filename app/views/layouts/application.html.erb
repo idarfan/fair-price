@@ -93,6 +93,9 @@
     <% if controller_name == 'option_profit_calc' %>
       <%= vite_javascript_tag 'option_profit_calc.tsx' %>
     <% end %>
+    <% if controller_name == 'hall_of_fame' %>
+      <%= vite_javascript_tag 'hall_of_fame.tsx' %>
+    <% end %>
   </head>
   <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
     <div data-behavior="page-progress"></div>

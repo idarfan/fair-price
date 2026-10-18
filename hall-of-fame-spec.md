@@ -14,7 +14,7 @@
 | P3 | House PDF 解析 | 完成 | r2 PASS | `hall_of_fame:parse_house_pdfs` 全量 87 份：parsed 44（ptr 42、annual 2）、needs_review 43、failed 0、pending 0；hof_transactions 1246、hof_holdings 779。needs_review：42 份掃描檔（文字層 0 字，Khanna PTR 21＋年報、McCaul PTR 19＋年報，皆 8/9 開頭紙本申報）、10075701 第 59 列 `Undetermined`。自洽檢查：有文字層 45 份列數＝標記數 45/45（FS 標記與年報 Schedule A `[XX]` 皆獨立計數，Schedule A→B 相鄰檢查全過）。夾具：20035553（Pelosi 最新 PTR）snapshot、20004433 舊格式回歸、8221120 掃描檔、10075701 年報。人工比對：20035553 唯一 1 列＋20035143 前 5 列與 PDF 一致。pytest 25 passed；rspec 1454 examples 0 failures。差異：Ruby 寫 DB、Python 只解析（使用者裁示 psql＝PostgreSQL）；§3 擴充 None／$1 - $1,000／精確金額；不寫 hof_sync_runs（避免覆蓋 P2 validators）；`.gitignore` 加 `/lib/hall_of_fame/venv/`；CI 無 venv，真 sidecar example skip、pytest 未接 CI。 | 2026-10-17 |
 | P3b | 期權解析＋口數反推 | 完成 | r2 PASS | `hall_of_fame:analyze_options` 正式庫 50 筆期權列：barchart_dom 4（MSFT 2026-08-14 四個合約，335C Dec 165.02／量 50 經使用者手動核對一致）、bs_model 22、stated_contracts 14、空值 10（履約列 8 只記期權資料不反推、Crenshaw META「10 puts at $X」2 筆 needs_review）；filings needs_review 44、parsed 43。夾具 20034836：INTC 200 口 50.00～250.00、UBER 25.00～50.00。CDP 離線 2 秒內回報、error_log 以 CDP_OFFLINE_MESSAGE 開頭、不走 bs_model。rspec 1482 examples 0 failures。差異：`hof_sync_runs.kind`（index／pdf_parse／options，保護 P2 validators）；Barchart 無成交日（lastPrice=0 或 volume 0／null）不採用；`[期權] ` 原因前綴；bs_model 參數在 `config/hall_of_fame_option_patterns.yml`；重新解析時先刪 option_details（r1 問題 1）；UI「模型估算」驗收延到 P5。 | 2026-10-17 |
 | P4 | 每日排程（pm2） | 待補驗（隔日 cron） | r1 PASS（質詢 1：cron 證據補齊前不得標完成） | pm2 app `hall-of-fame-sync`（cron `30 0 * * *` UTC = 台北 08:30，autorestart false），ecosystem diff 只含此 app；`pm2 start` 首跑 run#6–8、`pm2 restart` 觸發 run#9–11（finished_at 皆非 NULL）；模擬新 filing：刪 20026770（先備份）＋清 run#6 validators 後重新出現、parsed、交易列與備份一致；`pm2 save` 後 dump 含此 app。rspec 1488 examples 0 failures。差異（使用者裁示）：sync_house 加跑 analyze_options、P3 解析寫 kind=pdf_parse 紀錄、各步隔離錯誤＋結束碼 1。**待補**：一組 started_at 落在台北 08:30 前後、由 cron 觸發的 index／pdf_parse／options run（附 id、started_at、finished_at、當時 `uptime -s`）；2026-10-18 08:30 電腦關機未觸發。 | 2026-10-18 |
-| P5 | 第一期 UI（國會分頁） | 待辦 | | | |
+| P5 | 第一期 UI（國會分頁） | 完成 | r2 PASS | 頁面 `/hall_of_fame`（Phlex 掛載點＋React `HallOfFameApp`），API `api/v1/hall_of_fame/officials`（index／show）；sidebar 最末位入口。正式站（Playwright 9224）從 sidebar 點入：6 張人物卡；Pelosi 持股 68 列（Undetermined 1 列照原字串顯示、不列入佔比；None 7 列顯示 None）、圓餅 11 片、交易 29 列（BE 期權「申報 100 口｜$50.00～$100.00｜申報」）；Gottheimer 模型估算列「約 29～57 口｜$87.54｜模型估算」，hover 顯示 calc_note。佔比 service spec 手算一致（含 max=NULL），估算佔比加總 100 ± 0.1。rspec 1503 examples 0 failures；vitest 7 passed；tsc／eslint／rubocop 無錯。差異（使用者裁示）：只排除問題列；§1-0 例外更新 price_in_spec 一行與 leaps_page_html 一個 strip；持股 PDF 連結放表頭。截圖 `tmp/hall_of_fame/p5/`。 | 2026-10-18 |
 | P6 | 第一期 E2E 驗收 | 待辦 | | | |
 | Q1 | OGE 索引探勘＋同步 | 待辦 | | | |
 | Q2 | OGE 278e 年報解析 | 待辦 | | | |
@@ -256,6 +256,16 @@ Rake：`hall_of_fame:seed_officials` 由 yml 同步 `hof_officials`（冪等）�
 3. 頁尾聲明（§1-7）。
 4. sidebar 最末位入口。
 5. request spec：GET 頁面 200、含「國會議員」分頁、含 Pelosi 名字；GET 行政政要分頁 200。
+6. 使用者裁示與實作決定（2026-10-18）：
+   - 佔比只排除問題列：金額無法對照（min 為空）、持有人代碼未知、資產名稱空白的列照原值顯示、標「不列入佔比：原因」；同份 needs_review 年報的其餘列照算，表頭加警示標記（`HallOfFame::RowCheck`）。交易佔比同規則。
+   - sidebar 入口加在最末位後，分隔線（固定畫在倒數第二項之後）改到「Price-In／投資名人堂」之間。使用者裁示例外更新兩處其他功能的測試：`spec/requests/price_in_spec.rb`「入口是清單最後一列」改為「緊接在投資名人堂之前」；`spec/support/leaps_page_html.rb` 照既有慣例新增 `strip_hall_of_fame_entry`（兩邊拿掉入口與分隔線，baseline 檔不動）。
+   - 分頁以 `?tab=executive` 指定，未知值落回國會議員；行政政要分頁在第二期前只顯示「第二期建置中」。
+   - 人物卡「PTR 筆數」為 PTR 申報份數；「最新申報日」為該人物所有 filing 的最大 filing_date。
+   - 近 12 個月：`tx_date >= 今天 − 12 個月`；tx_date 解析不出的列改以申報日判斷，不靜默丟掉。
+   - 交易佔比：買進＝P；賣出＝S＋S_partial；E（交換）不列入；依 ticker 加總，沒有 ticker 的以資產名稱為鍵。
+   - 年報取 annual／amendment 中 year 最新者（排除 pending／failed）；圓餅圖用目前檢視（全部／僅有價證券）的估算佔比。
+   - 持股表的「原始 PDF」放在表頭一個連結（原始 PDF（doc_id）），不逐列重複：持股列全部來自同一份年報（P5 審查質詢 1）。交易表每列各自連到所屬 PTR。
+   - 申報金額欄：金額無法對照（min 為空），或標籤不是一般區間（`$a - $b`）也不是 `Over $…` 時（None、Spouse/DC Over $1,000,000、精確金額等），照申報原字串顯示；排除原因帶原字串，例如「金額無法對照（'Undetermined'）」（P5 審查問題 1、質詢 2）。None 的 0～0 仍列入佔比。
 
 驗證：
 - [ ] `bundle exec rspec spec/requests/hall_of_fame*` 全綠。

@@ -34,7 +34,20 @@ module LeapsPageHtml
     strip_poll_timeout(doc)
     strip_build_rules_note(doc)
     strip_strike_hint(doc)
+    strip_hall_of_fame_entry(doc)
     canonical(doc.to_html)
+  end
+
+  # 2026-10-18 sidebar 最末位新增「投資名人堂」（hall-of-fame-spec P5-4，使用者裁示例外更新本檔）。
+  # 分隔線固定畫在倒數第二項之後，新增一列就會位移，所以兩邊都拿掉入口與分隔線；與 /leaps 既有區塊無關。
+  # 入口本身由 spec/requests/hall_of_fame_spec.rb 驗證。
+  def strip_hall_of_fame_entry(doc)
+    doc.css('a[role="menuitem"][href="/hall_of_fame"]').each(&:remove)
+    doc.css("div").select { |n| n["class"] == "mx-3 border-t border-gray-100" }.each do |divider|
+      # 同 strip_build_rules_note：基準檔的分隔線後面跟著一個換行文字節點，一起拿掉兩邊才一致。
+      divider.next_sibling.remove if divider.next_sibling&.text? && divider.next_sibling.text.strip.empty?
+      divider.remove
+    end
   end
 
   # 2026-10-12 搜尋表單新增履約價提示（未填履約價時不顯示垂直價差區塊），與既有區塊無關。
