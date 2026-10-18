@@ -142,6 +142,16 @@ RSpec.describe HallOfFame::OptionAnalysis do
     expect(HallOfFame::OptionDetail.count).to eq(1)
   end
 
+  it "finishes the run with the exception message when analysis raises" do
+    option_trade("Call options; Strike price $340; Expires 10/16/2026", amount_min: 250_001, amount_max: 500_000)
+    allow(reference).to receive(:resolve).and_raise(Timeout::Error, "Barchart sidecar timeout")
+
+    expect { service.call }.to raise_error(Timeout::Error)
+
+    expect(HallOfFame::SyncRun.find_by!(kind: "options"))
+      .to have_attributes(error_count: 1, error_log: "Timeout::Error: Barchart sidecar timeout", finished_at: be_present)
+  end
+
   it "keeps P2 conditional-request validators intact (options runs are not index runs)" do
     url = HallOfFame::HouseIndexSync.zip_url(2026)
     create(:hof_sync_run, kind: "index", finished_at: 1.hour.ago, started_at: 2.hours.ago,

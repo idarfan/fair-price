@@ -13,7 +13,7 @@
 | P2 | House 索引同步 | 完成 | r1 PASS | `hall_of_fame:sync_house_index` 首跑 run#1 新增 87、錯誤 0（crenshaw 1／gottheimer 23／khanna 22／mccaul 20／pelosi 8／shreve 13；StateDst 全符，yml 未改）；重跑 run#2 新增 0、兩年皆 304，hof_filings 仍 87；隨機 3 筆 pdf_url 皆 HTTP/2 200 application/pdf。House IIS 需同時帶 If-None-Match＋If-Modified-Since 才回 304。spec 13 examples 0 failures；完整 rspec 1441 passed／1 failed（timed_capture_spec:27 負載偶發，單獨重跑 3 次皆過）。解壓用系統 unzip（rubyzip 僅 test 群組）。 | 2026-10-17 |
 | P3 | House PDF 解析 | 完成 | r2 PASS | `hall_of_fame:parse_house_pdfs` 全量 87 份：parsed 44（ptr 42、annual 2）、needs_review 43、failed 0、pending 0；hof_transactions 1246、hof_holdings 779。needs_review：42 份掃描檔（文字層 0 字，Khanna PTR 21＋年報、McCaul PTR 19＋年報，皆 8/9 開頭紙本申報）、10075701 第 59 列 `Undetermined`。自洽檢查：有文字層 45 份列數＝標記數 45/45（FS 標記與年報 Schedule A `[XX]` 皆獨立計數，Schedule A→B 相鄰檢查全過）。夾具：20035553（Pelosi 最新 PTR）snapshot、20004433 舊格式回歸、8221120 掃描檔、10075701 年報。人工比對：20035553 唯一 1 列＋20035143 前 5 列與 PDF 一致。pytest 25 passed；rspec 1454 examples 0 failures。差異：Ruby 寫 DB、Python 只解析（使用者裁示 psql＝PostgreSQL）；§3 擴充 None／$1 - $1,000／精確金額；不寫 hof_sync_runs（避免覆蓋 P2 validators）；`.gitignore` 加 `/lib/hall_of_fame/venv/`；CI 無 venv，真 sidecar example skip、pytest 未接 CI。 | 2026-10-17 |
 | P3b | 期權解析＋口數反推 | 完成 | r2 PASS | `hall_of_fame:analyze_options` 正式庫 50 筆期權列：barchart_dom 4（MSFT 2026-08-14 四個合約，335C Dec 165.02／量 50 經使用者手動核對一致）、bs_model 22、stated_contracts 14、空值 10（履約列 8 只記期權資料不反推、Crenshaw META「10 puts at $X」2 筆 needs_review）；filings needs_review 44、parsed 43。夾具 20034836：INTC 200 口 50.00～250.00、UBER 25.00～50.00。CDP 離線 2 秒內回報、error_log 以 CDP_OFFLINE_MESSAGE 開頭、不走 bs_model。rspec 1482 examples 0 failures。差異：`hof_sync_runs.kind`（index／pdf_parse／options，保護 P2 validators）；Barchart 無成交日（lastPrice=0 或 volume 0／null）不採用；`[期權] ` 原因前綴；bs_model 參數在 `config/hall_of_fame_option_patterns.yml`；重新解析時先刪 option_details（r1 問題 1）；UI「模型估算」驗收延到 P5。 | 2026-10-17 |
-| P4 | 每日排程（pm2） | 待辦 | | | |
+| P4 | 每日排程（pm2） | 待補驗（隔日 cron） | r1 PASS（質詢 1：cron 證據補齊前不得標完成） | pm2 app `hall-of-fame-sync`（cron `30 0 * * *` UTC = 台北 08:30，autorestart false），ecosystem diff 只含此 app；`pm2 start` 首跑 run#6–8、`pm2 restart` 觸發 run#9–11（finished_at 皆非 NULL）；模擬新 filing：刪 20026770（先備份）＋清 run#6 validators 後重新出現、parsed、交易列與備份一致；`pm2 save` 後 dump 含此 app。rspec 1488 examples 0 failures。差異（使用者裁示）：sync_house 加跑 analyze_options、P3 解析寫 kind=pdf_parse 紀錄、各步隔離錯誤＋結束碼 1。**待補**：一組 started_at 落在台北 08:30 前後、由 cron 觸發的 index／pdf_parse／options run（附 id、started_at、finished_at、當時 `uptime -s`）；2026-10-18 08:30 電腦關機未觸發。 | 2026-10-18 |
 | P5 | 第一期 UI（國會分頁） | 待辦 | | | |
 | P6 | 第一期 E2E 驗收 | 待辦 | | | |
 | Q1 | OGE 索引探勘＋同步 | 待辦 | | | |
@@ -230,6 +230,10 @@ Rake：`hall_of_fame:seed_officials` 由 yml 同步 `hof_officials`（冪等）�
 2. wrapper script `bin/hall-of-fame-sync.sh`：照 `bin/iv-daily-snapshot.sh` 的寫法，以 `set -a; source .env; set +a` 讀 `.env`，不得依賴 pm2 環境快照（避免舊環境變數覆蓋 `.env`）。
 3. `pm2 save`。
 4. 不得變動 ecosystem 內其他 app（§1-0）。
+5. 使用者裁示（2026-10-17）：
+   - `sync_house` 在 P2、P3 之後加跑 P3b `analyze_options`（CDP 離線只記錄、留待重試）。三步由 `HallOfFame::HouseDailySync` 依序執行，任一步拋例外只記錄並繼續下一步，rake 以結束碼 1 回報。
+   - P3 解析也寫 `hof_sync_runs`（kind=pdf_parse），error_log 第一行為本次各狀態筆數，其後為 failed／pending 錯誤。
+   - 「模擬新 filing」驗證挑一筆已 parsed、無期權明細的 PTR，先備份再刪除；並清空最近一筆 index run 的 validators，否則條件式請求回 304 不會重新讀取索引（真實新申報會讓 ZIP 變動，不需要這一步）。
 
 驗證：
 - [ ] `ecosystem.config.cjs` diff 貼證據欄；diff 只含 `hall-of-fame-sync` 一個 app。

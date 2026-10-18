@@ -31,6 +31,11 @@ module HallOfFame
       end
       reasons.each { |filing, lines| update_filing(filing, lines) }
       finish(run, online, reasons)
+    rescue StandardError => e
+      # 同 HouseIndexSync：留下 finished_at 與例外訊息，不讓排程留下沒結束的 run。
+      run&.update!(finished_at: Time.current, error_count: run.error_count + 1,
+                   error_log: [ run.error_log, "#{e.class}: #{e.message}" ].compact.join("\n"))
+      raise
     end
 
     private

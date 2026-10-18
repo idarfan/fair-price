@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-10-18（日）— 新增：投資名人堂 P4（每日排程）
+
+pm2 app `hall-of-fame-sync`（`bin/hall-of-fame-sync.sh`）每日 UTC 00:30（= 台北 08:30）執行
+`bin/rails hall_of_fame:sync_house`：House 索引同步 → 解析 pending PDF → 期權分析。每一步各寫一筆
+`hof_sync_runs`（kind = index／pdf_parse／options），某一步失敗只記錄、不中斷後續，並以結束碼 1 回報。
+手動觸發：`pm2 restart hall-of-fame-sync`。電腦在 08:30 須開機，排程才會執行。
+
 ### 2026-10-17（六）— 新增：投資名人堂 P3b（期權解析＋口數反推）
 
 `bin/rails hall_of_fame:analyze_options` 解析 House 期權交易描述（`config/hall_of_fame_option_patterns.yml`），

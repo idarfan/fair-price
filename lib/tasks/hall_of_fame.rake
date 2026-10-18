@@ -29,6 +29,19 @@ namespace :hall_of_fame do
     puts run.error_log if run.error_log.present?
   end
 
+  desc "每日排程（P4）：House 索引同步 → 解析 pending PDF → 期權分析；任一步失敗不中斷後續，結束碼 1"
+  task sync_house: :environment do
+    result = HallOfFame::HouseDailySync.new.call
+    result.runs.each do |kind, run|
+      puts "hall_of_fame:sync_house #{kind} run##{run.id} 錯誤 #{run.error_count}"
+      puts run.error_log if run.error_log.present?
+    end
+    next if result.ok?
+
+    warn result.failures
+    exit 1
+  end
+
   desc "把 parse_status=failed 的 House filing 改回 pending 並重新解析（修好程式／環境錯誤後手動執行）"
   task retry_failed_house_pdfs: :environment do
     reset = HallOfFame::Filing.where(source: HallOfFame::HouseIndexSync::SOURCE, parse_status: "failed")

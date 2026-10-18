@@ -101,5 +101,16 @@ module.exports = {
       autorestart: false,
       watch: false,
     },
+
+    // ── 投資名人堂每日同步（cron 30 0 * * * 為 UTC，= 台北 08:30）
+    {
+      name: 'hall-of-fame-sync',
+      script: './bin/hall-of-fame-sync.sh',
+      cwd: '/home/idarfan/fairprice',
+      interpreter: '/bin/bash',
+      cron_restart: '30 0 * * *',
+      autorestart: false,
+      watch: false,
+    },
   ],
 }
