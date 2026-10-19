@@ -12,23 +12,23 @@
 <rect x="70" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
 <text x="168" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">StockLogo</text>
 <rect x="277" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
-<text x="375" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">AddPositionForm</text>
+<text x="375" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">HoldingsSection</text>
 <rect x="484" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
-<text x="582" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">CalculatorTab</text>
+<text x="582" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">ReviewBadge</text>
 <rect x="691" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
-<text x="789" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Controlled</text>
+<text x="789" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">TradesSection</text>
 <rect x="898" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
-<text x="996" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">DaysSelector</text>
+<text x="996" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">AddPositionForm</text>
 <rect x="1105" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
-<text x="1203" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Story</text>
+<text x="1203" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">CalculatorTab</text>
 <rect x="1312" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
-<text x="1410" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">InterestScheduleTable</text>
+<text x="1410" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Controlled</text>
 <rect x="1519" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
-<text x="1617" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">PositionListTab</text>
+<text x="1617" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">DaysSelector</text>
 <rect x="1726" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
 <text x="1824" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">Story</text>
 <rect x="1933" y="160" width="197" height="64" rx="6" fill="#93c5fd" stroke="#1d4ed8" stroke-width="1.5" opacity="1"/>
-<text x="2031" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">PositionRow</text>
+<text x="2031" y="197" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">InterestScheduleTable</text>
 <rect x="60" y="258" width="2080" height="128" rx="10" fill="#dcfce7" stroke="#15803d" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
 <text x="74" y="274" text-anchor="start" font-size="11" fill="#15803d" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Rails API  (port 3000)</text>
 <rect x="70" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
@@ -38,15 +38,15 @@
 <rect x="586" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
 <text x="710" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">BaseController</text>
 <rect x="844" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
-<text x="968" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">MarginPositionsController</text>
+<text x="968" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OfficialsController</text>
 <rect x="1102" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
-<text x="1226" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OptionsController</text>
+<text x="1226" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">MarginPositionsController</text>
 <rect x="1360" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
-<text x="1484" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OwnershipSnapshotsController</text>
+<text x="1484" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OptionsController</text>
 <rect x="1618" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
-<text x="1742" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">ValuationsController</text>
+<text x="1742" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">OwnershipSnapshotsController</text>
 <rect x="1876" y="308" width="248" height="64" rx="6" fill="#86efac" stroke="#15803d" stroke-width="1.5" opacity="1"/>
-<text x="2000" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">BullCallSpreadsController</text>
+<text x="2000" y="345" text-anchor="middle" font-size="10" fill="#1c1c1c" font-weight="normal" font-family="ui-sans-serif,system-ui,sans-serif">ValuationsController</text>
 <rect x="60" y="406" width="2080" height="128" rx="10" fill="#fef9c3" stroke="#a16207" stroke-width="1.5" opacity="0.35" stroke-dasharray="8,4"/>
 <text x="74" y="422" text-anchor="start" font-size="11" fill="#a16207" font-weight="700" font-family="ui-sans-serif,system-ui,sans-serif">Services</text>
 <rect x="70" y="456" width="248" height="64" rx="6" fill="#fde047" stroke="#a16207" stroke-width="1.5" opacity="1"/>
