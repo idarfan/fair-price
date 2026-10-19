@@ -1,5 +1,13 @@
 # FairPrice
 
+### 2026-10-19（一）— 新增：投資名人堂 Q2（OGE 278e 年報解析）
+
+`bin/rails hall_of_fame:parse_oge_pdfs` 下載 pending 的 OGE 278e（Trump、Vance、Bessent、Lutnick、Burgum）到
+`storage/hall_of_fame/oge/{year}/`，由 Python sidecar `lib/hall_of_fame/oge_parser.py` 以表格框線切列，解析 Part 2／5／6
+寫入 `hof_holdings`（Part 5 為配偶，其餘記 self）。容器帳戶名稱併入子列（例「IRA #1 › SPY」）；不可估值的資產照列、不入佔比；
+金額或欄位無法完整辨識的列照原字串寫入並標 needs_review。`hof_filings.parse_error` 第一行為文字層判定（`textlayer: …`）。
+§3 金額對照表另擴充 `$15,001 - $25,000`、`$25,001 - $50,000`、`Over $1,000,000`。278-T 交易解析留待 Q3。
+
 ### 2026-10-19（一）— 新增：投資名人堂 Q1（OGE 索引同步）
 
 `bin/rails hall_of_fame:sync_oge_index` 同步行政政要（Trump、Vance、Bessent、Lutnick、Burgum）的 OGE 公開申報清單到

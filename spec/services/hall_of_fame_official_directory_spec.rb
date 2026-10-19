@@ -42,6 +42,20 @@ RSpec.describe HallOfFame::OfficialDirectory do
       expect(holdings[:views][:all][:excluded_count]).to eq(2)
     end
 
+    it "shows an unrecognized OGE value cell as its raw label and keeps it out of the shares (Q2 r1 質詢 3)" do
+      oge = create(:hof_official, slug: "trump", category: "executive", source: "oge")
+      annual = create(:hof_filing, official: oge, source: "oge", filing_type: "annual", year: 2025, parse_status: "needs_review")
+      create(:hof_holding, filing: annual, asset_name: "Good LLC", value_label: "$1,001 - $15,000", value_min: 1001, value_max: 15_000)
+      create(:hof_holding, filing: annual, asset_name: "Trump Ice LLC", value_label: "$500,001 to", value_min: nil, value_max: nil)
+
+      rows = described_class.new.profile(oge)[:holdings][:views][:all][:rows]
+
+      expect(rows.map { |r| r.values_at(:asset_name, :value_label, :estimated, :excluded_reason) }).to eq([
+        [ "Good LLC", "$1,001 - $15,000", 100.0, nil ],
+        [ "Trump Ice LLC", "$500,001 to", nil, "金額無法對照（'$500,001 to'）" ]
+      ])
+    end
+
     it "lists 12 months of PTR trades with option labels and buy/sell shares computed separately" do
       travel_to(Date.new(2026, 10, 18)) do
         buy = create(:hof_trade, filing: ptr, ticker: "BE", tx_type: "P", tx_date: Date.new(2026, 7, 28), amount_min: 500_001, amount_max: 1_000_000)

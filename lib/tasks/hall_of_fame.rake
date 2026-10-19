@@ -21,6 +21,13 @@ namespace :hall_of_fame do
     puts run.error_log if run.error_log.present?
   end
 
+  desc "下載並解析 parse_status=pending 的 OGE 278e（Part 2／5／6 → hof_holdings）；278-T 留給 Q3"
+  task parse_oge_pdfs: :environment do
+    summary = HallOfFame::OgePdfParse.new.call
+    puts "hall_of_fame:parse_oge_pdfs #{summary.counts.sort.map { |s, n| "#{s} #{n}" }.join('、').presence || '無 pending'}"
+    puts summary.errors if summary.errors.any?
+  end
+
   desc "下載並解析 parse_status=pending 的 House PDF（PTR→hof_transactions、年報→hof_holdings）"
   task parse_house_pdfs: :environment do
     summary = HallOfFame::HousePdfParse.new.call

@@ -15,3 +15,8 @@
 - { label: "None (or less than $1,001)",   min: 0,        max: 1000 }
 - { label: "None",                         min: 0,        max: 0 }
 - { label: "$1 - $1,000",                  min: 1,        max: 1000 }
+# 以下三列為 2026-10-19 使用者裁示擴充（Q2：Trump 278e 附件實際出現，原文用「to」，解析時正規化為「 - 」）。
+# 歐元金額與申報錯字（Vance「$250,000 - $500,000」）刻意不列，維持 needs_review。
+- { label: "$15,001 - $25,000",            min: 15001,    max: 25000 }
+- { label: "$25,001 - $50,000",            min: 25001,    max: 50000 }
+- { label: "Over $1,000,000",              min: 1000001,  max: null }

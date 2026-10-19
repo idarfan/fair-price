@@ -19,14 +19,17 @@ module HallOfFame
     Summary = Data.define(:counts, :errors)
 
     def initialize(fetcher: HouseIndexFetcher.new, sidecar: HouseParserSidecar.new,
-                   storage_dir: STORAGE_DIR, pause_seconds: 0.5)
+                   storage_dir: self.class::STORAGE_DIR, pause_seconds: 0.5)
       @fetcher       = fetcher
       @storage_dir   = Pathname(storage_dir)
       @sidecar       = sidecar
       @pause_seconds = pause_seconds
     end
 
-    def call(scope = Filing.where(source: SOURCE, parse_status: "pending"))
+    # 常數一律經 self.class:: 取用，讓 OgePdfParse（Q2）沿用同一套下載／存檔／寫入流程。
+    def pending_scope = Filing.where(source: self.class::SOURCE, parse_status: "pending")
+
+    def call(scope = pending_scope)
       counts = Hash.new(0)
       errors = []
       scope.order(:id).each do |filing|
@@ -42,7 +45,7 @@ module HallOfFame
     # 回傳 [狀態, 錯誤訊息或 nil]。
     def process(filing)
       path   = store_pdf(filing)
-      result = @sidecar.parse(path, KINDS.fetch(filing.filing_type))
+      result = @sidecar.parse(path, self.class::KINDS.fetch(filing.filing_type))
       save_result(filing, path, result)
       [ result.fetch("status"), nil ]
     rescue HouseIndexFetcher::Error => e
@@ -86,16 +89,18 @@ module HallOfFame
           pdf_path:     path.relative_path_from(Rails.root).to_s,
           sha256:       Digest::SHA256.file(path).hexdigest,
           parse_status: result.fetch("status"),
-          parse_error:  result.fetch("reasons").join("\n").presence,
+          parse_error:  parse_error_for(result),
           parsed_at:    Time.current
         )
       end
     end
 
+    def parse_error_for(result) = result.fetch("reasons").join("\n").presence
+
     def insert_rows(filing, rows)
       return if rows.empty?
 
-      if KINDS.fetch(filing.filing_type) == "ptr"
+      if self.class::KINDS.fetch(filing.filing_type) == "ptr"
         Trade.insert_all(rows.map { |row| row.slice(*TRADE_KEYS).merge("filing_id" => filing.id) })
       else
         Holding.insert_all(rows.map { |row| row.slice(*HOLDING_KEYS).merge("filing_id" => filing.id) })

@@ -17,7 +17,7 @@
 | P5 | 第一期 UI（國會分頁） | 完成 | r2 PASS | 頁面 `/hall_of_fame`（Phlex 掛載點＋React `HallOfFameApp`），API `api/v1/hall_of_fame/officials`（index／show）；sidebar 最末位入口。正式站（Playwright 9224）從 sidebar 點入：6 張人物卡；Pelosi 持股 68 列（Undetermined 1 列照原字串顯示、不列入佔比；None 7 列顯示 None）、圓餅 11 片、交易 29 列（BE 期權「申報 100 口｜$50.00～$100.00｜申報」）；Gottheimer 模型估算列「約 29～57 口｜$87.54｜模型估算」，hover 顯示 calc_note。佔比 service spec 手算一致（含 max=NULL），估算佔比加總 100 ± 0.1。rspec 1503 examples 0 failures；vitest 7 passed；tsc／eslint／rubocop 無錯。差異（使用者裁示）：只排除問題列；§1-0 例外更新 price_in_spec 一行與 leaps_page_html 一個 strip；持股 PDF 連結放表頭。截圖 `tmp/hall_of_fame/p5/`。 | 2026-10-18 |
 | P6 | 第一期 E2E 驗收 | 完成 | r1 PASS | 正式站 Playwright 9224（2026-10-18 22:47）：首頁 → app switcher 最末列點入，URL `http://localhost:3003/hall_of_fame`（無參數，referrer 首頁）；點 Pelosi 持股 68 列、交易 29 列；交易表第 1 列 `2026-09-08｜REOF XXX, LLC [AB]｜—｜配偶｜買｜$500,001 - $1,000,000｜2026-09-08` 與 P3 快照 20035553 及 PDF 原文逐欄一致；「原始 PDF」新分頁 200、application/pdf（Filing ID #20035553）。截圖 `tmp/hall_of_fame/p6/01_sidebar_entry.png`、`02_page_from_sidebar.png`、`03_pelosi_first_trade.png`、`04_original_pdf.png`。注意：P4 cron 證據補齊前，第一期不宣告完成（P6 質詢 1）。 | 2026-10-18 |
 | Q1 | OGE 索引探勘＋同步 | 完成 | r2 PASS | `hall_of_fame:sync_oge_index`（`HallOfFame::OgeIndexSync`）：Index view 條件式請求當關卡（帶 validators 回 304），有變動才用 OGE REST API `Presiden.nsf/API.xsp/v3/rest` 依姓查詢。正式庫 run#12 新增 39（trump 278e 3／278t 20、vance 2／0、bessent 2／2、lutnick 1／2、burgum 1／6），警示 1（Lutnick Annual 2026 需書面申請）；run#13 新增 0（304）。3 個樣本 UNID 皆在；5 位皆 ≥1 筆 oge_278e（裁示 2：Nominee 278 計入）；隨機 3 筆 PDF HEAD 200 application/pdf。有人查詢失敗時保留舊 validators，下次必重查（r1 問題 1）。spec 8 examples；完整 rspec 1511／1 failure（technical_dashboards_spec:24 台北日界既有時段性失敗，TZ=UTC 9 passed）。差異：filing_type 依 API 類型欄判定（非檔名）；尚未接入每日排程（Q4）。 | 2026-10-19 |
-| Q2 | OGE 278e 年報解析 | 待辦 | | | |
+| Q2 | OGE 278e 年報解析 | 完成 | r2 PASS | `hall_of_fame:parse_oge_pdfs`（`OgePdfParse` 繼承 `HousePdfParse`＋`lib/hall_of_fame/oge_parser.py`）：9 份 278e 文字層 98.89%～99.99% 皆可用，未走 OCR；以表格框線切列，收 Part 2／5／6，容器名稱以「 › 」併入子列。正式庫 parsed 4（Bessent ×2、Lutnick、Burgum）／needs_review 5（Trump ×3 歐元或 OCR、Vance 2025 申報錯字、Vance 2026 編號亂碼照列寫入）／failed 0；Trump 2025 holdings 3612，含 Trump Media common stock Over $50,000,000（第 168 頁 #331）。人工比對 Trump 第 8 頁 5 列、Part 2 附件 5 列、Vance 2026 第 5 頁與 DIA、Burgum 4.1～4.3 皆與 pdftotext 原文一致。精確金額列 0。pytest 70、rspec 1518 examples 0 failures。差異（裁示）：Part 5 一併收、Part 6 owner self、§3 擴充三列、Narya 照列寫入；Trump 2026 927 頁每 100 頁重開 PDF（640MB）。Q4 待辦見 Q4 節。 | 2026-10-19 |
 | Q3 | OGE 278-T 交易解析（OCR） | 待辦 | | | |
 | Q3b | OGE 資產名稱→ticker 對照 | 待辦 | | | |
 | Q4 | 第二期 UI（政要分頁）＋E2E | 待辦 | | | |
@@ -90,8 +90,11 @@ district 以 House 索引實際值為準；P2 驗證若對不上，修正 yml �
 | None | 0 | 0 |
 | $1 - $1,000 | 1 | 1000 |
 | 精確金額（如 `$15.00`） | 無條件捨去 | 無條件進位 |
+| $15,001 - $25,000 | 15001 | 25000 |
+| $25,001 - $50,000 | 25001 | 50000 |
+| Over $1,000,000 | 1000001 | NULL |
 
-（後三列為 2026-10-17 P3 使用者裁示擴充：年報 Schedule A 實際出現「None」293 列、「$1 - $1,000」5 列，PTR 20033725 有精確金額 `$15.00`。`Undetermined` 刻意不列，維持 needs_review。）
+（最後三列為 2026-10-19 Q2 使用者裁示擴充：Trump 278e 附件實際出現，原文寫「$15,001 to $25,000」，解析時把「to」正規化為「-」；歐元金額與申報錯字維持 needs_review。其上三列為 2026-10-17 P3 使用者裁示擴充：年報 Schedule A 實際出現「None」293 列、「$1 - $1,000」5 列，PTR 20033725 有精確金額 `$15.00`。`Undetermined` 刻意不列，維持 needs_review。）
 
 對照表放 `config/hall_of_fame_ranges.yml`，Ruby/Python 共讀。未知標籤 → needs_review。
 
@@ -319,6 +322,32 @@ Rake：`hall_of_fame:seed_officials` 由 yml 同步 `hof_officials`（冪等）�
 
 做：`lib/hall_of_fame/oge_parser.py` 解析 Part 6（Other Assets and Income）及 Part 2（Filer's Employment Assets）的 DESCRIPTION／VALUE，寫 holdings；「Value not readily ascertainable」→ min=max=NULL、該列不入佔比但列出並標註。文字層缺失頁 → 走 Q3 的 PaddleOCR-VL 流程（禁用 tesseract／ocrmypdf），OCR 產出列一律 needs_review。
 
+實測與裁示（2026-10-19）：
+- 9 份 278e 都有文字層：Integrity.gov（iText）4 份、Acrobat 1 份（Trump 2025）、Acrobat Paper Capture（掃描件 OCR）4 份（Trump 2021／2026、Vance 2025／2026）。可讀比例 98.9%～99.99%，皆 ≥ 95%，本階段不需走 Q3 OCR。文字層比例＝含英文字母的 token 中，只由英數與常見標點組成者的比例。
+- 版面：三類 PDF 都有水平框線，以框線切出的橫條為一列。描述可能在金額上方或下方換行，以「編號那一行」分列會錯。欄位邊界每頁由表頭（Description／Underlying／EIF／Value／Income／Ownership）重算。Trump 附件（Schedule 1 for Part 2 等）頁首仍有「Part N:」，比照同 Part 處理。
+- 使用者裁示：
+  1. Part 5（配偶資產）一併收，owner＝SP；Part 2、Part 6 的 owner＝self（OGE Part 6 不區分本人／配偶／子女，Q4 UI 須註明）。
+  2. 沒有金額、底下有子列的容器列（IRA #1、INVESTMENT ACCOUNT #1、LLC 等）不寫入，名稱以「 › 」併到子列 asset_name 前。層級依編號判斷（8 → 8.1）；Trump 的平編號帳戶以「區段第一列沒有金額、下一列也是頂層」判定為帳戶標題。
+  3. 9 份 pending 的 278e 全部解析（含 Trump 2021 Termination、2026 年報 927 頁）。
+  4. §3 擴充 $15,001 - $25,000、$25,001 - $50,000、Over $1,000,000（Trump 附件）。
+- 沒有金額的列，依下列規則處理，其餘照列並記 needs_review 原因：
+  - 指向別列（See Line(s)／See Attached）、「Line Intentionally Left Blank」、表單預先印好的空白編號列、Inactive 實體：不寫入。
+  - Part 2 的純所得列（薪資、顧問費、預付款：Value 空白、Income 欄有值）：不寫入。
+  - 有金額的基金底下逐一揭露的投資標的（Lutnick 9.5.x、Bessent 前 5 大持股）：不寫入，金額已含在上層。
+  - 描述／Underlying／Value 寫明 not readily ascertainable：照列，value_label＝「Value not readily ascertainable」，min＝max＝NULL，不入佔比，不算 needs_review。
+- 自洽檢查：編號標記數另以「不經框線、直接數 # 欄編號」獨立計數，須等於寫入列＋上述略過列；描述與金額的每個 token 須出現在該列所在頁的文字層。
+- Q2 r1 審查修正（2026-10-19，使用者同意問題 1–4、質詢 1–3）：
+  - Value 儲存格先正規化（`$1 ,000` → `$1,000`、`( or` → `(or`、`$500,001 to 1,000,000` 補成 `$500,001 to $1,000,000`），金額須從儲存格開頭起算。金額之後只允許不含數字、$、且不以 to／- 開頭的文字（Trump Part 6 沒有 Income Type 表頭，INTEREST／DIVIDEND 會落在 Value 欄）。其餘一律「Value 欄無法完整辨識」：value_label 存原字串、min＝max＝NULL、記 needs_review，不得把截斷的區間當成精確金額。
+  - 表頭連同上下 8 點內的字一起認欄位（Paper Capture 的表頭字縱座標會錯開）。抓不到 Income 欄時，Value 右界限寬 110 點，並記「表頭缺 Income 欄」。
+  - Integrity.gov 在 Description 與 EIF 之間有一欄沒有表頭的「See Endnote」，從 asset_name 排除。
+  - 平編號帳戶標題只在「同一 Part 內頂層編號重新從 1 開始」時才成立，且標題列不能有所得、不能是指向列。
+  - 編號欄同一行的字詞先接起來（OCR 把「11.」拆成「I」「I.」）。
+  - 有金額但編號是 OCR 亂碼的列（Vance 2026 Narya Capital Fund I）照列寫入、不加前綴，並記原因（使用者裁示）；這類列不計入「列數＝標記數」比對。
+- 編號換行：iText 窄欄會把 14.1.7.1 拆成「14.1.7.」／「1」、14.1.23.1 拆成「14.1.23」／「.1」，解析時接回。Paper Capture 的 I／l／O 視為 1／0；Trump 附件筆誤「115..6」視為 115.6。
+- 資源：每 100 頁重開一次 PDF。Trump 2026（927 頁）183 秒、640MB；不分段時要 3.7GB。sidecar timeout 1800 秒。
+- parse_error 第一行固定為「textlayer: 99.91%（可用）」，其後才是 needs_review 原因。
+- 觀察（待 Q4 裁示）：278e 封面的「Year」是報告年度，例如 Vance「Annual (2025)」封面寫 2024，filing.year 則是 OGE 列表上的申報年。Q4 顯示「資產截至」時要決定用哪一個。
+
 驗證：
 - [ ] Trump 2025 年報解析後 holdings > 0，且含 asset_name 含 "Trump Media" 的列。
 - [ ] 人工比對 Trump 年報任一頁 5 列（頁碼、資產、區間）與 DB 一致，結果貼證據欄。
@@ -383,6 +412,11 @@ Q3 前置閘門（通過才可跑全量）：
 ## Q4 第二期 UI（政要分頁）＋E2E
 
 做：「行政政要」分頁沿用 P5 元件（人物卡顯示 title），持股來自 278e、交易來自 278-T；排程 `hall_of_fame:sync_oge` 併入 P4 同一機制、同一時間後執行。request spec 補政要分頁含 Trump。
+
+Q2 留下的待辦（2026-10-19）：
+- `HoldingsView::ANNUAL_TYPES` 目前只有 annual／amendment，接 OGE 持股時要納入 `oge_278e`（Annual 優先，沒有才用 Nominee 278，Q1 裁示 2）。並以 `filing_type: "oge_278e"` 重做「無法辨識的 Value 照原字串顯示、不列入佔比」斷言（Q2 r2 審查質詢 1：r2 的 spec 用的是 annual，沒有走到 OGE 實際路徑）。
+- OGE Part 6 不區分本人／配偶／子女（owner 記 self），UI 須註明（Q2 裁示 1）。
+- 「資產截至」用封面報告年度還是 filing.year，待裁示（Q2 觀察）。
 
 驗證：
 - [ ] request spec 全綠。
