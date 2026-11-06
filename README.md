@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-11-06（五）— LEAPS IV 環境 P1：三張資料表
+
+新增 `leaps_iv_snapshots`（每標的每個美東交易日一筆，含 CM540 ATM IV、Barchart HV）、`leaps_iv_surface_points`
+（IV 曲面原始點）、`barchart_iv_histories`（Barchart Options Overview History 每日一列）三張表與 model，
+皆以唯一鍵 upsert、後寫覆蓋先寫。`schema.rb` 只含本分支的 migration：正式庫另有名人堂分支的 `hof_*` 表，
+兩分支合併後要以完整 dump 重新產生 `schema.rb`。
+
 ### 2026-11-06（五）— LEAPS IV 環境 P0 偵察
 
 新增 `docs/leaps-iv-recon.md`（`leaps-iv-environment.md` P0，只讀未改程式）：LEAPS 爬蟲呼叫鏈、Delta 篩選在爬蟲端

@@ -10,9 +10,27 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_06_120200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "barchart_iv_histories", force: :cascade do |t|
+    t.datetime "captured_at", null: false
+    t.datetime "created_at", null: false
+    t.decimal "imp_vol", precision: 8, scale: 5
+    t.decimal "iv_pctl", precision: 6, scale: 2
+    t.decimal "iv_rank", precision: 6, scale: 2
+    t.decimal "last_price", precision: 12, scale: 4
+    t.bigint "options_volume"
+    t.decimal "pc_oi_ratio", precision: 8, scale: 4
+    t.decimal "pc_vol_ratio", precision: 8, scale: 4
+    t.string "source_url", null: false
+    t.string "symbol", null: false
+    t.bigint "total_oi"
+    t.date "trade_date", null: false
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "trade_date"], name: "idx_barchart_iv_histories_unique", unique: true
+  end
 
   create_table "bcvs_chain_snapshots", force: :cascade do |t|
     t.datetime "created_at", null: false
@@ -164,6 +182,36 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
     t.bigint "user_id", null: false
     t.index ["group_tag"], name: "index_iv_watchlists_on_group_tag"
     t.index ["user_id", "symbol"], name: "index_iv_watchlists_on_user_id_and_symbol", unique: true
+  end
+
+  create_table "leaps_iv_snapshots", force: :cascade do |t|
+    t.date "as_of_date", null: false
+    t.decimal "bc_hv", precision: 8, scale: 5
+    t.string "bc_hv_label"
+    t.datetime "captured_at", null: false
+    t.decimal "cm540_atm_iv", precision: 8, scale: 5
+    t.datetime "created_at", null: false
+    t.string "source", null: false
+    t.string "source_url", null: false
+    t.decimal "spot", precision: 12, scale: 4
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "as_of_date"], name: "idx_leaps_iv_snapshots_unique", unique: true
+  end
+
+  create_table "leaps_iv_surface_points", force: :cascade do |t|
+    t.date "as_of_date", null: false
+    t.decimal "call_iv", precision: 8, scale: 5
+    t.datetime "captured_at", null: false
+    t.datetime "created_at", null: false
+    t.decimal "delta", precision: 6, scale: 4
+    t.integer "dte"
+    t.date "expiration", null: false
+    t.decimal "moneyness", precision: 6, scale: 4
+    t.decimal "strike", precision: 12, scale: 4, null: false
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "as_of_date", "expiration", "strike"], name: "idx_leaps_iv_surface_points_unique", unique: true
   end
 
   create_table "leaps_option_chain_snapshots", force: :cascade do |t|

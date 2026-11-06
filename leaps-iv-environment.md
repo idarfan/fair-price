@@ -22,7 +22,7 @@
 | 階段 | 名稱 | 狀態 | 驗證證據（檔案/指令輸出摘要） | 審查 | 更新時間 |
 |---|---|---|---|---|---|
 | P0 | 偵察（只讀） | ✅ 完成 | `docs/leaps-iv-recon.md` 11 個標題齊全；`tmp/recon/barchart_iv.png`；`git diff --stat -- app lib db config` 為空。偵察發現規格與現況不符 5 處（P4 pm2 時區、9223 不存在、margin-reminder 不存在、HV 標籤無天數、Barchart 歷史最長 2Y／520 列），進入對應階段前須使用者裁示後 patch | PASS（r1，附 4 條質詢） | 2026-11-06 |
-| P1 | Schema | ⬜ | | | |
+| P1 | Schema | ✅ 完成 | 3 個 migration（一表一個）＋3 個 model；`db:migrate` → `rollback STEP=3` → `db:migrate` 全成功，`column_names` 含規格全部欄位；`spec/models/leaps_iv_tables_spec.rb` 9 examples 0 failures；完整 rspec 1411 passed。schema.rb 排除正式庫中名人堂分支的 `hof_*` 表（合併名人堂後須以完整 dump 重新產生） | PASS（r1，附 4 條質詢） | 2026-11-06 |
 | P2 | 爬蟲擴充 | ⬜ | | | |
 | P3 | 計算服務 | ⬜ | | | |
 | P4 | 每日快照排程 | ⬜ | | | |
@@ -121,14 +121,15 @@ git diff --stat -- app lib db config   # 須為空（P0 不得改碼）
 | 欄位 | 型別 |
 |---|---|
 | symbol, as_of_date | 同上 |
-| expiration | date |
+| expiration | date, not null |
 | dte | integer |
-| strike | decimal(12,4) |
+| strike | decimal(12,4), not null |
 | moneyness | decimal(6,4) |
 | call_iv | decimal(8,5) |
 | delta | decimal(6,4) |
 | captured_at | datetime, not null |
-唯一索引：`[symbol, as_of_date, expiration, strike]`。寫入規則同上。
+| timestamps | |
+唯一索引：`[symbol, as_of_date, expiration, strike]`。寫入規則同上。expiration、strike 為唯一索引欄位，設 not null（PostgreSQL 唯一索引不把 NULL 視為相等，允許 NULL 會讓 upsert 寫出重複列；P1 r1 審查後 patch）。
 
 `barchart_iv_histories`（Barchart Options Overview History 每日一列；Barchart IV 指標的唯一來源）
 | 欄位 | 型別 |
@@ -145,6 +146,7 @@ git diff --stat -- app lib db config   # 須為空（P0 不得改碼）
 | last_price | decimal(12,4) |
 | captured_at | datetime, not null |
 | source_url | string, not null |
+| timestamps | |
 唯一索引：`[symbol, trade_date]`；upsert。
 
 **驗證**
