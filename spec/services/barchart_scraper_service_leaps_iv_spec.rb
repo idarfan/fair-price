@@ -41,6 +41,19 @@ RSpec.describe BarchartScraperService do
         .to eq([ [ "success", "points=2" ] ])
     end
 
+    it "曲面寫完接著算 CM540 寫回快照（P3 persist!）；夾不住 540 天時寫 nil" do
+      bracketing = leaps_data["iv_surface"] + [
+        { "expiration_date" => "2028-06-16", "dte" => 589, "strike" => 350.0, "iv" => 0.4295, "delta" => 0.64 },
+        { "expiration_date" => "2028-06-16", "dte" => 589, "strike" => 360.0, "iv" => 0.4287, "delta" => 0.62 },
+        { "expiration_date" => "2028-01-21", "dte" => 442, "strike" => 360.0, "iv" => 0.4240, "delta" => 0.60 }
+      ]
+      allow(service).to receive(:run_scraper).and_return({ status: "success", data: leaps_data.merge("iv_surface" => bracketing) })
+
+      service.fetch_leaps
+      # 獨立計算：S=353.1 → ATM(442)=0.424414、ATM(589)=0.429252，總變異數內插到 T=540/365 → 0.427937
+      expect(LeapsIvSnapshot.find_by(symbol: "TSM").cm540_atm_iv).to be_within(0.00001).of(0.42794)
+    end
+
     it "iv_source: scheduled 時快照記 scheduled（P4 排程用）" do
       allow(service).to receive(:run_scraper).and_return({ status: "success", data: leaps_data })
 

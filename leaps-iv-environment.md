@@ -24,7 +24,7 @@
 | P0 | 偵察（只讀） | ✅ 完成 | `docs/leaps-iv-recon.md` 11 個標題齊全；`tmp/recon/barchart_iv.png`；`git diff --stat -- app lib db config` 為空。偵察發現規格與現況不符 5 處（P4 pm2 時區、9223 不存在、margin-reminder 不存在、HV 標籤無天數、Barchart 歷史最長 2Y／520 列），進入對應階段前須使用者裁示後 patch | PASS（r1，附 4 條質詢） | 2026-11-06 |
 | P1 | Schema | ✅ 完成 | 3 個 migration（一表一個）＋3 個 model；`db:migrate` → `rollback STEP=3` → `db:migrate` 全成功，`column_names` 含規格全部欄位；`spec/models/leaps_iv_tables_spec.rb` 9 examples 0 failures；完整 rspec 1411 passed。schema.rb 排除正式庫中名人堂分支的 `hof_*` 表（合併名人堂後須以完整 dump 重新產生） | PASS（r1，附 4 條質詢） | 2026-11-06 |
 | P2 | 爬蟲擴充 | ✅ 完成 | LEAPS 爬蟲 Stage 3（篩 Delta 前全履約價 IV）＋`barchart_iv_history_scraper.py`（latest／backfill，切回原區間）＋`LeapsIvCapture`；TSM 實查：曲面 5 到期日×23 點＝頁面數、快照全欄非 null、2Y 回補 520 列＝頁面列數；排行回歸 SAME（83 筆）；合約 IV 與歷史 3 日期截圖逐欄一致；盤中不寫 IV（`--skip-iv-surface`）；完整 rspec 1445 passed | PASS（r2；r1 FAIL：缺中段／最舊列截圖） | 2026-11-06 |
-| P3 | 計算服務 | ⬜ | | | |
+| P3 | 計算服務 | ✅ 完成 | `LeapsIvEnvironmentService`（call／persist!）；規格測試向量逐一對應 + PMCC 讀取時合併（與快照同一次抓取、相差 1 小時內才併）；TSM 實資料 CM540＝0.427937（Python 獨立重算一致）；完整 rspec 1465 passed | PASS（r1，附 2 條質詢） | 2026-11-06 |
 | P4 | 每日快照排程 | ⬜ | | | |
 | P5 | UI 區塊 | ⬜ | | | |
 | P6 | 推薦文字整合 | ⬜ | | | |

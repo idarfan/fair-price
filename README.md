@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-11-06（五）— LEAPS IV 環境 P3：計算服務
+
+新增 `LeapsIvEnvironmentService`：`call(symbol:)` 回傳 CM540（540 天固定天期 ATM IV，總變異數內插）、
+LEAPS IV Rank／Percentile（過去一年、滿 20 筆才算）、ATM IV 期限結構、IV 曲面、Barchart IV 指標與走勢；
+`persist!` 是寫入 `cm540_atm_iv` 的唯一入口，LEAPS 查詢寫完曲面後自動呼叫。PMCC 短天期鏈只在與快照
+同一次抓取時（相差 1 小時內）併入曲面與期限結構。
+
 ### 2026-11-06（五）— LEAPS IV 環境 P2：IV 曲面與 Barchart IV 歷史抓取
 
 - LEAPS 爬蟲成功後多一段 Stage 3：讀每個 LEAPS 到期日的完整鏈（篩 Delta 之前），寫入 `leaps_iv_surface_points`

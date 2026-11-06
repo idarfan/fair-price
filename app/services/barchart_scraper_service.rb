@@ -749,9 +749,10 @@ class BarchartScraperService
 
   # leaps-iv-environment P2：LEAPS 爬蟲 Stage 3 的 IV 曲面。任何失敗只記 fetch_logs，
   # 不得影響 LEAPS 查詢本身（候選排行已在上面寫完）。
-  # 盤中由 fetch_leaps 決定不呼叫（見 skip_iv）。
+  # 盤中由 fetch_leaps 決定不呼叫（見 skip_iv）。曲面寫完接著算 CM540（P3：persist! 是寫入 cm540 的唯一入口）。
   def persist_iv_surface(data, source)
     points = LeapsIvCapture.new(@symbol, source: source).persist_leaps_chain(data)
+    LeapsIvEnvironmentService.new.persist!(symbol: @symbol, as_of_date: LeapsIvCapture.as_of_date(data["quote_date_text"]))
     log_fetch("leaps_iv_surface", "success", "points=#{points}")
   rescue => e
     Rails.logger.warn("[leaps_iv] IV 曲面寫入失敗（不影響 LEAPS 查詢）#{@symbol}: #{e.class}: #{e.message}")
