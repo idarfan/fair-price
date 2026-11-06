@@ -31,6 +31,72 @@ LEAPS IV Rank／Percentile（過去一年、滿 20 筆才算）、ATM IV 期限�
 （IV Pctl 為小數）、Select History 最長 2Y／520 列、HV 只在 options／overview 頁且標籤無天數、pm2 daemon 為 UTC、
 CDP 共用 9222 且無跨程序互斥、近 30 天查詢過的 symbol 可由 `fetch_logs` 取得。
 
+### 2026-10-19（一）— 新增：投資名人堂 Q2（OGE 278e 年報解析）
+
+`bin/rails hall_of_fame:parse_oge_pdfs` 下載 pending 的 OGE 278e（Trump、Vance、Bessent、Lutnick、Burgum）到
+`storage/hall_of_fame/oge/{year}/`，由 Python sidecar `lib/hall_of_fame/oge_parser.py` 以表格框線切列，解析 Part 2／5／6
+寫入 `hof_holdings`（Part 5 為配偶，其餘記 self）。容器帳戶名稱併入子列（例「IRA #1 › SPY」）；不可估值的資產照列、不入佔比；
+金額或欄位無法完整辨識的列照原字串寫入並標 needs_review。`hof_filings.parse_error` 第一行為文字層判定（`textlayer: …`）。
+§3 金額對照表另擴充 `$15,001 - $25,000`、`$25,001 - $50,000`、`Over $1,000,000`。278-T 交易解析留待 Q3。
+
+### 2026-10-19（一）— 新增：投資名人堂 Q1（OGE 索引同步）
+
+`bin/rails hall_of_fame:sync_oge_index` 同步行政政要（Trump、Vance、Bessent、Lutnick、Burgum）的 OGE 公開申報清單到
+`hof_filings`（source = oge，doc_id = UNID）：先對 `Presiden.nsf/Index` view 做條件式請求，304 即結束；有變動才用 OGE 搜尋頁的
+REST API 依姓查詢，Annual／Nominee 278／Termination／New Entrant 記為 `oge_278e`，278 Transaction 記為 `oge_278t`。
+只能書面申請（沒有線上 PDF）的報告不寫入，記在 `hof_sync_runs.error_log`。尚未接入每日排程。
+
+### 2026-10-18（日）— 驗收：投資名人堂 P6（第一期 E2E）
+
+正式站從 sidebar 進入 `/hall_of_fame`，點 Pelosi 後交易表第 1 列與 P3 人工比對值（PTR 20035553）及 PDF 原文逐欄一致，
+「原始 PDF」連結回 200。程式未變動；P4 每日排程的隔日 cron 紀錄仍待補驗，補齊前第一期不算完成。
+
+### 2026-10-18（日）— 新增：投資名人堂 P5（第一期 UI，國會分頁）
+
+新頁 `/hall_of_fame`（sidebar 最末位「投資名人堂」）：國會議員人物卡，點開顯示最新年報持股表（估算／下限／上限三欄佔比、
+全部資產／僅有價證券切換、前 10 名圓餅圖）與近 12 個月 PTR 交易表（買賣篩選、期權口數／權利金／資料來源、交易佔比），
+每列連到原始 PDF，needs_review 加警示，金額無法對照的列照申報原字串顯示、不列入佔比。資料由
+`GET /api/v1/hall_of_fame/officials(/:slug)` 提供；「行政政要」分頁第二期建置中。
+
+### 2026-10-18（日）— 新增：投資名人堂 P4（每日排程）
+
+pm2 app `hall-of-fame-sync`（`bin/hall-of-fame-sync.sh`）每日 UTC 00:30（= 台北 08:30）執行
+`bin/rails hall_of_fame:sync_house`：House 索引同步 → 解析 pending PDF → 期權分析。每一步各寫一筆
+`hof_sync_runs`（kind = index／pdf_parse／options），某一步失敗只記錄、不中斷後續，並以結束碼 1 回報。
+手動觸發：`pm2 restart hall-of-fame-sync`。電腦在 08:30 須開機，排程才會執行。
+
+### 2026-10-17（六）— 新增：投資名人堂 P3b（期權解析＋口數反推）
+
+`bin/rails hall_of_fame:analyze_options` 解析 House 期權交易描述（`config/hall_of_fame_option_patterns.yml`），
+寫入 `hof_option_details`。有申報口數 → 反推每股權利金區間（stated_contracts）；沒有口數 → 以成交日參考價反推口數區間，
+參考價先取 Barchart 合約 price-history 頁 DOM 的當日收盤（barchart_dom，只讀 DOM、當天無成交不採用），
+頁面沒有該日才用 Black-Scholes 估算（bs_model，Yahoo 收盤＋前 30 交易日波動率）。CDP 離線時不估算、留待重試，
+並在 `hof_sync_runs`（新增 `kind` 欄位）記錄 CDP 未連線訊息。履約列只記期權資料，不反推。
+House PDF 重新解析時會先清除該份的期權明細，下次 `analyze_options` 重算。
+
+### 2026-10-17（六）— 新增：投資名人堂 P3（House PDF 解析）
+
+`bin/rails hall_of_fame:parse_house_pdfs` 下載 `parse_status=pending` 的 House PDF 到
+`storage/hall_of_fame/house/{year}/`（記 sha256），交給 Python sidecar `lib/hall_of_fame/house_parser.py`
+（pdfplumber，專用 venv，見 `lib/hall_of_fame/requirements.txt`）解析，PTR 寫入 `hof_transactions`、年報
+Schedule A 寫入 `hof_holdings`。列數對不上標記數、掃描檔、未知金額標籤 → needs_review；程式／環境錯誤 → failed，
+修好後執行 `bin/rails hall_of_fame:retry_failed_house_pdfs`。金額對照表 `config/hall_of_fame_ranges.yml`。
+首跑 87 份：parsed 44、needs_review 43（42 份為掃描檔，Khanna／McCaul 全為紙本申報）、failed 0。
+
+### 2026-10-17（六）— 新增：投資名人堂 P2（House 索引同步）
+
+`HallOfFame::HouseIndexSync` 下載眾議院當年＋前一年的 `{year}FD.zip`，依名單（Last 完全相同＋First 前綴）
+寫入 `hof_filings`（PTR／年報／修正，附 PDF 網址）。下載前以 `If-None-Match`＋`If-Modified-Since` 條件式請求，
+304 即跳過；已存在的 doc_id 不重寫。執行：`bin/rails hall_of_fame:sync_house_index`，紀錄在 `hof_sync_runs`。
+首跑 6 位議員共 87 筆。尚無排程與頁面。
+
+### 2026-10-17（六）— 新增：投資名人堂 P0–P1（盤點與資料表）
+
+依 `hall-of-fame-spec.md` 建立投資名人堂的資料層：六張 `hof_` 表（`hof_officials`、`hof_filings`、
+`hof_holdings`、`hof_transactions`、`hof_option_details`、`hof_sync_runs`），model 放 `app/models/hall_of_fame/`
+（交易 model 為 `HallOfFame::Trade`，避免蓋掉 ActiveRecord#transaction）。名單只來自
+`config/hall_of_fame.yml`，`bin/rails hall_of_fame:seed_officials` 冪等同步（11 位）。尚無頁面與排程。
+
 ### 2026-10-12（一）— 版本 v20261012，更新版本說明
 
 - 版本更新說明新增 v20261012（涵蓋 10/10～10/12）：LEAPS 不填履約價時候選改從完整鏈挑 Δ 0.60–0.90、「期權鏈無此履約價」與「Delta 不足」分開顯示、舊結果網址顯示「已不是最新」、PMCC Long Δ ≥ 0.80 與 Short DTE 19–45 改為篩選、PMCC 無合格組合時說明擋下的規則、指定履約價時提供「不填履約價重新查詢」與 LEAPS 到期日的緩衝檔、履約價欄下方提示垂直價差顯示條件。

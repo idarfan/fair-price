@@ -236,8 +236,10 @@ RSpec.describe "Price-In 反推工具", type: :request do
         .to eq(controller: "price_in", action: "index")
     end
 
-    it "入口是清單最後一列" do
-      expect(FairValue::AppSwitcherComponent::APP_LINKS.last[:label]).to include("Price-In")
+    # 2026-10-18 投資名人堂（hall-of-fame-spec P5-4）佔了最末位，Price-In 改為緊接在它之前（使用者裁示例外更新）。
+    it "入口緊接在最末位的投資名人堂之前" do
+      labels = FairValue::AppSwitcherComponent::APP_LINKS.map { |a| a[:label] }
+      expect(labels.last(2)).to match([ a_string_including("Price-In"), "投資名人堂" ])
     end
   end
 

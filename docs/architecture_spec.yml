@@ -18,6 +18,12 @@ layers:
   items:
   - - StockLogo
     - ''
+  - - HoldingsSection
+    - ''
+  - - ReviewBadge
+    - ''
+  - - TradesSection
+    - ''
   - - AddPositionForm
     - ''
   - - CalculatorTab
@@ -29,12 +35,6 @@ layers:
   - - Story
     - ''
   - - InterestScheduleTable
-    - ''
-  - - PositionListTab
-    - ''
-  - - Story
-    - ''
-  - - PositionRow
     - ''
 - id: rails_api
   type: band
@@ -50,6 +50,8 @@ layers:
     - ''
   - - BaseController
     - ''
+  - - OfficialsController
+    - ''
   - - MarginPositionsController
     - ''
   - - OptionsController
@@ -57,8 +59,6 @@ layers:
   - - OwnershipSnapshotsController
     - ''
   - - ValuationsController
-    - ''
-  - - BullCallSpreadsController
     - ''
 - id: services
   type: band

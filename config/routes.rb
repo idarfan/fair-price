@@ -12,6 +12,11 @@ Rails.application.routes.draw do
       get  "ownership_snapshots/:ticker", to: "ownership_snapshots#index",  as: :ownership_snapshots
       post "ownership_snapshots/:ticker", to: "ownership_snapshots#create"
 
+      # 投資名人堂
+      namespace :hall_of_fame do
+        resources :officials, only: %i[index show], param: :slug
+      end
+
       # Options Analyzer API
       get  "options/:symbol/chain",      to: "options#chain",
            constraints: { symbol: TICKER_CONSTRAINT }
@@ -160,6 +165,9 @@ Rails.application.routes.draw do
   get  "ownership",         to: "ownership#index",   as: :ownership
   get  "ownership/history", to: "ownership#history", as: :ownership_history
   post "ownership/fetch",   to: "ownership#fetch",   as: :ownership_fetch
+
+  # 投資名人堂
+  get "hall_of_fame", to: "hall_of_fame#index", as: :hall_of_fame
 
   # IV Analysis
   get "iv_analysis", to: "iv_analysis#index", as: :iv_analysis

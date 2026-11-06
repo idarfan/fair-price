@@ -1,0 +1,16 @@
+# 名人堂期權描述解析（規格 P3b）。依序比對，第一個符合的生效；全部不符 → needs_review，不猜值。
+# 具名群組：right（call/put）、strike、expiration（M/D/YY 或 M/D/YYYY，兩位數年份補 20xx）、contracts（可省略）。
+# exercise: true 的列是履約取得股票，金額為股票價值，不反推權利金（2026-10-17 使用者裁示）。
+patterns:
+  - name: exercised
+    exercise: true
+    regex: '\AExercised (?<contracts>[\d,]+) (?<right>call|put) options? purchased .*? at a strike price of \$(?<strike>[\d,]+(?:\.\d+)?) with an expiration date of (?<expiration>\d{1,2}/\d{1,2}/\d{2,4})'
+  - name: purchased_or_sold
+    regex: '\A(?:Purchased |Sold |Bought )?(?<contracts>[\d,]+) (?<right>call|put) options? with a strike price of \$(?<strike>[\d,]+(?:\.\d+)?) and an expiration date of (?<expiration>\d{1,2}/\d{1,2}/\d{2,4})'
+  - name: semicolon_list
+    regex: '\A(?<right>call|put) options?; Strike price \$(?<strike>[\d,]+(?:\.\d+)?); Expires (?<expiration>\d{1,2}/\d{1,2}/\d{2,4})'
+
+# Black-Scholes（bs_model）參數：無風險利率（年化、連續複利近似）。
+bs_model:
+  risk_free_rate: 0.04
+  volatility_window: 30
