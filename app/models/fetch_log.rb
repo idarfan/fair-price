@@ -22,6 +22,7 @@ class FetchLog < ApplicationRecord
     bpus_expirations bpus_put_chain bpus_volatility
     bcvs_expirations bcvs_call_chain
     volap price_history
+    leaps_iv_surface barchart_iv_history
   ].freeze
 
   validates :symbol, :fetch_type, :status, :fetched_at, presence: true

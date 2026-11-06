@@ -1,5 +1,15 @@
 # FairPrice
 
+### 2026-11-06（五）— LEAPS IV 環境 P2：IV 曲面與 Barchart IV 歷史抓取
+
+- LEAPS 爬蟲成功後多一段 Stage 3：讀每個 LEAPS 到期日的完整鏈（篩 Delta 之前），寫入 `leaps_iv_surface_points`
+  （moneyness 0.60–1.25）與當天 `leaps_iv_snapshots`；候選排行完全不變（同一份原始資料改動前後 SAME）
+- 新爬蟲 `barchart_iv_history_scraper.py`：Barchart Options Overview History，`latest` 讀最新一列、`backfill` 讀 2Y；
+  結束前把 Barchart 記住的區間切回使用者原本的設定；HV 讀 overview 頁
+- LEAPS 查詢狀態寫完後才抓 Barchart 歷史（第一次自動回補 2Y），失敗不影響查詢；外層逾時 300 秒
+- 美股盤中（美東週一～五 09:30–16:00）不寫任何 IV 環境資料，Stage 3 也不跑
+- 存頁面資料原始精度（IV Pctl 由小數 ×100），as_of_date 取頁面報價日期，讀不到就不寫
+
 ### 2026-11-06（五）— LEAPS IV 環境 P1：三張資料表
 
 新增 `leaps_iv_snapshots`（每標的每個美東交易日一筆，含 CM540 ATM IV、Barchart HV）、`leaps_iv_surface_points`

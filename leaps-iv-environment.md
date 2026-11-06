@@ -23,7 +23,7 @@
 |---|---|---|---|---|---|
 | P0 | 偵察（只讀） | ✅ 完成 | `docs/leaps-iv-recon.md` 11 個標題齊全；`tmp/recon/barchart_iv.png`；`git diff --stat -- app lib db config` 為空。偵察發現規格與現況不符 5 處（P4 pm2 時區、9223 不存在、margin-reminder 不存在、HV 標籤無天數、Barchart 歷史最長 2Y／520 列），進入對應階段前須使用者裁示後 patch | PASS（r1，附 4 條質詢） | 2026-11-06 |
 | P1 | Schema | ✅ 完成 | 3 個 migration（一表一個）＋3 個 model；`db:migrate` → `rollback STEP=3` → `db:migrate` 全成功，`column_names` 含規格全部欄位；`spec/models/leaps_iv_tables_spec.rb` 9 examples 0 failures；完整 rspec 1411 passed。schema.rb 排除正式庫中名人堂分支的 `hof_*` 表（合併名人堂後須以完整 dump 重新產生） | PASS（r1，附 4 條質詢） | 2026-11-06 |
-| P2 | 爬蟲擴充 | ⬜ | | | |
+| P2 | 爬蟲擴充 | ✅ 完成 | LEAPS 爬蟲 Stage 3（篩 Delta 前全履約價 IV）＋`barchart_iv_history_scraper.py`（latest／backfill，切回原區間）＋`LeapsIvCapture`；TSM 實查：曲面 5 到期日×23 點＝頁面數、快照全欄非 null、2Y 回補 520 列＝頁面列數；排行回歸 SAME（83 筆）；合約 IV 與歷史 3 日期截圖逐欄一致；盤中不寫 IV（`--skip-iv-surface`）；完整 rspec 1445 passed | PASS（r2；r1 FAIL：缺中段／最舊列截圖） | 2026-11-06 |
 | P3 | 計算服務 | ⬜ | | | |
 | P4 | 每日快照排程 | ⬜ | | | |
 | P5 | UI 區塊 | ⬜ | | | |
@@ -169,6 +169,7 @@ bin/rails runner 'p LeapsIvSnapshot.column_names.sort; p LeapsIvSurfacePoint.col
    - 百分比欄位轉小數（51.92% → 0.5192），IV Rank／IV Pctl 存 0–100
 5. 寫入 `source_url`、`captured_at`；`as_of_date` 依「名詞與公式」規則。
 6. 本階段只存原始資料；`cm540_atm_iv` 由 P3 服務計算後寫入，爬蟲不得自行計算。
+7. **美股正常交易時段（美東週一～五 09:30–16:00；定義同 `StockPriceChecker#market_open?`，只排除週末，美股假日的同一時段也視為盤中而不寫入）不寫入任何 IV 環境資料**：不寫曲面點與快照，也不跑 Barchart 歷史表爬蟲；LEAPS 爬蟲以 `--skip-iv-surface` 略過 Stage 3（不白跑）；LEAPS 查詢本身照常（2026-11-06 使用者裁示；P2 r1 質詢 1、3 後 patch）。原因：盤中頁首 `div.pricechangerow` 帶 `data-ng-if="session !== 'Realtime'"`，讀不到收盤報價日期，期權 IV 也在變動。盤前實測（美東 05:29）`pricechangerow` 仍顯示前一交易日收盤與日期，可正常寫入。
 
 **驗證**
 ```bash
@@ -183,7 +184,9 @@ psql -c "select as_of_date, bc_hv, bc_hv_label, source_url from leaps_iv_snapsho
 psql -c "select min(trade_date), max(trade_date), count(*) from barchart_iv_histories where symbol='TSM';"
 # count 須等於驗收當下 Barchart 2Y 區間的表格列數（P0 實測 2026-11-06 為 520，列數隨日期變動，驗收時重測並列出兩邊數字）
 psql -c "select imp_vol, iv_rank, iv_pctl, pc_vol_ratio, last_price from barchart_iv_histories where symbol='TSM' and trade_date='2026-11-05';"
-# 須為 0.51920 | 82.44 | 92.00 | 0.9200 | 353.1000（2026-11-06 人工實測頁面值）
+# 存頁面資料（bc-data-grid）的原始值、依欄位精度四捨五入，不是畫面顯示值（2026-11-06 使用者裁示）：
+# 須為 0.51925 | 82.44 | 92.43 | 0.9182 | 353.1000；四捨五入到畫面位數後須與頁面一致（51.92% | 82.44% | 92% | 0.92 | 353.10）
+# 報告附 DOM 原始值（impliedVolatilityPercentile1y 為小數 0.9243…）與 DB iv_pctl（×100）的對照
 
 diff tmp/regress/leaps_before.json tmp/regress/leaps_after.json && echo SAME   # 須輸出 SAME
 bundle exec rspec $(git ls-files 'spec/**/*leaps*_spec.rb')                  # 全數通過

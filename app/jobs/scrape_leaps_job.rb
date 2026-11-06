@@ -75,6 +75,11 @@ class ScrapeLeapsJob < ApplicationJob
     )
     # Write errors by symbol so controller can read them on redirect without job_id
     Rails.cache.write("leaps_last_errors_#{symbol}", errors, expires_in: LeapsOptionChainSnapshot::FRESH_WINDOW) if errors.any?
+
+    # 狀態寫完之後才抓：Barchart 歷史表約多 20 秒（第一次回補 2Y 更久），不拖慢排行顯示；
+    # IV 環境區塊在查詢進行中顯示既有資料（leaps-iv-environment P5.6）。cached 表示沒有重抓，略過——
+    # 要看 service 的原始狀態：result_status 已把 cached 併成 success，分不出來。
+    fetch_barchart_iv_history_isolated(symbol) if %w[success partial_error].include?(result[:status])
   rescue => e
     err_msg = e.message.first(200)
     Rails.cache.write(
@@ -92,5 +97,14 @@ class ScrapeLeapsJob < ApplicationJob
     BarchartScraperService.new(symbol).fetch_pmcc_short_calls
   rescue => e
     Rails.logger.warn("[pmcc] fetch_pmcc_short_calls failed (non-fatal, LEAPS query unaffected): #{e.message}")
+  end
+
+  # leaps-iv-environment P2：同上的隔離原則——例外只記錄，不得讓已寫好的 job 狀態被頂層 rescue 改成 error。
+  # 這個標的還沒有任何 Barchart 歷史時先回補 2Y（P4 規格同一規則）。
+  def fetch_barchart_iv_history_isolated(symbol)
+    mode = BarchartIvHistory.for_symbol(symbol).exists? ? "latest" : "backfill"
+    BarchartScraperService.new(symbol).fetch_barchart_iv_history(mode: mode, source: "adhoc")
+  rescue => e
+    Rails.logger.warn("[leaps_iv] fetch_barchart_iv_history failed (non-fatal, LEAPS query unaffected): #{e.message}")
   end
 end

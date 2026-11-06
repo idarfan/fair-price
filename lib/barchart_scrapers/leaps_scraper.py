@@ -167,6 +167,36 @@ LOCK_STRIKE_VG_JS = """
 """
 
 
+# Stage 3（leaps-iv-environment P2）：IV 曲面用的完整鏈——單一到期日、全部履約價的 call IV。
+# 與 NEAR_MONEY_JS 分開：Stage 1 的列不能多出 iv 欄（_pick_candidates 會讀 row["iv"] 判斷 Greeks
+# 是否有算），否則候選挑選的行為會變。
+SURFACE_CHAIN_JS = """
+(() => {
+  const grid = document.querySelector('bc-data-grid');
+  if (!grid || !grid._data) return null;
+  return grid._data
+    .map(r => r.raw || r)
+    .filter(r => (r.optionType === 'Call' || r.symbolType === 'Call') && r.strikePrice != null)
+    .map(r => ({
+      expiration_date: r.expirationDate || r.expirationDateString || r.expiration || null,
+      dte:    typeof r.daysToExpiration === 'number' ? r.daysToExpiration : null,
+      strike: r.strikePrice,
+      iv:     typeof r.volatility === 'number' ? r.volatility : null,
+      delta:  typeof r.delta      === 'number' ? r.delta      : null,
+    }));
+})()
+"""
+
+# 頁首報價日期（P0：div.pricechangerow 內的 MM/DD/YY），換算 as_of_date 用；讀不到回 null。
+QUOTE_DATE_JS = """
+(() => {
+  const row = document.querySelector('.pricechangerow');
+  if (!row) return null;
+  const m = row.textContent.match(/\\b(\\d{2}\\/\\d{2}\\/\\d{2})\\b/);
+  return m ? m[1] : null;
+})()
+"""
+
 # Session-expiry positive detection — same modal logic as technical-analysis page
 # bc-overlay-modal-wrapper always exists; login keywords appear only when session expires
 SESSION_EXPIRED_JS = """
@@ -364,7 +394,47 @@ async def _confirm_empty(ws_url, js_expr, delay_s=1.5, target_id=None):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-async def main(symbol, user_strike=None):
+async def _collect_iv_surface(symbol, ws_url, target_id, exp_value_map):
+    """
+    Stage 3（leaps-iv-environment P2）：每個 LEAPS 到期日（DTE ≥ LEAPS_MIN_DTE）開完整鏈，
+    讀全部履約價的 call IV／Delta。Delta 篩選之前的原始資料，moneyness 範圍由 Ruby 端篩。
+    只在 Stage 2 成功後執行；任何失敗只回報在 iv_surface_error，不影響 rows。
+    回 (rows, quote_date_text, error)。
+    """
+    leaps_dates = [
+        d for d in sorted(exp_value_map)
+        if (date(*(int(x) for x in d.split("-"))) - date.today()).days >= LEAPS_MIN_DTE
+    ]
+    if not leaps_dates:
+        return [], None, "沒有 DTE ≥ 364 的到期日"
+
+    rows, quote_date_text, missing = [], None, []
+    for exp_date in leaps_dates:
+        url = (f"https://www.barchart.com/stocks/quotes/{symbol}/options"
+               f"?moneyness=100&expiration={exp_value_map[exp_date]}")
+        await cdp_navigate(ws_url, url, settle_ms=OPTIONS_SETTLE)
+        await activate_target(target_id)
+        chain = await _wait_for_grid(ws_url, SURFACE_CHAIN_JS, max_wait_s=GRID_MAX_WAIT_S, target_id=target_id)
+        if not isinstance(chain, list) or not chain:
+            missing.append(exp_date)
+            continue
+        if quote_date_text is None:
+            q = await cdp_eval(ws_url, QUOTE_DATE_JS, target_id=target_id)
+            quote_date_text = q if isinstance(q, str) else None
+        for r in chain:
+            r = dict(r)
+            r["expiration_date"] = (r.get("expiration_date") or exp_date)[:10]
+            rows.append(r)
+        await asyncio.sleep(0.8)
+
+    error = f"到期日 {', '.join(missing)} 的完整鏈沒有載入" if missing else None
+    return rows, quote_date_text, error
+
+
+SKIP_IV_SURFACE_FLAG = "--skip-iv-surface"
+
+
+async def main(symbol, user_strike=None, skip_iv_surface=False):
     symbol = symbol.upper()
 
     # prepare_page finds the tab but skips navigation when Chrome is already on
@@ -662,20 +732,43 @@ async def main(symbol, user_strike=None):
 
     merged = _merge_vg(all_opts_rows, all_vg_rows)
 
+    # Stage 3：IV 曲面（不影響上面的 rows；例外一律收進 iv_surface_error）。
+    # 美股盤中 Ruby 端不寫入 IV 資料，會帶 --skip-iv-surface，這裡就不白跑（P2 r1 質詢 1）。
+    if skip_iv_surface:
+        iv_surface, quote_date_text, iv_surface_error = [], None, "美股盤中，略過 IV 曲面"
+    else:
+        try:
+            iv_surface, quote_date_text, iv_surface_error = await _collect_iv_surface(
+                symbol, ws_url, target_id, exp_value_map)
+        except Exception as e:  # noqa: BLE001 — 曲面失敗不得讓 LEAPS 查詢失敗
+            iv_surface, quote_date_text, iv_surface_error = [], None, f"{type(e).__name__}: {e}"
+
     print(json.dumps({
         "status":           "success",
         "rows":             _finalize(merged, underlying_price),
         "underlying_price": underlying_price,
         "skipped_strikes":  skipped_strikes,
         "chain_snapshot":   chain_snapshot,
+        "iv_surface":       iv_surface,
+        "iv_surface_error": iv_surface_error,
+        "quote_date_text":  quote_date_text,
+        "source_url":       f"https://www.barchart.com/stocks/quotes/{symbol}/options",
     }))
 
 
+def _parse_argv(argv):
+    """SYMBOL [user_strike] [--skip-iv-surface]，flag 位置不限。回 (symbol, user_strike, skip_iv_surface)。"""
+    skip = SKIP_IV_SURFACE_FLAG in argv
+    pos  = [a for a in argv if a != SKIP_IV_SURFACE_FLAG]
+    sym      = pos[0] if len(pos) > 0 else "NOK"
+    u_strike = float(pos[1]) if len(pos) > 1 else None
+    return sym, u_strike, skip
+
+
 if __name__ == "__main__":
-    sym      = sys.argv[1] if len(sys.argv) > 1 else "NOK"
-    u_strike = float(sys.argv[2]) if len(sys.argv) > 2 else None
+    sym, u_strike, skip_iv = _parse_argv(sys.argv[1:])
     try:
-        asyncio.run(main(sym, user_strike=u_strike))
+        asyncio.run(main(sym, user_strike=u_strike, skip_iv_surface=skip_iv))
     except Exception as e:
         import traceback
         print(json.dumps({

@@ -23,9 +23,12 @@ class BarchartScraperService
   # 子程序卡死＝鎖卡住。數值要比爬蟲內部的等待上限長，正常路徑才不會被誤砍：
   #   volap：prepare_page settle 8s + CHART_READY 45s + POLL 60s + 導航
   #   price_history：POLL 45s + 導航
-  # 硬砍會跳過 volap 「切回原本期間」那一步，所以只能拿來收真正卡死的情況。
+  #   barchart_iv_history（leaps-iv-environment P2 r1 質詢 4）：表格 60s + 切區間 45s×2（含切回原區間）
+  #     + HV 15s + 導航，約 200s。它在 ScrapeLeapsJob 裡跑，卡死會讓 job 不結束、一直佔著抓取名額。
+  # 硬砍會跳過 volap 「切回原本期間」那一步，所以只能拿來收真正卡死的情況（barchart_iv_history 同理，
+  # 可能留在 1M／2Y 沒切回 Barchart 原本的區間）。
   # 其他爬蟲不在表上＝不設時限（LEAPS 本來就要跑 3–5 分鐘）。
-  SCRAPER_TIMEOUTS_S = { "volap" => 180, "price_history" => 120 }.freeze
+  SCRAPER_TIMEOUTS_S = { "volap" => 180, "price_history" => 120, "barchart_iv_history" => 300 }.freeze
 
   # phase：可選的回呼，每支爬蟲等抓取名額前收到 :queued、拿到名額後收到 :running。
   # 價格情境卡用它分辨排隊中與執行中（前端的逾時只算執行時間；並行化 S4）。
@@ -75,7 +78,9 @@ class BarchartScraperService
 
   # User-triggered LEAPS chain fetch: Options Prices + V&G for all expirations.
   # Returns :cached if the symbol was already scraped within the last 5 minutes.
-  def fetch_leaps(user_strike: nil)
+  # iv_source：LEAPS IV 環境快照的 source（leaps-iv-environment P2）。互動查詢為 adhoc，
+  # 每日排程（P4）傳 scheduled。
+  def fetch_leaps(user_strike: nil, iv_source: "adhoc")
     result = { symbol: @symbol, status: nil, errors: [] }
 
     unless cdp_available?
@@ -93,7 +98,11 @@ class BarchartScraperService
       return result
     end
 
-    fetch_result = run_scraper("leaps", extra_args: user_strike ? [ user_strike.to_s ] : [])
+    # 美股盤中不寫 IV 資料（P2.7），爬蟲的 Stage 3 也不必跑（P2 r1 質詢 1）。只在這裡判斷一次：
+    # 查詢若跨過開盤／收盤，「傳不傳參數」與「寫不寫入」才不會各判各的。
+    skip_iv  = LeapsIvCapture.regular_session?
+    cli_args = (user_strike ? [ user_strike.to_s ] : []) + (skip_iv ? [ "--skip-iv-surface" ] : [])
+    fetch_result = run_scraper("leaps", extra_args: cli_args)
 
     case fetch_result[:status]
     when "barchart_session_expired"
@@ -106,6 +115,7 @@ class BarchartScraperService
       persist_chain_snapshot(fetch_result[:data], user_strike: user_strike)
       persist_leaps(fetch_result[:data])
       log_fetch("leaps", "success", "rows=#{fetch_result[:data]["rows"]&.length}")
+      persist_iv_surface(fetch_result[:data], iv_source) unless skip_iv
       result[:status] = "success"
     when "partial"
       persist_chain_snapshot(fetch_result[:data], user_strike: user_strike)
@@ -192,6 +202,39 @@ class BarchartScraperService
     end
 
     result
+  end
+
+  # leaps-iv-environment P2：Barchart Options Overview History（mode: "latest" 讀最新一列、
+  # "backfill" 讀 2Y 整段）＋overview 頁 HV。呼叫端（ScrapeLeapsJob、P4 排程）負責隔離例外；
+  # 這裡把寫入驗證失敗記成 error 後回傳，不往外拋。
+  def fetch_barchart_iv_history(mode:, source: "adhoc")
+    result = { symbol: @symbol, status: nil, errors: [] }
+    # 盤中不寫 IV 資料（使用者裁示），連爬蟲都不跑
+    return result.merge(status: "skipped_regular_session") if LeapsIvCapture.regular_session?
+
+    unless cdp_available?
+      log_fetch("barchart_iv_history", "error", "CDP unavailable")
+      return result.merge(status: "error", errors: [ "Chrome CDP not reachable at #{CDP_URL}" ])
+    end
+
+    fetch_result = run_scraper("barchart_iv_history", extra_args: [ mode.to_s ])
+    case fetch_result[:status]
+    when "success"
+      rows = LeapsIvCapture.new(@symbol, source: source).persist_barchart_history(fetch_result[:data])
+      log_fetch("barchart_iv_history", "success", "mode=#{mode} rows=#{rows}")
+      result[:status] = "success"
+    when "barchart_session_expired"
+      log_fetch("barchart_iv_history", "barchart_session_expired", "mode=#{mode}")
+      result[:status] = "barchart_session_expired"
+    else
+      log_fetch("barchart_iv_history", "error", "mode=#{mode} #{fetch_result[:error]}")
+      result[:status] = "error"
+      result[:errors] << fetch_result[:error].to_s
+    end
+    result
+  rescue LeapsIvCapture::CaptureError => e
+    log_fetch("barchart_iv_history", "error", "mode=#{mode} #{e.message}")
+    result.merge(status: "error", errors: [ e.message ])
   end
 
   # BPUS §3.1：履約日清單抓取，(symbol) 為 key，5 分鐘快取（規格明講「Rails cache
@@ -702,6 +745,17 @@ class BarchartScraperService
       LeapsOptionChainSnapshot.where(symbol: @symbol).delete_all
       LeapsOptionChainSnapshot.insert_all(records)
     end
+  end
+
+  # leaps-iv-environment P2：LEAPS 爬蟲 Stage 3 的 IV 曲面。任何失敗只記 fetch_logs，
+  # 不得影響 LEAPS 查詢本身（候選排行已在上面寫完）。
+  # 盤中由 fetch_leaps 決定不呼叫（見 skip_iv）。
+  def persist_iv_surface(data, source)
+    points = LeapsIvCapture.new(@symbol, source: source).persist_leaps_chain(data)
+    log_fetch("leaps_iv_surface", "success", "points=#{points}")
+  rescue => e
+    Rails.logger.warn("[leaps_iv] IV 曲面寫入失敗（不影響 LEAPS 查詢）#{@symbol}: #{e.class}: #{e.message}")
+    log_fetch("leaps_iv_surface", "error", "#{e.class}: #{e.message}".first(500))
   end
 
   # 另案 3：爬蟲只抓 Short DTE 19–45 天，持有中的短腳進入 < 19 天（正要考慮滾倉）
