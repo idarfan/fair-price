@@ -21,7 +21,7 @@
 
 | 階段 | 名稱 | 狀態 | 驗證證據（檔案/指令輸出摘要） | 審查 | 更新時間 |
 |---|---|---|---|---|---|
-| P0 | 偵察（只讀） | ⬜ 未開始 | | | |
+| P0 | 偵察（只讀） | ✅ 完成 | `docs/leaps-iv-recon.md` 11 個標題齊全；`tmp/recon/barchart_iv.png`；`git diff --stat -- app lib db config` 為空。偵察發現規格與現況不符 5 處（P4 pm2 時區、9223 不存在、margin-reminder 不存在、HV 標籤無天數、Barchart 歷史最長 2Y／520 列），進入對應階段前須使用者裁示後 patch | PASS（r1，附 4 條質詢） | 2026-11-06 |
 | P1 | Schema | ⬜ | | | |
 | P2 | 爬蟲擴充 | ⬜ | | | |
 | P3 | 計算服務 | ⬜ | | | |

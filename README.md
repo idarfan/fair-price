@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-11-06（五）— LEAPS IV 環境 P0 偵察
+
+新增 `docs/leaps-iv-recon.md`（`leaps-iv-environment.md` P0，只讀未改程式）：LEAPS 爬蟲呼叫鏈、Delta 篩選在爬蟲端
+（非候選履約價的 IV 沒讀到）、PMCC 短天期鏈有 IV、Barchart Options Overview History 的 `bc-data-grid` 欄位與單位
+（IV Pctl 為小數）、Select History 最長 2Y／520 列、HV 只在 options／overview 頁且標籤無天數、pm2 daemon 為 UTC、
+CDP 共用 9222 且無跨程序互斥、近 30 天查詢過的 symbol 可由 `fetch_logs` 取得。
+
 ### 2026-10-12（一）— 版本 v20261012，更新版本說明
 
 - 版本更新說明新增 v20261012（涵蓋 10/10～10/12）：LEAPS 不填履約價時候選改從完整鏈挑 Δ 0.60–0.90、「期權鏈無此履約價」與「Delta 不足」分開顯示、舊結果網址顯示「已不是最新」、PMCC Long Δ ≥ 0.80 與 Short DTE 19–45 改為篩選、PMCC 無合格組合時說明擋下的規則、指定履約價時提供「不填履約價重新查詢」與 LEAPS 到期日的緩衝檔、履約價欄下方提示垂直價差顯示條件。
