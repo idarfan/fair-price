@@ -81,9 +81,9 @@
    - 「download」按鈕能否用 Playwright 點擊下載 CSV，CSV 欄位是否與表格相同
    - 頁首 `HV` 數值與 selector
    - 截圖存 `tmp/recon/barchart_iv.png`
-6. `## pm2 排程` — ecosystem 檔路徑、既有 margin-reminder 的排程寫法
+6. `## pm2 排程` — ecosystem 檔路徑、既有 margin-reminder 的排程寫法（2026-11-06 P0 實測：margin-reminder 不存在，改以 `iv-daily-snapshot` 為範本）
 7. `## 圖表元件` — 既有 Chart.js 使用位置（IV Skew Tracker 的檔案路徑）
-8. `## 爬蟲併發控制` — 互動查詢與排程是否共用同一個 CDP Chrome（cdp-relay 9223）；既有的鎖／佇列機制檔案路徑；若沒有，明寫「無」
+8. `## 爬蟲併發控制` — 互動查詢與排程是否共用同一個 CDP Chrome（2026-11-06 P0 實測：cdp-relay 9223 不存在，兩者都直接連 9222）；既有的鎖／佇列機制檔案路徑；若沒有，明寫「無」
 9. `## LEAPS 查詢紀錄` — 「最近 30 天在 /leaps 查詢過的 symbol」可從哪張表／哪個欄位取得（活躍度追蹤或 LEAPS job 表），附一條可執行的 SQL
 10. `## 到期日與 DTE` — 本次 TSM 查詢實際抓到的所有到期日與 DTE，並確認 540 天被夾住
 11. `## 收摺卡片與 tooltip` — 渲染 `#leaps-week52-card` 的 Phlex 元件路徑；正式站 `/assets/leaps_recommendations/tooltips-*.js` 對應的 repo 原始檔路徑；`VERTICAL_SPREAD_EXPLAIN` 與 `TOUR_ORDER` 所在行號；`#leaps-col-tip` 樣式所在 CSS 檔路徑
@@ -109,8 +109,8 @@ git diff --stat -- app lib db config   # 須為空（P0 不得改碼）
 | as_of_date | date, not null | 美東交易日 |
 | spot | decimal(12,4) | |
 | cm540_atm_iv | decimal(8,5) | 可為 null |
-| bc_hv | decimal(8,5) | Barchart 頁首 Historic Volatility |
-| bc_hv_label | string | 頁面上 HV 的原始標籤（含天數，例如 HV 20 天） |
+| bc_hv | decimal(8,5) | Barchart Historical Volatility，讀自 `/stocks/quotes/{SYMBOL}/overview`（options-history 頁沒有 HV） |
+| bc_hv_label | string | 固定存「HV 30 天」：頁面標籤沒有天數，天數依據 overview 頁名詞說明「30-Day Historical Volatility」（2026-11-06 使用者裁示） |
 | source | string, not null | `scheduled` / `adhoc` |
 | captured_at | datetime, not null | 實際抓取時間 |
 | source_url | string, not null | 實際抓取 URL |
@@ -162,8 +162,8 @@ bin/rails runner 'p LeapsIvSnapshot.column_names.sort; p LeapsIvSurfacePoint.col
 2. 既有 `Delta ≥ 0.60` 候選排行行為**不得改變**：改動前先對 TSM 存一份候選排行（到期日＋履約價＋Mid）為 `tmp/regress/leaps_before.json`，改動後同一份原始資料重算存 `leaps_after.json`，兩檔須完全相同。
 3. 若 P0 確認 PMCC 短天期快照有 IV，曲面讀取時合併（不重抓）；沒有則曲面只含 LEAPS 段，不另開爬蟲。
 4. 新增 Options Overview History 讀取（selector／下載方式用 P0 第 5 點記錄的），兩種模式：
-   - `latest`：每次抓取時讀表格最新列，upsert 進 `barchart_iv_histories`；同時把頁首 HV 寫入 `leaps_iv_snapshots.bc_hv`、`bc_hv_label`
-   - `backfill`：選 P0 實測可用的最長區間，整段 upsert（優先用表格 DOM；表格顯示不全才用 download CSV，仍須透過 Playwright 點擊 UI，不得直接請求下載網址）
+   - `latest`：每次抓取時讀表格最新列，upsert 進 `barchart_iv_histories`；同時從 overview 頁讀 Historical Volatility 寫入 `leaps_iv_snapshots.bc_hv`，`bc_hv_label` 存「HV 30 天」
+   - `backfill`：選 P0 實測可用的最長區間（2Y；Barchart 會記住上次選的區間，每次都要明確切換，不得假設預設值），整段 upsert（優先用表格 DOM；表格顯示不全才用 download CSV，仍須透過 Playwright 點擊 UI，不得直接請求下載網址）
    - 百分比欄位轉小數（51.92% → 0.5192），IV Rank／IV Pctl 存 0–100
 5. 寫入 `source_url`、`captured_at`；`as_of_date` 依「名詞與公式」規則。
 6. 本階段只存原始資料；`cm540_atm_iv` 由 P3 服務計算後寫入，爬蟲不得自行計算。
@@ -179,7 +179,7 @@ psql -c "select as_of_date, bc_hv, bc_hv_label, source_url from leaps_iv_snapsho
 
 # backfill 後：
 psql -c "select min(trade_date), max(trade_date), count(*) from barchart_iv_histories where symbol='TSM';"
-# count 須等於 P0 記錄的最長區間列數
+# count 須等於驗收當下 Barchart 2Y 區間的表格列數（P0 實測 2026-11-06 為 520，列數隨日期變動，驗收時重測並列出兩邊數字）
 psql -c "select imp_vol, iv_rank, iv_pctl, pc_vol_ratio, last_price from barchart_iv_histories where symbol='TSM' and trade_date='2026-11-05';"
 # 須為 0.51920 | 82.44 | 92.00 | 0.9200 | 353.1000（2026-11-06 人工實測頁面值）
 
@@ -217,7 +217,7 @@ spec 必含：「名詞與公式」全部測試向量（逐一對應 example）�
 - 只抓 LEAPS 鏈與 Barchart IV 指標（`latest` 模式），不產生候選排行或 PMCC 結果。
 - 標的在 `barchart_iv_histories` 沒有任何列時，先跑一次 `backfill` 模式。
 - 另提供 `bin/leaps_iv_snapshot --backfill SYMBOL` 手動回補單一標的。
-- pm2 排程：cron `30 6 * * 2-6`（WSL2 系統時區 Asia/Taipei；美股收盤為台北 04:00/05:00），`autorestart: false`，沿用 P0 第 6 點的 ecosystem 寫法。
+- pm2 排程：cron `0 6 * * 2-6`，`autorestart: false`，沿用 `iv-daily-snapshot`（`ecosystem.config.cjs`）的寫法。pm2 daemon 時區為 **UTC**（P0 實測），UTC 06:00＝台北 14:00（週二～週六），抓前一個美國交易日的收盤資料；選台北 14:00 是因為使用者電腦此時通常開著（2026-11-06 使用者裁示）。
 - 美股休市日：頁面報價日期不變，`as_of_date` 相同，自然 upsert，不產生新的一天。
 
 **驗證**
@@ -225,7 +225,7 @@ spec 必含：「名詞與公式」全部測試向量（逐一對應 example）�
 bin/leaps_iv_snapshot && bin/leaps_iv_snapshot   # 連跑兩次
 psql -c "select symbol, as_of_date, count(*) from leaps_iv_snapshots group by 1,2 having count(*)>1;"   # 須 0 筆
 pm2 jlist | jq '.[] | select(.name=="leaps-iv-snapshot") | {cron: .pm2_env.cron_restart, autorestart: .pm2_env.autorestart}'
-# 須為 {"cron":"30 6 * * 2-6","autorestart":false}
+# 須為 {"cron":"0 6 * * 2-6","autorestart":false}
 ```
 併發測試：手動跑排程的同時在 `/leaps` 按查詢，log 須顯示其中一方等待鎖，兩者都成功完成，無 CDP 錯誤。
 
