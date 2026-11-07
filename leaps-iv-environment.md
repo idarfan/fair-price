@@ -27,6 +27,7 @@
 | P3 | 計算服務 | ✅ 完成 | `LeapsIvEnvironmentService`（call／persist!）；規格測試向量逐一對應 + PMCC 讀取時合併（與快照同一次抓取、相差 1 小時內才併）；TSM 實資料 CM540＝0.427937（Python 獨立重算一致）；完整 rspec 1465 passed | PASS（r1，附 2 條質詢） | 2026-11-06 |
 | P4 | 每日快照排程 | ✅ 完成 | pm2 `leaps-iv-snapshot`（`0 6 * * 2-6` UTC）＋`LeapsIvCdpLock`（shared／exclusive advisory lock）＋`LeapsIvSnapshotRunner`；11/07 手動連跑兩輪＋cron 正式觸發一輪（台北 14:00）9 檔全 success、0 重複；CSCO／NOK／ORCL／TSM 頁首收盤價＝DB spot＝Barchart 歷史收盤價；TSM 曲面 5 到期日 68／64／52／59／51＝頁面全部 call 履約價數，CM540 0.42085 獨立重算一致；鎖逾時畫面 `tmp/regress/p4_lock_timeout_ui.png`；完整 rspec 1609 passed | PASS（r2，附 2 條質詢：pm2 不明來源啟動、missing 保留舊點實跑，P7 回覆；r1 FAIL：最終程式碼未實跑、22:08 結果寫錯） | 2026-11-07 |
 | P5 | UI 區塊 | ✅ 完成 | `IvEnvironmentSection`（＋`IvEnvironmentHeatmap`）放在推薦分析上方、預設收合；tooltips.js `IV_ENV_EXPLAIN` 14 key（無刪改既有行，導覽第 6 步）；`leapsIvEnvironment.ts` 第一次展開才畫兩張圖；查詢中標「更新中」；正式站 TSM 實測：熱圖 14 欄、Vega 計算句「每口約損失 $595」；component 20／request 83／完整 rspec 1636 passed、vitest 91 passed | PASS（r1，附 2 條質詢：PMCC 短天期併入後熱圖色階與期限結構被壓扁需使用者裁示、同日多次查詢覆寫說明，P6／P7 前回覆） | 2026-11-07 |
+| P5.1 | 短天期點的呈現（使用者裁示） | ✅ 完成 | 熱圖色階只依 LEAPS 列（DTE ≥ 364），短天期列移到分隔標題下方、灰底不上色；期限結構只畫 LEAPS 段；正式站已併入 PMCC 的 TSM：LEAPS 70 格端點 39.6%＝HEAT_LOW、49.4%＝HEAT_HIGH，短天期 56 格 0 格上色，期限結構點 405–804 天；完整 rspec 1640 passed | PASS（r1） | 2026-11-07 |
 | P6 | 推薦文字整合 | ⬜ | | | |
 | P7 | 端到端驗收 | ⬜ | | | |
 
@@ -313,6 +314,31 @@ for k in ivenv_overview ivenv_leaps_rank ivenv_leaps_pct ivenv_cm540 ivenv_accum
   grep -q "$k:" <tooltips 原始檔> || echo "MISSING $k"; done        # 須無輸出
 git diff <tooltips 原始檔> | grep '^-' | grep -v '^---'              # 只允許 TOUR_ORDER 那一行的變動，其餘既有行不得刪改
 ```
+
+---
+
+## P5.1 短天期點的呈現（2026-11-07 使用者裁示，P5 r1 審查質詢 1）
+
+背景：查詢後曲面會依 P2.3 併入 PMCC 短天期到期日（例：TSM 20–41 天，IV 最高 92.9%）。依 P5 原文「色階依該表最小→最大」，LEAPS 列（40–49%）全擠在最淺的色階；期限結構的 x 軸從 20 天起算，LEAPS 段被壓扁。
+
+LEAPS 列的定義：DTE ≥ `LeapsRankingService::MIN_DTE`（364，與爬蟲 `LEAPS_MIN_DTE`、推薦近天期下限同一個值）；其餘為短天期。
+
+1. **熱圖**：
+   - 色階只依 LEAPS 列的 IV 最小→最大計算。
+   - LEAPS 列照 DTE 由小到大排在上方；短天期列排在 LEAPS 列下方，前面加一列分隔標題「PMCC 短天期（參考，不上色）」。
+   - 短天期格仍顯示 IV% 數字，用灰底、不套色階。
+   - 沒有短天期列時，不出現分隔標題。
+2. **期限結構圖**：只畫 LEAPS 段（DTE ≥ 364）的點，短天期點不畫。
+3. CM540、Rank、Percentile 的計算不變（仍用 P3 的 term_structure，含短天期點，只影響畫面）。
+
+**驗證**
+- component spec：fixture 含 1 個短天期到期日（IV 0.90）與 2 個 LEAPS 到期日。驗證：
+  - 色階端點取自 LEAPS 列：LEAPS 最高 IV 那格＝`HEAT_HIGH`、最低 IV 那格＝`HEAT_LOW`。
+  - 短天期格沒有 `data-accent-bg`，數字照常顯示。
+  - 短天期列位於分隔標題之後、所有 LEAPS 列之後。
+  - 期限結構資料不含 DTE < 364 的點。
+  - 沒有短天期時沒有分隔標題。
+- e2e：查詢後已併入 PMCC 的 TSM 頁面，附展開截圖與 DOM 取值（各列的 DTE 順序、LEAPS 格色階的端點、期限結構點的 DTE）。
 
 ---
 

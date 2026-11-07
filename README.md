@@ -1,5 +1,10 @@
 # FairPrice
 
+### 2026-11-07（六）— LEAPS IV 環境 P5.1：短天期點不再壓扁 LEAPS 的熱圖與期限結構
+
+- IV 曲面熱圖的色階只依 LEAPS 到期日（DTE ≥ 364）計算；查詢後併入的 PMCC 短天期列移到下方，灰底不上色、數字照常顯示
+- ATM IV 期限結構只畫 LEAPS 段；CM540 與 Rank 的計算不變
+
 ### 2026-11-07（六）— LEAPS IV 環境 P5：/leaps 的 IV 環境區塊
 
 - 「推薦分析」上方新增可收摺的「IV 環境 · {代號}」卡片（預設收合）：摘要顯示 Barchart IV Rank 與 ATM IV（540 天）

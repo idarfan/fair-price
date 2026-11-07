@@ -158,8 +158,9 @@ class LeapsRecommendations::IvEnvironmentSection < ApplicationComponent
 
   # ── 圖表資料（交給 leapsIvEnvironment.ts 畫）────────────────────────────────
   def term_points
+    # P5.1：只畫 LEAPS 段，短天期點會把 x 軸拉到 20 天、壓扁 LEAPS 段（CM540 的計算不受影響）
     Array(@env[:term_structure]).filter_map do |pt|
-      { x: pt[:dte], y: (pt[:atm_iv] * 100).round(2) } if pt[:atm_iv]
+      { x: pt[:dte], y: (pt[:atm_iv] * 100).round(2) } if pt[:atm_iv] && pt[:dte] >= LEAPS_MIN_DTE
     end
   end
 

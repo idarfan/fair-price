@@ -173,6 +173,45 @@ RSpec.describe LeapsRecommendations::IvEnvironmentSection do
     end
   end
 
+  # P5.1（使用者裁示）：PMCC 短天期點不參與色階、排在 LEAPS 列之後；期限結構只畫 LEAPS 段
+  describe "短天期點的呈現（P5.1）" do
+    let(:short_exp) { Date.new(2026, 11, 27) }
+    let(:with_short) do
+      short = [ { expiration: short_exp, dte: 20, moneyness: 0.65, call_iv: 0.90 },
+                { expiration: short_exp, dte: 20, moneyness: 1.00, call_iv: 0.50 } ]
+      term = env[:term_structure] + [ { expiration: short_exp, dte: 20, atm_iv: 0.50 } ]
+      env.merge(surface: short + surface, term_structure: term)
+    end
+    let(:doc) { render_html(env: with_short) }
+    let(:table) { doc.at_css("table[data-ivenv-heatmap]") }
+
+    it "色階只依 LEAPS 列：LEAPS 最高 IV＝HEAT_HIGH、最低＝HEAT_LOW；短天期格不上色但照常顯示數字" do
+      leaps = table.css("tbody tr[data-ivenv-row='leaps'] td[data-accent-bg]").to_h { |td| [ td.text.strip, td["data-accent-bg"] ] }
+      expect(leaps["50.0%"]).to eq(described_class::HEAT_HIGH)
+      expect(leaps["40.0%"]).to eq(described_class::HEAT_LOW)
+
+      short_cells = table.css("tbody tr[data-ivenv-row='short'] td")
+      expect(short_cells.map { |td| td.text.strip }).to include("90.0%", "50.0%")
+      expect(short_cells.select { |td| td["data-accent-bg"] }).to be_empty
+    end
+
+    it "短天期列在分隔標題之後、所有 LEAPS 列之後" do
+      kinds = table.css("tbody tr").map { |tr| tr["data-ivenv-row"] }
+      expect(kinds).to eq(%w[leaps leaps divider short])
+      expect(table.at_css("tbody tr[data-ivenv-row='divider']").text).to include("PMCC 短天期（參考，不上色）")
+      expect(table.at_css("tbody tr[data-ivenv-row='short'] th").text).to eq("2026-11-27（20 天）")
+    end
+
+    it "期限結構資料不含 DTE < 364 的點" do
+      points = JSON.parse(doc.at_css("canvas[data-ivenv-chart='term']")["data-ivenv-points"])
+      expect(points.map { |p| p["x"] }).to eq([ 405, 587 ])
+    end
+
+    it "沒有短天期時沒有分隔標題" do
+      expect(html.at_css("tbody tr[data-ivenv-row='divider']")).to be_nil
+    end
+  end
+
   describe "圖表與資料資訊" do
     it "期限結構資料只含 atm_iv 不為 nil 的到期日" do
       points = JSON.parse(html.at_css("canvas[data-ivenv-chart='term']")["data-ivenv-points"])
