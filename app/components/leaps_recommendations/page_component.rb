@@ -13,7 +13,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   include LeapsRecommendations::PmccEducation
   include LeapsRecommendations::VocabCards
 
-  def initialize(symbol: nil, candidates: [], recommendation: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil, next_earnings: nil, pmcc_ranking: nil, pmcc_tracker: nil, price_context: nil)
+  def initialize(symbol: nil, candidates: [], recommendation: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil, next_earnings: nil, pmcc_ranking: nil, pmcc_tracker: nil, price_context: nil, iv_environment: nil)
     @symbol         = symbol
     @candidates     = Array(candidates)
     @recommendation = recommendation
@@ -31,6 +31,8 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     # 三個價格情境 widget 的資料。首次載入時通常是 nil（還沒抓），
     # 畫面先出骨架，由 leapsPriceContext.ts 輪詢 /leaps/price_context 換上來。
     @price_context  = price_context
+    # IV 環境區塊（leaps-iv-environment P5）：LeapsIvEnvironmentService#call 的回傳值，controller 算好傳進來。
+    @iv_environment = iv_environment
   end
 
 
@@ -42,6 +44,8 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
       render_search_form
       render_status_bar if @scrape_status
       render_price_context
+      # 放在「推薦分析」上方；不跟候選排行綁在一起——還沒查過時也要顯示「尚無 IV 資料，請按查詢」
+      render_iv_environment
       if @candidates.any?
         render_recommendation if @recommendation
         render_ranking_table
@@ -63,6 +67,14 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
 
 
   private
+
+  def render_iv_environment
+    return if @symbol.blank?
+
+    render LeapsRecommendations::IvEnvironmentSection.new(
+      symbol: @symbol, env: @iv_environment, near_pick: @recommendation&.dig(:near_term, :pick)
+    )
+  end
 
   def render_vertical_spread_frame
     return unless @symbol.present? && @user_strike.present?

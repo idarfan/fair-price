@@ -1,5 +1,15 @@
 # FairPrice
 
+### 2026-11-07（六）— LEAPS IV 環境 P5：/leaps 的 IV 環境區塊
+
+- 「推薦分析」上方新增可收摺的「IV 環境 · {代號}」卡片（預設收合）：摘要顯示 Barchart IV Rank 與 ATM IV（540 天）
+- 展開後：LEAPS 天期徽章（IV Rank／Percentile／ATM IV 540 天，未滿 20 天顯示累積中）與 Barchart 參考徽章
+  （IV Rank／Pctl／Imp Vol／HV）、Barchart IV Rank 與股價走勢、ATM IV 期限結構（虛線 540 天）、IV 曲面熱圖
+  （moneyness 0.60–1.25 共 14 欄、1.00 欄橘框）、資料時間與來源
+- 每個名詞都有 tooltip（滑過看說明、點擊聚光、「欄位導覽」多一步）；LEAPS IV Rank 的說明帶推薦近天期合約的
+  Vega，換算「IV 每下降 5 點，每口約損失多少」
+- 按「查詢」時區塊保留既有資料並標「更新中」；讀取失敗會照實顯示，不會整頁出錯
+
 ### 2026-11-07（六）— LEAPS IV 環境 P4：每日 IV 快照排程
 
 - 新 pm2 排程 `leaps-iv-snapshot`（`0 6 * * 2-6` UTC＝台北週二～六 14:00）：標的＝`config/leaps_iv.yml` 的 watchlist

@@ -120,7 +120,8 @@ class LeapsRecommendationsController < ApplicationController
       pmcc_tracker:   @pmcc_tracker,
       # 已經有快照就直接畫，不必等前端輪詢一輪才看到東西。
       # 沒有就傳 nil，畫面出骨架，由 leapsPriceContext.ts 接手。
-      price_context:  price_context_payload
+      price_context:  price_context_payload,
+      iv_environment: iv_environment_for(@symbol)
     )
   end
 
@@ -402,6 +403,17 @@ class LeapsRecommendationsController < ApplicationController
   #
   # 一律從 current_user 出發（比照 Api::V1::MarginPositionsController），
   # 別人的部位查不到。
+  # IV 環境區塊（leaps-iv-environment P5）的資料。讀取失敗不能讓整頁 500，也不能假裝「尚無資料」：
+  # 回傳 :error 狀態，區塊照實顯示讀取失敗，細節寫 log。
+  def iv_environment_for(symbol)
+    return nil if symbol.blank?
+
+    LeapsIvEnvironmentService.new.call(symbol: symbol)
+  rescue StandardError => e
+    Rails.logger.error("[leaps_iv_env] #{symbol} 讀取失敗：#{e.class}: #{e.message}")
+    { status: :error }
+  end
+
   def pmcc_tracker_for(symbol)
     return nil if symbol.blank? || current_user.blank?
 

@@ -35,7 +35,19 @@ module LeapsPageHtml
     strip_build_rules_note(doc)
     strip_strike_hint(doc)
     strip_hall_of_fame_entry(doc)
+    strip_iv_environment(doc)
     canonical(doc.to_html)
+  end
+
+  # 2026-11-07 /leaps 新增 IV 環境區塊（leaps-iv-environment P5，使用者裁示例外更新本檔），與既有區塊無關。
+  # 內容由 spec/components/leaps_recommendations/iv_environment_section_spec.rb 與
+  # spec/requests/leaps_recommendations_spec.rb 的「IV 環境區塊（P5）」驗證。
+  def strip_iv_environment(doc)
+    doc.css("#leaps-iv-environment").each do |node|
+      # 同 strip_build_rules_note：區塊前面的換行文字節點一起拿掉，兩邊才一致。
+      node.previous_sibling.remove if node.previous_sibling&.text? && node.previous_sibling.text.strip.empty?
+      node.remove
+    end
   end
 
   # 2026-10-18 sidebar 最末位新增「投資名人堂」（hall-of-fame-spec P5-4，使用者裁示例外更新本檔）。

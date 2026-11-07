@@ -46,7 +46,12 @@ class LeapsIvEnvironmentService
       status:         enough ? :ok : :accumulating,
       term_structure: term,
       surface:        surface(chain, snapshot),
-      barchart:       barchart(symbol, snapshot)
+      barchart:       barchart(symbol, snapshot),
+      # P5 區塊底部的資料資訊列（元件不得自行查 DB）
+      spot:           snapshot.spot&.to_f,
+      captured_at:    snapshot.captured_at,
+      source:         snapshot.source,
+      source_url:     snapshot.source_url
     }
   end
 
@@ -107,7 +112,7 @@ class LeapsIvEnvironmentService
 
   def no_data(as_of_date)
     { as_of_date: as_of_date, cm540: nil, rank: nil, percentile: nil, history_count: 0, status: :no_data,
-      term_structure: [], surface: [], barchart: nil }
+      term_structure: [], surface: [], barchart: nil, spot: nil, captured_at: nil, source: nil, source_url: nil }
   end
 
   def find_snapshot(symbol, as_of_date)

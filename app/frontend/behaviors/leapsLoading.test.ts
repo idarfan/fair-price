@@ -20,6 +20,7 @@ const PAGE = `
   <div id="leaps-strike-error" class="hidden"></div>
   <div data-leaps-status-alert>❌ 抓取時發生未知錯誤，請稍後重試。</div>
   <div id="unrelated">其他區塊</div>
+  <details id="leaps-iv-environment"><summary><span data-ivenv-updating class="hidden">更新中</span></summary></details>
   <button type="button" data-leaps-requery-auto>不填履約價重新查詢</button>
 `;
 
@@ -70,6 +71,21 @@ describe("leapsLoading", () => {
     const [url, opts] = fetchMock.mock.calls[0] ?? [];
     expect(url).toBe("/leaps/analyze");
     expect(JSON.parse(String(opts?.body))).toEqual({ symbol: "ORCL" });
+  });
+
+  // leaps-iv-environment P5：查詢進行中 IV 環境區塊保留既有資料，只標「更新中」
+  it("送出查詢時 IV 環境區塊標「更新中」，區塊本身不隱藏", () => {
+    submit();
+    expect(
+      document
+        .querySelector("[data-ivenv-updating]")
+        ?.classList.contains("hidden"),
+    ).toBe(false);
+    expect(
+      document
+        .getElementById("leaps-iv-environment")
+        ?.classList.contains("hidden"),
+    ).toBe(false);
   });
 
   it("不動其他區塊", () => {

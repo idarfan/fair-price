@@ -63,6 +63,11 @@ export function init(root: HTMLElement): void {
       .querySelectorAll("[data-leaps-status-alert]")
       .forEach((el) => el.classList.add("hidden"));
 
+    // IV 環境區塊保留既有最新資料，只標「更新中」（leaps-iv-environment P5）
+    document
+      .querySelectorAll("[data-ivenv-updating]")
+      .forEach((el) => el.classList.remove("hidden"));
+
     btn.disabled = true;
     btn.textContent = "查詢中…";
     btn.classList.add("opacity-50", "cursor-not-allowed");

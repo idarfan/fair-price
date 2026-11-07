@@ -1227,4 +1227,90 @@ RSpec.describe "GET /leaps", type: :request do
       expect(response.body).not_to include("NaN")
     end
   end
+
+  # leaps-iv-environment P5：IV 環境區塊。資料走真的 LeapsIvEnvironmentService（DB fixture），
+  # 不 stub，確認 route → controller → service → component 整條路徑。
+  describe "IV 環境區塊（P5）" do
+    let(:as_of)   { Date.new(2026, 11, 6) }
+    let(:tsm_url) { "https://www.barchart.com/stocks/quotes/TSM/options" }
+
+    before do
+      allow(LeapsOptionChainSnapshot).to receive(:fresh_for?).and_return(true)
+      allow(LeapsRankingService).to receive(:new).and_return(instance_double(LeapsRankingService, call: fake_candidates))
+      allow(LeapsOptionsFlowPanelService).to receive(:new)
+        .and_return(instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel))
+    end
+
+    # 2026-11-06 TSM 實資料（P4 r2）：S=375.44，440／587 天 K370／K380 → CM540 0.42085
+    def tsm_today!
+      LeapsIvSnapshot.create!(symbol: "TSM", as_of_date: as_of, spot: 375.44, source: "scheduled",
+                              captured_at: Time.zone.parse("2026-11-07 06:01:07 UTC"), source_url: tsm_url)
+      { 440 => [ 0.4176, 0.4138 ], 587 => [ 0.4238, 0.4218 ] }.each do |dte, (iv370, iv380)|
+        { 370.0 => iv370, 380.0 => iv380 }.each do |k, iv|
+          LeapsIvSurfacePoint.create!(symbol: "TSM", as_of_date: as_of, expiration: as_of + dte, dte: dte, strike: k,
+                                      moneyness: (k / 375.44).round(4), call_iv: iv, captured_at: Time.current)
+        end
+      end
+    end
+
+    def tsm_history!(count)
+      count.times do |i|
+        LeapsIvSnapshot.create!(symbol: "TSM", as_of_date: as_of - (i + 1), spot: 370, source: "scheduled",
+                                cm540_atm_iv: 0.40 + i * 0.001, captured_at: Time.current, source_url: tsm_url)
+      end
+    end
+
+    def section
+      Nokogiri::HTML(response.body).at_css("details#leaps-iv-environment")
+    end
+
+    it "GET /leaps?symbol=TSM&job_status=success 回應包含區塊與 fixture 的 CM540（百分比）" do
+      tsm_today!
+      tsm_history!(20)
+      get "/leaps", params: { symbol: "TSM", job_status: "success" }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include('id="leaps-iv-environment"')
+      expect(section.at_css("summary").text).to include("ATM IV（540 天）42.1%")
+    end
+
+    it "帶 user_strike=350 同樣包含該區塊" do
+      tsm_today!
+      get "/leaps", params: { symbol: "TSM", job_status: "success", user_strike: "350" }
+
+      expect(response).to have_http_status(:ok)
+      expect(section).to be_present
+      expect(section.text).to include("42.1%")
+    end
+
+    it "ok：歷史滿 20 筆，顯示 LEAPS IV Rank 數值與歷史筆數" do
+      tsm_today!
+      tsm_history!(20)
+      get "/leaps", params: { symbol: "TSM", job_status: "success" }
+
+      expect(section.text).to include("歷史資料 20/252 天")
+      expect(section.text).not_to include("資料累積中")
+    end
+
+    it "accumulating：歷史不滿 20 筆，顯示「資料累積中 n/252 天」" do
+      tsm_today!
+      tsm_history!(3)
+      get "/leaps", params: { symbol: "TSM", job_status: "success" }
+
+      expect(section.text).to include("資料累積中 3/252 天")
+    end
+
+    it "no_data：沒有任何 IV 快照，顯示「尚無 IV 資料，請按查詢」" do
+      get "/leaps", params: { symbol: "TSM", job_status: "success" }
+
+      expect(section.text).to include("尚無 IV 資料，請按查詢")
+    end
+
+    it "還沒有 LEAPS 資料（尚未查詢）時區塊也在，不跟候選排行綁在一起" do
+      allow(LeapsOptionChainSnapshot).to receive(:fresh_for?).and_return(false)
+      get "/leaps", params: { symbol: "TSM" }
+
+      expect(section.text).to include("尚無 IV 資料，請按查詢")
+    end
+  end
 end

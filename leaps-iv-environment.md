@@ -26,7 +26,7 @@
 | P2 | 爬蟲擴充 | ✅ 完成 | LEAPS 爬蟲 Stage 3（篩 Delta 前全履約價 IV）＋`barchart_iv_history_scraper.py`（latest／backfill，切回原區間）＋`LeapsIvCapture`；TSM 實查：曲面 5 到期日×23 點＝頁面數、快照全欄非 null、2Y 回補 520 列＝頁面列數；排行回歸 SAME（83 筆）；合約 IV 與歷史 3 日期截圖逐欄一致；盤中不寫 IV（`--skip-iv-surface`）；完整 rspec 1445 passed | PASS（r2；r1 FAIL：缺中段／最舊列截圖） | 2026-11-06 |
 | P3 | 計算服務 | ✅ 完成 | `LeapsIvEnvironmentService`（call／persist!）；規格測試向量逐一對應 + PMCC 讀取時合併（與快照同一次抓取、相差 1 小時內才併）；TSM 實資料 CM540＝0.427937（Python 獨立重算一致）；完整 rspec 1465 passed | PASS（r1，附 2 條質詢） | 2026-11-06 |
 | P4 | 每日快照排程 | ✅ 完成 | pm2 `leaps-iv-snapshot`（`0 6 * * 2-6` UTC）＋`LeapsIvCdpLock`（shared／exclusive advisory lock）＋`LeapsIvSnapshotRunner`；11/07 手動連跑兩輪＋cron 正式觸發一輪（台北 14:00）9 檔全 success、0 重複；CSCO／NOK／ORCL／TSM 頁首收盤價＝DB spot＝Barchart 歷史收盤價；TSM 曲面 5 到期日 68／64／52／59／51＝頁面全部 call 履約價數，CM540 0.42085 獨立重算一致；鎖逾時畫面 `tmp/regress/p4_lock_timeout_ui.png`；完整 rspec 1609 passed | PASS（r2，附 2 條質詢：pm2 不明來源啟動、missing 保留舊點實跑，P7 回覆；r1 FAIL：最終程式碼未實跑、22:08 結果寫錯） | 2026-11-07 |
-| P5 | UI 區塊 | ⬜ | | | |
+| P5 | UI 區塊 | ✅ 完成 | `IvEnvironmentSection`（＋`IvEnvironmentHeatmap`）放在推薦分析上方、預設收合；tooltips.js `IV_ENV_EXPLAIN` 14 key（無刪改既有行，導覽第 6 步）；`leapsIvEnvironment.ts` 第一次展開才畫兩張圖；查詢中標「更新中」；正式站 TSM 實測：熱圖 14 欄、Vega 計算句「每口約損失 $595」；component 20／request 83／完整 rspec 1636 passed、vitest 91 passed | PASS（r1，附 2 條質詢：PMCC 短天期併入後熱圖色階與期限結構被壓扁需使用者裁示、同日多次查詢覆寫說明，P6／P7 前回覆） | 2026-11-07 |
 | P6 | 推薦文字整合 | ⬜ | | | |
 | P7 | 端到端驗收 | ⬜ | | | |
 
@@ -267,7 +267,7 @@ pm2 jlist | jq '.[] | select(.name=="leaps-iv-snapshot") | {cron: .pm2_env.cron_
 
 | key | 掛在哪個元素 | title | desc |
 |---|---|---|---|
-| ivenv_overview | summary | 🌡 IV 環境 | 補上排行表沒回答的三個問題。TIP_H「三個問題」＋TIP_L：「<b>什麼時候買</b> → 看 LEAPS IV Rank（540 天）」「<b>買哪個到期日</b> → 看 ATM IV 期限結構」「<b>買哪個履約價</b> → 看 IV 曲面」。TIP_H「兩組指標」＋TIP_L：「左組：FairPrice 自算的 LEAPS 天期，決定 LEAPS 價格的主要是這組」「右組：Barchart 短天期參考，容易被財報、單日大跌拉動，當短期情緒看」「兩組天期不同，不能直接比大小」。 |
+| ivenv_overview | summary 內標題右側的 ⓘ（2026-11-07 使用者裁示：不掛整條 summary，避免每次展開／收合都跳出聚光說明；導覽 `el` 仍為 summary） | 🌡 IV 環境 | 補上排行表沒回答的三個問題。TIP_H「三個問題」＋TIP_L：「<b>什麼時候買</b> → 看 LEAPS IV Rank（540 天）」「<b>買哪個到期日</b> → 看 ATM IV 期限結構」「<b>買哪個履約價</b> → 看 IV 曲面」。TIP_H「兩組指標」＋TIP_L：「左組：FairPrice 自算的 LEAPS 天期，決定 LEAPS 價格的主要是這組」「右組：Barchart 短天期參考，容易被財報、單日大跌拉動，當短期情緒看」「兩組天期不同，不能直接比大小」。 |
 | ivenv_leaps_rank | LEAPS IV Rank（540 天）徽章 | 📊 LEAPS IV Rank（540 天） | 回答「現在買，時間價值貴不貴」：今天的 540 天 ATM IV 落在過去一年最低～最高之間的位置（0–100）。TIP_H「為什麼重要」＋TIP_L：「IV 偏高時買進，之後 IV 回落會直接吃掉獲利：損失 ≈ Vega × IV 下降點數 × 100（每口）」「天期越長 Vega 越大，越怕 IV 回落」。TIP_H「怎麼看」＋TIP_L：「< 30：時間價值相對便宜」「30–60：中性」「> 60：偏貴，可分批進場或改選更深價內（外在價值較低）」「只說明跟過去比貴或便宜，不預測股價方向」。另加 `data-tip-lines`（見下方規則）。 |
 | ivenv_leaps_pct | IV Percentile 徽章 | 📈 IV Percentile | 過去一年中，有幾 % 的交易日 540 天 ATM IV 比今天低。和 IV Rank 互相參照：Rank 看位置，Percentile 看天數。 |
 | ivenv_cm540 | ATM IV（540 天）徽章 | 🌊 ATM IV（540 天） | 把夾住 540 天的兩個到期日的價平 IV，用總變異數內插成「剛好 540 天」的 IV，讓每天的數字可以比較。 |

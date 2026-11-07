@@ -172,7 +172,16 @@ RSpec.describe LeapsIvEnvironmentService do
 
   it "無任何資料 → :no_data" do
     expect(described_class.new.call(symbol: sym)).to include(status: :no_data, cm540: nil, term_structure: [],
-                                                             surface: [], barchart: nil)
+                                                             surface: [], barchart: nil, captured_at: nil,
+                                                             source: nil, source_url: nil)
+  end
+
+  # P5 區塊底部的資料資訊列：元件不得自行查 DB，快照的來源資訊由 call 一併帶出
+  it "回傳快照的 spot、captured_at、source、source_url" do
+    snapshot!(today, spot: 353.1)
+    expect(described_class.new.call(symbol: sym)).to include(
+      spot: 353.1, captured_at: now, source: "adhoc", source_url: "https://www.barchart.com/stocks/quotes/TSM/options"
+    )
   end
 
   describe "#persist!" do
