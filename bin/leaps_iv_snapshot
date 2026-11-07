@@ -1,0 +1,31 @@
+#!/bin/bash
+# LEAPS IV 環境每日快照（leaps-iv-environment.md P4）
+# pm2 cron: 0 6 * * 2-6（UTC＝台北 14:00 週二～週六，抓前一個美國交易日收盤；pm2 daemon 必須以 TZ=UTC 啟動）
+#
+# 用法：
+#   bin/leaps_iv_snapshot                    每日快照（watchlist ∪ 近 30 天查詢過的標的）
+#   bin/leaps_iv_snapshot --backfill SYMBOL  手動回補單一標的的 Barchart IV 歷史（2Y）
+# 紀錄：log/leaps_iv_snapshot.log
+
+set -e
+
+export HOME=/home/idarfan
+export RBENV_ROOT="$HOME/.rbenv"
+export PATH="$RBENV_ROOT/shims:$RBENV_ROOT/bin:/usr/bin:/bin"
+
+eval "$(rbenv init -)"
+cd /home/idarfan/fairprice
+
+if [ -f .env ]; then
+  set -a; source .env; set +a
+fi
+
+if [ "$1" = "--backfill" ]; then
+  if [ -z "$2" ]; then
+    echo "用法：bin/leaps_iv_snapshot --backfill SYMBOL" >&2
+    exit 2
+  fi
+  exec bundle exec rake "leaps_iv:backfill[$2]"
+fi
+
+exec bundle exec rake leaps_iv:snapshot

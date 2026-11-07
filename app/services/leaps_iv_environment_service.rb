@@ -17,6 +17,7 @@ class LeapsIvEnvironmentService
   LOOKBACK_DAYS     = 365
   MAX_HISTORY       = 252
   BARCHART_HISTORY  = 252
+  CM540_SCALE       = 5 # 同 leaps_iv_snapshots.cm540_atm_iv decimal(8,5)
   # PMCC 短天期鏈每次查詢整批覆蓋、沒有歷史：只有和快照同一次抓取（scraped_at 與 captured_at
   # 相差在這個時間內）才併進曲面，避免把別的時間點的短天期 IV 混進來（P2 r2 質詢 2）。
   PMCC_ALIGN_WINDOW = LeapsOptionChainSnapshot::FRESH_WINDOW
@@ -32,7 +33,7 @@ class LeapsIvEnvironmentService
 
     chain   = chain_points(symbol, snapshot)
     term    = term_structure(chain, snapshot)
-    cm540   = self.class.constant_maturity_iv(term_points(term), TARGET_DTE / DAYS_PER_YEAR)
+    cm540   = cm540_for(term)
     history = rank_history(symbol, snapshot.as_of_date)
     enough  = history.size >= @min_history
 
@@ -53,9 +54,8 @@ class LeapsIvEnvironmentService
   def persist!(symbol:, as_of_date:)
     symbol   = symbol.to_s.upcase
     snapshot = LeapsIvSnapshot.find_by!(symbol: symbol, as_of_date: as_of_date)
-    cm540    = self.class.constant_maturity_iv(term_points(term_structure(chain_points(symbol, snapshot), snapshot)),
-                                               TARGET_DTE / DAYS_PER_YEAR)
-    snapshot.update!(cm540_atm_iv: cm540&.round(5))
+    cm540    = cm540_for(term_structure(chain_points(symbol, snapshot), snapshot))
+    snapshot.update!(cm540_atm_iv: cm540)
     cm540
   end
 
@@ -145,6 +145,12 @@ class LeapsIvEnvironmentService
       atm = snapshot.spot && self.class.atm_iv(rows.map { |_, _, k, iv| [ k.to_f, iv&.to_f ] }, snapshot.spot.to_f)
       { expiration: exp, dte: dte, atm_iv: atm }
     end.sort_by { |p| p[:dte] }
+  end
+
+  # 捨入到與 cm540_atm_iv 欄位相同的 5 位：call 的現值、persist! 寫入的值、Rank／Percentile 期間內的
+  # 歷史值三者同一精度，邊界上不會因精度不同差一筆（P3 r1 質詢 1）。
+  def cm540_for(term)
+    self.class.constant_maturity_iv(term_points(term), TARGET_DTE / DAYS_PER_YEAR)&.round(CM540_SCALE)
   end
 
   def term_points(term)

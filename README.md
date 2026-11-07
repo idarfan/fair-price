@@ -1,5 +1,16 @@
 # FairPrice
 
+### 2026-11-07（六）— LEAPS IV 環境 P4：每日 IV 快照排程
+
+- 新 pm2 排程 `leaps-iv-snapshot`（`0 6 * * 2-6` UTC＝台北週二～六 14:00）：標的＝`config/leaps_iv.yml` 的 watchlist
+  ∪ 近 30 天 /leaps 實際查過的 symbol（上限 20），逐檔只跑 IV 曲面（`--iv-surface-only`）＋ Barchart 歷史；
+  手動 `bin/leaps_iv_snapshot`，回補 `bin/leaps_iv_snapshot --backfill SYMBOL`
+- `LeapsIvCdpLock`：PG advisory lock（獨立連線），/leaps 查詢取 shared、排程取 exclusive；排程每檔之間空 5 秒讓查詢插隊；
+  等鎖超過 `lock_wait_sec`（900 秒）時查詢頁顯示「等待 LEAPS 抓取鎖超過 N 秒…請稍後再試」
+- IV 現價改用頁首收盤行（`.pricechangerow`）的日期與收盤價，不用 underlying_price；曲面改存全部履約價
+  （0.60–1.25 只在讀取時篩）；沒載入的到期日重試一次，仍失敗就保留當天舊點
+- Barchart 歷史切換期間時，必須等表格真的換頁才採信（修正 backfill 只拿到 65 列）
+
 ### 2026-11-06（五）— LEAPS IV 環境 P3：計算服務
 
 新增 `LeapsIvEnvironmentService`：`call(symbol:)` 回傳 CM540（540 天固定天期 ATM IV，總變異數內插）、

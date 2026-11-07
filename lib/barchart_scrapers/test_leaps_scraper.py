@@ -805,19 +805,29 @@ class TestIvSurfaceStage3(unittest.TestCase):
     def _exp_map(self, *days):
         return {self._date_in(d): self._date_in(d) + "-m" for d in days}
 
-    def _collect(self, exp_map, chains, quote="11/05/26"):
-        """chains：到期日 → 完整鏈列（None 表示載入失敗）。"""
+    def _collect(self, exp_map, chains, quote=None):
+        """
+        chains：到期日 → 完整鏈列（None 表示載入失敗）；值為 tuple 時依序代表第 1、2 次載入的結果
+        （測重試）。回 (rows, quote, error, navigated)，重試後仍失敗的到期日放在 self.missing。
+        """
         navigated = []
+        loads = {}
 
         async def nav(ws, url, settle_ms=0):
             navigated.append(url)
 
         async def wait_s(ws, js, max_wait_s=30, **kw):
             exp = navigated[-1].split("expiration=")[1][:10]
-            return chains.get(exp)
+            value = chains.get(exp)
+            if isinstance(value, tuple):
+                loads[exp] = loads.get(exp, 0) + 1
+                return value[loads[exp] - 1]
+            return value
 
         async def eval_side(ws, js, **kw):
-            return quote if js == scraper.QUOTE_DATE_JS else None
+            if js != scraper.QUOTE_JS:
+                return None
+            return {"date": "11/05/26", "last": 353.1} if quote is None else quote
 
         with (
             patch("leaps_scraper.cdp_navigate", new=AsyncMock(side_effect=nav)),
@@ -826,7 +836,7 @@ class TestIvSurfaceStage3(unittest.TestCase):
             patch("leaps_scraper._wait_for_grid", new=AsyncMock(side_effect=wait_s)),
             patch("leaps_scraper.asyncio.sleep", new=AsyncMock()),
         ):
-            rows, q, err = _run(scraper._collect_iv_surface("TSM", "ws://fake", "tid", exp_map))
+            rows, q, err, self.missing = _run(scraper._collect_iv_surface("TSM", "ws://fake", "tid", exp_map))
         return rows, q, err, navigated
 
     def test_reads_only_leaps_dated_expirations_with_full_strike_ladder(self):
@@ -842,16 +852,36 @@ class TestIvSurfaceStage3(unittest.TestCase):
         self.assertTrue(all("moneyness=100" in u for u in navigated))
         self.assertEqual(len(rows), 4, "Delta 0.3 的價外履約價也要收（篩選前的原始資料）")
         self.assertEqual({r["expiration_date"] for r in rows}, {far1, far2}, "缺到期日的列由頁面參數補上")
-        self.assertEqual(quote, "11/05/26")
+        self.assertEqual(quote, {"date": "11/05/26", "last": 353.1})
         self.assertIsNone(err)
 
     def test_missing_chain_is_reported_without_dropping_others(self):
         far1, far2 = self._date_in(442), self._date_in(589)
         chains = {far1: None, far2: [{"expiration_date": far2, "dte": 589, "strike": 350, "iv": 0.43, "delta": 0.64}]}
-        rows, _, err, _ = self._collect(self._exp_map(442, 589), chains)
+        rows, _, err, navigated = self._collect(self._exp_map(442, 589), chains)
 
         self.assertEqual(len(rows), 1)
         self.assertIn(far1, err)
+        self.assertEqual(self.missing, [far1], "重試後仍失敗的到期日要回報給 Ruby，保留舊點")
+        self.assertEqual(sum(far1 in u for u in navigated), 2, "失敗的到期日要重試一次")
+
+    def test_quote_requires_date_and_close_from_same_block(self):
+        # 2026-11-06 P4 實跑：開盤前 pricechangerow 消失，日期與現價來源不一致；兩者缺一就不採用
+        far1 = self._date_in(442)
+        row = {"expiration_date": far1, "dte": 442, "strike": 350, "iv": 0.42, "delta": 0.6}
+        for partial in ({"date": "11/05/26", "last": None}, {"date": None, "last": 353.1}, None):
+            _, quote, _, _ = self._collect(self._exp_map(442), {far1: [row]}, quote=partial or False)
+            self.assertIsNone(quote, f"不完整的報價 {partial!r} 不得採用")
+
+    def test_retry_recovers_flaky_chain(self):
+        # 2026-11-06 P4 實跑：TSM 有到期日第一次載不出來
+        far1 = self._date_in(442)
+        row = {"expiration_date": far1, "dte": 442, "strike": 350, "iv": 0.42, "delta": 0.6}
+        rows, _, err, _ = self._collect(self._exp_map(442), {far1: (None, [row])})
+
+        self.assertEqual(len(rows), 1)
+        self.assertIsNone(err)
+        self.assertEqual(self.missing, [])
 
     def test_no_leaps_expiration_returns_error(self):
         rows, _, err, navigated = self._collect(self._exp_map(30, 60), {})
@@ -872,7 +902,7 @@ class TestIvSurfaceStage3(unittest.TestCase):
 
     def test_skip_flag_does_not_run_stage3(self):
         # P2 r1 質詢 1：美股盤中 Ruby 端帶 --skip-iv-surface，Stage 3 一頁都不開
-        collect = AsyncMock(return_value=([{"strike": 1}], "11/05/26", None))
+        collect = AsyncMock(return_value=([{"strike": 1}], {"date": "11/05/26", "last": 353.1}, None, []))
         wait = AsyncMock(side_effect=lambda ws, js, **kw: (
             GOOD_VG if "itmProbability" in js else GOOD_OPTS if "bidPrice" in js else GOOD_NEAR_MONEY))
         buf = io.StringIO()
@@ -895,10 +925,38 @@ class TestIvSurfaceStage3(unittest.TestCase):
         self.assertIn("盤中", result["iv_surface_error"])
 
     def test_parse_argv_accepts_flag_anywhere(self):
-        self.assertEqual(scraper._parse_argv(["TSM"]), ("TSM", None, False))
-        self.assertEqual(scraper._parse_argv(["TSM", "--skip-iv-surface"]), ("TSM", None, True))
-        self.assertEqual(scraper._parse_argv(["TSM", "350", "--skip-iv-surface"]), ("TSM", 350.0, True))
-        self.assertEqual(scraper._parse_argv(["TSM", "--skip-iv-surface", "350"]), ("TSM", 350.0, True))
+        self.assertEqual(scraper._parse_argv(["TSM"]), ("TSM", None, False, False))
+        self.assertEqual(scraper._parse_argv(["TSM", "--skip-iv-surface"]), ("TSM", None, True, False))
+        self.assertEqual(scraper._parse_argv(["TSM", "350", "--skip-iv-surface"]), ("TSM", 350.0, True, False))
+        self.assertEqual(scraper._parse_argv(["TSM", "--skip-iv-surface", "350"]), ("TSM", 350.0, True, False))
+        self.assertEqual(scraper._parse_argv(["TSM", "--iv-surface-only"]), ("TSM", None, False, True))
+
+    def test_iv_surface_only_skips_candidates_and_stage2(self):
+        # P4 排程：只讀到期日與現價，直接跑 Stage 3；不開 stacked／V&G 頁、rows 為空
+        collect = AsyncMock(return_value=([{"strike": 350, "iv": 0.42}], {"date": "11/05/26", "last": 353.1}, None, []))
+        wait = AsyncMock(side_effect=lambda ws, js, **kw: GOOD_NEAR_MONEY)
+        navigated = []
+        buf = io.StringIO()
+        with (
+            patch("leaps_scraper._collect_iv_surface", new=collect),
+            patch("leaps_scraper.prepare_page", new=AsyncMock(return_value=("tid", "ws://fake"))),
+            patch("leaps_scraper.cdp_navigate", new=AsyncMock(side_effect=lambda ws, url, **kw: navigated.append(url))),
+            patch("leaps_scraper.activate_target", new=AsyncMock()),
+            patch("leaps_scraper.cdp_eval", new=_stage1_eval()),
+            patch("leaps_scraper._wait_for_grid", new=wait),
+            patch("sys.stdout", buf),
+        ):
+            _run(scraper.main("NOK", iv_surface_only=True))
+        result = json.loads(buf.getvalue().strip())
+
+        collect.assert_awaited_once()
+        self.assertEqual(result["status"], "success")
+        self.assertTrue(result["iv_surface_only"])
+        self.assertEqual(result["rows"], [])
+        self.assertEqual(result["iv_surface"], [{"strike": 350, "iv": 0.42}])
+        self.assertEqual(result["quote_date_text"], "11/05/26")
+        self.assertEqual(result["quote_last"], 353.1)
+        self.assertFalse([u for u in navigated if "view=stacked" in u or "volatility-greeks" in u])
 
 
 if __name__ == "__main__":

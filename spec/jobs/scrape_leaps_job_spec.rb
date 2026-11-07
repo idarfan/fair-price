@@ -195,6 +195,36 @@ RSpec.describe ScrapeLeapsJob, type: :job do
     end
   end
 
+  # leaps-iv-environment P4：整段抓取拿共用鎖；排程占用超過 lock_wait_sec 時寫 error，不讓前端一直等。
+  describe "#perform — 與 IV 快照排程互斥" do
+    let(:svc) do
+      instance_double(BarchartScraperService, fetch_leaps: { status: "success", errors: [] },
+                                              fetch_pmcc_short_calls: { status: "no_candidates" },
+                                              fetch_barchart_iv_history: { status: "success" })
+    end
+
+    before { allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc) }
+
+    it "抓取在共用鎖（shared）內執行，等候上限為 lock_wait_sec" do
+      allow(LeapsIvCdpLock).to receive(:shared).and_call_original
+      described_class.perform_now(symbol, job_id)
+
+      expect(LeapsIvCdpLock).to have_received(:shared).with(wait: 900, label: "LEAPS 查詢 #{symbol}")
+      expect(svc).to have_received(:fetch_leaps)
+    end
+
+    it "等鎖逾時：寫 error 狀態與訊息，不抓取" do
+      allow(LeapsIvCdpLock).to receive(:shared).and_raise(LeapsIvCdpLock::Timeout, "等待 LEAPS 抓取鎖超過 900 秒")
+      statuses = []
+      allow(Rails.cache).to receive(:write) { |key, value, **| statuses << value if key == "leaps_job_#{job_id}" }
+
+      described_class.perform_now(symbol, job_id)
+
+      expect(statuses).to eq([ { status: "error", errors: [ "等待 LEAPS 抓取鎖超過 900 秒" ] } ])
+      expect(svc).not_to have_received(:fetch_leaps)
+    end
+  end
+
   # 並行化 S3：同代號＋同履約價同時只跑一個 LEAPS 抓取，後來的人共用同一個 job_id。
   # 進行中的登記記下持有程序（ApplicationJob::PROCESS_TOKEN）：server 重啟砍掉
   # Async job 後，舊登記作廢，不會讓所有人卡在一個已經死掉的 job 上。

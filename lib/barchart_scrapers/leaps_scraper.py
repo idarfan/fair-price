@@ -187,13 +187,18 @@ SURFACE_CHAIN_JS = """
 })()
 """
 
-# 頁首報價日期（P0：div.pricechangerow 內的 MM/DD/YY），換算 as_of_date 用；讀不到回 null。
-QUOTE_DATE_JS = """
+# 頁首收盤報價（P0：div.pricechangerow）：日期 MM/DD/YY 與該日收盤價 .last-change，同一個區塊一起讀，
+# IV 環境的 as_of_date 與現價一定配對（2026-11-06 P4 實跑：美東開盤前 pricechangerow 在部分頁面消失，
+# 現價改由 UNDERLYING_JS 的備援讀到盤前即時價 7.82，日期卻是前一交易日 11/05，寫進了不配對的資料）。
+# 沒有 pricechangerow 回 null。UNDERLYING_JS 不動（候選排行用，行為不變）。
+QUOTE_JS = """
 (() => {
   const row = document.querySelector('.pricechangerow');
   if (!row) return null;
   const m = row.textContent.match(/\\b(\\d{2}\\/\\d{2}\\/\\d{2})\\b/);
-  return m ? m[1] : null;
+  const lastEl = row.querySelector('.last-change');
+  const last = lastEl ? parseFloat(lastEl.textContent.replace(/[^0-9.]/g, '')) : NaN;
+  return { date: m ? m[1] : null, last: last > 0 ? last : null };
 })()
 """
 
@@ -399,28 +404,36 @@ async def _collect_iv_surface(symbol, ws_url, target_id, exp_value_map):
     Stage 3（leaps-iv-environment P2）：每個 LEAPS 到期日（DTE ≥ LEAPS_MIN_DTE）開完整鏈，
     讀全部履約價的 call IV／Delta。Delta 篩選之前的原始資料，moneyness 範圍由 Ruby 端篩。
     只在 Stage 2 成功後執行；任何失敗只回報在 iv_surface_error，不影響 rows。
-    回 (rows, quote_date_text, error)。
+    回 (rows, quote, error, missing)。quote＝{"date": "MM/DD/YY", "last": 收盤價}（同一個 pricechangerow
+    一起讀，讀不到為 None）。missing＝重試後仍沒載入的到期日：Ruby 端保留這些
+    到期日當天已存的舊點，不讓一次不完整的抓取蓋掉完整資料（2026-11-06 P4 實跑，TSM 5 個到期日
+    有 2 個沒載入，整批換新後曲面從 115 點掉到 69 點）。
     """
     leaps_dates = [
         d for d in sorted(exp_value_map)
         if (date(*(int(x) for x in d.split("-"))) - date.today()).days >= LEAPS_MIN_DTE
     ]
     if not leaps_dates:
-        return [], None, "沒有 DTE ≥ 364 的到期日"
+        return [], None, "沒有 DTE ≥ 364 的到期日", []
 
-    rows, quote_date_text, missing = [], None, []
+    rows, quote, missing = [], None, []
     for exp_date in leaps_dates:
         url = (f"https://www.barchart.com/stocks/quotes/{symbol}/options"
                f"?moneyness=100&expiration={exp_value_map[exp_date]}")
-        await cdp_navigate(ws_url, url, settle_ms=OPTIONS_SETTLE)
-        await activate_target(target_id)
-        chain = await _wait_for_grid(ws_url, SURFACE_CHAIN_JS, max_wait_s=GRID_MAX_WAIT_S, target_id=target_id)
+        chain = None
+        for _attempt in range(2):  # Barchart 表格偶爾第一次載不出來，重開一次
+            await cdp_navigate(ws_url, url, settle_ms=OPTIONS_SETTLE)
+            await activate_target(target_id)
+            chain = await _wait_for_grid(ws_url, SURFACE_CHAIN_JS, max_wait_s=GRID_MAX_WAIT_S, target_id=target_id)
+            if isinstance(chain, list) and chain:
+                break
         if not isinstance(chain, list) or not chain:
             missing.append(exp_date)
             continue
-        if quote_date_text is None:
-            q = await cdp_eval(ws_url, QUOTE_DATE_JS, target_id=target_id)
-            quote_date_text = q if isinstance(q, str) else None
+        if quote is None:  # 日期與收盤價都讀到才採用；這頁沒有就到下一個到期日的頁面再試
+            q = await cdp_eval(ws_url, QUOTE_JS, target_id=target_id)
+            if isinstance(q, dict) and q.get("date") and q.get("last"):
+                quote = {"date": q["date"], "last": q["last"]}
         for r in chain:
             r = dict(r)
             r["expiration_date"] = (r.get("expiration_date") or exp_date)[:10]
@@ -428,13 +441,14 @@ async def _collect_iv_surface(symbol, ws_url, target_id, exp_value_map):
         await asyncio.sleep(0.8)
 
     error = f"到期日 {', '.join(missing)} 的完整鏈沒有載入" if missing else None
-    return rows, quote_date_text, error
+    return rows, quote, error, missing
 
 
 SKIP_IV_SURFACE_FLAG = "--skip-iv-surface"
+IV_SURFACE_ONLY_FLAG = "--iv-surface-only"
 
 
-async def main(symbol, user_strike=None, skip_iv_surface=False):
+async def main(symbol, user_strike=None, skip_iv_surface=False, iv_surface_only=False):
     symbol = symbol.upper()
 
     # prepare_page finds the tab but skips navigation when Chrome is already on
@@ -475,6 +489,29 @@ async def main(symbol, user_strike=None, skip_iv_surface=False):
     # Maps "2027-01-15" -> "2027-01-15-m" (the select option value)
     exp_value_map = {e["value"][:10]: e["value"] for e in expirations}
     first_exp_value = next(iter(exp_value_map.values()), None)
+
+    # 每日 IV 快照排程（leaps-iv-environment P4）只要 IV 曲面：不挑候選、不跑 Stage 2，
+    # rows 回空陣列——Ruby 端不寫候選排行，使用者最後一次查詢的排行不會被排程覆蓋。
+    if iv_surface_only:
+        try:
+            iv_surface, quote, iv_surface_error, iv_surface_missing = await _collect_iv_surface(
+                symbol, ws_url, target_id, exp_value_map)
+        except Exception as e:  # noqa: BLE001
+            iv_surface, quote, iv_surface_error, iv_surface_missing = [], None, f"{type(e).__name__}: {e}", []
+        quote = quote or {}
+        print(json.dumps({
+            "status":             "success",
+            "iv_surface_only":    True,
+            "rows":               [],
+            "underlying_price":   underlying_price,
+            "iv_surface":         iv_surface,
+            "iv_surface_error":   iv_surface_error,
+            "iv_surface_missing": iv_surface_missing,
+            "quote_date_text":    quote.get("date"),
+            "quote_last":         quote.get("last"),
+            "source_url":         f"https://www.barchart.com/stocks/quotes/{symbol}/options",
+        }))
+        return
 
     # ── Build chain_snapshot from a LEAPS-dated expiration (root-cause fix) ───
     # BUG (reported 2026-07-07, NOK): chain_snapshot was built from `near_money_rows`,
@@ -735,40 +772,46 @@ async def main(symbol, user_strike=None, skip_iv_surface=False):
     # Stage 3：IV 曲面（不影響上面的 rows；例外一律收進 iv_surface_error）。
     # 美股盤中 Ruby 端不寫入 IV 資料，會帶 --skip-iv-surface，這裡就不白跑（P2 r1 質詢 1）。
     if skip_iv_surface:
-        iv_surface, quote_date_text, iv_surface_error = [], None, "美股盤中，略過 IV 曲面"
+        iv_surface, quote, iv_surface_error, iv_surface_missing = [], None, "美股盤中，略過 IV 曲面", []
     else:
         try:
-            iv_surface, quote_date_text, iv_surface_error = await _collect_iv_surface(
+            iv_surface, quote, iv_surface_error, iv_surface_missing = await _collect_iv_surface(
                 symbol, ws_url, target_id, exp_value_map)
         except Exception as e:  # noqa: BLE001 — 曲面失敗不得讓 LEAPS 查詢失敗
-            iv_surface, quote_date_text, iv_surface_error = [], None, f"{type(e).__name__}: {e}"
+            iv_surface, quote, iv_surface_error, iv_surface_missing = [], None, f"{type(e).__name__}: {e}", []
+    quote = quote or {}
 
     print(json.dumps({
-        "status":           "success",
-        "rows":             _finalize(merged, underlying_price),
-        "underlying_price": underlying_price,
-        "skipped_strikes":  skipped_strikes,
-        "chain_snapshot":   chain_snapshot,
-        "iv_surface":       iv_surface,
-        "iv_surface_error": iv_surface_error,
-        "quote_date_text":  quote_date_text,
-        "source_url":       f"https://www.barchart.com/stocks/quotes/{symbol}/options",
+        "status":             "success",
+        "rows":               _finalize(merged, underlying_price),
+        "underlying_price":   underlying_price,
+        "skipped_strikes":    skipped_strikes,
+        "chain_snapshot":     chain_snapshot,
+        "iv_surface":         iv_surface,
+        "iv_surface_error":   iv_surface_error,
+        "iv_surface_missing": iv_surface_missing,
+        "quote_date_text":    quote.get("date"),
+        "quote_last":         quote.get("last"),
+        "source_url":         f"https://www.barchart.com/stocks/quotes/{symbol}/options",
     }))
 
 
 def _parse_argv(argv):
-    """SYMBOL [user_strike] [--skip-iv-surface]，flag 位置不限。回 (symbol, user_strike, skip_iv_surface)。"""
-    skip = SKIP_IV_SURFACE_FLAG in argv
-    pos  = [a for a in argv if a != SKIP_IV_SURFACE_FLAG]
+    """
+    SYMBOL [user_strike] [--skip-iv-surface] [--iv-surface-only]，flag 位置不限。
+    回 (symbol, user_strike, skip_iv_surface, iv_surface_only)。
+    """
+    flags = {SKIP_IV_SURFACE_FLAG, IV_SURFACE_ONLY_FLAG}
+    pos  = [a for a in argv if a not in flags]
     sym      = pos[0] if len(pos) > 0 else "NOK"
     u_strike = float(pos[1]) if len(pos) > 1 else None
-    return sym, u_strike, skip
+    return sym, u_strike, SKIP_IV_SURFACE_FLAG in argv, IV_SURFACE_ONLY_FLAG in argv
 
 
 if __name__ == "__main__":
-    sym, u_strike, skip_iv = _parse_argv(sys.argv[1:])
+    sym, u_strike, skip_iv, iv_only = _parse_argv(sys.argv[1:])
     try:
-        asyncio.run(main(sym, user_strike=u_strike, skip_iv_surface=skip_iv))
+        asyncio.run(main(sym, user_strike=u_strike, skip_iv_surface=skip_iv, iv_surface_only=iv_only))
     except Exception as e:
         import traceback
         print(json.dumps({

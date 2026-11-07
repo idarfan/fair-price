@@ -22,7 +22,7 @@ RSpec.describe BarchartScraperService do
       "itm_probability" => 0.6, "vol_oi_ratio" => 0.02, "vega" => 1.23 }
   end
   let(:leaps_data) do
-    { "status" => "success", "rows" => [ leaps_row ], "underlying_price" => 353.1,
+    { "status" => "success", "rows" => [ leaps_row ], "underlying_price" => 353.1, "quote_last" => 353.1,
       "chain_snapshot" => { "strikes" => [ 350.0 ], "spot_price" => 353.1, "expiration" => "2027-12-17" },
       "quote_date_text" => "11/05/26", "source_url" => "https://www.barchart.com/stocks/quotes/TSM/options",
       "iv_surface" => [ { "expiration_date" => "2028-01-21", "dte" => 442, "strike" => 350.0, "iv" => 0.4246, "delta" => 0.6258 },
@@ -41,7 +41,7 @@ RSpec.describe BarchartScraperService do
         .to eq([ [ "success", "points=2" ] ])
     end
 
-    it "曲面寫完接著算 CM540 寫回快照（P3 persist!）；夾不住 540 天時寫 nil" do
+    it "曲面寫完接著算 CM540 寫回快照（P3 persist!）" do
       bracketing = leaps_data["iv_surface"] + [
         { "expiration_date" => "2028-06-16", "dte" => 589, "strike" => 350.0, "iv" => 0.4295, "delta" => 0.64 },
         { "expiration_date" => "2028-06-16", "dte" => 589, "strike" => 360.0, "iv" => 0.4287, "delta" => 0.62 },
@@ -52,6 +52,24 @@ RSpec.describe BarchartScraperService do
       service.fetch_leaps
       # 獨立計算：S=353.1 → ATM(442)=0.424414、ATM(589)=0.429252，總變異數內插到 T=540/365 → 0.427937
       expect(LeapsIvSnapshot.find_by(symbol: "TSM").cm540_atm_iv).to be_within(0.00001).of(0.42794)
+    end
+
+    it "同一天原本有 CM540，重抓後夾不住 540 天 → 覆寫成 nil，不留舊值（P3 r1 質詢 2）" do
+      bracketing = leaps_data["iv_surface"] + [
+        { "expiration_date" => "2028-06-16", "dte" => 589, "strike" => 350.0, "iv" => 0.4295, "delta" => 0.64 },
+        { "expiration_date" => "2028-06-16", "dte" => 589, "strike" => 360.0, "iv" => 0.4287, "delta" => 0.62 },
+        { "expiration_date" => "2028-01-21", "dte" => 442, "strike" => 360.0, "iv" => 0.4240, "delta" => 0.60 }
+      ]
+      allow(service).to receive(:run_scraper).and_return({ status: "success", data: leaps_data.merge("iv_surface" => bracketing) })
+      service.fetch_leaps
+      expect(LeapsIvSnapshot.find_by(symbol: "TSM").cm540_atm_iv).to be_present
+
+      # 同一個報價日重抓：這次只有 2028-01-21 一個到期日，540 天夾不住
+      allow(LeapsOptionChainSnapshot).to receive(:fresh_for?).and_return(false)
+      allow(service).to receive(:run_scraper).and_return({ status: "success", data: leaps_data })
+      service.fetch_leaps
+
+      expect(LeapsIvSnapshot.find_by(symbol: "TSM").cm540_atm_iv).to be_nil
     end
 
     it "iv_source: scheduled 時快照記 scheduled（P4 排程用）" do
@@ -97,6 +115,56 @@ RSpec.describe BarchartScraperService do
       expect(LeapsIvSnapshot.count + LeapsIvSurfacePoint.count).to eq(0)
       expect(FetchLog.find_by(symbol: "TSM", fetch_type: "leaps_iv_surface"))
         .to have_attributes(status: "error", error_detail: a_string_including("報價日期"))
+    end
+  end
+
+  describe "#fetch_leaps_iv_snapshot（P4 排程）" do
+    let(:iv_only) do
+      leaps_data.merge("iv_surface_only" => true, "rows" => [],
+                       "iv_surface" => leaps_data["iv_surface"] + [
+                         { "expiration_date" => "2028-06-16", "dte" => 589, "strike" => 350.0, "iv" => 0.4295, "delta" => 0.64 },
+                         { "expiration_date" => "2028-06-16", "dte" => 589, "strike" => 360.0, "iv" => 0.4287, "delta" => 0.62 },
+                         { "expiration_date" => "2028-01-21", "dte" => 442, "strike" => 360.0, "iv" => 0.4240, "delta" => 0.60 }
+                       ])
+    end
+
+    it "爬蟲帶 --iv-surface-only 與逾時；寫曲面、快照（scheduled）與 cm540，不碰候選排行表" do
+      existing = create(:leaps_option_chain_snapshot, symbol: "TSM")
+      expect(service).to receive(:run_scraper).with("leaps", extra_args: [ "--iv-surface-only" ], timeout: 600)
+        .and_return({ status: "success", data: iv_only })
+
+      result = service.fetch_leaps_iv_snapshot(source: "scheduled", timeout: 600)
+
+      expect(result).to include(status: "success", points: 5)
+      expect(LeapsIvSnapshot.find_by(symbol: "TSM")).to have_attributes(source: "scheduled", cm540_atm_iv: BigDecimal("0.42794"))
+      expect(LeapsOptionChainSnapshot.where(symbol: "TSM").pluck(:id)).to eq([ existing.id ])
+      expect(StrikeChainSnapshot.where(symbol: "TSM")).to be_empty
+      expect(FetchLog.find_by(fetch_type: "leaps_iv_surface").error_detail).to include("source=scheduled", "points=5")
+    end
+
+    it "不看 fresh_for? 快取：互動查詢剛抓過也照樣抓" do
+      allow(LeapsOptionChainSnapshot).to receive(:fresh_for?).and_return(true)
+      allow(service).to receive(:run_scraper).and_return({ status: "success", data: iv_only })
+
+      expect(service.fetch_leaps_iv_snapshot[:status]).to eq("success")
+    end
+
+    it "爬蟲逾時或報價日期讀不到：回報失敗並記 fetch_logs，不寫入" do
+      allow(service).to receive(:run_scraper).and_return({ status: "scraper_timeout", error: "爬蟲超過 600 秒沒有結束" })
+      expect(service.fetch_leaps_iv_snapshot[:status]).to eq("scraper_timeout")
+
+      allow(service).to receive(:run_scraper).and_return({ status: "success", data: iv_only.merge("quote_date_text" => nil) })
+      expect(service.fetch_leaps_iv_snapshot[:status]).to eq("error")
+
+      expect(LeapsIvSnapshot.count).to eq(0)
+      expect(FetchLog.where(fetch_type: "leaps_iv_surface").pluck(:status)).to eq(%w[scraper_timeout error])
+    end
+
+    it "美股盤中不跑" do
+      allow(LeapsIvCapture).to receive(:regular_session?).and_return(true)
+      expect(service).not_to receive(:run_scraper)
+
+      expect(service.fetch_leaps_iv_snapshot[:status]).to eq("skipped_regular_session")
     end
   end
 

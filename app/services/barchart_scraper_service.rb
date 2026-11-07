@@ -204,6 +204,33 @@ class BarchartScraperService
     result
   end
 
+  # leaps-iv-environment P4：每日 IV 快照排程用。LEAPS 爬蟲帶 --iv-surface-only 只跑 Stage 3，
+  # 不挑候選、不寫 leaps_option_chain_snapshots／strike_chain_snapshots（「不產生候選排行或 PMCC 結果」，
+  # 使用者最後一次查詢的排行不被覆蓋），也不跑 fresh_for? 快取判斷與 options_flow 補抓。
+  # 曲面與 cm540 照 P2／P3 的同一條路徑寫入（persist_iv_surface）。
+  def fetch_leaps_iv_snapshot(source: "scheduled", timeout: nil)
+    return { symbol: @symbol, status: "skipped_regular_session", errors: [] } if LeapsIvCapture.regular_session?
+    return { symbol: @symbol, status: "error", errors: [ "Chrome CDP not reachable at #{CDP_URL}" ] } unless cdp_available?
+
+    fetch_result = run_scraper("leaps", extra_args: [ "--iv-surface-only" ], timeout: timeout)
+    case fetch_result[:status]
+    when "success"
+      points = LeapsIvCapture.new(@symbol, source: source).persist_leaps_chain(fetch_result[:data])
+      cm540  = LeapsIvEnvironmentService.new.persist!(
+        symbol: @symbol, as_of_date: LeapsIvCapture.as_of_date(fetch_result[:data]["quote_date_text"])
+      )
+      log_fetch("leaps_iv_surface", "success",
+                "source=#{source} points=#{points} cm540=#{cm540.inspect}#{missing_note(fetch_result[:data])}")
+      { symbol: @symbol, status: "success", errors: [], points: points, cm540: cm540 }
+    else
+      log_fetch("leaps_iv_surface", fetch_result[:status], "source=#{source} #{fetch_result[:error]}")
+      { symbol: @symbol, status: fetch_result[:status], errors: [ fetch_result[:error].to_s ] }
+    end
+  rescue LeapsIvCapture::CaptureError => e
+    log_fetch("leaps_iv_surface", "error", "source=#{source} #{e.message}")
+    { symbol: @symbol, status: "error", errors: [ e.message ] }
+  end
+
   # leaps-iv-environment P2：Barchart Options Overview History（mode: "latest" 讀最新一列、
   # "backfill" 讀 2Y 整段）＋overview 頁 HV。呼叫端（ScrapeLeapsJob、P4 排程）負責隔離例外；
   # 這裡把寫入驗證失敗記成 error 後回傳，不往外拋。
@@ -561,8 +588,9 @@ class BarchartScraperService
   end
 
   # 回 [stdout, stderr, status]；逾時時回 run_scraper 要直接往上傳的結果 Hash。
-  def execute_scraper(type, cmd)
-    timeout_s = SCRAPER_TIMEOUTS_S[type]
+  # timeout：呼叫端指定的時限（每日 IV 快照排程的 per_symbol_timeout_sec），優先於 SCRAPER_TIMEOUTS_S。
+  def execute_scraper(type, cmd, timeout: nil)
+    timeout_s = timeout || SCRAPER_TIMEOUTS_S[type]
     return Open3.capture3(*cmd, chdir: Rails.root.to_s) unless timeout_s
 
     result = TimedCapture.call(*cmd, timeout: timeout_s, chdir: Rails.root.to_s)
@@ -573,7 +601,7 @@ class BarchartScraperService
     [ result.stdout, result.stderr, result.status ]
   end
 
-  def run_scraper(type, extra_args: [])
+  def run_scraper(type, extra_args: [], timeout: nil)
     script = SCRIPT_DIR.join("#{type}_scraper.py")
     cmd    = [ "python3", script.to_s, @symbol, *extra_args ]
 
@@ -581,7 +609,7 @@ class BarchartScraperService
     @phase&.call(:queued)
     executed = ScraperSlots.with_slot do
       @phase&.call(:running)
-      execute_scraper(type, cmd)
+      timeout ? execute_scraper(type, cmd, timeout: timeout) : execute_scraper(type, cmd)
     end
     return executed if executed.is_a?(Hash)
 
@@ -749,11 +777,17 @@ class BarchartScraperService
 
   # leaps-iv-environment P2：LEAPS 爬蟲 Stage 3 的 IV 曲面。任何失敗只記 fetch_logs，
   # 不得影響 LEAPS 查詢本身（候選排行已在上面寫完）。
+  # 重試後仍沒載入的到期日（保留當天舊點），寫進 fetch_logs 方便追查；全部載入時為空字串。
+  def missing_note(data)
+    missing = Array(data["iv_surface_missing"])
+    missing.empty? ? "" : " missing=#{missing.join(',')}"
+  end
+
   # 盤中由 fetch_leaps 決定不呼叫（見 skip_iv）。曲面寫完接著算 CM540（P3：persist! 是寫入 cm540 的唯一入口）。
   def persist_iv_surface(data, source)
     points = LeapsIvCapture.new(@symbol, source: source).persist_leaps_chain(data)
     LeapsIvEnvironmentService.new.persist!(symbol: @symbol, as_of_date: LeapsIvCapture.as_of_date(data["quote_date_text"]))
-    log_fetch("leaps_iv_surface", "success", "points=#{points}")
+    log_fetch("leaps_iv_surface", "success", "points=#{points}#{missing_note(data)}")
   rescue => e
     Rails.logger.warn("[leaps_iv] IV 曲面寫入失敗（不影響 LEAPS 查詢）#{@symbol}: #{e.class}: #{e.message}")
     log_fetch("leaps_iv_surface", "error", "#{e.class}: #{e.message}".first(500))

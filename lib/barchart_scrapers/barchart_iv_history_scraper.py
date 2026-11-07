@@ -135,7 +135,14 @@ async def _open_toggle(ws_url, target_id):
 
 
 async def _select_period(ws_url, target_id, label):
-    """點擊區間選項，等到 li.active 是 label 且表格資料穩定；回傳穩定後的 rows，失敗回 None。"""
+    """
+    點擊區間選項，等到 li.active 是 label 且表格資料穩定；回傳穩定後的 rows，失敗回 None。
+
+    原本已是 label：表格不會換資料，穩定 MIN_SETTLE_S 秒就採信。
+    原本是別的區間：**一定要等到表格換了一批資料**才採信——2026-11-06 P4 實跑，CSCO／ORCL／WULF
+    的 2Y 回補只拿到 65 列：6 秒內表格還沒重載，舊的 3M 資料被當成穩定結果收下，而且記成 success。
+    """
+    already = ((await cdp_eval(ws_url, PERIOD_STATE_JS, target_id=target_id)) or {}).get("active") == label
     before = _signature(await cdp_eval(ws_url, GRID_JS, target_id=target_id))
     await _open_toggle(ws_url, target_id)
     if not await cdp_eval(ws_url, CLICK_PERIOD_JS % json.dumps(label), target_id=target_id):
@@ -151,8 +158,8 @@ async def _select_period(ws_url, target_id, label):
         sig = _signature(rows if isinstance(rows, list) else None)
         seen.append(sig)
         stable = len(seen) >= STABLE_POLLS and sig is not None and len(set(seen[-STABLE_POLLS:])) == 1
-        changed_or_settled = sig != before or loop.time() - start >= MIN_SETTLE_S
-        if state.get("active") == label and stable and changed_or_settled:
+        loaded = (loop.time() - start >= MIN_SETTLE_S) if already else (sig != before)
+        if state.get("active") == label and stable and loaded:
             return rows
     return None
 

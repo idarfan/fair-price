@@ -44,7 +44,7 @@ RSpec.describe LeapsIvCapture do
   describe "#persist_leaps_chain" do
     let(:leaps_data) do
       {
-        "underlying_price" => 353.1, "quote_date_text" => "11/05/26",
+        "underlying_price" => 353.1, "quote_date_text" => "11/05/26", "quote_last" => 353.1,
         "source_url" => "https://www.barchart.com/stocks/quotes/TSM/options",
         "iv_surface" => [
           # moneyness = K / 353.1：200 → 0.5664（範圍外）、220 → 0.6231、350 → 0.9912、
@@ -58,11 +58,13 @@ RSpec.describe LeapsIvCapture do
       }
     end
 
-    it "只寫入 moneyness 0.60–1.25 的點，moneyness＝K／S，含篩 Delta 前的價外履約價" do
-      expect(capture.persist_leaps_chain(leaps_data)).to eq(3)
+    it "全部履約價都寫入（含 moneyness 0.60–1.25 範圍外、篩 Delta 前的價外履約價），moneyness＝K／S" do
+      # 範圍外也要存：ATM IV 要用夾住現價的上下兩檔（使用者裁示，P4 實跑 NOK／WULF 算不出 CM540）
+      expect(capture.persist_leaps_chain(leaps_data)).to eq(5)
 
       points = LeapsIvSurfacePoint.where(symbol: "TSM", as_of_date: as_of).order(:expiration, :strike)
-      expect(points.map { |p| [ p.strike.to_f, p.moneyness.to_f ] }).to eq([ [ 220.0, 0.6231 ], [ 350.0, 0.9912 ], [ 440.0, 1.2461 ] ])
+      expect(points.map { |p| [ p.strike.to_f, p.moneyness.to_f ] })
+        .to eq([ [ 200.0, 0.5664 ], [ 220.0, 0.6231 ], [ 350.0, 0.9912 ], [ 440.0, 1.2461 ], [ 450.0, 1.2744 ] ])
       expect(points.find_by(strike: 350)).to have_attributes(call_iv: BigDecimal("0.4246"), delta: BigDecimal("0.6258"), dte: 442)
     end
 
@@ -76,13 +78,53 @@ RSpec.describe LeapsIvCapture do
 
     it "同一天再寫一次，後寫覆蓋先寫（盤中 adhoc → 收盤後 scheduled）" do
       capture.persist_leaps_chain(leaps_data)
-      later = leaps_data.merge("underlying_price" => 360.55)
+      later = leaps_data.merge("quote_last" => 360.55)
       later["iv_surface"] = [ leaps_data["iv_surface"][2].merge("iv" => 0.43) ]
       described_class.new("TSM", source: "scheduled").persist_leaps_chain(later)
 
       expect(LeapsIvSnapshot.where(symbol: "TSM").count).to eq(1)
       expect(LeapsIvSnapshot.find_by(symbol: "TSM")).to have_attributes(source: "scheduled", spot: BigDecimal("360.55"))
       expect(LeapsIvSurfacePoint.find_by(symbol: "TSM", strike: 350).call_iv).to eq(BigDecimal("0.43"))
+    end
+
+    it "同一天重抓：當天曲面整批換成這次的點，上一次有、這次沒有的點不殘留；其他日期不受影響" do
+      capture.persist_leaps_chain(leaps_data)
+      LeapsIvSurfacePoint.create!(symbol: "TSM", as_of_date: as_of - 1, expiration: Date.new(2028, 1, 21), strike: 350,
+                                  call_iv: 0.40, captured_at: Time.current)
+      later = leaps_data.merge("iv_surface" => [ leaps_data["iv_surface"][2] ]) # 只剩 K=350
+
+      capture.persist_leaps_chain(later)
+      expect(LeapsIvSurfacePoint.where(symbol: "TSM", as_of_date: as_of).pluck(:strike).map(&:to_f)).to eq([ 350.0 ])
+      expect(LeapsIvSurfacePoint.where(symbol: "TSM", as_of_date: as_of - 1).count).to eq(1)
+    end
+
+    it "同一天重抓時，爬蟲回報沒載入的到期日（iv_surface_missing）保留當天舊點，其他到期日照樣整批換新" do
+      capture.persist_leaps_chain(leaps_data) # 2028-01-21：K200、K220、K350；2028-06-16：K440、K450
+      partial = leaps_data.merge(
+        "iv_surface"         => [ leaps_data["iv_surface"][2].merge("iv" => 0.43) ], # 只抓到 2028-01-21 的 K350
+        "iv_surface_missing" => [ "2028-06-16" ],
+        "iv_surface_error"   => "到期日 2028-06-16 的完整鏈沒有載入"
+      )
+
+      capture.persist_leaps_chain(partial)
+      points = LeapsIvSurfacePoint.where(symbol: "TSM", as_of_date: as_of).order(:expiration, :strike)
+      expect(points.map { |p| [ p.expiration.to_s, p.strike.to_f, p.call_iv.to_f ] })
+        .to eq([ [ "2028-01-21", 350.0, 0.43 ], [ "2028-06-16", 440.0, 0.43 ], [ "2028-06-16", 450.0, 0.43 ] ])
+      # 2028-01-21 的 K200、K220 換掉；2028-06-16 沒載入，保留舊點
+    end
+
+    it "現價用頁首收盤價 quote_last，不用 underlying_price（兩者不同時以 quote_last 為準）" do
+      # 2026-11-06 P4 實跑 NOK：underlying_price 退回讀到盤前即時價，日期卻是前一交易日
+      capture.persist_leaps_chain(leaps_data.merge("underlying_price" => 376.0))
+
+      expect(LeapsIvSnapshot.find_by(symbol: "TSM").spot).to eq(BigDecimal("353.1"))
+      expect(LeapsIvSurfacePoint.find_by(symbol: "TSM", strike: 350).moneyness).to eq(BigDecimal("0.9912"))
+    end
+
+    it "讀不到頁首收盤價時整筆不寫（即使有 underlying_price）" do
+      expect { capture.persist_leaps_chain(leaps_data.merge("quote_last" => nil)) }
+        .to raise_error(LeapsIvCapture::CaptureError, /收盤價/)
+      expect(LeapsIvSnapshot.count + LeapsIvSurfacePoint.count).to eq(0)
     end
 
     it "讀不到報價日期時整筆不寫" do

@@ -46,14 +46,21 @@ class FakePage:
     """模擬 options-history 頁：點擊區間選項後，表格換成該區間的資料。"""
 
     def __init__(self, active="3M", grid=True, expired=False, options=("1M", "3M", "6M", "1Y", "2Y"),
-                 hv=46.66, quote="11/05/26"):
+                 hv=46.66, quote="11/05/26", reload_polls=0):
         self.active, self.grid, self.expired = active, grid, expired
         self.options, self.hv, self.quote = list(options), hv, quote
         self.clicks, self.navigated = [], []
+        # 點選區間後，表格要再被讀幾次才換成新區間的資料（模擬 Barchart 重載慢）；None＝永遠不換
+        self.reload_polls, self.stale, self.stale_left = reload_polls, None, 0
 
     async def eval(self, ws, js, **kw):
         if js == scraper.GRID_JS:
-            return ROWS_BY_PERIOD.get(self.active) if self.grid else None
+            if not self.grid:
+                return None
+            if self.stale is not None and (self.reload_polls is None or self.stale_left > 0):
+                self.stale_left -= 1
+                return ROWS_BY_PERIOD.get(self.stale)
+            return ROWS_BY_PERIOD.get(self.active)
         if js == scraper.PERIOD_STATE_JS:
             return {"active": self.active, "options": self.options}
         if js == scraper.SESSION_EXPIRED_JS:
@@ -67,6 +74,7 @@ class FakePage:
             if label not in self.options:
                 return False
             self.clicks.append(label)
+            self.stale, self.stale_left = self.active, (self.reload_polls or 0)
             self.active = label
             return True
         return True  # 開關下拉選單
@@ -122,6 +130,25 @@ class TestModes(unittest.TestCase):
         self.assertEqual(out["hv_pct"], 46.66)
         self.assertEqual(page.navigated, ["https://www.barchart.com/stocks/quotes/TSM/overview"])
         self.assertEqual(out["quote_date_text"], "11/05/26")
+
+
+class TestSlowReload(unittest.TestCase):
+    """2026-11-06 P4 實跑：CSCO／ORCL／WULF 的 2Y 回補只拿到 3M 的 65 列（表格還沒重載就被採信）。"""
+
+    def test_waits_until_grid_actually_reloads(self):
+        page = FakePage(active="3M", reload_polls=6)  # 點了 2Y 之後前 6 次讀到的仍是 3M
+        out = run_main(page, "backfill")
+
+        self.assertEqual(out["status"], "success")
+        self.assertEqual(len(out["rows"]), len(ROWS_BY_PERIOD["2Y"]), "不得把還沒重載的 3M 資料當成 2Y")
+
+    def test_grid_never_reloads_is_error_not_stale_success(self):
+        page = FakePage(active="3M", reload_polls=None)  # 表格一直停在 3M
+        with patch.object(scraper, "PERIOD_WAIT_S", 2):
+            out = run_main(page, "backfill")
+
+        self.assertEqual(out["status"], "error")
+        self.assertIn("2Y", out["error"])
 
 
 class TestFailures(unittest.TestCase):

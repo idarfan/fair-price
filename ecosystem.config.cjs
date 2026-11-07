@@ -79,6 +79,18 @@ module.exports = {
       watch: false,
     },
 
+    // ── LEAPS IV 環境每日快照（leaps-iv-environment P4）
+    // UTC 06:00＝台北 14:00（週二～週六），抓前一個美國交易日收盤；選這個時間是使用者電腦此時通常開著
+    {
+      name: 'leaps-iv-snapshot',
+      script: './bin/leaps_iv_snapshot',
+      cwd: '/home/idarfan/fairprice',
+      interpreter: '/bin/bash',
+      cron_restart: '0 6 * * 2-6',
+      autorestart: false,
+      watch: false,
+    },
+
     // ── IV 每日 25-delta Skew 快照（收盤後 16:45 ET = 20:45 UTC）
     {
       name: 'iv-skew-snapshot',

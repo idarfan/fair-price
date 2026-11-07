@@ -13,7 +13,7 @@
 class LeapsIvCapture
   class CaptureError < StandardError; end
 
-  MONEYNESS_RANGE = (0.60..1.25)
+  MONEYNESS_RANGE = (0.60..1.25) # 曲面顯示範圍（P3 surface 讀取時篩）；寫入時不篩
   HV_LABEL        = "HV 30 天" # overview 頁標籤沒有天數，依名詞說明「30-Day Historical Volatility」（使用者裁示）
 
   def initialize(symbol, source:)
@@ -24,13 +24,16 @@ class LeapsIvCapture
 
   # LEAPS 爬蟲成功結果 → 快照（現價）＋曲面點。回傳寫入的曲面點數。
   def persist_leaps_chain(data)
-    spot = data["underlying_price"].to_f
-    raise CaptureError, "缺少現價（underlying_price）" unless spot.positive?
+    # 現價取頁首 pricechangerow 的收盤價（quote_last），與 as_of_date 同一個區塊讀出，一定配對。
+    # 不用 underlying_price：它在 pricechangerow 不存在時會退回別的讀法，可能讀到盤前即時價
+    # （2026-11-06 P4 實跑 NOK：寫成「11/05 的日期＋11/06 盤前 7.82」）。
+    spot = data["quote_last"].to_f
+    raise CaptureError, "讀不到頁面收盤價（pricechangerow）" unless spot.positive?
 
     as_of_date = self.class.as_of_date(data["quote_date_text"])
     now        = Time.current
     points     = surface_points(data["iv_surface"], spot, as_of_date, now)
-    raise CaptureError, "IV 曲面沒有任何 moneyness #{MONEYNESS_RANGE} 的點（#{data['iv_surface_error']}）" if points.empty?
+    raise CaptureError, "IV 曲面沒有任何點（#{data['iv_surface_error']}）" if points.empty?
 
     ActiveRecord::Base.transaction do
       LeapsIvSnapshot.upsert(
@@ -38,7 +41,14 @@ class LeapsIvCapture
           captured_at: now, source_url: data.fetch("source_url") },
         unique_by: %i[symbol as_of_date], update_only: %i[spot source captured_at source_url]
       )
-      LeapsIvSurfacePoint.upsert_all(points, unique_by: %i[symbol as_of_date expiration strike])
+      # 當天整張曲面以最後一次抓取為準（後寫覆蓋先寫）：只 upsert 的話，上一次有、這次沒抓到的
+      # 到期日／履約價會留在表裡，CM540 會被過期的點夾住（P3 r1 質詢 2 的測試抓到）。
+      # 例外：爬蟲回報「重試後仍沒載入」的到期日（iv_surface_missing）保留舊點——那是這次抓取不完整，
+      # 不是到期日消失；整批刪掉會讓一次不完整的抓取蓋掉完整資料（P4 實跑 TSM 115 點掉到 69 點）。
+      LeapsIvSurfacePoint.where(symbol: @symbol, as_of_date: as_of_date)
+                         .where.not(expiration: missing_expirations(data))
+                         .delete_all
+      LeapsIvSurfacePoint.insert_all(points)
     end
     points.size
   end
@@ -84,15 +94,23 @@ class LeapsIvCapture
     raise CaptureError, "頁面報價日期格式無法辨識：#{text.inspect}"
   end
 
+  def self.missing_expirations(data)
+    Array(data["iv_surface_missing"]).map { |d| Date.parse(d.to_s) }
+  end
+
   private
+
+  def missing_expirations(data) = self.class.missing_expirations(data)
 
   def surface_points(raw_rows, spot, as_of_date, now)
     Array(raw_rows).filter_map do |r|
       strike = r["strike"]&.to_d
       next if strike.nil? || r["expiration_date"].blank?
 
+      # 全部履約價都存，不在這裡篩 moneyness（2026-11-06 使用者裁示，P4 實跑發現）：ATM IV 要用
+      # 「夾住現價的上下兩檔」，履約價間距大的低價股（NOK 現價 7.46，上一檔是 10＝1.34）上方那檔常在
+      # 0.60–1.25 之外，存入時先篩掉就算不出 ATM 與 CM540。0.60–1.25 只在 P3 讀曲面時篩。
       moneyness = (strike / spot.to_d).round(4)
-      next unless MONEYNESS_RANGE.cover?(moneyness)
 
       { symbol: @symbol, as_of_date: as_of_date, expiration: Date.parse(r["expiration_date"]),
         dte: r["dte"], strike: strike, moneyness: moneyness,

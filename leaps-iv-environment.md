@@ -25,7 +25,7 @@
 | P1 | Schema | ✅ 完成 | 3 個 migration（一表一個）＋3 個 model；`db:migrate` → `rollback STEP=3` → `db:migrate` 全成功，`column_names` 含規格全部欄位；`spec/models/leaps_iv_tables_spec.rb` 9 examples 0 failures；完整 rspec 1411 passed。schema.rb 排除正式庫中名人堂分支的 `hof_*` 表（合併名人堂後須以完整 dump 重新產生） | PASS（r1，附 4 條質詢） | 2026-11-06 |
 | P2 | 爬蟲擴充 | ✅ 完成 | LEAPS 爬蟲 Stage 3（篩 Delta 前全履約價 IV）＋`barchart_iv_history_scraper.py`（latest／backfill，切回原區間）＋`LeapsIvCapture`；TSM 實查：曲面 5 到期日×23 點＝頁面數、快照全欄非 null、2Y 回補 520 列＝頁面列數；排行回歸 SAME（83 筆）；合約 IV 與歷史 3 日期截圖逐欄一致；盤中不寫 IV（`--skip-iv-surface`）；完整 rspec 1445 passed | PASS（r2；r1 FAIL：缺中段／最舊列截圖） | 2026-11-06 |
 | P3 | 計算服務 | ✅ 完成 | `LeapsIvEnvironmentService`（call／persist!）；規格測試向量逐一對應 + PMCC 讀取時合併（與快照同一次抓取、相差 1 小時內才併）；TSM 實資料 CM540＝0.427937（Python 獨立重算一致）；完整 rspec 1465 passed | PASS（r1，附 2 條質詢） | 2026-11-06 |
-| P4 | 每日快照排程 | ⬜ | | | |
+| P4 | 每日快照排程 | ✅ 完成 | pm2 `leaps-iv-snapshot`（`0 6 * * 2-6` UTC）＋`LeapsIvCdpLock`（shared／exclusive advisory lock）＋`LeapsIvSnapshotRunner`；11/07 手動連跑兩輪＋cron 正式觸發一輪（台北 14:00）9 檔全 success、0 重複；CSCO／NOK／ORCL／TSM 頁首收盤價＝DB spot＝Barchart 歷史收盤價；TSM 曲面 5 到期日 68／64／52／59／51＝頁面全部 call 履約價數，CM540 0.42085 獨立重算一致；鎖逾時畫面 `tmp/regress/p4_lock_timeout_ui.png`；完整 rspec 1609 passed | PASS（r2，附 2 條質詢：pm2 不明來源啟動、missing 保留舊點實跑，P7 回覆；r1 FAIL：最終程式碼未實跑、22:08 結果寫錯） | 2026-11-07 |
 | P5 | UI 區塊 | ⬜ | | | |
 | P6 | 推薦文字整合 | ⬜ | | | |
 | P7 | 端到端驗收 | ⬜ | | | |
@@ -56,7 +56,7 @@
 - **IV Rank（指標固定為 CM540）** = `(現值 − 期間最低) / (期間最高 − 期間最低) × 100`。期間＝`as_of_date` 早於當日、且在 365 個日曆天內的快照（最多 252 筆）。最高等於最低時記 `nil`。
 - **IV Percentile** = 期間內「嚴格小於現值」的筆數 ÷ 期間筆數 × 100（相等不計入）。
 - **歷史筆數 n**＝上述期間筆數（不含當日）。n < 20 時 Rank/Percentile 回傳 `nil`、狀態 `accumulating`，UI 顯示「資料累積中 n/252 天」。
-- **曲面 moneyness** = `K / S`，收錄範圍 0.60–1.25（含端點）。
+- **曲面 moneyness** = `K / S`，顯示範圍 0.60–1.25（含端點）。`leaps_iv_surface_points` 存 LEAPS 到期日的**全部**履約價，0.60–1.25 只在讀取曲面（P3 `surface`、P5 熱圖）時篩；ATM IV 用全部履約價找夾住現價的上下兩檔（2026-11-06 使用者裁示：NOK 現價 7.46、上一檔 10＝1.34，存入時先篩掉就算不出 ATM 與 CM540）。
 
 **測試向量（P3 必用）**
 - 內插：T1=0.5、σ1=0.40；T2=1.5、σ2=0.44；目標 T=1.0 → σ=**0.4304**（±0.0001）。
@@ -160,7 +160,7 @@ bin/rails runner 'p LeapsIvSnapshot.column_names.sort; p LeapsIvSurfacePoint.col
 
 ## P2 爬蟲擴充
 
-1. 在 P0 找到的 LEAPS 爬蟲中，**篩選 Delta 之前**，把 LEAPS 各到期日 moneyness 0.60–1.25 的 call（strike、IV、delta）寫入 `leaps_iv_surface_points`。若 P0 第 3 點確認篩選發生在頁面端（未篩的履約價根本沒讀到），則改為讀完整履約價列表後再篩。
+1. 在 P0 找到的 LEAPS 爬蟲中，**篩選 Delta 之前**，把 LEAPS 各到期日**全部履約價**的 call（strike、IV、delta）寫入 `leaps_iv_surface_points`（原寫「moneyness 0.60–1.25 的 call」，P4 實跑後使用者裁示改為全部，理由見「名詞與公式」曲面 moneyness）。若 P0 第 3 點確認篩選發生在頁面端（未篩的履約價根本沒讀到），則改為讀完整履約價列表後再篩。
 2. 既有 `Delta ≥ 0.60` 候選排行行為**不得改變**：改動前先對 TSM 存一份候選排行（到期日＋履約價＋Mid）為 `tmp/regress/leaps_before.json`，改動後同一份原始資料重算存 `leaps_after.json`，兩檔須完全相同。
 3. 若 P0 確認 PMCC 短天期快照有 IV，曲面讀取時合併（不重抓）；沒有則曲面只含 LEAPS 段，不另開爬蟲。
 4. 新增 Options Overview History 讀取（selector／下載方式用 P0 第 5 點記錄的），兩種模式：
@@ -175,7 +175,7 @@ bin/rails runner 'p LeapsIvSnapshot.column_names.sort; p LeapsIvSurfacePoint.col
 ```bash
 # 觸發一次 TSM 查詢（不填 user_strike）後：
 psql -c "select expiration, count(*) from leaps_iv_surface_points where symbol='TSM' and as_of_date=(select max(as_of_date) from leaps_iv_surface_points where symbol='TSM') group by 1 order by 1;"
-# 每個到期日的筆數 = 該到期日 Barchart 頁面上 moneyness 0.60–1.25 的履約價數（報告列出兩邊數字，須相等）
+# 每個到期日的筆數 = 該到期日 Barchart 頁面上的全部 call 履約價數（報告列出兩邊數字，須相等；P4 後改，原為 0.60–1.25 的履約價數）
 
 psql -c "select as_of_date, bc_hv, bc_hv_label, source_url from leaps_iv_snapshots where symbol='TSM' order by as_of_date desc limit 1;"
 # 全部非 null
@@ -219,7 +219,8 @@ spec 必含：「名詞與公式」全部測試向量（逐一對應 example）�
 - 新增 `bin/leaps_iv_snapshot`：標的＝`config/leaps_iv.yml` 的 `watchlist` ∪ P0 第 9 點 SQL 取得的 symbol，去重後依字母排序，最多 `max_symbols` 個（超出寫 log 並略過）。
 - 每標的依序（不並行）執行 P2 抓取 → `persist!`，`source='scheduled'`；單一標的逾時 `per_symbol_timeout_sec` 或失敗不中斷其他標的，錯誤寫 `log/leaps_iv_snapshot.log`。
 - 併發：沿用 P0 第 8 點的鎖／佇列；若 P0 寫「無」，則新增以 PostgreSQL advisory lock 實作的互斥，互動查詢與排程都要取同一把鎖，取不到就等待（上限 `lock_wait_sec`），不得同時操作 CDP Chrome。
-- 只抓 LEAPS 鏈與 Barchart IV 指標（`latest` 模式），不產生候選排行或 PMCC 結果。
+- 只抓 LEAPS 鏈與 Barchart IV 指標（`latest` 模式），不產生候選排行或 PMCC 結果。實作：LEAPS 爬蟲帶 `--iv-surface-only`，讀完到期日與現價後直接跑 Stage 3（不挑候選、不跑 Stage 2），不寫 `leaps_option_chain_snapshots`／`strike_chain_snapshots`，使用者最後一次查詢的排行不被覆蓋。
+- 鎖的實作（P4 實跑後定案）：互動查詢取 **shared**、排程取 **exclusive**（多個互動查詢仍可並行）；鎖用**獨立的 PG 連線**（不向 ActiveRecord 連線池借，連線池只有 5 條）；排程每個標的放鎖後停 5 秒再拿下一個（advisory lock 不排隊，否則等鎖的互動查詢只能等整輪跑完）。
 - 標的在 `barchart_iv_histories` 沒有任何列時，先跑一次 `backfill` 模式。
 - 另提供 `bin/leaps_iv_snapshot --backfill SYMBOL` 手動回補單一標的。
 - pm2 排程：cron `0 6 * * 2-6`，`autorestart: false`，沿用 `iv-daily-snapshot`（`ecosystem.config.cjs`）的寫法。pm2 daemon 時區為 **UTC**（P0 實測），UTC 06:00＝台北 14:00（週二～週六），抓前一個美國交易日的收盤資料；選台北 14:00 是因為使用者電腦此時通常開著（2026-11-06 使用者裁示）。
@@ -324,7 +325,7 @@ rank_thresholds:
   expensive: 60   # rank > 60；30 ≤ rank ≤ 60 為中性
 watchlist: [TSM]
 max_symbols: 20
-per_symbol_timeout_sec: 600
+per_symbol_timeout_sec: 300   # P4 r1 質詢 2 後由 600 改 300：加 Barchart 歷史時限 300，持鎖最多 600 秒 < lock_wait_sec 900
 lock_wait_sec: 900
 ```
 （此檔由 P4 建立並寫入全部鍵；P6 只讀取 `rank_thresholds`，不得另建設定檔。）

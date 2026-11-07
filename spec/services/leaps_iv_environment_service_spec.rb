@@ -105,6 +105,27 @@ RSpec.describe LeapsIvEnvironmentService do
     end
   end
 
+  describe "CM540 精度（P3 r1 質詢 1）" do
+    it "現值捨入到 5 位，與歷史值同一精度比較：0.427934 → 0.42793，等於歷史 0.42793 不算「小於」" do
+      snapshot!(today)
+      surface!(today, { 442 => 0.427934, 589 => 0.427934 })
+      history!([ 0.42793 ])
+
+      result = described_class.new(min_history: 1).call(symbol: sym)
+      expect(result[:cm540]).to eq(0.42793)
+      expect(result[:percentile]).to eq(0.0) # 未捨入時 0.427934 > 0.42793 會算成 100.0
+    end
+
+    it "call 回傳值與 persist! 寫入的值相同" do
+      snapshot!(today)
+      surface!(today, { 442 => 0.40, 589 => 0.44 })
+
+      written = described_class.new.persist!(symbol: sym, as_of_date: today)
+      expect(described_class.new.call(symbol: sym)[:cm540]).to eq(written)
+      expect(LeapsIvSnapshot.find_by(symbol: sym).cm540_atm_iv.to_f).to eq(written)
+    end
+  end
+
   describe "CM540 與 ATM IV 的邊界" do
     it "540 天無法被夾住 → cm540 nil，Rank／Percentile 也 nil（不外插）" do
       snapshot!(today)
@@ -122,6 +143,20 @@ RSpec.describe LeapsIvEnvironmentService do
       result = described_class.new.call(symbol: sym)
       expect(result[:term_structure].map { |p| p[:atm_iv] }).to eq([ nil, nil ])
       expect(result[:cm540]).to be_nil
+    end
+
+    it "夾住現價的上一檔在曲面範圍外（低價股履約價間距大）仍用來算 ATM，但不出現在 surface" do
+      # 2026-11-06 P4 實跑 NOK：現價 7.46，上一檔 10（moneyness 1.34）；原本存入時就篩掉，算不出 CM540
+      snapshot!(today, spot: 7.46)
+      [ [ 442, 7.0, 0.5793 ], [ 442, 10.0, 0.5600 ], [ 589, 7.0, 0.5700 ], [ 589, 10.0, 0.5500 ] ].each do |dte, k, iv|
+        LeapsIvSurfacePoint.create!(symbol: sym, as_of_date: today, expiration: today + dte, dte: dte, strike: k,
+                                    moneyness: (k / 7.46).round(4), call_iv: iv, captured_at: now)
+      end
+
+      result = described_class.new.call(symbol: sym)
+      expect(result[:term_structure].map { |p| p[:atm_iv] }).to all(be_present)
+      expect(result[:cm540]).to be_present
+      expect(result[:surface].map { |p| p[:moneyness] }.uniq).to eq([ 0.9383 ]) # 10／7.46＝1.3405 不在 0.60–1.25
     end
 
     it "現價恰等於某履約價 → ATM IV＝該檔 IV" do
@@ -151,7 +186,7 @@ RSpec.describe LeapsIvEnvironmentService do
       t2 = 589 / 365.0
       t  = 540 / 365.0
       expected = Math.sqrt(((0.40**2 * t1) + ((t - t1) / (t2 - t1)) * ((0.44**2 * t2) - (0.40**2 * t1))) / t)
-      expect(value).to be_within(1e-9).of(expected)
+      expect(value).to eq(expected.round(5)) # 與欄位同為 5 位（P3 r1 質詢 1）
       expect(LeapsIvSnapshot.find_by(symbol: sym, as_of_date: today).cm540_atm_iv).to eq(BigDecimal(expected.round(5).to_s))
     end
   end
