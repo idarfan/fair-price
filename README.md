@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-11-08（日）— 安全性：升級有漏洞公告的套件（bundler-audit 恢復全綠）
+
+CI `scan_ruby` 的 bundler-audit 因 10/13 之後新公布的漏洞失敗（Gemfile 沒改），以 `bundle update --conservative` 只升被點名的套件：
+Rails 8.1.3.1 → 8.1.4.1、nokogiri 1.19.4 → 1.19.7、rack 3.2.6 → 3.2.8、rails-html-sanitizer 1.7.1 → 1.7.2、loofah 2.25.2 → 2.25.3、
+crass 1.0.7 → 1.0.8、addressable 2.9.0 → 2.9.2、net-ssh 7.3.0 → 7.3.9、css_parser 3.0.0 → 3.4.0、view_component 4.12.0 → 4.23.0（lookbook 相依）。
+只改 `Gemfile.lock`。
+
 ### 2026-10-12（一）— 版本 v20261012，更新版本說明
 
 - 版本更新說明新增 v20261012（涵蓋 10/10～10/12）：LEAPS 不填履約價時候選改從完整鏈挑 Δ 0.60–0.90、「期權鏈無此履約價」與「Delta 不足」分開顯示、舊結果網址顯示「已不是最新」、PMCC Long Δ ≥ 0.80 與 Short DTE 19–45 改為篩選、PMCC 無合格組合時說明擋下的規則、指定履約價時提供「不填履約價重新查詢」與 LEAPS 到期日的緩衝檔、履約價欄下方提示垂直價差顯示條件。
