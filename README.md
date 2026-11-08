@@ -1,5 +1,12 @@
 # FairPrice
 
+### 2026-11-08（日）— 安全性：升級有漏洞公告的套件（bundler-audit 恢復全綠）
+
+CI `scan_ruby` 的 bundler-audit 因 10/13 之後新公布的漏洞失敗（Gemfile 沒改），以 `bundle update --conservative` 只升被點名的套件：
+Rails 8.1.3.1 → 8.1.4.1、nokogiri 1.19.4 → 1.19.7、rack 3.2.6 → 3.2.8、rails-html-sanitizer 1.7.1 → 1.7.2、loofah 2.25.2 → 2.25.3、
+crass 1.0.7 → 1.0.8、addressable 2.9.0 → 2.9.2、net-ssh 7.3.0 → 7.3.9、css_parser 3.0.0 → 3.4.0、view_component 4.12.0 → 4.23.0（lookbook 相依）。
+只改 `Gemfile.lock`。
+
 ### 2026-11-08（日）— LEAPS IV 環境 P7.1：pm2 提早觸發防護、排程 log 印 missing
 
 pm2 6.0.14 內建的 croner 4.1.97 計時器到期就執行、不檢查牆上時鐘，WSL2 的牆上時鐘又比 monotonic 慢 3–7%，所以每個 pm2 cron 都會在正點前被多觸發 2–3 次。`leaps-iv-snapshot` 改成開頭先判斷：由 pm2 啟動（有 `cron_restart` 環境變數）且離下一次排定時間比離上一次近，就寫 log「提早觸發，略過」直接結束；手動執行照跑。新類別 `LeapsIvCronGuard`。另外每日快照 log 在有沒載入的到期日時附 `missing=…`。其他 pm2 cron（如 `x-order-db-backup`）同樣會提早觸發，本次未處理。
