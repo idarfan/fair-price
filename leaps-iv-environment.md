@@ -400,6 +400,7 @@ lock_wait_sec: 900
    - 只在 pm2 啟動時生效：以環境變數 `cron_restart`（pm2 傳給子程序的排程字串）判斷；手動執行 `bin/leaps_iv_snapshot`（沒有此變數）一律照跑。`--backfill` 不受影響。
    - 依 cron 字串（UTC）算出現在之前最近一次與之後最近一次的排定時間；**離下一次比離上一次近 → 判定為提早觸發**：寫一行 log「提早觸發，略過」（含現在時間與下一次排定時間），不取鎖、不抓取，exit 0。
    - 不設固定門檻：睡眠後晚觸發只要沒晚過兩次排定的中點，照常執行。
+   - 副作用（P7.1 r1 審查質詢 2）：手動 `pm2 restart leaps-iv-snapshot` 也帶 `cron_restart`，同樣適用此規則。例：週二 03:00 UTC 離週二 06:00 只有 3 小時、離上週六 06:00 有 69 小時 → 略過。**要強制跑一輪，直接執行 `bin/leaps_iv_snapshot`**（沒有 `cron_restart`），不要用 pm2 restart。
    - 只支援「分 時 * * 星期」形式（`*`、數字、`a-b`、`a,b`）；字串格式不支援時不擋、照跑並寫 warn log。
 2. **log 印 missing**：`fetch_leaps_iv_snapshot` 回傳值加 `missing`（重試後仍沒載入的到期日陣列）；runner 每標的那行在非空時附 ` missing=YYYY-MM-DD,…`，空的時候格式不變。
 
