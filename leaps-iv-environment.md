@@ -28,7 +28,7 @@
 | P4 | 每日快照排程 | ✅ 完成 | pm2 `leaps-iv-snapshot`（`0 6 * * 2-6` UTC）＋`LeapsIvCdpLock`（shared／exclusive advisory lock）＋`LeapsIvSnapshotRunner`；11/07 手動連跑兩輪＋cron 正式觸發一輪（台北 14:00）9 檔全 success、0 重複；CSCO／NOK／ORCL／TSM 頁首收盤價＝DB spot＝Barchart 歷史收盤價；TSM 曲面 5 到期日 68／64／52／59／51＝頁面全部 call 履約價數，CM540 0.42085 獨立重算一致；鎖逾時畫面 `tmp/regress/p4_lock_timeout_ui.png`；完整 rspec 1609 passed | PASS（r2，附 2 條質詢：pm2 不明來源啟動、missing 保留舊點實跑，P7 回覆；r1 FAIL：最終程式碼未實跑、22:08 結果寫錯） | 2026-11-07 |
 | P5 | UI 區塊 | ✅ 完成 | `IvEnvironmentSection`（＋`IvEnvironmentHeatmap`）放在推薦分析上方、預設收合；tooltips.js `IV_ENV_EXPLAIN` 14 key（無刪改既有行，導覽第 6 步）；`leapsIvEnvironment.ts` 第一次展開才畫兩張圖；查詢中標「更新中」；正式站 TSM 實測：熱圖 14 欄、Vega 計算句「每口約損失 $595」；component 20／request 83／完整 rspec 1636 passed、vitest 91 passed | PASS（r1，附 2 條質詢：PMCC 短天期併入後熱圖色階與期限結構被壓扁需使用者裁示、同日多次查詢覆寫說明，P6／P7 前回覆） | 2026-11-07 |
 | P5.1 | 短天期點的呈現（使用者裁示） | ✅ 完成 | 熱圖色階只依 LEAPS 列（DTE ≥ 364），短天期列移到分隔標題下方、灰底不上色；期限結構只畫 LEAPS 段；正式站已併入 PMCC 的 TSM：LEAPS 70 格端點 39.6%＝HEAT_LOW、49.4%＝HEAT_HIGH，短天期 56 格 0 格上色，期限結構點 405–804 天；完整 rspec 1640 passed | PASS（r1） | 2026-11-07 |
-| P6 | 推薦文字整合 | 🔄 送審中 | `LeapsRecommendations::IvRankNote`（推薦分析標題下方、近天期之前；門檻讀 `LeapsIvConfig.fetch(:rank_thresholds)`）；request spec 29.4→29 便宜／29.6→30 中性／60.4→60 中性／60.6→61 偏貴／nil 不出現、整頁只出現一次、位置、改設定檔門檻即改判斷，7 examples；完整 rspec 1647 passed；正式站 TSM（rank nil、累積中 1/252）推薦分析下 0 句 | 待審（r1） | 2026-11-08 |
+| P6 | 推薦文字整合 | ✅ 完成 | `LeapsRecommendations::IvRankNote`（推薦分析標題下方、近天期之前；門檻讀 `LeapsIvConfig.fetch(:rank_thresholds)`）；request spec 29.4→29 便宜／29.6→30 中性／60.4→60 中性／60.6→61 偏貴／nil 不出現、整頁只出現一次、位置、改設定檔門檻即改判斷，7 examples；完整 rspec 1647 passed；正式站 TSM（rank nil、累積中 1/252）推薦分析下 0 句 | PASS（r1；審查記錄：歷史滿 20 天後須補一次有句子的實頁證據） | 2026-11-08 |
 | P7 | 端到端驗收 | ⬜ | | | |
 
 接續 session：只讀本表＋進行中階段章節。
