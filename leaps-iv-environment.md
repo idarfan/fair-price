@@ -30,6 +30,7 @@
 | P5.1 | 短天期點的呈現（使用者裁示） | ✅ 完成 | 熱圖色階只依 LEAPS 列（DTE ≥ 364），短天期列移到分隔標題下方、灰底不上色；期限結構只畫 LEAPS 段；正式站已併入 PMCC 的 TSM：LEAPS 70 格端點 39.6%＝HEAT_LOW、49.4%＝HEAT_HIGH，短天期 56 格 0 格上色，期限結構點 405–804 天；完整 rspec 1640 passed | PASS（r1） | 2026-11-07 |
 | P6 | 推薦文字整合 | ✅ 完成 | `LeapsRecommendations::IvRankNote`（推薦分析標題下方、近天期之前；門檻讀 `LeapsIvConfig.fetch(:rank_thresholds)`）；request spec 29.4→29 便宜／29.6→30 中性／60.4→60 中性／60.6→61 偏貴／nil 不出現、整頁只出現一次、位置、改設定檔門檻即改判斷，7 examples；完整 rspec 1647 passed；正式站 TSM（rank nil、累積中 1/252）推薦分析下 0 句 | PASS（r1；審查記錄：歷史滿 20 天後須補一次有句子的實頁證據） | 2026-11-08 |
 | P7 | 端到端驗收 | ✅ 完成 | 正式站 TSM 兩情境（不填／user_strike=350）：DOM 與 DB 一致（CM540 42.1%＝0.42085、累積中 1/252＝n 1、Barchart IV Rank 65.47、熱圖 2027-12-17／2029-01-19 的 1.00 欄 41.2%／42.5%＝K380 0.4125／0.4246）；排行以 P2 原始資料重放＝`leaps_after.json`（sha256 be445401…）；收摺 open false→true、tooltip 滑過與點擊、`poi_fvg` 文案未變、導覽 34＝33＋1；`bin/leaps_iv_snapshot` 9 檔全 ok（週日 as_of 不變，upsert 9 列、無新增無重複；其中 AMD、BTI 的 2029-01-19 重試後未載入，沿用 11-07 06:00 UTC 那輪的舊點：fetch_logs #1476／#1478 `missing=2029-01-19`，snapshot log 不印 missing）；pm2 不明啟動查明為 croner 提早觸發（牆上時鐘比 monotonic 慢 3–7%） | PASS（r1，附 1 條一般問題＋3 條質詢：pm2 提早觸發修法、snapshot log 是否印 missing 待使用者裁示；有評語句子的實頁證據待 rank 非 nil 後補） | 2026-11-08 |
+| P7.1 | pm2 提早觸發防護＋log 印 missing（使用者裁示） | 🔄 送審中 | `LeapsIvCronGuard`（離下一次排定比上一次近＝提早）＋runner `early_fire?`（只看 `cron_restart`）＋rake 開頭略過；runner log 附 `missing=`；guard 16 例（11/07 實際序列 05:15:56／05:57:30／05:59:50 略過、06:00 執行等）；實跑 `cron_restart="0 2 * * *"` 於 01:41:53Z → 略過、2.9 秒、0 筆 fetch_logs；不設 → 9 檔全 ok，ORCL／WULF 印 `missing=2029-01-19`＝fetch_logs #1514／#1520；完整 rspec 1669 passed | 待審（r1） | 2026-11-08 |
 
 接續 session：只讀本表＋進行中階段章節。
 「審查」欄：依撰寫端審查協定填異端審查官結論；審查未通過不得進入下一階段。
@@ -386,6 +387,26 @@ lock_wait_sec: 900
 - 回歸：滑過既有 `[data-tip-key="poi_fvg"]` 仍顯示原文案；按「欄位導覽」，步驟數＝改動前步驟數＋1
 
 另跑一次 `bin/leaps_iv_snapshot`，貼 log 與 psql 新增的 scheduled 列。
+
+---
+
+## P7.1 pm2 提早觸發防護＋snapshot log 印 missing（2026-11-08 使用者裁示，P7 r1 審查質詢 1、2）
+
+不屬於 P7 驗收範圍；是 P7 查出的排程問題的修正。
+
+背景：pm2 6.0.14 內建 croner 4.1.97，`setTimeout` 到期就執行、不檢查牆上時鐘；本機 WSL2 牆上時鐘比 monotonic 慢 3–7%，每個 pm2 cron 會在正點前多觸發 2–3 次，後一輪以 SIGINT 中斷前一輪。同一機制影響 `x-order-db-backup` 等所有 pm2 cron 程序；本階段**只修 `leaps-iv-snapshot`**（使用者裁示：腳本開頭檢查時間，不換排程器、不升級 pm2）。
+
+1. **提早觸發防護**：
+   - 只在 pm2 啟動時生效：以環境變數 `cron_restart`（pm2 傳給子程序的排程字串）判斷；手動執行 `bin/leaps_iv_snapshot`（沒有此變數）一律照跑。`--backfill` 不受影響。
+   - 依 cron 字串（UTC）算出現在之前最近一次與之後最近一次的排定時間；**離下一次比離上一次近 → 判定為提早觸發**：寫一行 log「提早觸發，略過」（含現在時間與下一次排定時間），不取鎖、不抓取，exit 0。
+   - 不設固定門檻：睡眠後晚觸發只要沒晚過兩次排定的中點，照常執行。
+   - 只支援「分 時 * * 星期」形式（`*`、數字、`a-b`、`a,b`）；字串格式不支援時不擋、照跑並寫 warn log。
+2. **log 印 missing**：`fetch_leaps_iv_snapshot` 回傳值加 `missing`（重試後仍沒載入的到期日陣列）；runner 每標的那行在非空時附 ` missing=YYYY-MM-DD,…`，空的時候格式不變。
+
+**驗證**
+- unit spec：`0 6 * * 2-6` 下，週六 05:15:56／05:57:30／05:59:50 UTC → 略過；06:00:00、06:07 → 執行；週二 01:48（72 小時間隔提早 4.2 小時）→ 略過；週日 10:00（手動 pm2 restart）→ 執行；不支援的字串 → 執行；沒有 `cron_restart` → 執行。
+- runner spec：missing 非空時 log 行含 `missing=2029-01-19`，空時不含。
+- 實跑：手動設 `cron_restart` 在非排定時間跑一次 → log 出現略過、無抓取；不設時照跑。完整 rspec。
 
 ---
 

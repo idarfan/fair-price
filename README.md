@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-11-08（日）— LEAPS IV 環境 P7.1：pm2 提早觸發防護、排程 log 印 missing
+
+pm2 6.0.14 內建的 croner 4.1.97 計時器到期就執行、不檢查牆上時鐘，WSL2 的牆上時鐘又比 monotonic 慢 3–7%，所以每個 pm2 cron 都會在正點前被多觸發 2–3 次。`leaps-iv-snapshot` 改成開頭先判斷：由 pm2 啟動（有 `cron_restart` 環境變數）且離下一次排定時間比離上一次近，就寫 log「提早觸發，略過」直接結束；手動執行照跑。新類別 `LeapsIvCronGuard`。另外每日快照 log 在有沒載入的到期日時附 `missing=…`。其他 pm2 cron（如 `x-order-db-backup`）同樣會提早觸發，本次未處理。
+
 ### 2026-11-08（日）— LEAPS IV 環境 P6：推薦分析加一句 LEAPS IV Rank 評語
 
 `/leaps` 的「推薦分析」標題下方、近天期段落之前加一句：rank 四捨五入到整數後，< 30 寫「時間價值相對便宜」、30–60 寫「IV 中性」、> 60 寫「時間價值偏貴；可考慮分批進場或改選更深價內…」。門檻只讀 `config/leaps_iv.yml` 的 `rank_thresholds`；rank 為 nil（累積中／無資料）時整句不出現。新模組 `LeapsRecommendations::IvRankNote`。

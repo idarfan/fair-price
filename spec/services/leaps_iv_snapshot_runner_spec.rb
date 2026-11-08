@@ -74,6 +74,17 @@ RSpec.describe LeapsIvSnapshotRunner do
       expect(log.string).to include("爬蟲超過 600 秒沒有結束", "NOK 失敗：RuntimeError: CDP 斷線")
     end
 
+    it "log 行在有沒載入的到期日時附 missing=，沒有時格式不變（P7.1）" do
+      fetch_log!("AMD", "success")
+      stub_service("AMD", iv: { status: "success", errors: [], points: 604, cm540: 0.57268, missing: [ "2029-01-19" ] })
+      stub_service("TSM", iv: { status: "success", errors: [], points: 294, cm540: 0.42085, missing: [] })
+
+      expect(runner.run).to eq("AMD" => :ok, "TSM" => :ok)
+      amd, tsm = log.string.lines.grep(/\[snapshot\] (AMD|TSM)：/)
+      expect(amd).to include("AMD：IV success（points=604 cm540=0.57268 missing=2029-01-19）")
+      expect(tsm).to include("TSM：IV success（points=294 cm540=0.42085）")
+    end
+
     it "美股盤中依規則略過的標的記 :skipped，不算失敗" do
       skipped = { status: "skipped_regular_session", errors: [] }
       stub_service("TSM", iv: skipped, history: skipped)
@@ -129,6 +140,31 @@ RSpec.describe LeapsIvSnapshotRunner do
     it "等鎖的查詢插在兩個標的之間（不必等整輪跑完）" do
       run_with_waiting_query
       expect(events).to eq(%i[amd query tsm])
+    end
+  end
+
+  # P7.1：pm2 cron 提早觸發時整輪略過；cron 是 pm2 傳進來的環境變數 cron_restart。
+  describe "#early_fire?" do
+    let(:early) { Time.utc(2026, 11, 7, 5, 15, 56) }
+
+    it "提早觸發：回 true，log 寫略過與下一次排定時間" do
+      expect(runner.early_fire?("0 6 * * 2-6", now: early)).to be(true)
+      expect(log.string).to include("提早觸發，略過", "2026-11-07T05:15:56Z", "下一次排定 2026-11-07T06:00:00Z")
+    end
+
+    it "正點：回 false，不寫 log" do
+      expect(runner.early_fire?("0 6 * * 2-6", now: Time.utc(2026, 11, 7, 6))).to be(false)
+      expect(log.string).to be_empty
+    end
+
+    it "沒有 cron_restart（手動執行）：回 false" do
+      expect(runner.early_fire?(nil, now: early)).to be(false)
+      expect(runner.early_fire?("", now: early)).to be(false)
+    end
+
+    it "不支援的 cron 字串：照跑並寫 warn" do
+      expect(runner.early_fire?("*/30 6 * * *", now: early)).to be(false)
+      expect(log.string).to include("無法判斷提早觸發，照常執行")
     end
   end
 

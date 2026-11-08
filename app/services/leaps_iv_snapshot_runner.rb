@@ -32,6 +32,22 @@ class LeapsIvSnapshotRunner
     results
   end
 
+  # P7.1：pm2 cron 提早觸發時整輪略過（不取鎖、不抓取）。cron 是 pm2 傳給子程序的環境變數 cron_restart；
+  # 手動執行沒有這個變數，一律照跑。字串格式不支援時寧可照跑，不讓排程整個停掉。
+  def early_fire?(cron, now: Time.now.utc)
+    return false if cron.blank?
+
+    guard = LeapsIvCronGuard.new(cron)
+    return false unless guard.early?(now)
+
+    @logger.info("[snapshot] pm2 cron 提早觸發，略過：現在 #{now.utc.iso8601}，" \
+                 "下一次排定 #{guard.next_at(now).utc.iso8601}（cron #{cron}，UTC）")
+    true
+  rescue LeapsIvCronGuard::Unsupported => e
+    @logger.warn("[snapshot] cron #{cron.inspect} 無法判斷提早觸發，照常執行：#{e.message}")
+    false
+  end
+
   # bin/leaps_iv_snapshot --backfill SYMBOL
   def backfill(symbol)
     symbol = symbol.to_s.upcase
@@ -69,13 +85,19 @@ class LeapsIvSnapshotRunner
       iv      = service.fetch_leaps_iv_snapshot(source: "scheduled", timeout: @config.fetch("per_symbol_timeout_sec"))
       mode    = BarchartIvHistory.for_symbol(symbol).exists? ? "latest" : "backfill"
       history = service.fetch_barchart_iv_history(mode: mode, source: "scheduled")
-      @logger.info("[snapshot] #{symbol}：IV #{iv[:status]}（points=#{iv[:points].inspect} cm540=#{iv[:cm540].inspect}）" \
+      @logger.info("[snapshot] #{symbol}：IV #{iv[:status]}（points=#{iv[:points].inspect} cm540=#{iv[:cm540].inspect}#{missing_note(iv)}）" \
                    "，Barchart #{mode} #{history[:status]} #{(iv[:errors] + history[:errors]).join('; ')}".strip)
       outcome(iv[:status], history[:status])
     end
   rescue StandardError => e
     @logger.error("[snapshot] #{symbol} 失敗：#{e.class}: #{e.message}")
     :error
+  end
+
+  # P7.1：重試後仍沒載入、沿用當天舊點的到期日（P4 r2 質詢 2）；空的時候 log 格式不變
+  def missing_note(iv)
+    missing = Array(iv[:missing])
+    missing.empty? ? "" : " missing=#{missing.join(',')}"
   end
 
   # 美股盤中依規則略過（pm2 start 會立即執行一次、或手動在盤中跑）不是失敗，記成 :skipped

@@ -135,11 +135,18 @@ RSpec.describe BarchartScraperService do
 
       result = service.fetch_leaps_iv_snapshot(source: "scheduled", timeout: 600)
 
-      expect(result).to include(status: "success", points: 5)
+      expect(result).to include(status: "success", points: 5, missing: [])
       expect(LeapsIvSnapshot.find_by(symbol: "TSM")).to have_attributes(source: "scheduled", cm540_atm_iv: BigDecimal("0.42794"))
       expect(LeapsOptionChainSnapshot.where(symbol: "TSM").pluck(:id)).to eq([ existing.id ])
       expect(StrikeChainSnapshot.where(symbol: "TSM")).to be_empty
       expect(FetchLog.find_by(fetch_type: "leaps_iv_surface").error_detail).to include("source=scheduled", "points=5")
+    end
+
+    it "回傳值帶 missing（重試後仍沒載入的到期日），給排程 log 用（P7.1）" do
+      allow(service).to receive(:run_scraper)
+        .and_return({ status: "success", data: iv_only.merge("iv_surface_missing" => [ "2029-01-19" ]) })
+
+      expect(service.fetch_leaps_iv_snapshot(source: "scheduled")).to include(status: "success", missing: [ "2029-01-19" ])
     end
 
     it "不看 fresh_for? 快取：互動查詢剛抓過也照樣抓" do

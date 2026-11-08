@@ -221,7 +221,8 @@ class BarchartScraperService
       )
       log_fetch("leaps_iv_surface", "success",
                 "source=#{source} points=#{points} cm540=#{cm540.inspect}#{missing_note(fetch_result[:data])}")
-      { symbol: @symbol, status: "success", errors: [], points: points, cm540: cm540 }
+      { symbol: @symbol, status: "success", errors: [], points: points, cm540: cm540,
+        missing: Array(fetch_result[:data]["iv_surface_missing"]) }
     else
       log_fetch("leaps_iv_surface", fetch_result[:status], "source=#{source} #{fetch_result[:error]}")
       { symbol: @symbol, status: fetch_result[:status], errors: [ fetch_result[:error].to_s ] }
