@@ -1313,4 +1313,83 @@ RSpec.describe "GET /leaps", type: :request do
       expect(section.text).to include("尚無 IV 資料，請按查詢")
     end
   end
+
+  # leaps-iv-environment P6：「推薦分析」標題下方的一句 LEAPS IV Rank 評語。
+  # 只把 rank 換成邊界值（其餘欄位走真的 LeapsIvEnvironmentService），門檻讀 config/leaps_iv.yml。
+  describe "推薦文字整合（P6）" do
+    let(:cheap)     { "時間價值相對便宜。" }
+    let(:neutral)   { "IV 中性。" }
+    let(:expensive) { "時間價值偏貴；可考慮分批進場或改選更深價內（外在價值較低）的履約價。" }
+
+    before do
+      allow(LeapsOptionChainSnapshot).to receive(:fresh_for?).and_return(true)
+      allow(LeapsRankingService).to receive(:new).and_return(instance_double(LeapsRankingService, call: fake_candidates))
+      allow(LeapsOptionsFlowPanelService).to receive(:new)
+        .and_return(instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel))
+      allow(LeapsRecommendationService).to receive(:new)
+        .and_return(instance_double(LeapsRecommendationService, call: stub_recommendation))
+    end
+
+    def get_with_rank(rank)
+      allow_any_instance_of(LeapsIvEnvironmentService).to receive(:call).and_wrap_original do |m, **kw|
+        m.call(**kw).merge(rank: rank, status: rank ? :ok : :accumulating)
+      end
+      get "/leaps", params: { symbol: "TSM", job_status: "success" }
+      expect(response).to have_http_status(:ok)
+    end
+
+    def recommendation_card
+      h2 = Nokogiri::HTML(response.body).css("h2").find { |h| h.text.start_with?("推薦分析") }
+      h2&.ancestors("div.overflow-hidden")&.first
+    end
+
+    def rank_sentences
+      recommendation_card.css("[data-leaps-iv-rank-note]")
+    end
+
+    {
+      29.4 => [ 29, :cheap ],
+      29.6 => [ 30, :neutral ],
+      60.4 => [ 60, :neutral ],
+      60.6 => [ 61, :expensive ]
+    }.each do |rank, (shown, kind)|
+      it "rank #{rank} → 顯示 #{shown}、判為 #{kind}，整頁只出現一次" do
+        get_with_rank(rank)
+
+        expect(rank_sentences.size).to eq(1)
+        expect(rank_sentences.first.text).to eq("LEAPS IV Rank #{shown}，#{send(kind)}")
+        expect(response.body.scan("LEAPS IV Rank #{shown}，").size).to eq(1)
+        ([ cheap, neutral, expensive ] - [ send(kind) ]).each { |other| expect(response.body).not_to include(other) }
+      end
+    end
+
+    it "句子在標題下方、近天期段落之前" do
+      get_with_rank(29.4)
+
+      card  = recommendation_card # 只解析一次：不同次解析的節點彼此不相等
+      nodes = card.css("*").to_a
+      note  = card.at_css("[data-leaps-iv-rank-note]")
+      near  = nodes.find { |n| n.children.all?(&:text?) && n.text.include?("近天期 LEAPS（DTE 364–550）") }
+      expect(nodes.index(card.at_css("h2"))).to be < nodes.index(note)
+      expect(nodes.index(note)).to be < nodes.index(near)
+    end
+
+    it "rank nil → 三句皆不出現" do
+      get_with_rank(nil)
+
+      expect(recommendation_card).to be_present
+      expect(rank_sentences).to be_empty
+      [ cheap, neutral, expensive ].each { |t| expect(response.body).not_to include(t) }
+    end
+
+    it "門檻讀設定檔：cheap 20／expensive 25 時 rank 24 判為中性、26 判為偏貴" do
+      config = LeapsIvConfig.load.merge("rank_thresholds" => { "cheap" => 20, "expensive" => 25 })
+      allow(LeapsIvConfig).to receive(:load).and_return(config)
+
+      get_with_rank(24)
+      expect(rank_sentences.first.text).to eq("LEAPS IV Rank 24，#{neutral}")
+      get_with_rank(26)
+      expect(rank_sentences.first.text).to eq("LEAPS IV Rank 26，#{expensive}")
+    end
+  end
 end

@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-11-08（日）— LEAPS IV 環境 P6：推薦分析加一句 LEAPS IV Rank 評語
+
+`/leaps` 的「推薦分析」標題下方、近天期段落之前加一句：rank 四捨五入到整數後，< 30 寫「時間價值相對便宜」、30–60 寫「IV 中性」、> 60 寫「時間價值偏貴；可考慮分批進場或改選更深價內…」。門檻只讀 `config/leaps_iv.yml` 的 `rank_thresholds`；rank 為 nil（累積中／無資料）時整句不出現。新模組 `LeapsRecommendations::IvRankNote`。
+
 ### 2026-11-07（六）— LEAPS IV 環境 P5.1：短天期點不再壓扁 LEAPS 的熱圖與期限結構
 
 - IV 曲面熱圖的色階只依 LEAPS 到期日（DTE ≥ 364）計算；查詢後併入的 PMCC 短天期列移到下方，灰底不上色、數字照常顯示

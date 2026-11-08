@@ -5,6 +5,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   include LeapsRecommendations::PageHeader
   include LeapsRecommendations::PdfExport
   include LeapsRecommendations::ConceptCards
+  include LeapsRecommendations::IvRankNote
   include LeapsRecommendations::RankingTable
   include LeapsRecommendations::PriceEstimator
   include LeapsRecommendations::FlowPanel

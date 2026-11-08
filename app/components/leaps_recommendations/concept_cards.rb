@@ -11,6 +11,7 @@ module LeapsRecommendations::ConceptCards
       div(class: "px-4 py-3 border-b border-gray-100 bg-gray-50") do
         h2(class: "text-sm font-semibold text-gray-700") { plain "推薦分析 — #{@symbol}" }
         p(class: "text-xs text-gray-400 mt-0.5") { plain "近天期 DTE 364–550 / 遠天期 DTE 550+，各自依流動性獨立挑選" }
+        render_iv_rank_note
       end
       div(class: "divide-y divide-gray-100") do
         render_recommendation_group(near)
