@@ -1418,6 +1418,10 @@ RSpec.describe "GET /leaps", type: :request do
 
     # 同一批抓取共用一個 scraped_at：LeapsRankingService 只取 scraped_at 最大的那一批。
     let(:scraped_at) { Time.current }
+      let(:cfg) { LeapsBestValueConfig.load }
+      # ── leaps-best-value S3：畫面 ─────────────────────────────────────────────
+      # （直接掛在 S2 的 describe 底下，共用 11 筆快照與 PageComponent 擷取；再包一層會超過 NestedGroups 上限）
+      let(:doc) { Nokogiri::HTML(response.body) }
 
     before do
       baseline.each do |exp, dte, strike, delta, bid, ask, oi, vol|
@@ -1454,6 +1458,7 @@ RSpec.describe "GET /leaps", type: :request do
       expect(response.body).not_to include("undefined method")
       expect(response.body).not_to match(/\b\w*Error\b/)
     end
+
 
     it "不帶履約價時呼叫 LeapsBestValueService 一次，結果傳進 PageComponent" do
       get "/leaps", params: { symbol: symbol }
@@ -1527,5 +1532,145 @@ RSpec.describe "GET /leaps", type: :request do
         expect(pick_of(captured[:best_value], :near_term)).to eq [ 130, "2028-01-21" ]
       end
     end
+
+
+      def criteria_text = doc.at_css("[data-leaps-selection-criteria]").text.gsub(/\s+/, " ")
+      def iv_warning = doc.at_css("[data-leaps-iv-high-warning]")
+
+      # LeapsIvEnvironmentService 照常跑（NVDA 在測試庫沒有 IV 資料），只覆寫 rank 與 Barchart IV Rank。
+      def stub_iv(leaps_rank:, barchart_rank:)
+        allow_any_instance_of(LeapsIvEnvironmentService).to receive(:call).and_wrap_original do |m, **kw|
+          env = m.call(**kw)
+          env = env.merge(rank: leaps_rank, status: :ok) if leaps_rank
+          env.merge(barchart: (env[:barchart] || {}).merge(iv_rank: barchart_rank))
+        end
+      end
+
+      context "不帶履約價（核心案例）" do
+        before { get "/leaps", params: { symbol: symbol } }
+
+        it "同時有最划算與流動性最佳，主推字串、年化時間成本、預設選擇標準都在" do
+          body = response.body
+          expect(response).to have_http_status(:ok)
+          %w[最划算 流動性最佳 年化時間成本 預設選擇標準].each { |text| expect(body).to include(text) }
+          expect(body).to include("$130.00 / 2028-01-21")
+          expect(body).to include("$180.00 / 2028-01-21")
+          expect(body).not_to include("無合格")
+          expect(body).not_to include("無符合")
+        end
+
+        it "近／遠天期各一列，左最划算、右流動性最佳；手機寬度上下堆疊、最划算在上" do
+          rows = doc.css("[data-leaps-best-value-card]").map(&:parent)
+          expect(rows.size).to eq 2
+          rows.each do |row|
+            expect(row["class"]).to include("grid-cols-1", "md:grid-cols-2")
+            cards = row.element_children
+            expect(cards.first.key?("data-leaps-best-value-card")).to be true
+            expect(cards.last.key?("data-leaps-oi-card")).to be true
+          end
+        end
+
+        it "兩張卡用同一組欄位、同一順序，OI 卡也補算年化時間成本與損益兩平" do
+          labels = %w[履約價／到期日 Delta Ask OI 成交量 Spread\ % 年化時間成本 損益兩平]
+          lists = doc.css("[data-leaps-metric-list]")
+          expect(lists).not_to be_empty
+          lists.each { |dl| expect(dl.css("dt").map(&:text)).to eq labels }
+
+          near_oi = doc.css("[data-leaps-oi-card]").first
+          expect(near_oi.text).to include("$180.00 / 2028-01-21")
+          # $180：(42.50 − 6.64) ÷ 186.64 × 365 ÷ 440 × 100 = 15.94
+          expect(near_oi.css("[data-leaps-metric-list]").first.text).to include("15.94%")
+        end
+
+        it "最划算卡顯示主推與次選的年化時間成本" do
+          near_bv = doc.css("[data-leaps-best-value-card]").first.text
+          expect(near_bv).to include("$130.00 / 2028-01-21", "7.36%", "$140.00 / 2028-01-21", "8.72%")
+          far_bv = doc.css("[data-leaps-best-value-card]").last.text
+          expect(far_bv).to include("$140.00 / 2028-12-15", "7.50%", "$120.00 / 2029-01-19", "5.80%")
+        end
+
+        it "主推不同合約時不顯示「與流動性最佳相同」" do
+          expect(response.body).not_to include("與流動性最佳相同")
+        end
+
+        it "預設選擇標準的數字讀設定檔與既有常數" do
+          text = criteria_text
+          expect(text).to include("Delta #{sprintf('%.2f', cfg['delta_min'])}–#{sprintf('%.2f', cfg['delta_max'])}")
+          expect(text).to include("Spread（買賣差價比）≤ 3%", "OI ≥ 1,000", "當日成交量 ≥ 50", "近期無成交合約照常列入")
+          near_min = LeapsRecommendationService::NEAR_DTE_MIN
+          near_max = LeapsRecommendationService::NEAR_DTE_MAX
+          far_min  = LeapsRecommendationService::FAR_DTE_MIN
+          expect(text).to include("近天期 DTE #{near_min}–#{near_max}／遠天期 DTE 超過 #{far_min}")
+          expect(text).to include("排序先比流動性等級，同等級再比年化成本，因此次選的年化成本可能低於主推。")
+          expect(text).to include("「流動性最佳」依 OI 由高到低挑選，不套用以上條件。")
+        end
+
+        it "天期邊界不重疊：DTE＝near_max 歸近天期、near_max＋1 歸遠天期（以既有分區方法驗證）" do
+          near_max = LeapsRecommendationService::NEAR_DTE_MAX
+          rows = [ near_max, near_max + 1 ].map do |dte|
+            { dte: dte, strike: 130, delta: 0.84, open_interest: 1, liquidity_tier: "充足", expiration_date: Date.new(2028, 1, 21) }
+          end
+          result = LeapsRecommendationService.new(rows).call
+          expect(result[:near_term][:pick][:dte]).to eq near_max
+          expect(result[:near_term][:runner_up]).to be_nil
+          expect(result[:far_term][:pick][:dte]).to eq near_max + 1
+        end
+
+        it "排行表在 Time Value% 右側多一欄年化時間成本，主推／次選列有徽章" do
+          headers = doc.css("#leaps-ranking-table thead th").map { |th| th["data-col"] }
+          expect(headers.index("annual_cost_pct")).to eq headers.index("time_value_pct") + 1
+          expect(doc.at_css("#leaps-th-annual_cost_pct").text).to include("年化時間成本")
+
+          row130 = doc.css("#leaps-ranking-table tbody tr").find do |tr|
+            tr.at_css("td[data-col='expiration']").text == "2028-01-21" && tr.at_css("td[data-col='strike'] span").text == "130.00"
+          end
+          expect(row130.at_css("td[data-col='annual_cost_pct']").text).to eq "7.36%"
+          badges = doc.css("[data-leaps-best-value-badge]").map { |b| b["data-leaps-best-value-badge"] }
+          expect(badges.tally).to eq("最優" => 2, "次選" => 2)
+        end
+
+        it "PDF 匯出 payload 含年化時間成本欄，每列都有值" do
+          payload = JSON.parse(doc.at_css("script#leaps-pdf-data").text)
+          expect(payload["column_order"]).to include("annual_cost_pct")
+          expect(payload["column_labels"]["annual_cost_pct"]).to eq "年化時間成本"
+          expect(payload["candidates"].map { |r| r["annual_cost_pct"] }).to all(match(/\A\d+\.\d{2}%\z/))
+          expect(payload["candidates"].map { |r| r["annual_cost_pct"] }).to include("7.36%")
+        end
+      end
+
+      context "兩卡主推為同一合約" do
+        let(:baseline) { [ [ "2028-01-21", 440, 130, 0.8417, 72.00, 73.20, 2264, 160 ] ] }
+
+        it "最划算卡加「與流動性最佳相同」" do
+          get "/leaps", params: { symbol: symbol }
+          expect(doc.css("[data-leaps-best-value-card]").first.text).to include("與流動性最佳相同")
+        end
+      end
+
+      context "IV 偏高警示" do
+        it "LEAPS IV Rank 有值且 ≥ 門檻 → 顯示 LEAPS 來源" do
+          stub_iv(leaps_rank: 75.4, barchart_rank: 87)
+          get "/leaps", params: { symbol: symbol }
+          expect(iv_warning.text).to eq "IV 偏高（LEAPS IV Rank 75），優先深度價內以降低 Vega 與外在價值"
+        end
+
+        it "LEAPS IV Rank 無值、Barchart 87 → 顯示「Barchart IV Rank 87」" do
+          stub_iv(leaps_rank: nil, barchart_rank: 87)
+          get "/leaps", params: { symbol: symbol }
+          expect(iv_warning.text).to eq "IV 偏高（Barchart IV Rank 87），優先深度價內以降低 Vega 與外在價值"
+        end
+
+        it "兩者皆無 → 不顯示" do
+          stub_iv(leaps_rank: nil, barchart_rank: nil)
+          get "/leaps", params: { symbol: symbol }
+          expect(iv_warning).to be_nil
+        end
+
+        it "LEAPS IV Rank 有值但低於門檻 → 不顯示（不退回 Barchart）" do
+          stub_iv(leaps_rank: 40, barchart_rank: 87)
+          get "/leaps", params: { symbol: symbol }
+          expect(iv_warning).to be_nil
+        end
+      end
   end
 end

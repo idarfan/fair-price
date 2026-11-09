@@ -10,7 +10,7 @@ class LeapsTableColumns
   # 預設順序（＝過去寫死在 RankingTable::TABLE_COLS 的順序）。
   DEFAULT_KEYS = %w[
     price_estimate expiration dte strike delta oi volume liquidity bid ask mid spread
-    intrinsic extrinsic extrinsic_pct time_value_pct iv vega itm_prob
+    intrinsic extrinsic extrinsic_pct time_value_pct annual_cost_pct iv vega itm_prob
   ].freeze
 
   LABELS = {
@@ -30,6 +30,7 @@ class LeapsTableColumns
     "extrinsic"       => "外在價值",
     "extrinsic_pct"   => "外在佔比",
     "time_value_pct"  => "Time Value%",
+    "annual_cost_pct" => "年化時間成本",
     "iv"              => "IV",
     "vega"            => "Vega",
     "itm_prob"        => "被指派機率"

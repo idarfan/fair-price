@@ -167,6 +167,12 @@
       desc: "外在÷股價，「相對直接持股多付幾 % 溢價」。與外在佔比分母不同，回答不同問題。",
       side: "bottom",
     },
+    annual_cost_pct: {
+      el: "#leaps-th-annual_cost_pct",
+      title: "💰 年化時間成本",
+      desc: "（Ask − 內在價值）÷ 現價 × 365 ÷ DTE。以 Ask 計，買賣價差寬的合約自然吃虧；把不同天期攤成每年多付幾 % 溢價，可直接比較。「推薦分析」的最划算卡依此排序。",
+      side: "bottom",
+    },
     iv: {
       el: "#leaps-th-iv",
       title: "🌊 Implied Volatility",
@@ -729,6 +735,7 @@
     "extrinsic",
     "extrinsic_pct",
     "time_value_pct",
+    "annual_cost_pct",
     "iv",
     "vega",
     "itm_prob",

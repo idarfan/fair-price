@@ -147,6 +147,7 @@ module LeapsRecommendations::RankingTable
       "extrinsic"      => -> { td(class: "px-3 py-2 text-center", data_col: "extrinsic") { plain fmt_price(row[:extrinsic_value]) } },
       "extrinsic_pct"  => -> { td(class: "px-3 py-2 text-center font-semibold", data_col: "extrinsic_pct") { plain fmt_pct(row[:extrinsic_pct]) } },
       "time_value_pct" => -> { td(class: "px-3 py-2 text-center", data_col: "time_value_pct") { plain fmt_pct(row[:time_value_pct]) } },
+      "annual_cost_pct" => -> { td(class: "px-3 py-2 text-center", data_col: "annual_cost_pct") { plain fmt_cost_pct(annual_cost_pct_for(row)) } },
       "iv"             => -> { td(class: "px-3 py-2 text-center #{iv_color_class(row[:iv])}", data_col: "iv") { plain fmt_pct(row[:iv]) } },
       "vega"           => -> { td(class: "px-3 py-2 text-center", data_col: "vega") { plain fmt_decimal(row[:vega], 4) } },
       "itm_prob"       => -> { td(class: "px-3 py-2 text-center#{hidden_col_class('itm_prob')}", data_col: "itm_prob") { plain fmt_pct(row[:itm_probability]) } }
@@ -175,6 +176,10 @@ module LeapsRecommendations::RankingTable
     td(class: "px-3 py-2 text-center font-semibold", data_col: "strike") do
       div(class: "inline-flex flex-col items-center gap-0.5") do
         span { plain fmt_price(row[:strike]) }
+        if (badge = best_value_badge_for(row))
+          span(class: "text-emerald-700 text-[10px] font-normal whitespace-nowrap px-1 rounded bg-emerald-50 border border-emerald-200",
+               data_leaps_best_value_badge: badge) { plain badge }
+        end
         if mine
           span(class: "text-blue-600 text-[10px] font-normal whitespace-nowrap") { plain "★ 你查詢的履約價" }
         end

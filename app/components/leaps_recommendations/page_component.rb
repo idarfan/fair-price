@@ -5,6 +5,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   include LeapsRecommendations::PageHeader
   include LeapsRecommendations::PdfExport
   include LeapsRecommendations::ConceptCards
+  include LeapsRecommendations::BestValueCards
   include LeapsRecommendations::IvRankNote
   include LeapsRecommendations::RankingTable
   include LeapsRecommendations::PriceEstimator
@@ -18,7 +19,7 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
     @symbol         = symbol
     @candidates     = Array(candidates)
     @recommendation = recommendation
-    # leaps-best-value S2：LeapsBestValueService#call 的回傳值。S2 只接住參數、不改畫面；顯示在 S3。
+    # leaps-best-value：LeapsBestValueService#call 的回傳值（推薦分析左卡、排行表徽章與年化時間成本欄）。
     @best_value     = best_value
     @flow_panel     = flow_panel
     @scrape_status  = scrape_status

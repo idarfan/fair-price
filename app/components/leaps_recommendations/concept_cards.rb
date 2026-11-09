@@ -12,11 +12,13 @@ module LeapsRecommendations::ConceptCards
         h2(class: "text-sm font-semibold text-gray-700") { plain "推薦分析 — #{@symbol}" }
         p(class: "text-xs text-gray-400 mt-0.5") { plain "近天期 DTE 364–550 / 遠天期 DTE 550+，各自依流動性獨立挑選" }
         render_iv_rank_note
+        render_iv_high_warning
       end
       div(class: "divide-y divide-gray-100") do
-        render_recommendation_group(near)
-        render_recommendation_group(far)
+        render_recommendation_group(near, :near_term)
+        render_recommendation_group(far, :far_term)
       end
+      render_selection_criteria
       render_concept_cards
     end
   end
@@ -234,26 +236,41 @@ module LeapsRecommendations::ConceptCards
   end
 
 
-  def render_recommendation_group(group)
+  # leaps-best-value S3：每個天期一列，左「💰 最划算」、右「🔓 流動性最佳」等寬並列；
+  # 手機寬度（< md）上下堆疊，最划算在上（DOM 順序即堆疊順序）。
+  def render_recommendation_group(group, term)
     div(class: "px-4 py-4") do
       h3(class: "text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2") { plain group[:label] }
-      if group[:no_candidates]
-        div(class: "text-sm text-gray-400 italic") { plain "此天期區間目前沒有符合條件的候選。" }
-      else
-        pick = group[:pick]
-        expired_s = partial_error_strike
-        pick_incomplete = expired_s && pick[:strike].to_f == expired_s
-        div(class: "flex flex-wrap gap-3 mb-3") do
-          render_pick_badge(pick)
-          if pick_incomplete
-            span(class: "text-xs text-orange-600 self-center font-medium") { plain "⚠️ 此推薦的 Vega/被指派機率資料可能不完整" }
-          end
-          if (ru = group[:runner_up])
-            div(class: "text-xs text-gray-400 self-center") { plain "次選：#{sprintf('$%.2f', ru[:strike].to_f)} / #{ru[:expiration_date]}" }
-          end
+      div(class: "grid grid-cols-1 md:grid-cols-2 gap-3 items-start") do
+        render_best_value_card(best_value_group(term), group[:pick])
+        div(class: "rounded-lg border border-gray-200 p-3 min-w-0", data_leaps_oi_card: "") do
+          h4(class: "text-xs font-semibold text-gray-600 mb-2") { plain "🔓 流動性最佳（OI 最高）" }
+          render_oi_recommendation(group)
         end
-        div(class: "text-sm text-gray-700 whitespace-pre-line leading-relaxed") { plain group[:reason] }
       end
+    end
+  end
+
+
+  # 既有 OI 推薦內容（與 S3 前版本相同），只在最後補上與最划算卡同一組欄位。
+  def render_oi_recommendation(group)
+    if group[:no_candidates]
+      div(class: "text-sm text-gray-400 italic") { plain "此天期區間目前沒有符合條件的候選。" }
+    else
+      pick = group[:pick]
+      expired_s = partial_error_strike
+      pick_incomplete = expired_s && pick[:strike].to_f == expired_s
+      div(class: "flex flex-wrap gap-3 mb-3") do
+        render_pick_badge(pick)
+        if pick_incomplete
+          span(class: "text-xs text-orange-600 self-center font-medium") { plain "⚠️ 此推薦的 Vega/被指派機率資料可能不完整" }
+        end
+        if (ru = group[:runner_up])
+          div(class: "text-xs text-gray-400 self-center") { plain "次選：#{sprintf('$%.2f', ru[:strike].to_f)} / #{ru[:expiration_date]}" }
+        end
+      end
+      div(class: "text-sm text-gray-700 whitespace-pre-line leading-relaxed") { plain group[:reason] }
+      div(class: "mt-3 pt-3 border-t border-gray-100") { render_oi_metric_blocks(group) }
     end
   end
 

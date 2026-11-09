@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-11-09（一）— LEAPS 最划算推薦 S3：推薦卡並列與排行表年化時間成本欄
+
+`/leaps` 推薦分析每個天期改成左「💰 最划算（最低年化時間成本）」、右「🔓 流動性最佳（OI 最高）」兩張等寬卡，手機寬度上下堆疊、最划算在上；兩卡用同一組八個欄位（OI 卡補算年化時間成本與損益兩平），主推相同時標「與流動性最佳相同」。IV 偏高警示以 LEAPS IV Rank 優先、累積未滿時退回 Barchart IV Rank 並標明來源。推薦內容底部加「預設選擇標準」，數字讀 `config/leaps_best_value.yml` 與既有天期常數。排行表在 Time Value% 右側新增「年化時間成本」欄，主推／次選列加「最優」「次選」徽章；PDF 匯出與欄位說明同步。新模組 `LeapsRecommendations::BestValueCards`。整頁 HTML 回歸基準經使用者裁示重新產生一次。
+
 ### 2026-11-09（一）— LEAPS 最划算推薦 S2：controller 接線
 
 `LeapsRecommendationsController#index` 在資料新鮮時，用同一批候選呼叫 `LeapsBestValueService`，結果以 `best_value:` 傳入 `LeapsRecommendations::PageComponent`。本階段只接線、不改畫面（整頁 HTML 回歸基準未動），顯示在 S3。既有 OI 推薦不變。

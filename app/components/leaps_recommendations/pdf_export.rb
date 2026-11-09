@@ -168,6 +168,7 @@ module LeapsRecommendations::PdfExport
       extrinsic:       fmt_price(row[:extrinsic_value]),
       extrinsic_pct:   fmt_pct(row[:extrinsic_pct]),
       time_value_pct:  fmt_pct(row[:time_value_pct]),
+      annual_cost_pct: fmt_cost_pct(annual_cost_pct_for(row)),
       iv:              fmt_pct(row[:iv]),
       vega:            fmt_decimal(row[:vega], 4),
       itm_prob:        fmt_pct(row[:itm_probability])
