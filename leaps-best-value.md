@@ -139,7 +139,7 @@ A／B／C 三級共同硬條件（任何等級都不得違反）：`bid > 0`；`
 
 `LeapsRecommendationsController#index` 呼叫 `LeapsBestValueService`，結果傳給推薦分析 component。原 OI 推薦邏輯**完全不改**，兩組結果同時傳入、並列呈現（見 S3）。
 
-必交：`spec/requests/leaps_recommendations_spec.rb` 新增案例——`GET /leaps?symbol=NVDA`（不帶履約價，用 fixture snapshot）回 200，body 同時含 `最划算`、`流動性最佳`、最划算近天期主推 `$130.00 / 2028-01-21`、OI 近天期主推 `$180.00 / 2028-01-21`、`年化時間成本`、`預設選擇標準`。
+必交：`spec/requests/leaps_recommendations_spec.rb` 新增案例——`GET /leaps?symbol=NVDA`（不帶履約價，用 fixture snapshot）回 200，且 `LeapsBestValueService` 被呼叫一次、`PageComponent` 收到的 best_value 結果近天期主推為 `$130 / 2028-01-21`、既有 OI 推薦結果不變（近天期主推 `$180 / 2028-01-21`）。S2 不改畫面，既有整頁 HTML 回歸比對必須照常通過、不得修改基準。
 
 驗證：`bundle exec rspec spec/requests/leaps_recommendations_spec.rb` 0 failures。
 
@@ -175,7 +175,9 @@ A／B／C 三級共同硬條件（任何等級都不得違反）：`bid > 0`；`
 
 排行表：新增欄「年化時間成本」（放在 Time Value% 右側）；主推與次選列加徽章「最優」「次選」。排序維持 OI。
 
-驗證：request spec 斷言上述文字皆出現；`bin/rails test` 或 rspec 全套 0 failures。
+驗證：`spec/requests/leaps_recommendations_spec.rb` 的 `GET /leaps?symbol=NVDA` 案例，body 同時含 `最划算`、`流動性最佳`、最划算近天期主推 `$130.00 / 2028-01-21`、OI 近天期主推 `$180.00 / 2028-01-21`、`年化時間成本`、`預設選擇標準`，以及上述註記與邊界斷言；rspec 全套 0 failures。
+
+整頁 HTML 回歸基準（`spec/support/leaps_page_html.rb`）：使用者裁示例外，S3 重新產生基準一次，不得新增 strip 規則隱藏新區塊。送審時附新舊基準 diff，審查官確認變更只限推薦分析區塊與排行表新欄。
 
 ## S4 E2E 核心案例
 
