@@ -1,0 +1,11 @@
+# LEAPS「最划算」推薦門檻（leaps-best-value.md S1）。
+# 日後調參請改這裡，不要動程式碼。數值為推估值，尚未實測確認。
+# 天期區間不在本檔設定：一律引用 LeapsRecommendationService 的 NEAR_DTE_MIN／NEAR_DTE_MAX／FAR_DTE_MIN。
+
+delta_min: 0.80
+delta_max: 0.92
+spread_pct_max: 3.0      # (ask-bid)/mid*100
+oi_min: 1000             # 使用者指定預設（2026-11-09）
+volume_min: 50           # 使用者指定預設（2026-11-09）
+exclude_no_recent_trade: false   # 使用者決定：近期無成交照常列出
+iv_rank_warn: 70
