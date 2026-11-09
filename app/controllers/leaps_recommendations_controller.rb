@@ -24,6 +24,8 @@ class LeapsRecommendationsController < ApplicationController
       if fresh_data_exists?(@symbol, user_strike: @user_strike&.to_f)
         @candidates    = LeapsRankingService.new(@symbol).call
         @recommendation = LeapsRecommendationService.new(@candidates).call
+        # leaps-best-value S2：與 OI 推薦並列的「最划算」推薦，吃同一批候選，不另查 DB。
+        @best_value     = LeapsBestValueService.new(@candidates).call
         @flow_panel     = LeapsOptionsFlowPanelService.new(@symbol, @candidates).call
 
         @scrape_status = :cached
@@ -111,6 +113,7 @@ class LeapsRecommendationsController < ApplicationController
       symbol:         @symbol,
       candidates:     @candidates,
       recommendation: @recommendation,
+      best_value:     @best_value,
       flow_panel:     @flow_panel,
       scrape_status:  @scrape_status,
       scrape_errors:  @scrape_errors,

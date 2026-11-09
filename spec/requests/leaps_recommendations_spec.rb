@@ -1392,4 +1392,62 @@ RSpec.describe "GET /leaps", type: :request do
       expect(rank_sentences.first.text).to eq("LEAPS IV Rank 26，#{expensive}")
     end
   end
+
+  # leaps-best-value.md S2：controller 接線。真實 DB 快照走 LeapsRankingService，
+  # 只驗證「最划算」結果有傳進 PageComponent、既有 OI 推薦不變；畫面字樣在 S3 驗證。
+  describe "最划算推薦接線（leaps-best-value S2）" do
+    let(:symbol) { "NVDA" }
+    let(:captured) { {} }
+
+    # 驗收基準資料（2026-11-09 NVDA，S = 186.64）：到期, DTE, K, Delta, Bid, Ask, OI, Vol
+    let(:baseline) do
+      [
+        [ "2028-01-21", 440, 120, 0.8710, 79.10, 80.50,  2069,  18 ],
+        [ "2028-01-21", 440, 125, 0.8569, 75.40, 76.85,   634,  10 ],
+        [ "2028-01-21", 440, 130, 0.8417, 72.00, 73.20,  2264, 160 ],
+        [ "2028-01-21", 440, 140, 0.8092, 65.40, 66.25,  4163, 191 ],
+        [ "2028-01-21", 440, 180, 0.6562, 42.00, 42.50, 14764, 724 ],
+        [ "2027-12-17", 405, 130, 0.8453, 70.65, 72.10,  7565,  22 ],
+        [ "2028-06-16", 587, 140, 0.8042, 69.60, 71.25,   499,  13 ],
+        [ "2028-12-15", 769, 120, 0.8540, 87.40, 89.65,  6168,   6 ],
+        [ "2028-12-15", 769, 140, 0.8047, 74.60, 76.15,  4898,  60 ],
+        [ "2029-01-19", 804, 120, 0.8530, 88.25, 90.50,   221,   5 ],
+        [ "2029-01-19", 804, 140, 0.8045, 75.80, 77.00,   502, 107 ]
+      ]
+    end
+
+    before do
+      # 同一批抓取共用一個 scraped_at：LeapsRankingService 只取 scraped_at 最大的那一批。
+      scraped_at = Time.current
+      baseline.each do |exp, dte, strike, delta, bid, ask, oi, vol|
+        create(:leaps_option_chain_snapshot,
+               symbol: symbol, expiration_date: Date.parse(exp), dte: dte, strike: strike, delta: delta,
+               bid: bid, ask: ask, open_interest: oi, volume: vol, vol_oi_ratio: (vol.to_f / oi).round(4),
+               underlying_price: 186.64, scraped_at: scraped_at)
+      end
+      allow(LeapsBestValueService).to receive(:new).and_call_original
+      allow(LeapsRecommendations::PageComponent).to receive(:new).and_wrap_original do |original, **kwargs|
+        captured.merge!(kwargs)
+        original.call(**kwargs)
+      end
+    end
+
+    after { LeapsOptionChainSnapshot.where(symbol: symbol).delete_all }
+
+    def pick_of(result, term) = result.dig(term, :pick).then { |p| [ p[:strike].to_i, p[:expiration_date].to_s ] }
+
+    it "不帶履約價時呼叫 LeapsBestValueService 一次，結果傳進 PageComponent" do
+      get "/leaps", params: { symbol: symbol }
+
+      expect(response).to have_http_status(:ok)
+      expect(LeapsBestValueService).to have_received(:new).once
+      expect(pick_of(captured[:best_value], :near_term)).to eq [ 130, "2028-01-21" ]
+    end
+
+    it "既有 OI 推薦結果不變（近天期主推 $180 / 2028-01-21）" do
+      get "/leaps", params: { symbol: symbol }
+
+      expect(pick_of(captured[:recommendation], :near_term)).to eq [ 180, "2028-01-21" ]
+    end
+  end
 end

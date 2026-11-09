@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-11-09（一）— LEAPS 最划算推薦 S2：controller 接線
+
+`LeapsRecommendationsController#index` 在資料新鮮時，用同一批候選呼叫 `LeapsBestValueService`，結果以 `best_value:` 傳入 `LeapsRecommendations::PageComponent`。本階段只接線、不改畫面（整頁 HTML 回歸基準未動），顯示在 S3。既有 OI 推薦不變。
+
 ### 2026-11-09（一）— LEAPS 最划算推薦 S1：年化時間成本計算與篩選服務
 
 新增 `LeapsBestValueService`：每個天期區間挑「年化時間成本＝（Ask − 內在價值）÷ 現價 × 365 ÷ DTE」最低的合約。篩選條件 Delta 0.80–0.92、Spread ≤ 3%、OI ≥ 1000、成交量 ≥ 50，不足時依 A→B→C 流動性等級補位；`bid > 0` 與 `exclude_no_recent_trade` 是三級共同硬條件。門檻集中在 `config/leaps_best_value.yml`（唯一讀取點 `LeapsBestValueConfig`），天期區間沿用 `LeapsRecommendationService` 常數。本階段只有服務與單元測試，尚未接上畫面（規格 `leaps-best-value.md` S2–S4）。

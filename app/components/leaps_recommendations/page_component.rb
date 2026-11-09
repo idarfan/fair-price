@@ -14,10 +14,12 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   include LeapsRecommendations::PmccEducation
   include LeapsRecommendations::VocabCards
 
-  def initialize(symbol: nil, candidates: [], recommendation: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil, next_earnings: nil, pmcc_ranking: nil, pmcc_tracker: nil, price_context: nil, iv_environment: nil)
+  def initialize(symbol: nil, candidates: [], recommendation: nil, best_value: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil, next_earnings: nil, pmcc_ranking: nil, pmcc_tracker: nil, price_context: nil, iv_environment: nil)
     @symbol         = symbol
     @candidates     = Array(candidates)
     @recommendation = recommendation
+    # leaps-best-value S2：LeapsBestValueService#call 的回傳值。S2 只接住參數、不改畫面；顯示在 S3。
+    @best_value     = best_value
     @flow_panel     = flow_panel
     @scrape_status  = scrape_status
     @scrape_errors  = Array(scrape_errors)
