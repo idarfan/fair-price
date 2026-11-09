@@ -1416,9 +1416,10 @@ RSpec.describe "GET /leaps", type: :request do
       ]
     end
 
+    # 同一批抓取共用一個 scraped_at：LeapsRankingService 只取 scraped_at 最大的那一批。
+    let(:scraped_at) { Time.current }
+
     before do
-      # 同一批抓取共用一個 scraped_at：LeapsRankingService 只取 scraped_at 最大的那一批。
-      scraped_at = Time.current
       baseline.each do |exp, dte, strike, delta, bid, ask, oi, vol|
         create(:leaps_option_chain_snapshot,
                symbol: symbol, expiration_date: Date.parse(exp), dte: dte, strike: strike, delta: delta,
@@ -1432,9 +1433,27 @@ RSpec.describe "GET /leaps", type: :request do
       end
     end
 
-    after { LeapsOptionChainSnapshot.where(symbol: symbol).delete_all }
+    after do
+      LeapsOptionChainSnapshot.where(symbol: symbol).delete_all
+      StrikeChainSnapshot.where(symbol: symbol).delete_all
+    end
 
     def pick_of(result, term) = result.dig(term, :pick).then { |p| [ p[:strike].to_i, p[:expiration_date].to_s ] }
+
+    # fresh_for? 以上一次查詢的中心履約價判定新鮮度（nil＝上次沒帶履約價）。
+    def seed_last_query_strike(strike)
+      StrikeChainSnapshot.upsert(
+        { symbol: symbol, strikes: [ 120.0, 180.0 ], spot_price: 186.64,
+          last_query_strike: strike, scraped_at: Time.current },
+        unique_by: :symbol
+      )
+    end
+
+    def expect_page_without_errors
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("undefined method")
+      expect(response.body).not_to match(/\b\w*Error\b/)
+    end
 
     it "不帶履約價時呼叫 LeapsBestValueService 一次，結果傳進 PageComponent" do
       get "/leaps", params: { symbol: symbol }
@@ -1448,6 +1467,65 @@ RSpec.describe "GET /leaps", type: :request do
       get "/leaps", params: { symbol: symbol }
 
       expect(pick_of(captured[:recommendation], :near_term)).to eq [ 180, "2028-01-21" ]
+    end
+
+    # S2 補充案例 1：快照過舊（超出 FRESH_WINDOW）→ fresh_for? 為 false，不產生推薦。
+    context "快照超出 FRESH_WINDOW（資料不夠新）" do
+      let(:scraped_at) { LeapsOptionChainSnapshot::FRESH_WINDOW.ago - 1.minute }
+
+      it "回 200、不呼叫服務、best_value 為 nil、頁面無例外訊息" do
+        get "/leaps", params: { symbol: symbol }
+
+        expect_page_without_errors
+        expect(LeapsBestValueService).not_to have_received(:new)
+        expect(captured).to have_key(:best_value)
+        expect(captured[:best_value]).to be_nil
+        expect(captured[:recommendation]).to be_nil
+      end
+    end
+
+    # S2 補充案例 2a：上次查詢中心＝180，這次也帶 user_strike=180 → 新鮮。
+    context "user_strike=180 且上次查詢中心也是 180" do
+      before { seed_last_query_strike(180.0) }
+
+      it "產生 OI 推薦，服務呼叫一次，近天期主推 $130 / 2028-01-21" do
+        get "/leaps", params: { symbol: symbol, user_strike: "180" }
+
+        expect_page_without_errors
+        expect(LeapsBestValueService).to have_received(:new).once
+        expect(pick_of(captured[:best_value], :near_term)).to eq [ 130, "2028-01-21" ]
+        expect(pick_of(captured[:recommendation], :near_term)).to eq [ 180, "2028-01-21" ]
+      end
+    end
+
+    # S2 補充案例 2b：上次沒帶履約價，這次帶 user_strike=180 → 中心對不上，不新鮮。
+    context "user_strike=180 但上次查詢沒帶履約價" do
+      before { seed_last_query_strike(nil) }
+
+      it "不產生 OI 推薦，服務未被呼叫、best_value 為 nil、頁面無例外訊息" do
+        get "/leaps", params: { symbol: symbol, user_strike: "180" }
+
+        expect_page_without_errors
+        expect(LeapsBestValueService).not_to have_received(:new)
+        expect(captured).to have_key(:best_value)
+        expect(captured[:best_value]).to be_nil
+        expect(captured[:recommendation]).to be_nil
+      end
+    end
+
+    # S2 補充案例 2c：strike 不是 controller 認得的參數（履約價參數是 user_strike）。
+    context "錯誤參數名 strike=180" do
+      it "strike 被忽略，結果與不帶履約價相同" do
+        get "/leaps", params: { symbol: symbol }
+        without_strike = captured.slice(:best_value, :recommendation, :user_strike)
+
+        get "/leaps", params: { symbol: symbol, strike: "180" }
+
+        expect_page_without_errors
+        expect(captured[:user_strike]).to be_nil
+        expect(captured.slice(:best_value, :recommendation, :user_strike)).to eq without_strike
+        expect(pick_of(captured[:best_value], :near_term)).to eq [ 130, "2028-01-21" ]
+      end
     end
   end
 end
