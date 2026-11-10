@@ -1,5 +1,9 @@
 # FairPrice
 
+### 2026-11-10（二）— LEAPS 成交相對清淡 S1：Vol/OI 改用同列 volume ÷ OI 自算
+
+`LeapsRankingService` 的「近期無成交」判定不再讀 Barchart V&G 頁的 `vol_oi_ratio`，因為它只到小數第 2 位、跟 Options 頁不同時間抓，而且 $95–$115 深價內履約價常缺值。改用同一列 volume ÷ OI 自算，不四捨五入。後三分之一界線的公式不變。OI 為 0 或空值時資料不足，不判定。全部候選自算值為 0（多半是開盤前）時逐列不標記，另外提供 `all_zero_volume?` 給頁面顯示提示。`call` 回傳形狀不變，PMCC、垂直價差呼叫端都沒動。也順便修了一個跟執行順序有關的排序測試：factory 給的 strike 太低時，算出負的外在價值，資料會被排除。完整 rspec seed 35801：1725 examples, 0 failures。
+
 ### 2026-11-09（一）— 測試：開啟 rspec 隨機順序
 
 `spec/spec_helper.rb` 的 `config.order = :random` 與 `Kernel.srand config.seed` 原本包在 `=begin/=end` 註解裡，從未生效。改為生效（其他建議設定仍維持註解），連跑 5 次完整 rspec（seed 32325／61479／47973／65147／53261）皆 1712 examples, 0 failures，沒有發現跟執行順序有關的失敗。
