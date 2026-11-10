@@ -42,6 +42,10 @@ module LeapsRecommendations::RankingTable
         p(class: "text-xs text-gray-400 mt-0.5") do
           plain "依 OI 由高到低排序；流動性判斷依本次查詢候選的 OI 相對排名計算，非固定門檻，不同標的會自動調整基準。"
         end
+        # 全 0（多半是開盤前）時不逐列標「成交相對清淡」，改在表格上方提示一行。
+        if @all_zero_volume
+          p(class: "text-xs text-orange-600 mt-1", data_leaps_all_zero_volume: "") { plain ALL_ZERO_VOLUME_NOTICE }
+        end
         if col_reorder_enabled?
           p(class: "text-xs text-blue-500 mt-0.5", data_export_exclude: "") do
             plain "（管理員）按住表頭左右拖曳可調整欄位順序，放開即儲存，全站套用。"
@@ -104,7 +108,7 @@ module LeapsRecommendations::RankingTable
   # 使用者指定的履約價流動性不足時的原因文字（供「不建議」標籤旁顯示）。
   # 只在 user_strike_row? 為真時呼叫。
   def not_recommended_reason(row)
-    return "近期無成交紀錄，進出場可能有困難" if row[:no_recent_volume_warning]
+    return THIN_TRADING_REASON if row[:no_recent_volume_warning]
     return "OI 在本次候選中排名偏低，流動性相對較差" if row[:liquidity_tier].to_s == "偏低"
 
     nil
@@ -202,7 +206,7 @@ module LeapsRecommendations::RankingTable
             plain tier
           end
           if warn
-            span(class: "text-orange-600 text-xs whitespace-nowrap") { plain "⚠ 近期無成交" }
+            span(class: "text-orange-600 text-xs whitespace-nowrap", title: THIN_TRADING_TOOLTIP) { plain THIN_TRADING_LABEL }
           end
         end
         if not_reco

@@ -94,7 +94,7 @@ class LeapsRecommendationService
     end
 
     if pick[:no_recent_volume_warning]
-      parts << "⚠️ 注意：此合約 Volume/OI 比率偏低（本次查詢候選中排名後段），近期成交相對清淡，掛單簿可能已久未更新，進出場前務必先確認報價是否合理。"
+      parts << "⚠️ 注意：#{LeapsRecommendations::SharedConstants::THIN_TRADING_CAUTION}"
     end
 
     parts << "以上為流動性與 Greeks 篩選後的推薦結果，僅供策略篩選參考，非投資建議，請自行評估。"

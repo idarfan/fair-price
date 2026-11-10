@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# 已知問題：元件拆檔後掃描範圍不全，勿直接使用
 # Phase J (leaps-phase-j-vector-pdf-spec.md)：重建 LEAPS PDF 向量匯出用的
 # Noto Sans TC 字型子集。文案改動後重跑本腳本即可重建，不需手工列舉字元。
 #

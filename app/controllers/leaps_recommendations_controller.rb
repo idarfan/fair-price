@@ -22,7 +22,10 @@ class LeapsRecommendationsController < ApplicationController
 
     if @symbol.present?
       if fresh_data_exists?(@symbol, user_strike: @user_strike&.to_f)
-        @candidates    = LeapsRankingService.new(@symbol).call
+        ranking          = LeapsRankingService.new(@symbol)
+        @candidates      = ranking.call
+        # leaps-thin-trading-flag：全部候選當日成交量為 0（多半是開盤前）時不逐列標記，排行表上方改顯示一行提示。
+        @all_zero_volume = ranking.all_zero_volume?
         @recommendation = LeapsRecommendationService.new(@candidates).call
         # leaps-best-value S2：與 OI 推薦並列的「最划算」推薦，吃同一批候選，不另查 DB。
         @best_value     = LeapsBestValueService.new(@candidates).call
@@ -114,6 +117,7 @@ class LeapsRecommendationsController < ApplicationController
       candidates:     @candidates,
       recommendation: @recommendation,
       best_value:     @best_value,
+      all_zero_volume: @all_zero_volume == true,
       flow_panel:     @flow_panel,
       scrape_status:  @scrape_status,
       scrape_errors:  @scrape_errors,

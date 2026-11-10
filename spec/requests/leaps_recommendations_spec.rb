@@ -113,7 +113,7 @@ RSpec.describe "GET /leaps", type: :request do
         .to receive_message_chain(:for_symbol, :fresh, :exists?)
         .and_return(true)
 
-      ranking_svc = instance_double(LeapsRankingService, call: fake_candidates)
+      ranking_svc = instance_double(LeapsRankingService, call: fake_candidates, all_zero_volume?: false)
       allow(LeapsRankingService).to receive(:new).with(symbol).and_return(ranking_svc)
 
       flow_svc = instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel)
@@ -352,7 +352,7 @@ RSpec.describe "GET /leaps", type: :request do
         .to receive_message_chain(:for_symbol, :fresh, :exists?)
         .and_return(true)
       allow(LeapsRankingService).to receive(:new).with(symbol)
-        .and_return(instance_double(LeapsRankingService, call: fake_candidates))
+        .and_return(instance_double(LeapsRankingService, call: fake_candidates, all_zero_volume?: false))
       allow(LeapsOptionsFlowPanelService).to receive(:new).with(symbol, fake_candidates)
         .and_return(instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel))
       allow(PmccShortCallSnapshot).to receive_message_chain(:for_symbol, :exists?).and_return(false)
@@ -375,7 +375,7 @@ RSpec.describe "GET /leaps", type: :request do
         .to receive_message_chain(:for_symbol, :fresh, :exists?)
         .and_return(true)
       allow(LeapsRankingService).to receive(:new).with(symbol)
-        .and_return(instance_double(LeapsRankingService, call: fake_candidates))
+        .and_return(instance_double(LeapsRankingService, call: fake_candidates, all_zero_volume?: false))
       allow(LeapsOptionsFlowPanelService).to receive(:new).with(symbol, fake_candidates)
         .and_return(instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel))
       allow(PmccShortCallSnapshot).to receive_message_chain(:for_symbol, :exists?).and_return(true)
@@ -519,7 +519,7 @@ RSpec.describe "GET /leaps", type: :request do
         .to receive_message_chain(:for_symbol, :fresh, :exists?)
         .and_return(true)
       allow(LeapsRankingService).to receive(:new).with(symbol)
-        .and_return(instance_double(LeapsRankingService, call: fake_candidates))
+        .and_return(instance_double(LeapsRankingService, call: fake_candidates, all_zero_volume?: false))
       allow(LeapsOptionsFlowPanelService).to receive(:new).with(symbol, fake_candidates)
         .and_return(instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel))
       allow(PmccShortCallSnapshot).to receive_message_chain(:for_symbol, :exists?).and_return(true)
@@ -613,7 +613,7 @@ RSpec.describe "GET /leaps", type: :request do
         .to receive_message_chain(:for_symbol, :fresh, :exists?)
         .and_return(true)
       allow(LeapsRankingService).to receive(:new).and_return(
-        instance_double(LeapsRankingService, call: [])
+        instance_double(LeapsRankingService, call: [], all_zero_volume?: false)
       )
       allow(LeapsOptionsFlowPanelService).to receive(:new).and_return(
         instance_double(LeapsOptionsFlowPanelService, call: { status: :no_data, date: Date.current })
@@ -669,7 +669,8 @@ RSpec.describe "GET /leaps", type: :request do
   def stub_fresh_with_recommendation(recommendation)
     allow(LeapsOptionChainSnapshot)
       .to receive_message_chain(:for_symbol, :fresh, :exists?).and_return(true)
-    allow(LeapsRankingService).to receive_message_chain(:new, :call).and_return([ stub_candidate ])
+    allow(LeapsRankingService).to receive(:new)
+      .and_return(instance_double(LeapsRankingService, call: [ stub_candidate ], all_zero_volume?: false))
     allow(LeapsRecommendationService).to receive_message_chain(:new, :call).and_return(recommendation)
     allow(LeapsOptionsFlowPanelService).to receive_message_chain(:new, :call).and_return({ status: :no_data })
   end
@@ -863,7 +864,7 @@ RSpec.describe "GET /leaps", type: :request do
         .to receive_message_chain(:for_symbol, :fresh, :exists?)
         .and_return(true)
       allow(LeapsRankingService).to receive(:new).and_return(
-        instance_double(LeapsRankingService, call: [])
+        instance_double(LeapsRankingService, call: [], all_zero_volume?: false)
       )
       allow(LeapsRecommendationService).to receive(:new).and_return(
         instance_double(LeapsRecommendationService, call: nil)
@@ -891,7 +892,7 @@ RSpec.describe "GET /leaps", type: :request do
         .to receive_message_chain(:for_symbol, :fresh, :exists?)
         .and_return(true)
       allow(LeapsRankingService).to receive(:new).and_return(
-        instance_double(LeapsRankingService, call: [])
+        instance_double(LeapsRankingService, call: [], all_zero_volume?: false)
       )
       allow(LeapsRecommendationService).to receive(:new).and_return(
         instance_double(LeapsRecommendationService, call: nil)
@@ -1236,7 +1237,7 @@ RSpec.describe "GET /leaps", type: :request do
 
     before do
       allow(LeapsOptionChainSnapshot).to receive(:fresh_for?).and_return(true)
-      allow(LeapsRankingService).to receive(:new).and_return(instance_double(LeapsRankingService, call: fake_candidates))
+      allow(LeapsRankingService).to receive(:new).and_return(instance_double(LeapsRankingService, call: fake_candidates, all_zero_volume?: false))
       allow(LeapsOptionsFlowPanelService).to receive(:new)
         .and_return(instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel))
     end
@@ -1323,7 +1324,7 @@ RSpec.describe "GET /leaps", type: :request do
 
     before do
       allow(LeapsOptionChainSnapshot).to receive(:fresh_for?).and_return(true)
-      allow(LeapsRankingService).to receive(:new).and_return(instance_double(LeapsRankingService, call: fake_candidates))
+      allow(LeapsRankingService).to receive(:new).and_return(instance_double(LeapsRankingService, call: fake_candidates, all_zero_volume?: false))
       allow(LeapsOptionsFlowPanelService).to receive(:new)
         .and_return(instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel))
       allow(LeapsRecommendationService).to receive(:new)
@@ -1424,10 +1425,12 @@ RSpec.describe "GET /leaps", type: :request do
       let(:doc) { Nokogiri::HTML(response.body) }
 
     before do
-      baseline.each do |exp, dte, strike, delta, bid, ask, oi, vol|
+      # 第 9 欄（選填）：DB 存的 vol_oi_ratio 覆寫值，用來模擬 Barchart 四捨五入成 0 或缺值（NULL）。
+      baseline.each do |exp, dte, strike, delta, bid, ask, oi, vol, *stored|
         create(:leaps_option_chain_snapshot,
                symbol: symbol, expiration_date: Date.parse(exp), dte: dte, strike: strike, delta: delta,
-               bid: bid, ask: ask, open_interest: oi, volume: vol, vol_oi_ratio: (vol.to_f / oi).round(4),
+               bid: bid, ask: ask, open_interest: oi, volume: vol,
+               vol_oi_ratio: stored.empty? ? (vol.to_f / oi).round(4) : stored.first,
                underlying_price: 186.64, scraped_at: scraped_at)
       end
       allow(LeapsBestValueService).to receive(:new).and_call_original
@@ -1486,6 +1489,27 @@ RSpec.describe "GET /leaps", type: :request do
         expect(captured).to have_key(:best_value)
         expect(captured[:best_value]).to be_nil
         expect(captured[:recommendation]).to be_nil
+      end
+    end
+
+    # leaps-thin-trading-flag S2（使用者裁示）：指定履約價那列被標「成交相對清淡」時，
+    # 「🚫 不建議」後面用短句；⚠ 標記的 title 維持完整 tooltip。
+    # $120 有三列：2028-01-21、2028-12-15 被標（自算 Vol/OI 落在後三分之一），2029-01-19 未標。
+    context "user_strike=120 且該履約價有被標記的列" do
+      before { seed_last_query_strike(120.0) }
+
+      it "不建議原因為短句，不再出現舊說法" do
+        get "/leaps", params: { symbol: symbol, user_strike: "120" }
+
+        expect_page_without_errors
+        reasons = Nokogiri::HTML(response.body).css("#leaps-ranking-table span").map(&:text).grep(/\A🚫 不建議：/)
+        # 2029-01-19 那列未被標記，但 OI 221 排名偏低，顯示的是既有的 OI 原因。
+        expect(reasons).to contain_exactly(
+          "🚫 不建議：成交相對清淡，進出場前先確認報價與價差。",
+          "🚫 不建議：成交相對清淡，進出場前先確認報價與價差。",
+          "🚫 不建議：OI 在本次候選中排名偏低，流動性相對較差"
+        )
+        expect(response.body).not_to include("近期無成交紀錄")
       end
     end
 
@@ -1596,7 +1620,7 @@ RSpec.describe "GET /leaps", type: :request do
         it "預設選擇標準的數字讀設定檔與既有常數" do
           text = criteria_text
           expect(text).to include("Delta #{sprintf('%.2f', cfg['delta_min'])}–#{sprintf('%.2f', cfg['delta_max'])}")
-          expect(text).to include("Spread（買賣差價比）≤ 3%", "OI ≥ 1,000", "當日成交量 ≥ 50", "近期無成交合約照常列入")
+          expect(text).to include("Spread（買賣差價比）≤ 3%", "OI ≥ 1,000", "當日成交量 ≥ 50", "成交相對清淡合約照常列入")
           near_min = LeapsRecommendationService::NEAR_DTE_MIN
           near_max = LeapsRecommendationService::NEAR_DTE_MAX
           far_min  = LeapsRecommendationService::FAR_DTE_MIN
@@ -1635,6 +1659,103 @@ RSpec.describe "GET /leaps", type: :request do
           expect(payload["column_labels"]["annual_cost_pct"]).to eq "年化時間成本"
           expect(payload["candidates"].map { |r| r["annual_cost_pct"] }).to all(match(/\A\d+\.\d{2}%\z/))
           expect(payload["candidates"].map { |r| r["annual_cost_pct"] }).to include("7.36%")
+        end
+
+        # ── leaps-thin-trading-flag S2：改名「成交相對清淡」 ────────────────────
+        # 11 筆自算 Vol/OI 由小到大前三：2028-12-15 $120（6/6168）、2027-12-17 $130（22/7565）、
+        # 2028-01-21 $120（18/2069）；n=11，cutoff=floor(11/3)=3，界線＝第 3 小 → 標這三筆。
+        it "標記改名「成交相對清淡」、附新 tooltip，頁面不再出現「無成交」" do
+          body = response.body
+          expect(body).to include("成交相對清淡")
+          expect(body).not_to include("無成交")
+          flagged = doc.css("#leaps-ranking-table tbody tr").select { |tr| tr.text.include?("⚠ 成交相對清淡") }.map do |tr|
+            [ tr.at_css("td[data-col='expiration']").text, tr.at_css("td[data-col='strike'] span").text ]
+          end
+          expect(flagged).to contain_exactly([ "2028-12-15", "120.00" ], [ "2027-12-17", "130.00" ], [ "2028-01-21", "120.00" ])
+          titles = doc.css("span").select { |s| s.text == "⚠ 成交相對清淡" }.map { |s| s["title"] }.uniq
+          expect(titles).to eq [ "本次查詢候選中，當日成交量／未平倉量（自行計算）落在後三分之一。不代表沒有成交。" ]
+          expect(doc.at_css("[data-leaps-all-zero-volume]")).to be_nil
+        end
+
+        it "PDF 匯出 payload：標記欄改新名稱、不含「無成交」、非全 0 時沒有表格上方提示" do
+          raw = doc.at_css("script#leaps-pdf-data").text
+          payload = JSON.parse(raw)
+          expect(raw).not_to include("無成交")
+          expect(payload["candidates"].count { |r| r["liquidity"].include?("（⚠成交相對清淡）") }).to eq 3
+          expect(payload["candidates_notice"]).to be_nil
+        end
+      end
+
+      # leaps-thin-trading-flag S2 r2（審查 S0／S1／S2 質詢 1）：最划算卡的標記經
+      # LeapsBestValueService#graded_candidates（leaps_best_value_service.rb:62 slice）傳入，
+      # 必須跟著新判定（同列 volume ÷ OI 自算）走，而不是 DB 存的 vol_oi_ratio。
+      # （兩個 context 直接並列，不再包一層，否則超過 NestedGroups 上限）
+      def best_value_card(term_index) = doc.css("[data-leaps-best-value-card]")[term_index]
+
+      context "最划算卡標記跟著新判定走：遠天期主推的自算值落在後三分之一" do
+        # 2028-12-15 $140 的 OI 從 4,898 調成 600,000：成交量 60 不變（等級仍 A、年化成本不變，主推不變），
+        # 自算 60 ÷ 600,000 = 0.0001，成為 11 筆中最小 → 被標記。
+        let(:baseline) do
+          super().map { |row| row[0, 3] == [ "2028-12-15", 769, 140 ] ? row.dup.tap { |r| r[6] = 600_000 } : row }
+        end
+
+        it "最划算卡的主推顯示 ⚠ 成交相對清淡，title 是完整 tooltip" do
+          get "/leaps", params: { symbol: symbol }
+          far = best_value_card(1)
+          expect(far.text).to include("$140.00 / 2028-12-15")
+          flag = far.css("span").find { |s| s.text == "⚠ 成交相對清淡" }
+          expect(flag).not_to be_nil
+          expect(flag["title"]).to eq "本次查詢候選中，當日成交量／未平倉量（自行計算）落在後三分之一。不代表沒有成交。"
+        end
+      end
+
+      context "最划算卡標記跟著新判定走：DB 存的 vol_oi_ratio 是 0 或 NULL，但自算值不低（舊邏輯會標、新邏輯不標）" do
+        # 近天期最划算主推 2028-01-21 $130（160 ÷ 2,264 = 0.0707）存 0.0、次選 $140（191 ÷ 4,163 = 0.0459）存 NULL。
+        # 舊邏輯：0 ≤ 界線、NULL 一律標 → 兩筆都標。新邏輯：自算值不在後三分之一 → 都不標。
+        let(:baseline) do
+          super().map do |row|
+            case row[0, 3]
+            when [ "2028-01-21", 440, 130 ] then row + [ 0.0 ]
+            when [ "2028-01-21", 440, 140 ] then row + [ nil ]
+            else row
+            end
+          end
+        end
+
+        it "最划算近天期卡的主推、次選都不顯示標記" do
+          get "/leaps", params: { symbol: symbol }
+          near = best_value_card(0)
+          expect(near.text).to include("$130.00 / 2028-01-21", "$140.00 / 2028-01-21")
+          expect(near.text).not_to include("成交相對清淡")
+        end
+      end
+
+      context "全部候選當日成交量為 0（leaps-thin-trading-flag 全 0 情況）" do
+        let(:baseline) do
+          [
+            [ "2028-01-21", 440, 130, 0.8417, 72.00, 73.20, 2264, 0 ],
+            [ "2028-01-21", 440, 140, 0.8092, 65.40, 66.25, 4163, 0 ],
+            [ "2028-01-21", 440, 180, 0.6562, 42.00, 42.50, 14764, 0 ],
+            [ "2028-12-15", 769, 140, 0.8047, 74.60, 76.15, 4898, 0 ],
+            [ "2029-01-19", 804, 140, 0.8045, 75.80, 77.00, 502, 0 ]
+          ]
+        end
+        let(:notice) { "所有候選當日成交量皆為 0（可能尚未開盤或標的冷門），報價可能未更新。" }
+
+        before { get "/leaps", params: { symbol: symbol } }
+
+        it "排行表上方顯示一行提示，排行表無任何「成交相對清淡」標記" do
+          expect(captured[:all_zero_volume]).to be true
+          expect(doc.at_css("[data-leaps-all-zero-volume]").text).to eq notice
+          expect(doc.at_css("#leaps-ranking-table").text).not_to include("成交相對清淡")
+          expect(response.body).not_to include("無成交")
+        end
+
+        it "PDF payload 帶表格上方提示，推薦理由也附同一句" do
+          payload = JSON.parse(doc.at_css("script#leaps-pdf-data").text)
+          expect(payload["candidates_notice"]).to eq notice
+          expect(payload["candidates"].none? { |r| r["liquidity"].include?("成交相對清淡") }).to be true
+          expect(payload.dig("recommendation", "near_term", "reason")).to include("⚠ 注意：#{notice}")
         end
       end
 

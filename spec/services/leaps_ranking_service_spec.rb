@@ -6,8 +6,14 @@ RSpec.describe LeapsRankingService do
   # All rows in one example share the same scraped_at so maximum() returns them all.
   around { |ex| freeze_time { ex.run } }
 
+  # 沒指定 strike 時從 13.0 起每筆 +0.5（現價 13.08、Mid 3.2 → 外在價值皆為正；
+  # 每例重新起算，同例內不重複，符合 idx_leaps_chain_unique）。factory 的全域 strike
+  # 序列在 suite 前段很低（8.5 起），會算出負外在價值被排除；隨機順序下哪個案例先跑
+  # 就輪到誰失敗（seed 17594 sort order、seed 9176 bid_ask_spread_pct）。
+  let(:strike_seq) { 13.0.step(by: 0.5) }
+
   def make(attrs)
-    create(:leaps_option_chain_snapshot, attrs)
+    create(:leaps_option_chain_snapshot, { strike: strike_seq.next }.merge(attrs))
   end
 
   # ── Delta filter ─────────────────────────────────────────────────────────────

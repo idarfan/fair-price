@@ -7,5 +7,5 @@ delta_max: 0.92
 spread_pct_max: 3.0      # (ask-bid)/mid*100
 oi_min: 1000             # 使用者指定預設（2026-11-09）
 volume_min: 50           # 使用者指定預設（2026-11-09）
-exclude_no_recent_trade: false   # 使用者決定：近期無成交照常列出
+exclude_no_recent_trade: false   # 使用者決定：成交相對清淡照常列出
 iv_rank_warn: 70

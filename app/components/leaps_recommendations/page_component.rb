@@ -15,12 +15,14 @@ class LeapsRecommendations::PageComponent < ApplicationComponent
   include LeapsRecommendations::PmccEducation
   include LeapsRecommendations::VocabCards
 
-  def initialize(symbol: nil, candidates: [], recommendation: nil, best_value: nil, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil, next_earnings: nil, pmcc_ranking: nil, pmcc_tracker: nil, price_context: nil, iv_environment: nil)
+  def initialize(symbol: nil, candidates: [], recommendation: nil, best_value: nil, all_zero_volume: false, flow_panel: nil, scrape_status: nil, scrape_errors: [], user_strike: nil, next_earnings: nil, pmcc_ranking: nil, pmcc_tracker: nil, price_context: nil, iv_environment: nil)
     @symbol         = symbol
     @candidates     = Array(candidates)
     @recommendation = recommendation
     # leaps-best-value：LeapsBestValueService#call 的回傳值（推薦分析左卡、排行表徽章與年化時間成本欄）。
     @best_value     = best_value
+    # leaps-thin-trading-flag：LeapsRankingService#all_zero_volume?，排行表上方與 PDF 的全 0 提示。
+    @all_zero_volume = all_zero_volume
     @flow_panel     = flow_panel
     @scrape_status  = scrape_status
     @scrape_errors  = Array(scrape_errors)

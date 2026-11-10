@@ -76,8 +76,8 @@ module LeapsRecommendations::ConceptCards
       end
       if warned
         p do
-          strong { plain "⚠ 但本合約近期無成交" }
-          plain "（Volume 對 OI 比率偏低）——OI 高不代表現在還在動，掛單簿可能已經很久沒更新，實際進出前務必先看報價是否合理、掛限價單試單。"
+          strong { plain "#{THIN_TRADING_LABEL}：" }
+          plain THIN_TRADING_CAUTION
         end
       else
         p { plain "OI 高只代表「歷史上累積的未平倉量」，不保證今天一定買得到／賣得掉，仍要搭配 Volume 一起看。" }

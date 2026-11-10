@@ -128,7 +128,7 @@ module LeapsPageHtml
     example_group.instance_exec do
       allow(LeapsOptionChainSnapshot).to receive(:fresh_for?).and_return(true)
       allow(LeapsRankingService).to receive(:new).with(symbol)
-        .and_return(instance_double(LeapsRankingService, call: [ candidate ]))
+        .and_return(instance_double(LeapsRankingService, call: [ candidate ], all_zero_volume?: false))
       allow(LeapsOptionsFlowPanelService).to receive(:new)
         .and_return(instance_double(LeapsOptionsFlowPanelService, call: flow))
     end

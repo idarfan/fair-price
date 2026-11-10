@@ -6,6 +6,7 @@
 # 用同一支 render_metric_list，指標一律由 LeapsBestValueService.metrics 算（公式只有一份）。
 # 門檻與註記數值只讀 LeapsBestValueConfig，天期邊界只讀 LeapsRecommendationService 常數。
 module LeapsRecommendations::BestValueCards
+  include LeapsRecommendations::SharedConstants
   IV_WARN_TEXT = "優先深度價內以降低 Vega 與外在價值"
 
   def best_value_group(term) = @best_value&.dig(term)
@@ -45,7 +46,7 @@ module LeapsRecommendations::BestValueCards
           span(class: "text-[10px] text-gray-500") { plain primary ? "主推" : "次選" }
           span(class: "text-xs font-semibold text-gray-800") { plain contract_label(row) }
           if row[:no_recent_volume_warning]
-            span(class: "text-orange-600 text-xs whitespace-nowrap") { plain "⚠ 近期無成交" }
+            span(class: "text-orange-600 text-xs whitespace-nowrap", title: THIN_TRADING_TOOLTIP) { plain THIN_TRADING_LABEL }
           end
         end
       end
@@ -128,7 +129,7 @@ module LeapsRecommendations::BestValueCards
       "Spread（買賣差價比）≤ #{sprintf('%g', cfg.fetch('spread_pct_max'))}%",
       "OI ≥ #{fmt_int(cfg.fetch('oi_min'))}",
       "當日成交量 ≥ #{fmt_int(cfg.fetch('volume_min'))}",
-      cfg.fetch("exclude_no_recent_trade") ? "近期無成交合約不列入" : "近期無成交合約照常列入",
+      cfg.fetch("exclude_no_recent_trade") ? "成交相對清淡合約不列入" : "成交相對清淡合約照常列入",
       "天期：近天期 DTE #{LeapsRecommendationService::NEAR_DTE_MIN}–#{LeapsRecommendationService::NEAR_DTE_MAX}" \
       "／遠天期 DTE 超過 #{LeapsRecommendationService::FAR_DTE_MIN}，各自挑選"
     ]

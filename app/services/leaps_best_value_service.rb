@@ -2,11 +2,11 @@
 
 # LEAPS「最划算」推薦（leaps-best-value.md S1）：每個天期區間挑年化時間成本最低的合約。
 #
-# 輸入是 LeapsRankingService#call 產出的候選 hash。「近期無成交」直接讀候選上
+# 輸入是 LeapsRankingService#call 產出的候選 hash。「成交相對清淡」直接讀候選上
 # 已算好的 :no_recent_volume_warning——那個門檻是同一批候選的 Vol/OI 相對界線，
 # 單筆合約判斷不出來，這裡不另寫一套（S0 質詢 2）。
 #
-# 三級共同硬條件：bid > 0；exclude_no_recent_trade: true 時排除近期無成交。
+# 三級共同硬條件：bid > 0；exclude_no_recent_trade: true 時排除成交相對清淡的合約。
 # 流動性等級：A＝全部條件、B＝Delta＋Spread、C＝只看 Delta。先比等級再比成本，
 # 所以次選的年化成本可能低於主推（規格 S3 註記）。
 class LeapsBestValueService
@@ -107,7 +107,7 @@ class LeapsBestValueService
     spread && spread <= @config.fetch("spread_pct_max")
   end
 
-  # Bid 為 0＝賣不掉；exclude_no_recent_trade: true＝完全不推無成交合約。
+  # Bid 為 0＝賣不掉；exclude_no_recent_trade: true＝完全不推成交相對清淡的合約。
   def hard_requirements_met?(candidate)
     return false unless candidate[:bid].to_f.positive?
     return false if @config.fetch("exclude_no_recent_trade") && candidate[:no_recent_volume_warning]
