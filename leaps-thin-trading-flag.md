@@ -66,7 +66,7 @@ S1 用本文驗收資料跑單元測試；S3 於美股開盤時段開核心網�
 - 新增 `computed_vol_oi(volume, open_interest)`：`open_interest` 為 nil 或 0 → nil；`volume` 為 nil → nil；否則 `volume.to_f / open_interest`，**不四捨五入**。
 - `vol_oi_threshold` 與 `low_vol_oi?` 改用 `computed_vol_oi`，不再讀 `vol_oi_ratio`。
 - `low_vol_oi?`：ratio 為 nil → **false**（資料不足不判定）；其餘邏輯不變。
-- 全 0 情況：同批非 nil 的自算值全部為 0 時，**逐列不標記**，改由頁面（與 PDF）在排行表上方顯示一行：「所有候選當日成交量皆為 0（可能尚未開盤或標的冷門），報價可能未更新。」候選 hash 外另回傳 `all_zero_volume: true` 供元件判斷。
+- 全 0 情況：同批非 nil 的自算值全部為 0 時，**逐列不標記**，改由頁面（與 PDF）在排行表上方顯示一行：「所有候選當日成交量皆為 0（可能尚未開盤或標的冷門），報價可能未更新。」`LeapsRankingService#call` 回傳形狀不變（陣列）；另加公開方法 `all_zero_volume?`（於 `call` 之後可讀），由 controller 讀取傳給元件。PMCC、垂直價差等既有呼叫端不得修改。
 - 候選 hash 新增 `:computed_vol_oi`（供 S3 比對與 tooltip），既有 `:vol_oi_ratio` 保留不動。
 
 ### 驗收資料（單元測試，7 筆同批候選）
@@ -86,8 +86,9 @@ S1 用本文驗收資料跑單元測試；S3 於美股開盤時段開核心網�
 - 界線依 S0 記錄的公式，以 {E, A, G, D, B, C} 六個非 nil 值手算，算式寫進測試註解；被標記者＝自算值 ≤ 界線者。
 - **F 不被標記**（nil 不判定）；**D 不被標記**（舊邏輯因 NULL 會標）；**C 不被標記**（舊邏輯因存 0 會標）。
 - 另一案：全部 OI 為 0 → 界線 nil → 無人被標記。
-- 另一案：7 筆 volume 皆為 0、OI 皆 > 0 → 無人被標記、`all_zero_volume` 為 true。
-- 另一案：驗收資料原 7 筆 → `all_zero_volume` 為 false。
+- 另一案：7 筆 volume 皆為 0、OI 皆 > 0 → 無人被標記、`all_zero_volume?` 為 true。
+- 另一案：驗收資料原 7 筆 → `all_zero_volume?` 為 false。
+- 另一案：`call` 回傳值仍為陣列（`be_an(Array)`），既有呼叫端 spec 不需修改即全過。
 - 另一案：候選 < `MIN_CANDIDATES_FOR_VOL_OI_TIER` → 無人被標記（既有行為不變）。
 
 驗證：`bundle exec rspec spec/services/leaps_ranking_service_spec.rb` 0 failures；`spec/services/leaps_best_value_service_spec.rb` 0 failures（其注入旗標的測試不受影響）；完整 rspec 0 failures（記 seed）。
@@ -106,6 +107,7 @@ S0 列出的所有使用者可見文字：
 | `concept_cards.rb:79`、`pdf_export.rb:71` | 「成交量相對未平倉量偏低，掛單可能較少；進出場前先確認報價與價差。」 |
 | `pdf_export.rb:147` | 「所有候選當日成交量皆為 0（可能尚未開盤或標的冷門），報價可能未更新。」（僅在第 4 點的全 0 情況顯示） |
 | `pdf_export.rb:161`「（⚠無成交）」 | 「（⚠成交相對清淡）」 |
+| `leaps_recommendation_service.rb:97` 注意事項 | 「成交量相對未平倉量偏低，掛單可能較少；進出場前先確認報價與價差。」 |
 | `ranking_table.rb:107` 標記滑鼠提示 | 即上方指定的新 tooltip，取代原句 |
 | `tooltips.js:99` 排名欄說明 | 「⚠ 近期無成交」→「⚠ 成交相對清淡」，其餘不變 |
 | `tooltips.js:693` IV 偏斜教學 | 「報價過時（呼應『近期無成交』）」→「報價過時（成交清淡時常見）」 |
@@ -116,7 +118,7 @@ S0 列出的所有使用者可見文字：
 - request spec 追加：全 0 資料狀態下，body 含上述一行提示、排行表無任何「成交相對清淡」標記。
 - 整頁 HTML 回歸基準：使用者裁示例外，重新產生一次；不得新增 strip 規則；送審附新舊 diff，審查官確認變更只限標記文字與 tooltip。
 
-驗證：`grep -rn "無成交" app/ config/` 無結果；request spec＋回歸比對全過；完整 rspec 0 failures（記 seed）。
+驗證：`grep -rn "無成交" app/ config/ --exclude-dir=hall_of_fame` 無結果（`app/services/hall_of_fame/premium_reference.rb:33`「當天無成交」與本標記無關，不改）；request spec＋回歸比對全過；完整 rspec 0 failures（記 seed）。
 
 重啟：每次重啟前詢問使用者。重啟前先跑 `assets:precompile`（`tooltips.js` 屬 asset）。
 
