@@ -33,7 +33,7 @@ S1 用本文驗收資料跑單元測試；S3 於美股開盤時段開核心網�
 
 | 階段 | 內容 | 狀態 | 驗證證據 | 審查 |
 |---|---|---|---|---|
-| S0 | 定位改名點與界線公式 | 未開始 | | |
+| S0 | 定位改名點與界線公式 | 完成 | 「無成交」出現處（app/config）：`ranking_table.rb:107,205`、`pdf_export.rb:71,147,161`、`best_value_cards.rb:48,131`、`concept_cards.rb:79`、`tooltips.js:99,693`、`config/leaps_best_value.yml:10`（註解）、`leaps_best_value_service.rb:5,9,110`（註解）；範圍外：`hall_of_fame/premium_reference.rb:33,41`（名人堂「當天無成交」，與本標記無關）。界線公式 `leaps_ranking_service.rb:71-80`：候選數 < `MIN_CANDIDATES_FOR_VOL_OI_TIER`（=4，第 6 行）→ nil（第 72 行，以候選總數計、含 nil 列）；非 nil 值升冪排序（74）；空 → nil（75）；`cutoff_count = max(floor(n/3), 1)`（78，無條件捨去）；界線＝`ratios[cutoff_count - 1]`（79，即後三分之一中最大值）。判定 `low_vol_oi?` 137–142：`ratio <= floor`（含等號）。讀 `vol_oi_ratio` 做判定：僅 `leaps_ranking_service.rb:74,106`；讀旗標者：`leaps_best_value_service.rb:113`、`leaps_recommendation_service.rb:96`、`ranking_table.rb:107,194`、`best_value_cards.rb:47`、`concept_cards.rb:67`、`pdf_export.rb:53,161`；`pmcc_ranking_service.rb:168` 讀 ratio 僅顯示。`LeapsRankingService#call` 回傳 Array，呼叫端 4 處：controller:25、`pmcc_ranking_service.rb:40`、`leaps_vertical_spread_service.rb:117`、（`leaps_best_value_service` 吃其結果）。`pdf_export.rb:147` 的 `group[:all_warned]` 全專案無人設定（死碼）。驗收資料手算：6 非 nil 值 floor(6/3)=2 → 界線＝第 2 小＝0.001119 → 標 E、A。 | 異端審查官表示: VERDICT: PASS（verdict-leaps-thin-trading-flag-S0-r1.md） |
 | S1 | 自算 Vol/OI＋nil 處理＋單元測試 | 未開始 | | |
 | S2 | 改名「成交相對清淡」＋request spec＋回歸基準 | 未開始 | | |
 | S3 | E2E 實頁驗收 | 未開始 | | |
