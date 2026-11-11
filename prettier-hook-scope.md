@@ -102,8 +102,8 @@ fi
 1. 用 Edit 工具在 `app/assets/javascripts/leaps_recommendations/vector_pdf.js` 檔尾加一行註解 `// prettier-hook-scope 驗收`。
 2. `git diff --stat` 該檔必須是 `1 insertion`；stderr 有「跳過 prettier」。
 3. `git checkout -- <該檔>` 還原。
-4. 新建 `tmp/prettier_scope_probe.js`（未納版控、新檔），寫入未排版內容 → 確認被排版 → 刪除。
+4. 新建 `app/assets/javascripts/prettier_scope_probe.js`（未納版控、不在 `.gitignore`、新檔），先以 `prettier --file-info` 確認 `"ignored": false`，寫入未排版內容 → 確認被排版 → 立即刪除。
 
-驗證：步驟 2 的 `--stat` 輸出、步驟 4 排版前後內容附證據；`git status` 回到乾淨狀態。
+驗證：步驟 2 的 `--stat` 輸出、步驟 4 的 `--file-info` 輸出與排版前後內容附證據；`git status` 回到乾淨狀態（既有 docs/ 3 個未追蹤檔除外，逐一列名）。
 
 不需重啟 server（未改 app 程式）。
