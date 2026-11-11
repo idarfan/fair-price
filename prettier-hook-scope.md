@@ -42,7 +42,7 @@ S1 用暫存 git repo 跑三種狀態；S2 在 FairPrice 實際用 Edit 工具�
 
 | 階段 | 內容 | 狀態 | 驗證證據 | 審查 |
 |---|---|---|---|---|
-| S0 | 定位編輯後 prettier hook | 未開始 | | |
+| S0 | 定位編輯後 prettier hook | 完成 | 設定：`/home/idarfan/.claude/settings.json:377-381`，PostToolUse matcher `Edit\|Write`、command `/home/idarfan/.claude/hooks/post-edit-ts.sh`、timeout 30。腳本：`/home/idarfan/.claude/hooks/post-edit-ts.sh`（`~/.claude` 為 git repo，HEAD 4085036；該腳本無未 commit 變更）。觸發：第 14 行只處理 `.js/.jsx/.ts/.tsx`（不含 css/json）。prettier 執行（第 19–31 行）：`./node_modules/.bin/prettier --write "$FILE_PATH"`，相對 hook 的 cwd；不存在時 `npx prettier --write`；stderr 丟棄。FairPrice 本地 prettier 3.8.1，無 `.prettierrc`（預設設定）。其後：`.ts/.tsx` 跑 tsc（33–44 行），全部跑 `eslint --fix`（46–54 行），任一失敗 exit 1。現況：`vector_pdf.js` HEAD 版 `prettier --check` exit 1（未排版）；FairPrice 追蹤中的 143 個 js/ts 只有 55 個 HEAD 版已符合 prettier。 | 異端審查官表示: VERDICT: PASS（verdict-prettier-hook-scope-S0-r1.md） |
 | S1 | hook 改為依 HEAD 狀態決定＋測試腳本 | 未開始 | | |
 | S2 | 實際編輯驗收 | 未開始 | | |
 
