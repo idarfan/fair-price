@@ -6,6 +6,10 @@
 # 來源字型：Google Fonts CDN, Noto Sans Regular, version 2.015 (OFL 1.1)
 #   https://fonts.gstatic.com/s/notosans/v42/o-0mIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjcz6L1SoM-jCpoiyD9A99d.ttf
 # 完整字型不 commit 進 repo；本腳本會下載到 tmp 再 subset。
+#
+# 2026-11-11：extract_ipa_charset.py 改掃整個 leaps_recommendations/ 目錄（VOCAB_CARDS
+# 已搬到 shared_constants.rb，舊路徑掃到 0 字），並沿用舊字型已收錄的字。重建後由
+# font_subset_guard.py 檢查；不通過就還原舊字型並失敗。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -29,6 +33,10 @@ echo "  完整字型大小：$FULL_SIZE bytes"
 echo "[3/3] 執行 pyftsubset..."
 mkdir -p "$ROOT/vendor/assets/fonts"
 
+OLD_FONT="$(mktemp --suffix=.ttf)"
+trap 'rm -f "$OLD_FONT"' EXIT
+cp "$OUT_FONT" "$OLD_FONT"
+
 pyftsubset "$FULL_FONT" \
   --output-file="$OUT_FONT" \
   --text-file="$CHARSET_FILE" \
@@ -43,6 +51,13 @@ pyftsubset "$FULL_FONT" \
   --name-IDs='*' \
   --name-legacy \
   --name-languages='*'
+
+echo "[檢查] 新舊字型比對..."
+if ! python3 "$ROOT/script/font_subset_guard.py" verify "$OLD_FONT" "$OUT_FONT" "$FULL_FONT" "$CHARSET_FILE"; then
+  cp "$OLD_FONT" "$OUT_FONT"
+  echo "已還原舊字型：$OUT_FONT" >&2
+  exit 1
+fi
 
 SUBSET_SIZE=$(stat -c%s "$OUT_FONT")
 
