@@ -260,30 +260,16 @@ module LeapsRecommendations::ConceptCards
       pick = group[:pick]
       expired_s = partial_error_strike
       pick_incomplete = expired_s && pick[:strike].to_f == expired_s
-      div(class: "flex flex-wrap gap-3 mb-3") do
-        render_pick_badge(pick)
+      # 膠囊、次選灰字、說明文字、明細格改用與最划算卡共用的零件（leaps-best-value-card-style S1）；
+      # 文字內容與順序不變，膠囊顏色仍依流動性等級。
+      style = LIQUIDITY_STYLE[pick[:liquidity_tier].to_s] || LIQUIDITY_STYLE["普通"]
+      render_capsule_row(pick, runner_up: group[:runner_up], style: style) do
         if pick_incomplete
           span(class: "text-xs text-orange-600 self-center font-medium") { plain "⚠️ 此推薦的 Vega/被指派機率資料可能不完整" }
         end
-        if (ru = group[:runner_up])
-          div(class: "text-xs text-gray-400 self-center") { plain "次選：#{sprintf('$%.2f', ru[:strike].to_f)} / #{ru[:expiration_date]}" }
-        end
       end
-      div(class: "text-sm text-gray-700 whitespace-pre-line leading-relaxed") { plain group[:reason] }
-      div(class: "mt-3 pt-3 border-t border-gray-100") { render_oi_metric_blocks(group) }
-    end
-  end
-
-
-  def render_pick_badge(pick)
-    tier  = pick[:liquidity_tier].to_s
-    style = LIQUIDITY_STYLE[tier] || LIQUIDITY_STYLE["普通"]
-    div(class: "flex items-center gap-2 px-3 py-1.5 rounded-lg border #{style[:bg]} #{style[:border]}") do
-      div(class: "w-2 h-2 rounded-full #{style[:dot]}")
-      span(class: "text-xs font-semibold #{style[:text]}") do
-        plain "#{sprintf('$%.2f', pick[:strike].to_f)} / #{pick[:expiration_date]}"
-      end
-      span(class: "text-xs #{style[:text]} opacity-70") { plain "Delta #{sprintf("%.3f", pick[:delta].to_f)}" }
+      render_pick_reason(group[:reason])
+      render_pick_details(pick, group[:runner_up])
     end
   end
 end

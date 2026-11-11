@@ -17,8 +17,28 @@ module LeapsPageHtml
     "b_symbol_only"     => { params: { symbol: "ORCL" } },
     "c_symbol_strike"   => { params: { symbol: "ORCL", user_strike: "100" } },
     "d_invalid_strike"  => { params: { symbol: "ORCL", user_strike: "abc" } },
-    "e_with_candidates" => { params: { symbol: "NOK", user_strike: "10" }, candidates: true }
+    "e_with_candidates" => { params: { symbol: "NOK", user_strike: "10" }, candidates: true },
+    # leaps-best-value-card-style S1（使用者 2026-11-11 指示新增）：a–e 都沒有「最划算」卡，
+    # 左卡結構不在回歸保護範圍內。用 leaps-best-value 驗收基準的 11 筆真快照（不 stub 服務），
+    # 讓左右兩卡同時出現。
+    "f_with_best_value" => { params: { symbol: "NVDA" }, best_value: true }
   }.freeze
+
+  # leaps-best-value 驗收基準資料（2026-11-09 NVDA，S = 186.64）：到期, DTE, K, Delta, Bid, Ask, OI, Vol。
+  # 與 spec/requests/leaps_recommendations_spec.rb「最划算推薦接線」describe 的 baseline 相同。
+  BEST_VALUE_ROWS = [
+    [ "2028-01-21", 440, 120, 0.8710, 79.10, 80.50,  2069,  18 ],
+    [ "2028-01-21", 440, 125, 0.8569, 75.40, 76.85,   634,  10 ],
+    [ "2028-01-21", 440, 130, 0.8417, 72.00, 73.20,  2264, 160 ],
+    [ "2028-01-21", 440, 140, 0.8092, 65.40, 66.25,  4163, 191 ],
+    [ "2028-01-21", 440, 180, 0.6562, 42.00, 42.50, 14764, 724 ],
+    [ "2027-12-17", 405, 130, 0.8453, 70.65, 72.10,  7565,  22 ],
+    [ "2028-06-16", 587, 140, 0.8042, 69.60, 71.25,   499,  13 ],
+    [ "2028-12-15", 769, 120, 0.8540, 87.40, 89.65,  6168,   6 ],
+    [ "2028-12-15", 769, 140, 0.8047, 74.60, 76.15,  4898,  60 ],
+    [ "2029-01-19", 804, 120, 0.8530, 88.25, 90.50,   221,   5 ],
+    [ "2029-01-19", 804, 140, 0.8045, 75.80, 77.00,   502, 107 ]
+  ].freeze
 
   module_function
 
@@ -113,6 +133,23 @@ module LeapsPageHtml
 
   # 基準檔擷取時已經過 normalize；再套一次，讓版本號遮蔽等後來新增的規則也作用在基準上。
   def read_baseline(name) = normalize(File.read(baseline_path(name)))
+
+  # 各情境請求前的準備：candidates → stub 資料層；best_value → 寫入 11 筆真快照。
+  def prepare!(example_group, spec)
+    stub_candidates!(example_group, spec[:params][:symbol]) if spec[:candidates]
+    seed_best_value!(spec[:params][:symbol]) if spec[:best_value]
+  end
+
+  # 寫入驗收基準快照（同一批 scraped_at），交易式 fixture 會在案例結束時回滾。
+  def seed_best_value!(symbol)
+    scraped_at = Time.current
+    BEST_VALUE_ROWS.each do |exp, dte, strike, delta, bid, ask, oi, vol|
+      FactoryBot.create(:leaps_option_chain_snapshot,
+                        symbol: symbol, expiration_date: Date.parse(exp), dte: dte, strike: strike, delta: delta,
+                        bid: bid, ask: ask, open_interest: oi, volume: vol, vol_oi_ratio: (vol.to_f / oi).round(4),
+                        underlying_price: 186.64, scraped_at: scraped_at)
+    end
+  end
 
   # 「有候選」情境：沿用 spec/requests/leaps_recommendations_spec.rb 的做法，stub 掉資料層。
   def stub_candidates!(example_group, symbol)

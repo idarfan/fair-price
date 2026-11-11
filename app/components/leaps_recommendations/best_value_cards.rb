@@ -27,66 +27,27 @@ module LeapsRecommendations::BestValueCards
           end
         end
       end
-      render_contract_block(pick, primary: true)
-      render_contract_block(group[:runner_up], primary: false) if group[:runner_up]
-    end
-  end
-
-  # 右卡的欄位列表（主推＋次選）：既有 OI 推薦內容不動，只在下方補同一組欄位。
-  def render_oi_metric_blocks(group)
-    render_contract_block(group[:pick], primary: true, badge: false)
-    render_contract_block(group[:runner_up], primary: false) if group[:runner_up]
-  end
-
-  # 一筆合約：標題列（主推／次選＋履約價／到期日）＋八個欄位。
-  def render_contract_block(row, primary:, badge: true)
-    div(class: "mt-2 first:mt-0") do
-      if badge || !primary
-        div(class: "flex flex-wrap items-center gap-2 mb-1") do
-          span(class: "text-[10px] text-gray-500") { plain primary ? "主推" : "次選" }
-          span(class: "text-xs font-semibold text-gray-800") { plain contract_label(row) }
-          if row[:no_recent_volume_warning]
-            span(class: "text-orange-600 text-xs whitespace-nowrap", title: THIN_TRADING_TOOLTIP) { plain THIN_TRADING_LABEL }
-          end
-        end
+      # leaps-best-value-card-style S1：與流動性最佳卡同一結構（共用 PickCardParts）。
+      # 膠囊固定綠色（使用者裁示 2a）；主推的「⚠ 成交相對清淡」接在膠囊後（原本接在合約標題後）。
+      runner_up = group[:runner_up]
+      render_capsule_row(pick, runner_up: runner_up, style: LIQUIDITY_STYLE["充足"]) do
+        render_thin_trading_flag(pick)
       end
-      render_metric_list(row)
+      render_pick_reason(best_value_reason_text(pick))
+      render_pick_details(pick, runner_up)
     end
   end
 
-  # 最划算卡的列是 LeapsBestValueService 回傳值，指標已算好（且不帶 underlying_price）；
-  # OI 卡的列是排行候選，沒有指標，用同一支公式補算。
-  def render_metric_list(row)
-    metrics = row.key?(:annual_cost_pct) ? row : (LeapsBestValueService.metrics(row) || {})
-    dl(class: "grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1 text-xs", data_leaps_metric_list: "") do
-      metric_items(row, metrics).each_with_index do |(label, value), i|
-        # 「履約價／到期日」的值最長（$130.00 / 2028-01-21），獨佔一整行，否則會壓到右邊欄位。
-        span_class = i.zero? ? " col-span-2 sm:col-span-4" : ""
-        div(class: "flex justify-between gap-2 min-w-0#{span_class}") do
-          dt(class: "text-gray-400 whitespace-nowrap") { plain label }
-          dd(class: "text-gray-800 font-mono tabular-nums whitespace-nowrap") { plain value }
-        end
-      end
-    end
-  end
-
-  def metric_items(row, metrics)
+  # 說明文字（規格 S1 第 3 點範本）。
+  def best_value_reason_text(pick)
     [
-      [ "履約價／到期日", contract_label(row) ],
-      [ "Delta",        fmt_decimal(row[:delta], 3) ],
-      [ "Ask",          fmt_price(row[:ask]) ],
-      [ "OI",           fmt_int(row[:open_interest]) ],
-      [ "成交量",       fmt_int(row[:volume]) ],
-      [ "Spread %",     fmt_cost_pct(metrics[:spread_pct]) ],
-      [ "年化時間成本", fmt_cost_pct(metrics[:annual_cost_pct]) ],
-      [ "損益兩平",     fmt_cost_pct(metrics[:breakeven_pct]) ]
-    ]
+      "建議到期日：#{pick[:expiration_date]}（DTE #{pick[:dte].to_i}），履約價 #{sprintf('$%.2f', pick[:strike].to_f)}，" \
+      "Delta #{fmt_decimal(pick[:delta], 3)}，Mid $#{fmt_price(mid_of(pick))}。",
+      "年化時間成本 #{fmt_cost_pct(pick[:annual_cost_pct])}，股價需漲 #{fmt_cost_pct(pick[:breakeven_pct])} 才損益兩平。",
+      "Bid-Ask Spread #{fmt_cost_pct(pick[:spread_pct])}。",
+      "以上依「預設選擇標準」篩選，僅供策略篩選參考，非投資建議，請自行評估。"
+    ].join("\n")
   end
-
-  # 已經是百分比數值（7.36 → "7.36%"），跟既有 fmt_pct（小數 ×100）不同，所以另開一支。
-  def fmt_cost_pct(value) = value.nil? ? "—" : sprintf("%.2f%%", value)
-
-  def contract_label(row) = "#{sprintf('$%.2f', row[:strike].to_f)} / #{row[:expiration_date]}"
 
   def same_contract?(a, b)
     a && b && a[:expiration_date].to_s == b[:expiration_date].to_s && a[:strike].to_f == b[:strike].to_f

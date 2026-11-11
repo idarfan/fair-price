@@ -1,5 +1,18 @@
 # FairPrice
 
+### 2026-11-11（三）— LEAPS 最划算卡改成與流動性最佳卡同一風格（S1）
+
+/leaps 的左卡「💰 最划算」改用和右卡「流動性最佳」相同的零件（新檔 `app/components/leaps_recommendations/pick_card_parts.rb`）：
+- 膠囊列：左卡固定綠色。
+- 說明文字：左卡新增，照規格範本 4 行。
+- 明細格：
+  - 兩卡都拿掉重複的「履約價／到期日」列，補上 Mid（依 bid／ask 算，規則同 `LeapsOptionChainSnapshot#mid_price`）。
+  - 欄位：Delta、Mid、Ask、OI、成交量、Spread %、年化時間成本、損益兩平。
+  - 每格標籤在上、數值在下。
+  - 欄數依**卡片內容寬度**決定（容器查詢 `@container`＋`@md:grid-cols-5`）：卡片 ≥ 448px 時排 5＋3，否則 2 欄。視窗 768–1103px 兩卡並排、卡片太窄時，明細為 2 欄。
+
+選擇邏輯（`LeapsBestValueService`、`LeapsRecommendationService`）沒有修改。新增回歸基準 `f_with_best_value`（左右兩卡同時出現）。規格：`leaps-best-value-card-style.md`。
+
 ### 2026-11-11（三）— 架構圖改在 commit 時產生並併入同一個 commit
 
 以前 `docs/` 的架構圖是在 pre-push 時才產生，而且產生後不會 commit。結果是推上 GitHub 的永遠是舊圖，push 完工作區還會多出 3 個沒 commit 的修改。

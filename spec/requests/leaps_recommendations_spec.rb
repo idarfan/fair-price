@@ -1595,7 +1595,8 @@ RSpec.describe "GET /leaps", type: :request do
         end
 
         it "兩張卡用同一組欄位、同一順序，OI 卡也補算年化時間成本與損益兩平" do
-          labels = %w[履約價／到期日 Delta Ask OI 成交量 Spread\ % 年化時間成本 損益兩平]
+          # leaps-best-value-card-style S1：拿掉重複的「履約價／到期日」列，補 Mid（patch1）
+          labels = %w[Delta Mid Ask OI 成交量 Spread\ % 年化時間成本 損益兩平]
           lists = doc.css("[data-leaps-metric-list]")
           expect(lists).not_to be_empty
           lists.each { |dl| expect(dl.css("dt").map(&:text)).to eq labels }
@@ -1604,6 +1605,88 @@ RSpec.describe "GET /leaps", type: :request do
           expect(near_oi.text).to include("$180.00 / 2028-01-21")
           # $180：(42.50 − 6.64) ÷ 186.64 × 365 ÷ 440 × 100 = 15.94
           expect(near_oi.css("[data-leaps-metric-list]").first.text).to include("15.94%")
+        end
+
+        # ── leaps-best-value-card-style S1：最划算卡改為與流動性最佳卡同一風格 ──────
+        # 使用者裁示（2026-11-11）：1a Mid 由元件依 mid_price 同規則自算；2a 左卡膠囊固定綠色；
+        # 3a「PDF 含 Mid」為回歸測試（舊程式已通過，不要求先紅燈）。
+        it "兩卡的膠囊、次選灰字、說明文字、明細格都存在，同一元素的 class 集合相同" do
+          parts = %w[data-leaps-pick-capsule data-leaps-runner-up-note data-leaps-pick-reason data-leaps-pick-details]
+          doc.css("[data-leaps-best-value-card]").zip(doc.css("[data-leaps-oi-card]")).each do |bv, oi|
+            parts.each do |attr|
+              left = bv.at_css("[#{attr}]")
+              right = oi.at_css("[#{attr}]")
+              expect(left).not_to be_nil, "最划算卡缺 #{attr}"
+              expect(right).not_to be_nil, "流動性卡缺 #{attr}"
+              expect(left["class"].split.sort).to eq(right["class"].split.sort), attr
+            end
+          end
+        end
+
+        # S1 r2 問題 1（使用者裁示以容器寬度取代 sm 門檻）：明細格依卡片內容寬度切 5 欄，不看視窗寬度。
+        # 版面實測（不溢出）由 evidence 的 measure_pick_details.mjs 重跑；這裡只防 class 被改回視窗斷點。
+        it "明細格以容器查詢切換欄數：外框 @container、dl 用 @md:grid-cols-5，不用視窗斷點" do
+          boxes = doc.css("[data-leaps-best-value-card] [data-leaps-pick-details], [data-leaps-oi-card] [data-leaps-pick-details]")
+          expect(boxes.size).to eq 4
+          boxes.each do |box|
+            expect(box["class"].split).to include("@container")
+            lists = box.css("[data-leaps-metric-list]")
+            expect(lists).not_to be_empty
+            lists.each do |dl|
+              classes = dl["class"].split
+              expect(classes).to include("grid-cols-2", "@md:grid-cols-5")
+              expect(classes.grep(/\A(sm|md|lg|xl|2xl):grid-cols-/)).to be_empty
+            end
+          end
+        end
+
+        it "左卡膠囊固定綠色（與右卡充足等級同色）" do
+          capsule = doc.at_css("[data-leaps-best-value-card] [data-leaps-pick-capsule]")
+          expect(capsule["class"].split).to include("bg-green-50", "border-green-300")
+          expect(capsule.text).to include("$130.00 / 2028-01-21", "Delta 0.842")
+        end
+
+        it "兩卡明細皆無「履約價／到期日」列，次選以標題列呈現" do
+          cards = doc.css("[data-leaps-best-value-card], [data-leaps-oi-card]")
+          cards.each do |card|
+            expect(card.text).not_to include("履約價／到期日")
+            expect(card.text).not_to include("履約價 / 到期日")
+          end
+          near_bv = doc.css("[data-leaps-best-value-card]").first
+          near_oi = doc.css("[data-leaps-oi-card]").first
+          expect(near_bv.at_css("[data-leaps-runner-up-title]").text).to start_with("次選 $140.00 / 2028-01-21")
+          # 流動性卡近天期次選＝OI 第二高的 $130 / 2027-12-17（OI 7,565），自算 Vol/OI 落在後三分之一 → ⚠ 接在標題後
+          oi_title = near_oi.at_css("[data-leaps-runner-up-title]")
+          expect(oi_title.text).to eq "次選 $130.00 / 2027-12-17⚠ 成交相對清淡"
+          expect(captured[:recommendation][:near_term][:runner_up].values_at(:strike, :expiration_date).map(&:to_s))
+            .to eq [ "130.0", "2027-12-17" ]
+        end
+
+        it "左卡主推 Mid＝(bid＋ask)÷2（$130：(72.00＋73.20)÷2＝72.60）" do
+          details = doc.at_css("[data-leaps-best-value-card] [data-leaps-pick-details] [data-leaps-metric-list]")
+          mid = details.css("div").find { |d| d.at_css("dt")&.text == "Mid" }
+          expect(mid.at_css("dd").text).to eq "72.60"
+        end
+
+        it "左卡說明文字照規格範本" do
+          pick = captured[:best_value][:near_term][:pick]
+          reason = doc.at_css("[data-leaps-best-value-card] [data-leaps-pick-reason]").text
+          expect(reason).to eq [
+            "建議到期日：2028-01-21（DTE 440），履約價 $130.00，Delta 0.842，Mid $72.60。",
+            "年化時間成本 #{sprintf('%.2f', pick[:annual_cost_pct])}%，股價需漲 #{sprintf('%.2f', pick[:breakeven_pct])}% 才損益兩平。",
+            "Bid-Ask Spread #{sprintf('%.2f', pick[:spread_pct])}%。",
+            "以上依「預設選擇標準」篩選，僅供策略篩選參考，非投資建議，請自行評估。"
+          ].join("\n")
+        end
+
+        it "右卡說明文字與 LeapsRecommendationService 產出相同（內容不變）" do
+          reason = doc.at_css("[data-leaps-oi-card] [data-leaps-pick-reason]").text
+          expect(reason).to eq captured[:recommendation][:near_term][:reason]
+        end
+
+        it "PDF 匯出含 Mid 且不出錯（回歸測試，使用者裁示 3a）" do
+          payload = JSON.parse(doc.at_css("script#leaps-pdf-data").text)
+          expect(payload.dig("recommendation", "near_term", "reason")).to include("Mid $")
         end
 
         it "最划算卡顯示主推與次選的年化時間成本" do
