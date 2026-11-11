@@ -70,7 +70,7 @@
     pdf.text(group.label, margin, y);
     y += 6.5;
     if (group.badge) {
-      // 彩色徽章比照 HTML render_pick_badge（色塊背景+邊框+圓點+文字），
+      // 彩色徽章比照 HTML render_pick_capsule（pick_card_parts.rb；色塊背景+邊框+圓點+文字），
       // 用同一組 PDF_SIGNAL_HEX（跟排行表流動性欄位、Flow 方向欄同一色票）
       var b = group.badge;
       pdf.setFontSize(8.5);
@@ -370,6 +370,18 @@
 
     if (data.candidates && data.candidates.length) {
       if (y > pageH - 40) { pdf.addPage(); y = margin; }
+      // 全 0 情況（多半是開盤前）：表格上方一行提示，與頁面排行表同一句（pdf_export.rb candidates_notice）。
+      if (data.candidates_notice) {
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(234, 88, 12); // text-orange-600
+        var noticeLines = wrapCjk(pdf, data.candidates_notice, pageW - margin * 2);
+        for (var ni = 0; ni < noticeLines.length; ni++) {
+          pdf.text(noticeLines[ni], margin, y);
+          y += 4;
+        }
+        pdf.setTextColor(0, 0, 0);
+        y += 2;
+      }
       y = renderCandidatesTable(pdf, data.candidates, margin, y, data.column_order, data.column_labels);
     }
 

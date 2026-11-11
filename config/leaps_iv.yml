@@ -1,0 +1,8 @@
+# LEAPS IV 環境（leaps-iv-environment.md P4 建立、P6 讀取 rank_thresholds）。
+rank_thresholds:
+  cheap: 30       # rank < 30
+  expensive: 60   # rank > 60；30 ≤ rank ≤ 60 為中性
+watchlist: [TSM]
+max_symbols: 20
+per_symbol_timeout_sec: 300   # IV 曲面爬蟲時限；加 Barchart 歷史 300 秒＝持鎖最多 600 秒，小於 lock_wait_sec（P4 r1 質詢 2）
+lock_wait_sec: 900

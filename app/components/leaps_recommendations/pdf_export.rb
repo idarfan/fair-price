@@ -16,6 +16,8 @@ module LeapsRecommendations::PdfExport
         far_term:  pdf_reco_group(@recommendation[:far_term])
       } : nil,
       candidates: @candidates.map { |row| pdf_candidate_row(row) },
+      # 全 0 情況：排行表上方的一行提示（與頁面 render_ranking_table 同一句）。
+      candidates_notice: @all_zero_volume ? ALL_ZERO_VOLUME_NOTICE : nil,
       # 欄位順序（admin 可拖曳調整）也要進 PDF，否則畫面與匯出檔會對不起來。
       # 「價格預估」是試算按鈕，平面文件上沒有意義，不列入。
       column_order: ordered_col_keys - LeapsTableColumns::PDF_EXCLUDED_KEYS,
@@ -68,7 +70,7 @@ module LeapsRecommendations::PdfExport
         "市場上還沒被平倉的合約總數，只在盤後更新一次（跟即時成交量 Volume 不同）。是本表排行的排序主鍵。",
         "本合約 OI #{fmt_int(oi)}，本次查詢候選中的相對排名為「#{tier}」。OI 越高，通常代表這個履約價／到期日組合有越多人在交易，掛單簿越厚、進出價格越不容易被自己的單子打歪。",
         warned ?
-          "⚠ 但本合約近期無成交（Volume 對 OI 比率偏低）——OI 高不代表現在還在動，掛單簿可能已經很久沒更新，實際進出前務必先看報價是否合理、掛限價單試單。" :
+          "#{THIN_TRADING_LABEL}：#{THIN_TRADING_CAUTION}" :
           "OI 高只代表「歷史上累積的未平倉量」，不保證今天一定買得到／賣得掉，仍要搭配 Volume 一起看。"
       ] },
       { title: "⚡ Delta（方向敏感度）", paragraphs: [
@@ -144,7 +146,8 @@ module LeapsRecommendations::PdfExport
         "Bid-Ask Spread #{fmt_pct(pick[:bid_ask_spread_pct])}，進出場成本合理。")
     end
     parts << "IV #{fmt_pct(pick[:iv])}，Vega #{fmt_decimal(pick[:vega], 4)}；若未來 IV 回落，每個百分點 IV 變化對此合約的影響約為 Vega 值，需留意 IV Crush 風險。" if pick[:vega]
-    parts << "⚠ 注意：此天期區間所有候選均有「近期無成交」警示，目前市場成交清淡，進出場可能有困難。" if group[:all_warned]
+    # 原條件 group[:all_warned] 全專案無人設定（死碼）；改為全 0 情況才顯示（leaps-thin-trading-flag S2）。
+    parts << "⚠ 注意：#{ALL_ZERO_VOLUME_NOTICE}" if @all_zero_volume
     parts.join("\n")
   end
 
@@ -158,7 +161,7 @@ module LeapsRecommendations::PdfExport
       delta:           fmt_decimal(row[:delta], 4),
       oi:              fmt_int(row[:open_interest]),
       volume:          fmt_int(row[:volume]),
-      liquidity:       tier + (row[:no_recent_volume_warning] ? "（⚠無成交）" : ""),
+      liquidity:       tier + (row[:no_recent_volume_warning] ? "（⚠成交相對清淡）" : ""),
       liquidity_rgb:   pdf_signal_rgb_for_tier(tier),
       bid:             fmt_price(row[:bid]),
       ask:             fmt_price(row[:ask]),
@@ -168,6 +171,7 @@ module LeapsRecommendations::PdfExport
       extrinsic:       fmt_price(row[:extrinsic_value]),
       extrinsic_pct:   fmt_pct(row[:extrinsic_pct]),
       time_value_pct:  fmt_pct(row[:time_value_pct]),
+      annual_cost_pct: fmt_cost_pct(annual_cost_pct_for(row)),
       iv:              fmt_pct(row[:iv]),
       vega:            fmt_decimal(row[:vega], 4),
       itm_prob:        fmt_pct(row[:itm_probability])

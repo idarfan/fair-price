@@ -7,6 +7,10 @@
 # 完整字型不 commit 進 repo（約 7MB）；本腳本會下載到 tmp 再 subset。
 #
 # 依賴：pyftsubset（fonttools）、curl
+#
+# 2026-11-11：掃描範圍改為整個 leaps_recommendations/ 目錄＋PDF 文案來源（見
+# extract_leaps_charset.py），且沿用舊字型已收錄的字，重建只增不減。重建後由
+# font_subset_guard.py 檢查；新字型少了任何舊字、或掃到的字沒收進去，就還原舊字型並失敗。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,6 +36,10 @@ mkdir -p "$ROOT/vendor/assets/fonts"
 
 CHARSET="$(cat "$CHARSET_FILE")"
 
+OLD_FONT="$(mktemp --suffix=.ttf)"
+trap 'rm -f "$OLD_FONT"' EXIT
+cp "$OUT_FONT" "$OLD_FONT"
+
 pyftsubset "$FULL_FONT" \
   --output-file="$OUT_FONT" \
   --unicodes="U+0020-007E" \
@@ -48,6 +56,13 @@ pyftsubset "$FULL_FONT" \
   --name-IDs='*' \
   --name-legacy \
   --name-languages='*'
+
+echo "[檢查] 新舊字型比對..."
+if ! python3 "$ROOT/script/font_subset_guard.py" verify "$OLD_FONT" "$OUT_FONT" "$FULL_FONT" "$CHARSET_FILE"; then
+  cp "$OLD_FONT" "$OUT_FONT"
+  echo "已還原舊字型：$OUT_FONT" >&2
+  exit 1
+fi
 
 SUBSET_SIZE=$(stat -c%s "$OUT_FONT")
 RATIO=$(python3 -c "print(f'{$SUBSET_SIZE / $FULL_SIZE * 100:.1f}')")

@@ -113,7 +113,7 @@ RSpec.describe "GET /leaps", type: :request do
         .to receive_message_chain(:for_symbol, :fresh, :exists?)
         .and_return(true)
 
-      ranking_svc = instance_double(LeapsRankingService, call: fake_candidates)
+      ranking_svc = instance_double(LeapsRankingService, call: fake_candidates, all_zero_volume?: false)
       allow(LeapsRankingService).to receive(:new).with(symbol).and_return(ranking_svc)
 
       flow_svc = instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel)
@@ -352,7 +352,7 @@ RSpec.describe "GET /leaps", type: :request do
         .to receive_message_chain(:for_symbol, :fresh, :exists?)
         .and_return(true)
       allow(LeapsRankingService).to receive(:new).with(symbol)
-        .and_return(instance_double(LeapsRankingService, call: fake_candidates))
+        .and_return(instance_double(LeapsRankingService, call: fake_candidates, all_zero_volume?: false))
       allow(LeapsOptionsFlowPanelService).to receive(:new).with(symbol, fake_candidates)
         .and_return(instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel))
       allow(PmccShortCallSnapshot).to receive_message_chain(:for_symbol, :exists?).and_return(false)
@@ -375,7 +375,7 @@ RSpec.describe "GET /leaps", type: :request do
         .to receive_message_chain(:for_symbol, :fresh, :exists?)
         .and_return(true)
       allow(LeapsRankingService).to receive(:new).with(symbol)
-        .and_return(instance_double(LeapsRankingService, call: fake_candidates))
+        .and_return(instance_double(LeapsRankingService, call: fake_candidates, all_zero_volume?: false))
       allow(LeapsOptionsFlowPanelService).to receive(:new).with(symbol, fake_candidates)
         .and_return(instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel))
       allow(PmccShortCallSnapshot).to receive_message_chain(:for_symbol, :exists?).and_return(true)
@@ -519,7 +519,7 @@ RSpec.describe "GET /leaps", type: :request do
         .to receive_message_chain(:for_symbol, :fresh, :exists?)
         .and_return(true)
       allow(LeapsRankingService).to receive(:new).with(symbol)
-        .and_return(instance_double(LeapsRankingService, call: fake_candidates))
+        .and_return(instance_double(LeapsRankingService, call: fake_candidates, all_zero_volume?: false))
       allow(LeapsOptionsFlowPanelService).to receive(:new).with(symbol, fake_candidates)
         .and_return(instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel))
       allow(PmccShortCallSnapshot).to receive_message_chain(:for_symbol, :exists?).and_return(true)
@@ -613,7 +613,7 @@ RSpec.describe "GET /leaps", type: :request do
         .to receive_message_chain(:for_symbol, :fresh, :exists?)
         .and_return(true)
       allow(LeapsRankingService).to receive(:new).and_return(
-        instance_double(LeapsRankingService, call: [])
+        instance_double(LeapsRankingService, call: [], all_zero_volume?: false)
       )
       allow(LeapsOptionsFlowPanelService).to receive(:new).and_return(
         instance_double(LeapsOptionsFlowPanelService, call: { status: :no_data, date: Date.current })
@@ -669,7 +669,8 @@ RSpec.describe "GET /leaps", type: :request do
   def stub_fresh_with_recommendation(recommendation)
     allow(LeapsOptionChainSnapshot)
       .to receive_message_chain(:for_symbol, :fresh, :exists?).and_return(true)
-    allow(LeapsRankingService).to receive_message_chain(:new, :call).and_return([ stub_candidate ])
+    allow(LeapsRankingService).to receive(:new)
+      .and_return(instance_double(LeapsRankingService, call: [ stub_candidate ], all_zero_volume?: false))
     allow(LeapsRecommendationService).to receive_message_chain(:new, :call).and_return(recommendation)
     allow(LeapsOptionsFlowPanelService).to receive_message_chain(:new, :call).and_return({ status: :no_data })
   end
@@ -863,7 +864,7 @@ RSpec.describe "GET /leaps", type: :request do
         .to receive_message_chain(:for_symbol, :fresh, :exists?)
         .and_return(true)
       allow(LeapsRankingService).to receive(:new).and_return(
-        instance_double(LeapsRankingService, call: [])
+        instance_double(LeapsRankingService, call: [], all_zero_volume?: false)
       )
       allow(LeapsRecommendationService).to receive(:new).and_return(
         instance_double(LeapsRecommendationService, call: nil)
@@ -891,7 +892,7 @@ RSpec.describe "GET /leaps", type: :request do
         .to receive_message_chain(:for_symbol, :fresh, :exists?)
         .and_return(true)
       allow(LeapsRankingService).to receive(:new).and_return(
-        instance_double(LeapsRankingService, call: [])
+        instance_double(LeapsRankingService, call: [], all_zero_volume?: false)
       )
       allow(LeapsRecommendationService).to receive(:new).and_return(
         instance_double(LeapsRecommendationService, call: nil)
@@ -1226,5 +1227,654 @@ RSpec.describe "GET /leaps", type: :request do
       expect(response.body).to include("—")
       expect(response.body).not_to include("NaN")
     end
+  end
+
+  # leaps-iv-environment P5：IV 環境區塊。資料走真的 LeapsIvEnvironmentService（DB fixture），
+  # 不 stub，確認 route → controller → service → component 整條路徑。
+  describe "IV 環境區塊（P5）" do
+    let(:as_of)   { Date.new(2026, 11, 6) }
+    let(:tsm_url) { "https://www.barchart.com/stocks/quotes/TSM/options" }
+
+    before do
+      allow(LeapsOptionChainSnapshot).to receive(:fresh_for?).and_return(true)
+      allow(LeapsRankingService).to receive(:new).and_return(instance_double(LeapsRankingService, call: fake_candidates, all_zero_volume?: false))
+      allow(LeapsOptionsFlowPanelService).to receive(:new)
+        .and_return(instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel))
+    end
+
+    # 2026-11-06 TSM 實資料（P4 r2）：S=375.44，440／587 天 K370／K380 → CM540 0.42085
+    def tsm_today!
+      LeapsIvSnapshot.create!(symbol: "TSM", as_of_date: as_of, spot: 375.44, source: "scheduled",
+                              captured_at: Time.zone.parse("2026-11-07 06:01:07 UTC"), source_url: tsm_url)
+      { 440 => [ 0.4176, 0.4138 ], 587 => [ 0.4238, 0.4218 ] }.each do |dte, (iv370, iv380)|
+        { 370.0 => iv370, 380.0 => iv380 }.each do |k, iv|
+          LeapsIvSurfacePoint.create!(symbol: "TSM", as_of_date: as_of, expiration: as_of + dte, dte: dte, strike: k,
+                                      moneyness: (k / 375.44).round(4), call_iv: iv, captured_at: Time.current)
+        end
+      end
+    end
+
+    def tsm_history!(count)
+      count.times do |i|
+        LeapsIvSnapshot.create!(symbol: "TSM", as_of_date: as_of - (i + 1), spot: 370, source: "scheduled",
+                                cm540_atm_iv: 0.40 + i * 0.001, captured_at: Time.current, source_url: tsm_url)
+      end
+    end
+
+    def section
+      Nokogiri::HTML(response.body).at_css("details#leaps-iv-environment")
+    end
+
+    it "GET /leaps?symbol=TSM&job_status=success 回應包含區塊與 fixture 的 CM540（百分比）" do
+      tsm_today!
+      tsm_history!(20)
+      get "/leaps", params: { symbol: "TSM", job_status: "success" }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include('id="leaps-iv-environment"')
+      expect(section.at_css("summary").text).to include("ATM IV（540 天）42.1%")
+    end
+
+    it "帶 user_strike=350 同樣包含該區塊" do
+      tsm_today!
+      get "/leaps", params: { symbol: "TSM", job_status: "success", user_strike: "350" }
+
+      expect(response).to have_http_status(:ok)
+      expect(section).to be_present
+      expect(section.text).to include("42.1%")
+    end
+
+    it "ok：歷史滿 20 筆，顯示 LEAPS IV Rank 數值與歷史筆數" do
+      tsm_today!
+      tsm_history!(20)
+      get "/leaps", params: { symbol: "TSM", job_status: "success" }
+
+      expect(section.text).to include("歷史資料 20/252 天")
+      expect(section.text).not_to include("資料累積中")
+    end
+
+    it "accumulating：歷史不滿 20 筆，顯示「資料累積中 n/252 天」" do
+      tsm_today!
+      tsm_history!(3)
+      get "/leaps", params: { symbol: "TSM", job_status: "success" }
+
+      expect(section.text).to include("資料累積中 3/252 天")
+    end
+
+    it "no_data：沒有任何 IV 快照，顯示「尚無 IV 資料，請按查詢」" do
+      get "/leaps", params: { symbol: "TSM", job_status: "success" }
+
+      expect(section.text).to include("尚無 IV 資料，請按查詢")
+    end
+
+    it "還沒有 LEAPS 資料（尚未查詢）時區塊也在，不跟候選排行綁在一起" do
+      allow(LeapsOptionChainSnapshot).to receive(:fresh_for?).and_return(false)
+      get "/leaps", params: { symbol: "TSM" }
+
+      expect(section.text).to include("尚無 IV 資料，請按查詢")
+    end
+  end
+
+  # leaps-iv-environment P6：「推薦分析」標題下方的一句 LEAPS IV Rank 評語。
+  # 只把 rank 換成邊界值（其餘欄位走真的 LeapsIvEnvironmentService），門檻讀 config/leaps_iv.yml。
+  describe "推薦文字整合（P6）" do
+    let(:cheap)     { "時間價值相對便宜。" }
+    let(:neutral)   { "IV 中性。" }
+    let(:expensive) { "時間價值偏貴；可考慮分批進場或改選更深價內（外在價值較低）的履約價。" }
+
+    before do
+      allow(LeapsOptionChainSnapshot).to receive(:fresh_for?).and_return(true)
+      allow(LeapsRankingService).to receive(:new).and_return(instance_double(LeapsRankingService, call: fake_candidates, all_zero_volume?: false))
+      allow(LeapsOptionsFlowPanelService).to receive(:new)
+        .and_return(instance_double(LeapsOptionsFlowPanelService, call: fake_flow_panel))
+      allow(LeapsRecommendationService).to receive(:new)
+        .and_return(instance_double(LeapsRecommendationService, call: stub_recommendation))
+    end
+
+    def get_with_rank(rank)
+      allow_any_instance_of(LeapsIvEnvironmentService).to receive(:call).and_wrap_original do |m, **kw|
+        m.call(**kw).merge(rank: rank, status: rank ? :ok : :accumulating)
+      end
+      get "/leaps", params: { symbol: "TSM", job_status: "success" }
+      expect(response).to have_http_status(:ok)
+    end
+
+    def recommendation_card
+      h2 = Nokogiri::HTML(response.body).css("h2").find { |h| h.text.start_with?("推薦分析") }
+      h2&.ancestors("div.overflow-hidden")&.first
+    end
+
+    def rank_sentences
+      recommendation_card.css("[data-leaps-iv-rank-note]")
+    end
+
+    {
+      29.4 => [ 29, :cheap ],
+      29.6 => [ 30, :neutral ],
+      60.4 => [ 60, :neutral ],
+      60.6 => [ 61, :expensive ]
+    }.each do |rank, (shown, kind)|
+      it "rank #{rank} → 顯示 #{shown}、判為 #{kind}，整頁只出現一次" do
+        get_with_rank(rank)
+
+        expect(rank_sentences.size).to eq(1)
+        expect(rank_sentences.first.text).to eq("LEAPS IV Rank #{shown}，#{send(kind)}")
+        expect(response.body.scan("LEAPS IV Rank #{shown}，").size).to eq(1)
+        ([ cheap, neutral, expensive ] - [ send(kind) ]).each { |other| expect(response.body).not_to include(other) }
+      end
+    end
+
+    it "句子在標題下方、近天期段落之前" do
+      get_with_rank(29.4)
+
+      card  = recommendation_card # 只解析一次：不同次解析的節點彼此不相等
+      nodes = card.css("*").to_a
+      note  = card.at_css("[data-leaps-iv-rank-note]")
+      near  = nodes.find { |n| n.children.all?(&:text?) && n.text.include?("近天期 LEAPS（DTE 364–550）") }
+      expect(nodes.index(card.at_css("h2"))).to be < nodes.index(note)
+      expect(nodes.index(note)).to be < nodes.index(near)
+    end
+
+    it "rank nil → 三句皆不出現" do
+      get_with_rank(nil)
+
+      expect(recommendation_card).to be_present
+      expect(rank_sentences).to be_empty
+      [ cheap, neutral, expensive ].each { |t| expect(response.body).not_to include(t) }
+    end
+
+    it "門檻讀設定檔：cheap 20／expensive 25 時 rank 24 判為中性、26 判為偏貴" do
+      config = LeapsIvConfig.load.merge("rank_thresholds" => { "cheap" => 20, "expensive" => 25 })
+      allow(LeapsIvConfig).to receive(:load).and_return(config)
+
+      get_with_rank(24)
+      expect(rank_sentences.first.text).to eq("LEAPS IV Rank 24，#{neutral}")
+      get_with_rank(26)
+      expect(rank_sentences.first.text).to eq("LEAPS IV Rank 26，#{expensive}")
+    end
+  end
+
+  # leaps-best-value.md S2：controller 接線。真實 DB 快照走 LeapsRankingService，
+  # 只驗證「最划算」結果有傳進 PageComponent、既有 OI 推薦不變；畫面字樣在 S3 驗證。
+  describe "最划算推薦接線（leaps-best-value S2）" do
+    let(:symbol) { "NVDA" }
+    let(:captured) { {} }
+
+    # 驗收基準資料（2026-11-09 NVDA，S = 186.64）：到期, DTE, K, Delta, Bid, Ask, OI, Vol
+    let(:baseline) do
+      [
+        [ "2028-01-21", 440, 120, 0.8710, 79.10, 80.50,  2069,  18 ],
+        [ "2028-01-21", 440, 125, 0.8569, 75.40, 76.85,   634,  10 ],
+        [ "2028-01-21", 440, 130, 0.8417, 72.00, 73.20,  2264, 160 ],
+        [ "2028-01-21", 440, 140, 0.8092, 65.40, 66.25,  4163, 191 ],
+        [ "2028-01-21", 440, 180, 0.6562, 42.00, 42.50, 14764, 724 ],
+        [ "2027-12-17", 405, 130, 0.8453, 70.65, 72.10,  7565,  22 ],
+        [ "2028-06-16", 587, 140, 0.8042, 69.60, 71.25,   499,  13 ],
+        [ "2028-12-15", 769, 120, 0.8540, 87.40, 89.65,  6168,   6 ],
+        [ "2028-12-15", 769, 140, 0.8047, 74.60, 76.15,  4898,  60 ],
+        [ "2029-01-19", 804, 120, 0.8530, 88.25, 90.50,   221,   5 ],
+        [ "2029-01-19", 804, 140, 0.8045, 75.80, 77.00,   502, 107 ]
+      ]
+    end
+
+    # 同一批抓取共用一個 scraped_at：LeapsRankingService 只取 scraped_at 最大的那一批。
+    let(:scraped_at) { Time.current }
+      let(:cfg) { LeapsBestValueConfig.load }
+      # ── leaps-best-value S3：畫面 ─────────────────────────────────────────────
+      # （直接掛在 S2 的 describe 底下，共用 11 筆快照與 PageComponent 擷取；再包一層會超過 NestedGroups 上限）
+      let(:doc) { Nokogiri::HTML(response.body) }
+
+    before do
+      # 第 9 欄（選填）：DB 存的 vol_oi_ratio 覆寫值，用來模擬 Barchart 四捨五入成 0 或缺值（NULL）。
+      baseline.each do |exp, dte, strike, delta, bid, ask, oi, vol, *stored|
+        create(:leaps_option_chain_snapshot,
+               symbol: symbol, expiration_date: Date.parse(exp), dte: dte, strike: strike, delta: delta,
+               bid: bid, ask: ask, open_interest: oi, volume: vol,
+               vol_oi_ratio: stored.empty? ? (vol.to_f / oi).round(4) : stored.first,
+               underlying_price: 186.64, scraped_at: scraped_at)
+      end
+      allow(LeapsBestValueService).to receive(:new).and_call_original
+      allow(LeapsRecommendations::PageComponent).to receive(:new).and_wrap_original do |original, **kwargs|
+        captured.merge!(kwargs)
+        original.call(**kwargs)
+      end
+    end
+
+    after do
+      LeapsOptionChainSnapshot.where(symbol: symbol).delete_all
+      StrikeChainSnapshot.where(symbol: symbol).delete_all
+    end
+
+    def pick_of(result, term) = result.dig(term, :pick).then { |p| [ p[:strike].to_i, p[:expiration_date].to_s ] }
+
+    # fresh_for? 以上一次查詢的中心履約價判定新鮮度（nil＝上次沒帶履約價）。
+    def seed_last_query_strike(strike)
+      StrikeChainSnapshot.upsert(
+        { symbol: symbol, strikes: [ 120.0, 180.0 ], spot_price: 186.64,
+          last_query_strike: strike, scraped_at: Time.current },
+        unique_by: :symbol
+      )
+    end
+
+    def expect_page_without_errors
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("undefined method")
+      expect(response.body).not_to match(/\b\w*Error\b/)
+    end
+
+
+    it "不帶履約價時呼叫 LeapsBestValueService 一次，結果傳進 PageComponent" do
+      get "/leaps", params: { symbol: symbol }
+
+      expect(response).to have_http_status(:ok)
+      expect(LeapsBestValueService).to have_received(:new).once
+      expect(pick_of(captured[:best_value], :near_term)).to eq [ 130, "2028-01-21" ]
+    end
+
+    it "既有 OI 推薦結果不變（近天期主推 $180 / 2028-01-21）" do
+      get "/leaps", params: { symbol: symbol }
+
+      expect(pick_of(captured[:recommendation], :near_term)).to eq [ 180, "2028-01-21" ]
+    end
+
+    # S2 補充案例 1：快照過舊（超出 FRESH_WINDOW）→ fresh_for? 為 false，不產生推薦。
+    context "快照超出 FRESH_WINDOW（資料不夠新）" do
+      let(:scraped_at) { LeapsOptionChainSnapshot::FRESH_WINDOW.ago - 1.minute }
+
+      it "回 200、不呼叫服務、best_value 為 nil、頁面無例外訊息" do
+        get "/leaps", params: { symbol: symbol }
+
+        expect_page_without_errors
+        expect(LeapsBestValueService).not_to have_received(:new)
+        expect(captured).to have_key(:best_value)
+        expect(captured[:best_value]).to be_nil
+        expect(captured[:recommendation]).to be_nil
+      end
+    end
+
+    # leaps-thin-trading-flag S2（使用者裁示）：指定履約價那列被標「成交相對清淡」時，
+    # 「🚫 不建議」後面用短句；⚠ 標記的 title 維持完整 tooltip。
+    # $120 有三列：2028-01-21、2028-12-15 被標（自算 Vol/OI 落在後三分之一），2029-01-19 未標。
+    context "user_strike=120 且該履約價有被標記的列" do
+      before { seed_last_query_strike(120.0) }
+
+      it "不建議原因為短句，不再出現舊說法" do
+        get "/leaps", params: { symbol: symbol, user_strike: "120" }
+
+        expect_page_without_errors
+        reasons = Nokogiri::HTML(response.body).css("#leaps-ranking-table span").map(&:text).grep(/\A🚫 不建議：/)
+        # 2029-01-19 那列未被標記，但 OI 221 排名偏低，顯示的是既有的 OI 原因。
+        expect(reasons).to contain_exactly(
+          "🚫 不建議：成交相對清淡，進出場前先確認報價與價差。",
+          "🚫 不建議：成交相對清淡，進出場前先確認報價與價差。",
+          "🚫 不建議：OI 在本次候選中排名偏低，流動性相對較差"
+        )
+        expect(response.body).not_to include("近期無成交紀錄")
+      end
+    end
+
+    # S2 補充案例 2a：上次查詢中心＝180，這次也帶 user_strike=180 → 新鮮。
+    context "user_strike=180 且上次查詢中心也是 180" do
+      before { seed_last_query_strike(180.0) }
+
+      it "產生 OI 推薦，服務呼叫一次，近天期主推 $130 / 2028-01-21" do
+        get "/leaps", params: { symbol: symbol, user_strike: "180" }
+
+        expect_page_without_errors
+        expect(LeapsBestValueService).to have_received(:new).once
+        expect(pick_of(captured[:best_value], :near_term)).to eq [ 130, "2028-01-21" ]
+        expect(pick_of(captured[:recommendation], :near_term)).to eq [ 180, "2028-01-21" ]
+      end
+    end
+
+    # S2 補充案例 2b：上次沒帶履約價，這次帶 user_strike=180 → 中心對不上，不新鮮。
+    context "user_strike=180 但上次查詢沒帶履約價" do
+      before { seed_last_query_strike(nil) }
+
+      it "不產生 OI 推薦，服務未被呼叫、best_value 為 nil、頁面無例外訊息" do
+        get "/leaps", params: { symbol: symbol, user_strike: "180" }
+
+        expect_page_without_errors
+        expect(LeapsBestValueService).not_to have_received(:new)
+        expect(captured).to have_key(:best_value)
+        expect(captured[:best_value]).to be_nil
+        expect(captured[:recommendation]).to be_nil
+      end
+    end
+
+    # S2 補充案例 2c：strike 不是 controller 認得的參數（履約價參數是 user_strike）。
+    context "錯誤參數名 strike=180" do
+      it "strike 被忽略，結果與不帶履約價相同" do
+        get "/leaps", params: { symbol: symbol }
+        without_strike = captured.slice(:best_value, :recommendation, :user_strike)
+
+        get "/leaps", params: { symbol: symbol, strike: "180" }
+
+        expect_page_without_errors
+        expect(captured[:user_strike]).to be_nil
+        expect(captured.slice(:best_value, :recommendation, :user_strike)).to eq without_strike
+        expect(pick_of(captured[:best_value], :near_term)).to eq [ 130, "2028-01-21" ]
+      end
+    end
+
+
+      def criteria_text = doc.at_css("[data-leaps-selection-criteria]").text.gsub(/\s+/, " ")
+      def iv_warning = doc.at_css("[data-leaps-iv-high-warning]")
+
+      # LeapsIvEnvironmentService 照常跑（NVDA 在測試庫沒有 IV 資料），只覆寫 rank 與 Barchart IV Rank。
+      def stub_iv(leaps_rank:, barchart_rank:)
+        allow_any_instance_of(LeapsIvEnvironmentService).to receive(:call).and_wrap_original do |m, **kw|
+          env = m.call(**kw)
+          env = env.merge(rank: leaps_rank, status: :ok) if leaps_rank
+          env.merge(barchart: (env[:barchart] || {}).merge(iv_rank: barchart_rank))
+        end
+      end
+
+      context "不帶履約價（核心案例）" do
+        before { get "/leaps", params: { symbol: symbol } }
+
+        it "同時有最划算與流動性最佳，主推字串、年化時間成本、預設選擇標準都在" do
+          body = response.body
+          expect(response).to have_http_status(:ok)
+          %w[最划算 流動性最佳 年化時間成本 預設選擇標準].each { |text| expect(body).to include(text) }
+          expect(body).to include("$130.00 / 2028-01-21")
+          expect(body).to include("$180.00 / 2028-01-21")
+          expect(body).not_to include("無合格")
+          expect(body).not_to include("無符合")
+        end
+
+        it "近／遠天期各一列，左最划算、右流動性最佳；手機寬度上下堆疊、最划算在上" do
+          rows = doc.css("[data-leaps-best-value-card]").map(&:parent)
+          expect(rows.size).to eq 2
+          rows.each do |row|
+            expect(row["class"]).to include("grid-cols-1", "md:grid-cols-2")
+            cards = row.element_children
+            expect(cards.first.key?("data-leaps-best-value-card")).to be true
+            expect(cards.last.key?("data-leaps-oi-card")).to be true
+          end
+        end
+
+        it "兩張卡用同一組欄位、同一順序，OI 卡也補算年化時間成本與損益兩平" do
+          # leaps-best-value-card-style S1：拿掉重複的「履約價／到期日」列，補 Mid（patch1）
+          labels = %w[Delta Mid Ask OI 成交量 Spread\ % 年化時間成本 損益兩平]
+          lists = doc.css("[data-leaps-metric-list]")
+          expect(lists).not_to be_empty
+          lists.each { |dl| expect(dl.css("dt").map(&:text)).to eq labels }
+
+          near_oi = doc.css("[data-leaps-oi-card]").first
+          expect(near_oi.text).to include("$180.00 / 2028-01-21")
+          # $180：(42.50 − 6.64) ÷ 186.64 × 365 ÷ 440 × 100 = 15.94
+          expect(near_oi.css("[data-leaps-metric-list]").first.text).to include("15.94%")
+        end
+
+        # ── leaps-best-value-card-style S1：最划算卡改為與流動性最佳卡同一風格 ──────
+        # 使用者裁示（2026-11-11）：1a Mid 由元件依 mid_price 同規則自算；2a 左卡膠囊固定綠色；
+        # 3a「PDF 含 Mid」為回歸測試（舊程式已通過，不要求先紅燈）。
+        it "兩卡的膠囊、次選灰字、說明文字、明細格都存在，同一元素的 class 集合相同" do
+          parts = %w[data-leaps-pick-capsule data-leaps-runner-up-note data-leaps-pick-reason data-leaps-pick-details]
+          doc.css("[data-leaps-best-value-card]").zip(doc.css("[data-leaps-oi-card]")).each do |bv, oi|
+            parts.each do |attr|
+              left = bv.at_css("[#{attr}]")
+              right = oi.at_css("[#{attr}]")
+              expect(left).not_to be_nil, "最划算卡缺 #{attr}"
+              expect(right).not_to be_nil, "流動性卡缺 #{attr}"
+              expect(left["class"].split.sort).to eq(right["class"].split.sort), attr
+            end
+          end
+        end
+
+        # S1 r2 問題 1（使用者裁示以容器寬度取代 sm 門檻）：明細格依卡片內容寬度切 5 欄，不看視窗寬度。
+        # 版面實測（不溢出）由 evidence 的 measure_pick_details.mjs 重跑；這裡只防 class 被改回視窗斷點。
+        it "明細格以容器查詢切換欄數：外框 @container、dl 用 @md:grid-cols-5，不用視窗斷點" do
+          boxes = doc.css("[data-leaps-best-value-card] [data-leaps-pick-details], [data-leaps-oi-card] [data-leaps-pick-details]")
+          expect(boxes.size).to eq 4
+          boxes.each do |box|
+            expect(box["class"].split).to include("@container")
+            lists = box.css("[data-leaps-metric-list]")
+            expect(lists).not_to be_empty
+            lists.each do |dl|
+              classes = dl["class"].split
+              expect(classes).to include("grid-cols-2", "@md:grid-cols-5")
+              expect(classes.grep(/\A(sm|md|lg|xl|2xl):grid-cols-/)).to be_empty
+            end
+          end
+        end
+
+        it "左卡膠囊固定綠色（與右卡充足等級同色）" do
+          capsule = doc.at_css("[data-leaps-best-value-card] [data-leaps-pick-capsule]")
+          expect(capsule["class"].split).to include("bg-green-50", "border-green-300")
+          expect(capsule.text).to include("$130.00 / 2028-01-21", "Delta 0.842")
+        end
+
+        it "兩卡明細皆無「履約價／到期日」列，次選以標題列呈現" do
+          cards = doc.css("[data-leaps-best-value-card], [data-leaps-oi-card]")
+          cards.each do |card|
+            expect(card.text).not_to include("履約價／到期日")
+            expect(card.text).not_to include("履約價 / 到期日")
+          end
+          near_bv = doc.css("[data-leaps-best-value-card]").first
+          near_oi = doc.css("[data-leaps-oi-card]").first
+          expect(near_bv.at_css("[data-leaps-runner-up-title]").text).to start_with("次選 $140.00 / 2028-01-21")
+          # 流動性卡近天期次選＝OI 第二高的 $130 / 2027-12-17（OI 7,565），自算 Vol/OI 落在後三分之一 → ⚠ 接在標題後
+          oi_title = near_oi.at_css("[data-leaps-runner-up-title]")
+          expect(oi_title.text).to eq "次選 $130.00 / 2027-12-17⚠ 成交相對清淡"
+          expect(captured[:recommendation][:near_term][:runner_up].values_at(:strike, :expiration_date).map(&:to_s))
+            .to eq [ "130.0", "2027-12-17" ]
+        end
+
+        it "左卡主推 Mid＝(bid＋ask)÷2（$130：(72.00＋73.20)÷2＝72.60）" do
+          details = doc.at_css("[data-leaps-best-value-card] [data-leaps-pick-details] [data-leaps-metric-list]")
+          mid = details.css("div").find { |d| d.at_css("dt")&.text == "Mid" }
+          expect(mid.at_css("dd").text).to eq "72.60"
+        end
+
+        it "左卡說明文字照規格範本" do
+          pick = captured[:best_value][:near_term][:pick]
+          reason = doc.at_css("[data-leaps-best-value-card] [data-leaps-pick-reason]").text
+          expect(reason).to eq [
+            "建議到期日：2028-01-21（DTE 440），履約價 $130.00，Delta 0.842，Mid $72.60。",
+            "年化時間成本 #{sprintf('%.2f', pick[:annual_cost_pct])}%，股價需漲 #{sprintf('%.2f', pick[:breakeven_pct])}% 才損益兩平。",
+            "Bid-Ask Spread #{sprintf('%.2f', pick[:spread_pct])}%。",
+            "以上依「預設選擇標準」篩選，僅供策略篩選參考，非投資建議，請自行評估。"
+          ].join("\n")
+        end
+
+        it "右卡說明文字與 LeapsRecommendationService 產出相同（內容不變）" do
+          reason = doc.at_css("[data-leaps-oi-card] [data-leaps-pick-reason]").text
+          expect(reason).to eq captured[:recommendation][:near_term][:reason]
+        end
+
+        it "PDF 匯出含 Mid 且不出錯（回歸測試，使用者裁示 3a）" do
+          payload = JSON.parse(doc.at_css("script#leaps-pdf-data").text)
+          expect(payload.dig("recommendation", "near_term", "reason")).to include("Mid $")
+        end
+
+        it "最划算卡顯示主推與次選的年化時間成本" do
+          near_bv = doc.css("[data-leaps-best-value-card]").first.text
+          expect(near_bv).to include("$130.00 / 2028-01-21", "7.36%", "$140.00 / 2028-01-21", "8.72%")
+          far_bv = doc.css("[data-leaps-best-value-card]").last.text
+          expect(far_bv).to include("$140.00 / 2028-12-15", "7.50%", "$120.00 / 2029-01-19", "5.80%")
+        end
+
+        it "主推不同合約時不顯示「與流動性最佳相同」" do
+          expect(response.body).not_to include("與流動性最佳相同")
+        end
+
+        it "預設選擇標準的數字讀設定檔與既有常數" do
+          text = criteria_text
+          expect(text).to include("Delta #{sprintf('%.2f', cfg['delta_min'])}–#{sprintf('%.2f', cfg['delta_max'])}")
+          expect(text).to include("Spread（買賣差價比）≤ 3%", "OI ≥ 1,000", "當日成交量 ≥ 50", "成交相對清淡合約照常列入")
+          near_min = LeapsRecommendationService::NEAR_DTE_MIN
+          near_max = LeapsRecommendationService::NEAR_DTE_MAX
+          far_min  = LeapsRecommendationService::FAR_DTE_MIN
+          expect(text).to include("近天期 DTE #{near_min}–#{near_max}／遠天期 DTE 超過 #{far_min}")
+          expect(text).to include("排序先比流動性等級，同等級再比年化成本，因此次選的年化成本可能低於主推。")
+          expect(text).to include("「流動性最佳」依 OI 由高到低挑選，不套用以上條件。")
+        end
+
+        it "天期邊界不重疊：DTE＝near_max 歸近天期、near_max＋1 歸遠天期（以既有分區方法驗證）" do
+          near_max = LeapsRecommendationService::NEAR_DTE_MAX
+          rows = [ near_max, near_max + 1 ].map do |dte|
+            { dte: dte, strike: 130, delta: 0.84, open_interest: 1, liquidity_tier: "充足", expiration_date: Date.new(2028, 1, 21) }
+          end
+          result = LeapsRecommendationService.new(rows).call
+          expect(result[:near_term][:pick][:dte]).to eq near_max
+          expect(result[:near_term][:runner_up]).to be_nil
+          expect(result[:far_term][:pick][:dte]).to eq near_max + 1
+        end
+
+        it "排行表在 Time Value% 右側多一欄年化時間成本，主推／次選列有徽章" do
+          headers = doc.css("#leaps-ranking-table thead th").map { |th| th["data-col"] }
+          expect(headers.index("annual_cost_pct")).to eq headers.index("time_value_pct") + 1
+          expect(doc.at_css("#leaps-th-annual_cost_pct").text).to include("年化時間成本")
+
+          row130 = doc.css("#leaps-ranking-table tbody tr").find do |tr|
+            tr.at_css("td[data-col='expiration']").text == "2028-01-21" && tr.at_css("td[data-col='strike'] span").text == "130.00"
+          end
+          expect(row130.at_css("td[data-col='annual_cost_pct']").text).to eq "7.36%"
+          badges = doc.css("[data-leaps-best-value-badge]").map { |b| b["data-leaps-best-value-badge"] }
+          expect(badges.tally).to eq("最優" => 2, "次選" => 2)
+        end
+
+        it "PDF 匯出 payload 含年化時間成本欄，每列都有值" do
+          payload = JSON.parse(doc.at_css("script#leaps-pdf-data").text)
+          expect(payload["column_order"]).to include("annual_cost_pct")
+          expect(payload["column_labels"]["annual_cost_pct"]).to eq "年化時間成本"
+          expect(payload["candidates"].map { |r| r["annual_cost_pct"] }).to all(match(/\A\d+\.\d{2}%\z/))
+          expect(payload["candidates"].map { |r| r["annual_cost_pct"] }).to include("7.36%")
+        end
+
+        # ── leaps-thin-trading-flag S2：改名「成交相對清淡」 ────────────────────
+        # 11 筆自算 Vol/OI 由小到大前三：2028-12-15 $120（6/6168）、2027-12-17 $130（22/7565）、
+        # 2028-01-21 $120（18/2069）；n=11，cutoff=floor(11/3)=3，界線＝第 3 小 → 標這三筆。
+        it "標記改名「成交相對清淡」、附新 tooltip，頁面不再出現「無成交」" do
+          body = response.body
+          expect(body).to include("成交相對清淡")
+          expect(body).not_to include("無成交")
+          flagged = doc.css("#leaps-ranking-table tbody tr").select { |tr| tr.text.include?("⚠ 成交相對清淡") }.map do |tr|
+            [ tr.at_css("td[data-col='expiration']").text, tr.at_css("td[data-col='strike'] span").text ]
+          end
+          expect(flagged).to contain_exactly([ "2028-12-15", "120.00" ], [ "2027-12-17", "130.00" ], [ "2028-01-21", "120.00" ])
+          titles = doc.css("span").select { |s| s.text == "⚠ 成交相對清淡" }.map { |s| s["title"] }.uniq
+          expect(titles).to eq [ "本次查詢候選中，當日成交量／未平倉量（自行計算）落在後三分之一。不代表沒有成交。" ]
+          expect(doc.at_css("[data-leaps-all-zero-volume]")).to be_nil
+        end
+
+        it "PDF 匯出 payload：標記欄改新名稱、不含「無成交」、非全 0 時沒有表格上方提示" do
+          raw = doc.at_css("script#leaps-pdf-data").text
+          payload = JSON.parse(raw)
+          expect(raw).not_to include("無成交")
+          expect(payload["candidates"].count { |r| r["liquidity"].include?("（⚠成交相對清淡）") }).to eq 3
+          expect(payload["candidates_notice"]).to be_nil
+        end
+      end
+
+      # leaps-thin-trading-flag S2 r2（審查 S0／S1／S2 質詢 1）：最划算卡的標記經
+      # LeapsBestValueService#graded_candidates（leaps_best_value_service.rb:62 slice）傳入，
+      # 必須跟著新判定（同列 volume ÷ OI 自算）走，而不是 DB 存的 vol_oi_ratio。
+      # （兩個 context 直接並列，不再包一層，否則超過 NestedGroups 上限）
+      def best_value_card(term_index) = doc.css("[data-leaps-best-value-card]")[term_index]
+
+      context "最划算卡標記跟著新判定走：遠天期主推的自算值落在後三分之一" do
+        # 2028-12-15 $140 的 OI 從 4,898 調成 600,000：成交量 60 不變（等級仍 A、年化成本不變，主推不變），
+        # 自算 60 ÷ 600,000 = 0.0001，成為 11 筆中最小 → 被標記。
+        let(:baseline) do
+          super().map { |row| row[0, 3] == [ "2028-12-15", 769, 140 ] ? row.dup.tap { |r| r[6] = 600_000 } : row }
+        end
+
+        it "最划算卡的主推顯示 ⚠ 成交相對清淡，title 是完整 tooltip" do
+          get "/leaps", params: { symbol: symbol }
+          far = best_value_card(1)
+          expect(far.text).to include("$140.00 / 2028-12-15")
+          flag = far.css("span").find { |s| s.text == "⚠ 成交相對清淡" }
+          expect(flag).not_to be_nil
+          expect(flag["title"]).to eq "本次查詢候選中，當日成交量／未平倉量（自行計算）落在後三分之一。不代表沒有成交。"
+        end
+      end
+
+      context "最划算卡標記跟著新判定走：DB 存的 vol_oi_ratio 是 0 或 NULL，但自算值不低（舊邏輯會標、新邏輯不標）" do
+        # 近天期最划算主推 2028-01-21 $130（160 ÷ 2,264 = 0.0707）存 0.0、次選 $140（191 ÷ 4,163 = 0.0459）存 NULL。
+        # 舊邏輯：0 ≤ 界線、NULL 一律標 → 兩筆都標。新邏輯：自算值不在後三分之一 → 都不標。
+        let(:baseline) do
+          super().map do |row|
+            case row[0, 3]
+            when [ "2028-01-21", 440, 130 ] then row + [ 0.0 ]
+            when [ "2028-01-21", 440, 140 ] then row + [ nil ]
+            else row
+            end
+          end
+        end
+
+        it "最划算近天期卡的主推、次選都不顯示標記" do
+          get "/leaps", params: { symbol: symbol }
+          near = best_value_card(0)
+          expect(near.text).to include("$130.00 / 2028-01-21", "$140.00 / 2028-01-21")
+          expect(near.text).not_to include("成交相對清淡")
+        end
+      end
+
+      context "全部候選當日成交量為 0（leaps-thin-trading-flag 全 0 情況）" do
+        let(:baseline) do
+          [
+            [ "2028-01-21", 440, 130, 0.8417, 72.00, 73.20, 2264, 0 ],
+            [ "2028-01-21", 440, 140, 0.8092, 65.40, 66.25, 4163, 0 ],
+            [ "2028-01-21", 440, 180, 0.6562, 42.00, 42.50, 14764, 0 ],
+            [ "2028-12-15", 769, 140, 0.8047, 74.60, 76.15, 4898, 0 ],
+            [ "2029-01-19", 804, 140, 0.8045, 75.80, 77.00, 502, 0 ]
+          ]
+        end
+        let(:notice) { "所有候選當日成交量皆為 0（可能尚未開盤或標的冷門），報價可能未更新。" }
+
+        before { get "/leaps", params: { symbol: symbol } }
+
+        it "排行表上方顯示一行提示，排行表無任何「成交相對清淡」標記" do
+          expect(captured[:all_zero_volume]).to be true
+          expect(doc.at_css("[data-leaps-all-zero-volume]").text).to eq notice
+          expect(doc.at_css("#leaps-ranking-table").text).not_to include("成交相對清淡")
+          expect(response.body).not_to include("無成交")
+        end
+
+        it "PDF payload 帶表格上方提示，推薦理由也附同一句" do
+          payload = JSON.parse(doc.at_css("script#leaps-pdf-data").text)
+          expect(payload["candidates_notice"]).to eq notice
+          expect(payload["candidates"].none? { |r| r["liquidity"].include?("成交相對清淡") }).to be true
+          expect(payload.dig("recommendation", "near_term", "reason")).to include("⚠ 注意：#{notice}")
+        end
+      end
+
+      context "兩卡主推為同一合約" do
+        let(:baseline) { [ [ "2028-01-21", 440, 130, 0.8417, 72.00, 73.20, 2264, 160 ] ] }
+
+        it "最划算卡加「與流動性最佳相同」" do
+          get "/leaps", params: { symbol: symbol }
+          expect(doc.css("[data-leaps-best-value-card]").first.text).to include("與流動性最佳相同")
+        end
+      end
+
+      context "IV 偏高警示" do
+        it "LEAPS IV Rank 有值且 ≥ 門檻 → 顯示 LEAPS 來源" do
+          stub_iv(leaps_rank: 75.4, barchart_rank: 87)
+          get "/leaps", params: { symbol: symbol }
+          expect(iv_warning.text).to eq "IV 偏高（LEAPS IV Rank 75），優先深度價內以降低 Vega 與外在價值"
+        end
+
+        it "LEAPS IV Rank 無值、Barchart 87 → 顯示「Barchart IV Rank 87」" do
+          stub_iv(leaps_rank: nil, barchart_rank: 87)
+          get "/leaps", params: { symbol: symbol }
+          expect(iv_warning.text).to eq "IV 偏高（Barchart IV Rank 87），優先深度價內以降低 Vega 與外在價值"
+        end
+
+        it "兩者皆無 → 不顯示" do
+          stub_iv(leaps_rank: nil, barchart_rank: nil)
+          get "/leaps", params: { symbol: symbol }
+          expect(iv_warning).to be_nil
+        end
+
+        it "LEAPS IV Rank 有值但低於門檻 → 不顯示（不退回 Barchart）" do
+          stub_iv(leaps_rank: 40, barchart_rank: 87)
+          get "/leaps", params: { symbol: symbol }
+          expect(iv_warning).to be_nil
+        end
+      end
   end
 end

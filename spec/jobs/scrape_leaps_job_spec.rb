@@ -36,7 +36,8 @@ RSpec.describe ScrapeLeapsJob, type: :job do
     let(:fake_result) { { status: "success", errors: [] } }
 
     before do
-      svc = instance_double(BarchartScraperService, fetch_leaps: fake_result, fetch_pmcc_short_calls: { status: "no_candidates" })
+      svc = instance_double(BarchartScraperService, fetch_leaps: fake_result, fetch_pmcc_short_calls: { status: "no_candidates" },
+                                                    fetch_barchart_iv_history: { status: "success" })
       allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc)
     end
 
@@ -61,7 +62,8 @@ RSpec.describe ScrapeLeapsJob, type: :job do
     let(:fake_result) { { status: "partial_error", errors: [ partial_msg ] } }
 
     before do
-      svc = instance_double(BarchartScraperService, fetch_leaps: fake_result, fetch_pmcc_short_calls: { status: "no_candidates" })
+      svc = instance_double(BarchartScraperService, fetch_leaps: fake_result, fetch_pmcc_short_calls: { status: "no_candidates" },
+                                                    fetch_barchart_iv_history: { status: "success" })
       allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc)
     end
 
@@ -90,7 +92,8 @@ RSpec.describe ScrapeLeapsJob, type: :job do
     let(:fake_result) { { status: "barchart_session_expired", errors: [] } }
 
     before do
-      svc = instance_double(BarchartScraperService, fetch_leaps: fake_result, fetch_pmcc_short_calls: { status: "no_candidates" })
+      svc = instance_double(BarchartScraperService, fetch_leaps: fake_result, fetch_pmcc_short_calls: { status: "no_candidates" },
+                                                    fetch_barchart_iv_history: { status: "success" })
       allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc)
     end
 
@@ -112,7 +115,8 @@ RSpec.describe ScrapeLeapsJob, type: :job do
     let(:events) { [] }
 
     before do
-      svc = instance_double(BarchartScraperService, fetch_leaps: { status: "success", errors: [] })
+      svc = instance_double(BarchartScraperService, fetch_leaps: { status: "success", errors: [] },
+                                                    fetch_barchart_iv_history: { status: "success" })
       allow(svc).to receive(:fetch_pmcc_short_calls) { events << :pmcc; { status: "success" } }
       allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc)
       allow(Rails.cache).to receive(:write) { |key, *| events << :status if key == "leaps_job_#{job_id}" }
@@ -129,7 +133,7 @@ RSpec.describe ScrapeLeapsJob, type: :job do
     let(:fake_result) { { status: "success", errors: [] } }
 
     before do
-      svc = instance_double(BarchartScraperService, fetch_leaps: fake_result)
+      svc = instance_double(BarchartScraperService, fetch_leaps: fake_result, fetch_barchart_iv_history: { status: "success" })
       allow(svc).to receive(:fetch_pmcc_short_calls).and_raise(RuntimeError, "PMCC Short Call 資料不完整")
       allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc)
     end
@@ -147,6 +151,77 @@ RSpec.describe ScrapeLeapsJob, type: :job do
     it "does not raise out of perform_now" do
       allow(Rails.cache).to receive(:write)
       expect { described_class.perform_now(symbol, job_id) }.not_to raise_error
+    end
+  end
+
+  # leaps-iv-environment P2：LEAPS 狀態寫完之後才抓 Barchart Options Overview History；
+  # 沒有歷史時先回補 2Y；失敗不得影響 job 狀態；cached（沒有重抓）時不抓。
+  describe "#perform — Barchart IV 歷史" do
+    let(:events) { [] }
+    let(:svc) { instance_double(BarchartScraperService, fetch_pmcc_short_calls: { status: "no_candidates" }) }
+
+    before do
+      allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc)
+      allow(svc).to receive(:fetch_leaps).and_return({ status: "success", errors: [] })
+      allow(svc).to receive(:fetch_barchart_iv_history) { |**kw| events << [ :iv_history, kw ]; { status: "success" } }
+      allow(Rails.cache).to receive(:write) { |key, *| events << :status if key == "leaps_job_#{job_id}" }
+    end
+
+    it "還沒有歷史時用 backfill，在 job 狀態寫完之後才抓" do
+      described_class.perform_now(symbol, job_id)
+      expect(events).to eq([ :status, [ :iv_history, { mode: "backfill", source: "adhoc" } ] ])
+    end
+
+    it "已有歷史時只抓 latest" do
+      BarchartIvHistory.create!(symbol: symbol, trade_date: Date.new(2026, 11, 4), captured_at: Time.current,
+                                source_url: "https://www.barchart.com/stocks/quotes/NOK/options-history")
+      described_class.perform_now(symbol, job_id)
+      expect(events.last).to eq([ :iv_history, { mode: "latest", source: "adhoc" } ])
+    end
+
+    it "LEAPS 用快取（cached → success 但沒有重抓）時不抓" do
+      allow(svc).to receive(:fetch_leaps).and_return({ status: "cached", errors: [] })
+      described_class.perform_now(symbol, job_id)
+      expect(events).to eq([ :status ])
+    end
+
+    it "抓取例外不會把已寫好的 success 狀態改成 error" do
+      allow(svc).to receive(:fetch_barchart_iv_history).and_raise(RuntimeError, "Options Overview History 表格遲遲沒有載入")
+      statuses = []
+      allow(Rails.cache).to receive(:write) { |key, value, **| statuses << value[:status] if key == "leaps_job_#{job_id}" }
+
+      expect { described_class.perform_now(symbol, job_id) }.not_to raise_error
+      expect(statuses).to eq([ "success" ])
+    end
+  end
+
+  # leaps-iv-environment P4：整段抓取拿共用鎖；排程占用超過 lock_wait_sec 時寫 error，不讓前端一直等。
+  describe "#perform — 與 IV 快照排程互斥" do
+    let(:svc) do
+      instance_double(BarchartScraperService, fetch_leaps: { status: "success", errors: [] },
+                                              fetch_pmcc_short_calls: { status: "no_candidates" },
+                                              fetch_barchart_iv_history: { status: "success" })
+    end
+
+    before { allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc) }
+
+    it "抓取在共用鎖（shared）內執行，等候上限為 lock_wait_sec" do
+      allow(LeapsIvCdpLock).to receive(:shared).and_call_original
+      described_class.perform_now(symbol, job_id)
+
+      expect(LeapsIvCdpLock).to have_received(:shared).with(wait: 900, label: "LEAPS 查詢 #{symbol}")
+      expect(svc).to have_received(:fetch_leaps)
+    end
+
+    it "等鎖逾時：寫 error 狀態與訊息，不抓取" do
+      allow(LeapsIvCdpLock).to receive(:shared).and_raise(LeapsIvCdpLock::Timeout, "等待 LEAPS 抓取鎖超過 900 秒")
+      statuses = []
+      allow(Rails.cache).to receive(:write) { |key, value, **| statuses << value if key == "leaps_job_#{job_id}" }
+
+      described_class.perform_now(symbol, job_id)
+
+      expect(statuses).to eq([ { status: "error", errors: [ "等待 LEAPS 抓取鎖超過 900 秒" ] } ])
+      expect(svc).not_to have_received(:fetch_leaps)
     end
   end
 
@@ -231,7 +306,10 @@ RSpec.describe ScrapeLeapsJob, type: :job do
     end
 
     describe "#perform 結束就取消登記" do
-      let(:svc) { instance_double(BarchartScraperService, fetch_pmcc_short_calls: { status: "no_candidates" }) }
+      let(:svc) do
+        instance_double(BarchartScraperService, fetch_pmcc_short_calls: { status: "no_candidates" },
+                                                fetch_barchart_iv_history: { status: "success" })
+      end
 
       before { allow(BarchartScraperService).to receive(:new).with(symbol).and_return(svc) }
 

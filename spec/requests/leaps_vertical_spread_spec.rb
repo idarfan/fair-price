@@ -271,7 +271,7 @@ RSpec.describe "LEAPS 垂直價差", type: :request do
 
     LeapsPageHtml::CASES.each do |name, spec|
       it name do
-        LeapsPageHtml.stub_candidates!(self, spec[:params][:symbol]) if spec[:candidates]
+        LeapsPageHtml.prepare!(self, spec)
         get "/leaps", params: spec[:params]
 
         expect(LeapsPageHtml.normalize(response.body)).to eq(LeapsPageHtml.read_baseline(name))

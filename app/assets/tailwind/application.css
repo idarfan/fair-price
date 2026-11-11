@@ -44,6 +44,9 @@
 /* Value Area 的列用極淡的青綠漸層標出來，不搶長條本身的視覺。 */
 .pc-row-va     { background: linear-gradient(90deg, rgba(44,165,141,.07), rgba(44,165,141,0)); }
 
+/* LEAPS IV 環境熱圖（leaps-iv-environment P5）：最接近現價（moneyness 1.00）的一欄加橘框。 */
+.ivenv-atm-col { border-left: 2px solid #f97316; border-right: 2px solid #f97316; }
+
 /* <summary> 預設的三角形 marker 要拿掉，否則會跟自訂的 .pc-chevron 並存。 */
 .pc-summary    { list-style: none; }
 .pc-summary::-webkit-details-marker { display: none; }

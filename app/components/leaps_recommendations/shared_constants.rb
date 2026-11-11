@@ -1,6 +1,16 @@
 # frozen_string_literal: true
 
 module LeapsRecommendations::SharedConstants
+  # leaps-thin-trading-flag S2：舊標記（:no_recent_volume_warning）改名。判定是「同批候選自算
+  # Vol/OI 後三分之一」（LeapsRankingService），不代表沒有成交；文案集中在此，
+  # 頁面、PDF、推薦服務共用，避免各處各寫一份。
+  THIN_TRADING_LABEL     = "⚠ 成交相對清淡"
+  THIN_TRADING_TOOLTIP   = "本次查詢候選中，當日成交量／未平倉量（自行計算）落在後三分之一。不代表沒有成交。"
+  THIN_TRADING_CAUTION   = "成交量相對未平倉量偏低，掛單可能較少；進出場前先確認報價與價差。"
+  # 「🚫 不建議：」後面的原因（使用者裁示用短句；⚠ 標記的 title 維持完整 tooltip）。
+  THIN_TRADING_REASON    = "成交相對清淡，進出場前先確認報價與價差。"
+  ALL_ZERO_VOLUME_NOTICE = "所有候選當日成交量皆為 0（可能尚未開盤或標的冷門），報價可能未更新。"
+
   LIQUIDITY_STYLE = {
     "充足" => ApplicationComponent::SIGNAL_COLORS[:confirm_bull],
     "普通" => ApplicationComponent::SIGNAL_COLORS[:caution],

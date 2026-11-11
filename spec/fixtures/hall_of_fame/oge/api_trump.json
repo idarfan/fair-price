@@ -1,0 +1,70 @@
+{
+ "draw": 1,
+ "recordsTotal": 16745,
+ "recordsFiltered": 7,
+ "data": [
+  {
+   "type": "Presidential Candidate (<a href='https://extapps2.oge.gov/201/Presiden.nsf/201%20Request?OpenForm&Filer=Trump'>Request this Document</a>)",
+   "name": "Trump, Donald J",
+   "agency": "Candidates - F.E.C.",
+   "title": "Presidential Candidate",
+   "level": "n/a",
+   "docDate": "2023-07-08T04:33:07",
+   "amended": ""
+  },
+  {
+   "type": "Presidential Candidate (<a href='https://extapps2.oge.gov/201/Presiden.nsf/201%20Request?OpenForm&Filer=Trump'>Request this Document</a>)",
+   "name": "Trump, Donald J",
+   "agency": "Candidates - F.E.C.",
+   "title": "Presidential Candidate",
+   "level": "n/a",
+   "docDate": "2023-10-18T04:33:25",
+   "amended": ""
+  },
+  {
+   "type": "Presidential Candidate (<a href='https://extapps2.oge.gov/201/Presiden.nsf/201%20Request?OpenForm&Filer=Trump'>Request this Document</a>)",
+   "name": "Trump, Donald J",
+   "agency": "Candidates - F.E.C.",
+   "title": "Presidential Candidate",
+   "level": "n/a",
+   "docDate": "2024-08-23T04:21:52",
+   "amended": ""
+  },
+  {
+   "type": "Termination (<a href='https://extapps2.oge.gov/201/Presiden.nsf/201%20Request?OpenForm&Filer=Trump'>Request this Document</a>)",
+   "name": "Trump, Ivanka",
+   "agency": "White House Office",
+   "title": "Assistant to the President",
+   "level": "n/a",
+   "docDate": "2021-01-30T04:16:09",
+   "amended": ""
+  },
+  {
+   "type": "<a href='https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/18353894FE440B3685258D430031A337/$FILE/Donald%20J.%20Trump%2010.20.2025%20278-T%20(2).pdf'>278 Transaction</a>",
+   "name": "Trump, Donald J",
+   "agency": "White House Office",
+   "title": "President",
+   "level": "n/a",
+   "docDate": "2025-11-15T04:02:10",
+   "amended": ""
+  },
+  {
+   "type": "<a href='https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/4EC9A8E6DD078F2985258CA9002C9377/$FILE/Trump%2C%20Donald%20J.%202025%20Annual%20278.pdf'>Annual (2025)</a>",
+   "name": "Trump, Donald J",
+   "agency": "White House Office",
+   "title": "President",
+   "level": "n/a",
+   "docDate": "2025-06-14T04:06:53",
+   "amended": ""
+  },
+  {
+   "type": "<a href='https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/6E78B163F816EF6A852586630075291D/$FILE/Trump%2C%20Donald%20J.%202021Termination%20278.pdf'>Termination</a>",
+   "name": "Trump, Donald J",
+   "agency": "White House Office",
+   "title": "President",
+   "level": "n/a",
+   "docDate": "2021-01-20T16:19:42",
+   "amended": ""
+  }
+ ]
+}

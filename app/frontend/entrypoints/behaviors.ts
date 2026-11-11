@@ -47,6 +47,7 @@ const REGISTRY: Record<string, Loader> = {
   "iv-education-chart": () => import("../behaviors/ivEducationChart"),
   "iv-education-tts": () => import("../behaviors/ivEducationTts"),
   "iv-watchlists": () => import("../behaviors/ivWatchlists"),
+  "leaps-iv-environment": () => import("../behaviors/leapsIvEnvironment"),
   "leaps-loading": () => import("../behaviors/leapsLoading"),
   "leaps-price-context": () => import("../behaviors/leapsPriceContext"),
   "leaps-vertical-spread": () => import("../behaviors/leapsVerticalSpread"),

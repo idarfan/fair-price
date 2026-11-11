@@ -11,11 +11,14 @@ module LeapsRecommendations::ConceptCards
       div(class: "px-4 py-3 border-b border-gray-100 bg-gray-50") do
         h2(class: "text-sm font-semibold text-gray-700") { plain "推薦分析 — #{@symbol}" }
         p(class: "text-xs text-gray-400 mt-0.5") { plain "近天期 DTE 364–550 / 遠天期 DTE 550+，各自依流動性獨立挑選" }
+        render_iv_rank_note
+        render_iv_high_warning
       end
       div(class: "divide-y divide-gray-100") do
-        render_recommendation_group(near)
-        render_recommendation_group(far)
+        render_recommendation_group(near, :near_term)
+        render_recommendation_group(far, :far_term)
       end
+      render_selection_criteria
       render_concept_cards
     end
   end
@@ -73,8 +76,8 @@ module LeapsRecommendations::ConceptCards
       end
       if warned
         p do
-          strong { plain "⚠ 但本合約近期無成交" }
-          plain "（Volume 對 OI 比率偏低）——OI 高不代表現在還在動，掛單簿可能已經很久沒更新，實際進出前務必先看報價是否合理、掛限價單試單。"
+          strong { plain "#{THIN_TRADING_LABEL}：" }
+          plain THIN_TRADING_CAUTION
         end
       else
         p { plain "OI 高只代表「歷史上累積的未平倉量」，不保證今天一定買得到／賣得掉，仍要搭配 Volume 一起看。" }
@@ -233,39 +236,40 @@ module LeapsRecommendations::ConceptCards
   end
 
 
-  def render_recommendation_group(group)
+  # leaps-best-value S3：每個天期一列，左「💰 最划算」、右「🔓 流動性最佳」等寬並列；
+  # 手機寬度（< md）上下堆疊，最划算在上（DOM 順序即堆疊順序）。
+  def render_recommendation_group(group, term)
     div(class: "px-4 py-4") do
       h3(class: "text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2") { plain group[:label] }
-      if group[:no_candidates]
-        div(class: "text-sm text-gray-400 italic") { plain "此天期區間目前沒有符合條件的候選。" }
-      else
-        pick = group[:pick]
-        expired_s = partial_error_strike
-        pick_incomplete = expired_s && pick[:strike].to_f == expired_s
-        div(class: "flex flex-wrap gap-3 mb-3") do
-          render_pick_badge(pick)
-          if pick_incomplete
-            span(class: "text-xs text-orange-600 self-center font-medium") { plain "⚠️ 此推薦的 Vega/被指派機率資料可能不完整" }
-          end
-          if (ru = group[:runner_up])
-            div(class: "text-xs text-gray-400 self-center") { plain "次選：#{sprintf('$%.2f', ru[:strike].to_f)} / #{ru[:expiration_date]}" }
-          end
+      div(class: "grid grid-cols-1 md:grid-cols-2 gap-3 items-start") do
+        render_best_value_card(best_value_group(term), group[:pick])
+        div(class: "rounded-lg border border-gray-200 p-3 min-w-0", data_leaps_oi_card: "") do
+          h4(class: "text-xs font-semibold text-gray-600 mb-2") { plain "🔓 流動性最佳（OI 最高）" }
+          render_oi_recommendation(group)
         end
-        div(class: "text-sm text-gray-700 whitespace-pre-line leading-relaxed") { plain group[:reason] }
       end
     end
   end
 
 
-  def render_pick_badge(pick)
-    tier  = pick[:liquidity_tier].to_s
-    style = LIQUIDITY_STYLE[tier] || LIQUIDITY_STYLE["普通"]
-    div(class: "flex items-center gap-2 px-3 py-1.5 rounded-lg border #{style[:bg]} #{style[:border]}") do
-      div(class: "w-2 h-2 rounded-full #{style[:dot]}")
-      span(class: "text-xs font-semibold #{style[:text]}") do
-        plain "#{sprintf('$%.2f', pick[:strike].to_f)} / #{pick[:expiration_date]}"
+  # 既有 OI 推薦內容（與 S3 前版本相同），只在最後補上與最划算卡同一組欄位。
+  def render_oi_recommendation(group)
+    if group[:no_candidates]
+      div(class: "text-sm text-gray-400 italic") { plain "此天期區間目前沒有符合條件的候選。" }
+    else
+      pick = group[:pick]
+      expired_s = partial_error_strike
+      pick_incomplete = expired_s && pick[:strike].to_f == expired_s
+      # 膠囊、次選灰字、說明文字、明細格改用與最划算卡共用的零件（leaps-best-value-card-style S1）；
+      # 文字內容與順序不變，膠囊顏色仍依流動性等級。
+      style = LIQUIDITY_STYLE[pick[:liquidity_tier].to_s] || LIQUIDITY_STYLE["普通"]
+      render_capsule_row(pick, runner_up: group[:runner_up], style: style) do
+        if pick_incomplete
+          span(class: "text-xs text-orange-600 self-center font-medium") { plain "⚠️ 此推薦的 Vega/被指派機率資料可能不完整" }
+        end
       end
-      span(class: "text-xs #{style[:text]} opacity-70") { plain "Delta #{sprintf("%.3f", pick[:delta].to_f)}" }
+      render_pick_reason(group[:reason])
+      render_pick_details(pick, group[:runner_up])
     end
   end
 end

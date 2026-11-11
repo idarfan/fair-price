@@ -16,7 +16,8 @@ RSpec.describe BarchartScraperService, "#run_scraper" do
                              timed_out: false)
   end
 
-  %w[volap price_history].each do |type|
+  # barchart_iv_history：leaps-iv-environment P2 r1 質詢 4，在 ScrapeLeapsJob 裡跑，卡死會讓 job 不結束
+  %w[volap price_history barchart_iv_history].each do |type|
     it "#{type}：帶 SCRAPER_TIMEOUTS_S 的時限執行" do
       expect(TimedCapture).to receive(:call)
         .with("python3", end_with("#{type}_scraper.py"), "TSTX",
@@ -89,6 +90,18 @@ RSpec.describe BarchartScraperService, "#run_scraper" do
   it "時限比爬蟲內部的等待上限長，正常路徑不會被誤砍" do
     expect(described_class::SCRAPER_TIMEOUTS_S.fetch("volap")).to be >= 8 + 45 + 60 + 30
     expect(described_class::SCRAPER_TIMEOUTS_S.fetch("price_history")).to be >= 45 + 30
+    # 表格 60 + 切區間 45×2（含切回原區間）+ HV 15 + 導航
+    expect(described_class::SCRAPER_TIMEOUTS_S.fetch("barchart_iv_history")).to be >= 60 + (45 * 2) + 15 + 30
+  end
+
+  it "fetch_barchart_iv_history 逾時：回報並記 fetch_logs（job 才會結束）" do
+    allow(service).to receive(:cdp_available?).and_return(true)
+    allow(LeapsIvCapture).to receive(:regular_session?).and_return(false)
+    allow(TimedCapture).to receive(:call).and_return(timed_out)
+
+    expect(service.fetch_barchart_iv_history(mode: "backfill")[:status]).to eq("error")
+    expect(FetchLog.find_by(symbol: "TSTX", fetch_type: "barchart_iv_history").error_detail)
+      .to include("mode=backfill", "300")
   end
 
   it "其他爬蟲不套時限，照舊用 Open3.capture3" do

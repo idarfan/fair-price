@@ -96,7 +96,7 @@
     liquidity: {
       el: "#leaps-th-liquidity",
       title: "🚦 流動性判斷",
-      desc: "依本次查詢候選的 OI 三分位相對排名（充足/普通/偏低），非固定門檻；「⚠ 近期無成交」由 Vol/OI 比率判斷。",
+      desc: "依本次查詢候選的 OI 三分位相對排名（充足/普通/偏低），非固定門檻；「⚠ 成交相對清淡」由 Vol/OI 比率判斷。",
       side: "bottom",
     },
     bid: {
@@ -165,6 +165,12 @@
       el: "#leaps-th-time_value_pct",
       title: "📐 Time Value%",
       desc: "外在÷股價，「相對直接持股多付幾 % 溢價」。與外在佔比分母不同，回答不同問題。",
+      side: "bottom",
+    },
+    annual_cost_pct: {
+      el: "#leaps-th-annual_cost_pct",
+      title: "💰 年化時間成本",
+      desc: "（Ask − 內在價值）÷ 現價 × 365 ÷ DTE。以 Ask 計，買賣價差寬的合約自然吃虧；把不同天期攤成每年多付幾 % 溢價，可直接比較。「推薦分析」的最划算卡依此排序。",
       side: "bottom",
     },
     iv: {
@@ -577,6 +583,132 @@
     LEAPS_COL_EXPLAIN[k] = VERTICAL_SPREAD_EXPLAIN[k];
   });
 
+  /* ── IV 環境區塊的名詞（leaps-iv-environment P5）──────────────────────────
+     同垂直價差：這裡只放定義，不寫任何標的的數字；實際數值由伺服器放在
+     data-tip-value／data-tip-lines。只有 ivenv_overview 帶 el 進導覽。 */
+  var IV_ENV_EXPLAIN = {
+    ivenv_overview: {
+      el: "#leaps-iv-environment > summary",
+      title: "🌡 IV 環境",
+      desc:
+        "補上排行表沒回答的三個問題。" +
+        TIP_H("三個問題") +
+        TIP_L([
+          "<b>什麼時候買</b> → 看 LEAPS IV Rank（540 天）",
+          "<b>買哪個到期日</b> → 看 ATM IV 期限結構",
+          "<b>買哪個履約價</b> → 看 IV 曲面",
+        ]) +
+        TIP_H("兩組指標") +
+        TIP_L([
+          "左組：FairPrice 自算的 LEAPS 天期，決定 LEAPS 價格的主要是這組",
+          "右組：Barchart 短天期參考，容易被財報、單日大跌拉動，當短期情緒看",
+          "兩組天期不同，不能直接比大小",
+        ]),
+      side: "bottom",
+    },
+    ivenv_leaps_rank: {
+      title: "📊 LEAPS IV Rank（540 天）",
+      desc:
+        "回答「現在買，時間價值貴不貴」：今天的 540 天 ATM IV 落在過去一年最低～最高之間的位置（0–100）。" +
+        TIP_H("為什麼重要") +
+        TIP_L([
+          "IV 偏高時買進，之後 IV 回落會直接吃掉獲利：損失 ≈ Vega × IV 下降點數 × 100（每口）",
+          "天期越長 Vega 越大，越怕 IV 回落",
+        ]) +
+        TIP_H("怎麼看") +
+        TIP_L([
+          "&lt; 30：時間價值相對便宜",
+          "30–60：中性",
+          "&gt; 60：偏貴，可分批進場或改選更深價內（外在價值較低）",
+          "只說明跟過去比貴或便宜，不預測股價方向",
+        ]),
+      side: "bottom",
+    },
+    ivenv_leaps_pct: {
+      title: "📈 IV Percentile",
+      desc: "過去一年中，有幾 % 的交易日 540 天 ATM IV 比今天低。和 IV Rank 互相參照：Rank 看位置，Percentile 看天數。",
+      side: "bottom",
+    },
+    ivenv_cm540: {
+      title: "🌊 ATM IV（540 天）",
+      desc: "把夾住 540 天的兩個到期日的價平 IV，用總變異數內插成「剛好 540 天」的 IV，讓每天的數字可以比較。",
+      side: "bottom",
+    },
+    ivenv_accumulating: {
+      title: "⏳ 資料累積中",
+      desc: "自算的 Rank 需要歷史資料：滿 20 個交易日才顯示，滿 252 個交易日才是完整一年。",
+      side: "bottom",
+    },
+    ivenv_bc_rank: {
+      title: "📊 Barchart IV Rank",
+      desc:
+        "Barchart 依它自己的 IV 定義算的 IV Rank，取自 Options Overview History 頁面，本系統不重算。" +
+        TIP_H("和 LEAPS IV Rank 的差別") +
+        TIP_L([
+          "天期是最近一個 30 天以上的月選擇權，不是 LEAPS 天期",
+          "財報、單日大跌會讓它一天大幅跳動，但 LEAPS 的價格主要受長天期 IV 影響，兩者常不同步",
+          "只看這個數字，可能在 LEAPS 其實不貴時被嚇跑，或反過來",
+        ]),
+      side: "bottom",
+    },
+    ivenv_bc_pctl: {
+      title: "📈 Barchart IV Percentile",
+      desc: "過去一年中，Barchart IV 比今天低的交易日比例。",
+      side: "bottom",
+    },
+    ivenv_bc_iv: {
+      title: "🌊 Barchart Implied Volatility",
+      desc: "Barchart 定義的 IV：最近一個 30 天以上月選擇權的平均隱含波動率。",
+      side: "bottom",
+    },
+    ivenv_bc_hv: {
+      title: "📉 Historic Volatility",
+      desc: "股價過去實際的波動率（天數見標籤）。IV 明顯高於 HV，代表期權價格比實際波動貴。",
+      side: "bottom",
+    },
+    ivenv_bc_trend: {
+      title: "📉 Barchart IV Rank 走勢",
+      desc: "最近 252 個交易日的 Barchart IV Rank 與股價。可看出 IV 是否因大跌、財報等事件衝高。",
+      side: "top",
+    },
+    ivenv_term: {
+      title: "📐 ATM IV 期限結構",
+      desc:
+        "回答「買哪個到期日」：把各 LEAPS 到期日的價平 IV 連成一條線，虛線標出 540 天。" +
+        TIP_H("怎麼看") +
+        TIP_L([
+          "曲線平 → 拉長天期不必多付波動溢價，可直接比『每月外在價值成本』（外在價值 ÷ 剩餘月數）挑到期日",
+          "某段突然翹高 → 市場預期那段期間有事件（如財報），該到期日相對貴",
+          "一般是遠天期略高，屬正常",
+        ]),
+      side: "top",
+    },
+    ivenv_surface: {
+      title: "🗺 IV 曲面",
+      desc:
+        "回答「買哪個履約價」：每個到期日 × 每個履約價位置的 Call IV，顏色越深 IV 越高，橘框是最接近現價的一欄。" +
+        TIP_H("讓你明白兩件事") +
+        TIP_L([
+          "IV% 高不代表貴：深價內的 IV 數字常比價平高，但外在價值金額反而最小，貴不貴看排行表的外在價值",
+          "抓異常：某格 IV 明顯偏離左右兩格，常是報價過時（成交清淡時常見）或定價失衡，下單前先確認報價",
+        ]),
+      side: "top",
+    },
+    ivenv_moneyness: {
+      title: "➗ 履約價 ÷ 現價（moneyness）",
+      desc: "小於 1 是價內，等於 1 是價平，大於 1 是價外。例：0.70 代表履約價約為現價的 7 成。",
+      side: "top",
+    },
+    ivenv_meta: {
+      title: "🕒 資料時間與來源",
+      desc: "as_of_date 是報價所屬的美東交易日；captured_at 是實際抓取時間（台北）；scheduled 是收盤後排程寫入，adhoc 是手動查詢寫入。",
+      side: "top",
+    },
+  };
+  Object.keys(IV_ENV_EXPLAIN).forEach(function (k) {
+    LEAPS_COL_EXPLAIN[k] = IV_ENV_EXPLAIN[k];
+  });
+
   /* 價格情境 widget 在頁面上位於排行表之上，導覽順序跟著閱讀順序走，放最前面。
      沒有 el 的純名詞（poi_poc、poi_fvg…）不進 TOUR_ORDER——它們沒有唯一的
      聚光目標（同一個 key 可能出現在好幾列），改由滑過／點擊標籤觸發。
@@ -587,6 +719,7 @@
     "poi_legend_tour",
     "week52_card",
     "day_card",
+    "ivenv_overview",
     "expiration",
     "dte",
     "strike",
@@ -602,6 +735,7 @@
     "extrinsic",
     "extrinsic_pct",
     "time_value_pct",
+    "annual_cost_pct",
     "iv",
     "vega",
     "itm_prob",

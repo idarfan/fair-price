@@ -1,11 +1,253 @@
 # FairPrice
 
+### 2026-11-11（三）— 名人堂 P4、LEAPS IV P7.1 排程補驗完成
+
+兩項都是 PR #20 合併前的條件，兩項補驗都經審查 PASS：
+- **名人堂 P4**（`hall-of-fame-sync`，每天台北 08:30）：2026-11-10 run #51–53 在 08:30 由 cron 觸發，當時開機已約 36 小時，不是開機時順便觸發的。狀態表改為「完成」。
+- **LEAPS IV P7.1**（`leaps-iv-snapshot`，台北 14:00）：2026-11-11 開機時 pm2 自動啟動的那次被正確略過，正點那次跑完 9 檔，fetch_logs 只有這一輪。
+
+另外觀察到 pm2 cron 會提早或延後觸發：
+- LEAPS IV 在 11/10 延後 18 分鐘。
+- 名人堂在 11/07、11/08 各多跑 3 輪，11/09 延後 15 分鐘。
+
+接下來先觀察 3–5 天。名人堂要不要加防護，待使用者裁示。
+
+### 2026-11-11（三）— LEAPS 最划算卡改成與流動性最佳卡同一風格（S1）
+
+/leaps 的左卡「💰 最划算」改用和右卡「流動性最佳」相同的零件（新檔 `app/components/leaps_recommendations/pick_card_parts.rb`）：
+- 膠囊列：左卡固定綠色。
+- 說明文字：左卡新增，照規格範本 4 行。
+- 明細格：
+  - 兩卡都拿掉重複的「履約價／到期日」列，補上 Mid（依 bid／ask 算，規則同 `LeapsOptionChainSnapshot#mid_price`）。
+  - 欄位：Delta、Mid、Ask、OI、成交量、Spread %、年化時間成本、損益兩平。
+  - 每格標籤在上、數值在下。
+  - 欄數依**卡片內容寬度**決定（容器查詢 `@container`＋`@md:grid-cols-5`）：卡片 ≥ 448px 時排 5＋3，否則 2 欄。視窗 768–1103px 兩卡並排、卡片太窄時，明細為 2 欄。
+
+選擇邏輯（`LeapsBestValueService`、`LeapsRecommendationService`）沒有修改。新增回歸基準 `f_with_best_value`（左右兩卡同時出現）。規格：`leaps-best-value-card-style.md`。
+
+S2 正式站驗收（TSM）：640／1104／1280px 的欄數與每格的空間都和測試環境一致，1104px 是切回 5 欄的臨界點。375px 頁首可以橫向捲動，這是全站導覽列的既有問題，不在本規格處理。
+
+### 2026-11-11（三）— 架構圖改在 commit 時產生並併入同一個 commit
+
+以前 `docs/` 的架構圖是在 pre-push 時才產生，而且產生後不會 commit。結果是推上 GitHub 的永遠是舊圖，push 完工作區還會多出 3 個沒 commit 的修改。
+
+現在改到 git pre-commit：
+- `.git/hooks/pre-commit` 會呼叫 `bin/arch-diagram-precommit`。
+- 這支腳本先更新 graph.db，再產生架構圖，圖有變動就併入這次 commit。
+- pre-push 不再產生架構圖。
+- 每次 commit 大約多等 2 秒。
+
+以下情況會中止 commit，不會靜默放行：
+- 產生失敗。
+- 腳本不存在或不能執行。
+- 還沒建好圖譜。
+
+重新 clone 後要補的步驟，見下方「重新 clone 後要補的 git hook」。測試：`script/arch_diagram_precommit_test.sh`。規格：`arch-diagram-autocommit.md`。
+
+### 2026-11-11（三）— 編輯後的 prettier hook 不再整檔重排舊檔
+
+以前 `~/.claude/hooks/post-edit-ts.sh` 每次都對整個檔案跑 prettier。舊檔只改一行，整份也會被重新排版，`vector_pdf.js` 就因此一次多出 427 行差異。
+
+現在 hook 會先看這個檔案在 HEAD 的狀態：
+- 新檔、或 HEAD 版本已經符合 prettier：照常排版。
+- HEAD 版本從來沒排版過：跳過 prettier，只跑 eslint。
+
+實測在 `vector_pdf.js` 檔尾加一行，diff 只顯示 1 行新增；新建的檔案仍會照常排版。測試腳本是 `~/.claude/hooks/test/prettier_scope_test.sh`。規格見 `prettier-hook-scope.md`。
+
+### 2026-11-11（三）— 修正 PDF 字型子集腳本的掃描範圍
+
+修正 LEAPS PDF 字型子集腳本。
+
+**問題**
+- 中文字型腳本 `script/extract_leaps_charset.py` 只掃 3 個寫死的檔案。元件拆成多個模組後，照它重建，字型會從 790 字掉到 404 字。
+- 音標腳本 `script/extract_ipa_charset.py` 找不到 `VOCAB_CARDS`，一個音標都掃不到。
+
+**修正**
+- 兩支腳本都改成掃描整個 `leaps_recommendations/` 目錄，以及其他 PDF 文案來源。路徑對不到任何檔案時直接報錯。
+- 重建時保留舊字型已收錄的字，字型只會變多、不會變少。
+- 新增 `script/font_subset_guard.py`。重建後如果新字型少了舊字，或漏收掃到的字，就還原舊字型並回報失敗。
+
+這次沒有換字型。目前 PDF 實際用到的字都已經在字型裡，所以字型和字元集檔維持原樣。
+
+### 2026-11-10（二）— LEAPS 成交相對清淡 S3：開盤時段實頁驗收
+
+美股開盤時段（台灣 22:52／美東 09:52 抓取）重新抓 NVDA，在 `/leaps?symbol=NVDA` 逐列用 volume ÷ OI 重算。結果如下：
+
+- **標記**：候選 101 筆中標記 33 筆，跟重算的界線 0.005975 完全一致，沒有一筆不符。
+- **對照**：修改前那一批是 107 筆標 61 筆；同一批資料如果用舊邏輯，會標 45 筆。
+- **深價內**：$105–$115 這幾檔的 Barchart Vol/OI 全是空值。舊邏輯 18 列全標，新邏輯只標其中自算值低的 6 列。
+- **舊字樣**：頁面上已經沒有「無成交」字樣。
+
+### 2026-11-10（二）— LEAPS 成交相對清淡 S2：標記改名「成交相對清淡」與全 0 提示
+
+LEAPS 頁的「⚠ 近期無成交」改名為「⚠ 成交相對清淡」。
+- 標記加上滑鼠提示，說明這是本次候選中自算成交量／未平倉量落在後三分之一，不代表沒有成交。
+- 推薦卡、PDF、推薦理由裡的相關說明，都改成「成交量相對未平倉量偏低，掛單可能較少；進出場前先確認報價與價差。」
+- 「🚫 不建議」後面的原因改用短句。
+- 全部候選當日成交量都是 0（多半是開盤前）時，不逐列標記，改在排行表上方和 PDF 顯示一行提示。
+- 文案集中放在 `LeapsRecommendations::SharedConstants`。
+
+PDF 字型子集只補了缺的「冷」「皆」兩個字。`script/subset_font.sh` 的掃描範圍已經跟不上元件拆檔，照它重建會掉 406 個字，腳本開頭已加註「勿直接使用」。另外重新產生了一次 `/leaps` 整頁回歸基準，跟舊版只差字型 digest、PDF 資料欄位和預設選擇標準的文字。
+
+### 2026-11-10（二）— LEAPS 成交相對清淡 S1：Vol/OI 改用同列 volume ÷ OI 自算
+
+`LeapsRankingService` 的「近期無成交」判定不再讀 Barchart V&G 頁的 `vol_oi_ratio`，因為它只到小數第 2 位、跟 Options 頁不同時間抓，而且 $95–$115 深價內履約價常缺值。改用同一列 volume ÷ OI 自算，不四捨五入。後三分之一界線的公式不變。OI 為 0 或空值時資料不足，不判定。全部候選自算值為 0（多半是開盤前）時逐列不標記，另外提供 `all_zero_volume?` 給頁面顯示提示。`call` 回傳形狀不變，PMCC、垂直價差呼叫端都沒動。也順便修了一個跟執行順序有關的排序測試：factory 給的 strike 太低時，算出負的外在價值，資料會被排除。完整 rspec seed 35801：1725 examples, 0 failures。
+
+### 2026-11-09（一）— 測試：開啟 rspec 隨機順序
+
+`spec/spec_helper.rb` 的 `config.order = :random` 與 `Kernel.srand config.seed` 原本包在 `=begin/=end` 註解裡，從未生效。改為生效（其他建議設定仍維持註解），連跑 5 次完整 rspec（seed 32325／61479／47973／65147／53261）皆 1712 examples, 0 failures，沒有發現跟執行順序有關的失敗。
+
+### 2026-11-09（一）— LEAPS 最划算推薦 S3：推薦卡並列與排行表年化時間成本欄
+
+`/leaps` 推薦分析每個天期改成左「💰 最划算（最低年化時間成本）」、右「🔓 流動性最佳（OI 最高）」兩張等寬卡，手機寬度上下堆疊、最划算在上；兩卡用同一組八個欄位（OI 卡補算年化時間成本與損益兩平），主推相同時標「與流動性最佳相同」。IV 偏高警示以 LEAPS IV Rank 優先、累積未滿時退回 Barchart IV Rank 並標明來源。推薦內容底部加「預設選擇標準」，數字讀 `config/leaps_best_value.yml` 與既有天期常數。排行表在 Time Value% 右側新增「年化時間成本」欄，主推／次選列加「最優」「次選」徽章；PDF 匯出與欄位說明同步。新模組 `LeapsRecommendations::BestValueCards`。整頁 HTML 回歸基準經使用者裁示重新產生一次。
+
+### 2026-11-09（一）— LEAPS 最划算推薦 S2：controller 接線
+
+`LeapsRecommendationsController#index` 在資料新鮮時，用同一批候選呼叫 `LeapsBestValueService`，結果以 `best_value:` 傳入 `LeapsRecommendations::PageComponent`。本階段只接線、不改畫面（整頁 HTML 回歸基準未動），顯示在 S3。既有 OI 推薦不變。
+
+### 2026-11-09（一）— LEAPS 最划算推薦 S1：年化時間成本計算與篩選服務
+
+新增 `LeapsBestValueService`：每個天期區間挑「年化時間成本＝（Ask − 內在價值）÷ 現價 × 365 ÷ DTE」最低的合約。篩選條件 Delta 0.80–0.92、Spread ≤ 3%、OI ≥ 1000、成交量 ≥ 50，不足時依 A→B→C 流動性等級補位；`bid > 0` 與 `exclude_no_recent_trade` 是三級共同硬條件。門檻集中在 `config/leaps_best_value.yml`（唯一讀取點 `LeapsBestValueConfig`），天期區間沿用 `LeapsRecommendationService` 常數。本階段只有服務與單元測試，尚未接上畫面（規格 `leaps-best-value.md` S2–S4）。
+
 ### 2026-11-08（日）— 安全性：升級有漏洞公告的套件（bundler-audit 恢復全綠）
 
 CI `scan_ruby` 的 bundler-audit 因 10/13 之後新公布的漏洞失敗（Gemfile 沒改），以 `bundle update --conservative` 只升被點名的套件：
 Rails 8.1.3.1 → 8.1.4.1、nokogiri 1.19.4 → 1.19.7、rack 3.2.6 → 3.2.8、rails-html-sanitizer 1.7.1 → 1.7.2、loofah 2.25.2 → 2.25.3、
 crass 1.0.7 → 1.0.8、addressable 2.9.0 → 2.9.2、net-ssh 7.3.0 → 7.3.9、css_parser 3.0.0 → 3.4.0、view_component 4.12.0 → 4.23.0（lookbook 相依）。
 只改 `Gemfile.lock`。
+
+### 2026-11-08（日）— LEAPS IV 環境 P7.1：pm2 提早觸發防護、排程 log 印 missing
+
+pm2 6.0.14 內建的 croner 4.1.97 計時器到期就執行、不檢查牆上時鐘，WSL2 的牆上時鐘又比 monotonic 慢 3–7%，所以每個 pm2 cron 都會在正點前被多觸發 2–3 次。`leaps-iv-snapshot` 改成開頭先判斷：由 pm2 啟動（有 `cron_restart` 環境變數）且離下一次排定時間比離上一次近，就寫 log「提早觸發，略過」直接結束；手動執行照跑。新類別 `LeapsIvCronGuard`。另外每日快照 log 在有沒載入的到期日時附 `missing=…`。其他 pm2 cron（如 `x-order-db-backup`）同樣會提早觸發，本次未處理。
+
+注意：手動 `pm2 restart leaps-iv-snapshot` 也會套用同一個判斷，在排定時間前幾小時執行會被略過（例：週二 03:00 UTC 離 06:00 只剩 3 小時）。**要強制跑一輪，請直接執行 `bin/leaps_iv_snapshot`**，不要用 pm2 restart。
+
+### 2026-11-08（日）— LEAPS IV 環境 P6：推薦分析加一句 LEAPS IV Rank 評語
+
+`/leaps` 的「推薦分析」標題下方、近天期段落之前加一句：rank 四捨五入到整數後，< 30 寫「時間價值相對便宜」、30–60 寫「IV 中性」、> 60 寫「時間價值偏貴；可考慮分批進場或改選更深價內…」。門檻只讀 `config/leaps_iv.yml` 的 `rank_thresholds`；rank 為 nil（累積中／無資料）時整句不出現。新模組 `LeapsRecommendations::IvRankNote`。
+
+### 2026-11-07（六）— LEAPS IV 環境 P5.1：短天期點不再壓扁 LEAPS 的熱圖與期限結構
+
+- IV 曲面熱圖的色階只依 LEAPS 到期日（DTE ≥ 364）計算；查詢後併入的 PMCC 短天期列移到下方，灰底不上色、數字照常顯示
+- ATM IV 期限結構只畫 LEAPS 段；CM540 與 Rank 的計算不變
+
+### 2026-11-07（六）— LEAPS IV 環境 P5：/leaps 的 IV 環境區塊
+
+- 「推薦分析」上方新增可收摺的「IV 環境 · {代號}」卡片（預設收合）：摘要顯示 Barchart IV Rank 與 ATM IV（540 天）
+- 展開後：LEAPS 天期徽章（IV Rank／Percentile／ATM IV 540 天，未滿 20 天顯示累積中）與 Barchart 參考徽章
+  （IV Rank／Pctl／Imp Vol／HV）、Barchart IV Rank 與股價走勢、ATM IV 期限結構（虛線 540 天）、IV 曲面熱圖
+  （moneyness 0.60–1.25 共 14 欄、1.00 欄橘框）、資料時間與來源
+- 每個名詞都有 tooltip（滑過看說明、點擊聚光、「欄位導覽」多一步）；LEAPS IV Rank 的說明帶推薦近天期合約的
+  Vega，換算「IV 每下降 5 點，每口約損失多少」
+- 按「查詢」時區塊保留既有資料並標「更新中」；讀取失敗會照實顯示，不會整頁出錯
+
+### 2026-11-07（六）— LEAPS IV 環境 P4：每日 IV 快照排程
+
+- 新 pm2 排程 `leaps-iv-snapshot`（`0 6 * * 2-6` UTC＝台北週二～六 14:00）：標的＝`config/leaps_iv.yml` 的 watchlist
+  ∪ 近 30 天 /leaps 實際查過的 symbol（上限 20），逐檔只跑 IV 曲面（`--iv-surface-only`）＋ Barchart 歷史；
+  手動 `bin/leaps_iv_snapshot`，回補 `bin/leaps_iv_snapshot --backfill SYMBOL`
+- `LeapsIvCdpLock`：PG advisory lock（獨立連線），/leaps 查詢取 shared、排程取 exclusive；排程每檔之間空 5 秒讓查詢插隊；
+  等鎖超過 `lock_wait_sec`（900 秒）時查詢頁顯示「等待 LEAPS 抓取鎖超過 N 秒…請稍後再試」
+- IV 現價改用頁首收盤行（`.pricechangerow`）的日期與收盤價，不用 underlying_price；曲面改存全部履約價
+  （0.60–1.25 只在讀取時篩）；沒載入的到期日重試一次，仍失敗就保留當天舊點
+- Barchart 歷史切換期間時，必須等表格真的換頁才採信（修正 backfill 只拿到 65 列）
+
+### 2026-11-06（五）— LEAPS IV 環境 P3：計算服務
+
+新增 `LeapsIvEnvironmentService`：`call(symbol:)` 回傳 CM540（540 天固定天期 ATM IV，總變異數內插）、
+LEAPS IV Rank／Percentile（過去一年、滿 20 筆才算）、ATM IV 期限結構、IV 曲面、Barchart IV 指標與走勢；
+`persist!` 是寫入 `cm540_atm_iv` 的唯一入口，LEAPS 查詢寫完曲面後自動呼叫。PMCC 短天期鏈只在與快照
+同一次抓取時（相差 1 小時內）併入曲面與期限結構。
+
+### 2026-11-06（五）— LEAPS IV 環境 P2：IV 曲面與 Barchart IV 歷史抓取
+
+- LEAPS 爬蟲成功後多一段 Stage 3：讀每個 LEAPS 到期日的完整鏈（篩 Delta 之前），寫入 `leaps_iv_surface_points`
+  （moneyness 0.60–1.25）與當天 `leaps_iv_snapshots`；候選排行完全不變（同一份原始資料改動前後 SAME）
+- 新爬蟲 `barchart_iv_history_scraper.py`：Barchart Options Overview History，`latest` 讀最新一列、`backfill` 讀 2Y；
+  結束前把 Barchart 記住的區間切回使用者原本的設定；HV 讀 overview 頁
+- LEAPS 查詢狀態寫完後才抓 Barchart 歷史（第一次自動回補 2Y），失敗不影響查詢；外層逾時 300 秒
+- 美股盤中（美東週一～五 09:30–16:00）不寫任何 IV 環境資料，Stage 3 也不跑
+- 存頁面資料原始精度（IV Pctl 由小數 ×100），as_of_date 取頁面報價日期，讀不到就不寫
+
+### 2026-11-06（五）— LEAPS IV 環境 P1：三張資料表
+
+新增 `leaps_iv_snapshots`（每標的每個美東交易日一筆，含 CM540 ATM IV、Barchart HV）、`leaps_iv_surface_points`
+（IV 曲面原始點）、`barchart_iv_histories`（Barchart Options Overview History 每日一列）三張表與 model，
+皆以唯一鍵 upsert、後寫覆蓋先寫。`schema.rb` 只含本分支的 migration：正式庫另有名人堂分支的 `hof_*` 表，
+兩分支合併後要以完整 dump 重新產生 `schema.rb`。
+
+### 2026-11-06（五）— LEAPS IV 環境 P0 偵察
+
+新增 `docs/leaps-iv-recon.md`（`leaps-iv-environment.md` P0，只讀未改程式）：LEAPS 爬蟲呼叫鏈、Delta 篩選在爬蟲端
+（非候選履約價的 IV 沒讀到）、PMCC 短天期鏈有 IV、Barchart Options Overview History 的 `bc-data-grid` 欄位與單位
+（IV Pctl 為小數）、Select History 最長 2Y／520 列、HV 只在 options／overview 頁且標籤無天數、pm2 daemon 為 UTC、
+CDP 共用 9222 且無跨程序互斥、近 30 天查詢過的 symbol 可由 `fetch_logs` 取得。
+
+### 2026-10-19（一）— 新增：投資名人堂 Q2（OGE 278e 年報解析）
+
+`bin/rails hall_of_fame:parse_oge_pdfs` 下載 pending 的 OGE 278e（Trump、Vance、Bessent、Lutnick、Burgum）到
+`storage/hall_of_fame/oge/{year}/`，由 Python sidecar `lib/hall_of_fame/oge_parser.py` 以表格框線切列，解析 Part 2／5／6
+寫入 `hof_holdings`（Part 5 為配偶，其餘記 self）。容器帳戶名稱併入子列（例「IRA #1 › SPY」）；不可估值的資產照列、不入佔比；
+金額或欄位無法完整辨識的列照原字串寫入並標 needs_review。`hof_filings.parse_error` 第一行為文字層判定（`textlayer: …`）。
+§3 金額對照表另擴充 `$15,001 - $25,000`、`$25,001 - $50,000`、`Over $1,000,000`。278-T 交易解析留待 Q3。
+
+### 2026-10-19（一）— 新增：投資名人堂 Q1（OGE 索引同步）
+
+`bin/rails hall_of_fame:sync_oge_index` 同步行政政要（Trump、Vance、Bessent、Lutnick、Burgum）的 OGE 公開申報清單到
+`hof_filings`（source = oge，doc_id = UNID）：先對 `Presiden.nsf/Index` view 做條件式請求，304 即結束；有變動才用 OGE 搜尋頁的
+REST API 依姓查詢，Annual／Nominee 278／Termination／New Entrant 記為 `oge_278e`，278 Transaction 記為 `oge_278t`。
+只能書面申請（沒有線上 PDF）的報告不寫入，記在 `hof_sync_runs.error_log`。尚未接入每日排程。
+
+### 2026-10-18（日）— 驗收：投資名人堂 P6（第一期 E2E）
+
+正式站從 sidebar 進入 `/hall_of_fame`，點 Pelosi 後交易表第 1 列與 P3 人工比對值（PTR 20035553）及 PDF 原文逐欄一致，
+「原始 PDF」連結回 200。程式未變動；P4 每日排程的隔日 cron 紀錄仍待補驗，補齊前第一期不算完成。
+
+### 2026-10-18（日）— 新增：投資名人堂 P5（第一期 UI，國會分頁）
+
+新頁 `/hall_of_fame`（sidebar 最末位「投資名人堂」）：國會議員人物卡，點開顯示最新年報持股表（估算／下限／上限三欄佔比、
+全部資產／僅有價證券切換、前 10 名圓餅圖）與近 12 個月 PTR 交易表（買賣篩選、期權口數／權利金／資料來源、交易佔比），
+每列連到原始 PDF，needs_review 加警示，金額無法對照的列照申報原字串顯示、不列入佔比。資料由
+`GET /api/v1/hall_of_fame/officials(/:slug)` 提供；「行政政要」分頁第二期建置中。
+
+### 2026-10-18（日）— 新增：投資名人堂 P4（每日排程）
+
+pm2 app `hall-of-fame-sync`（`bin/hall-of-fame-sync.sh`）每日 UTC 00:30（= 台北 08:30）執行
+`bin/rails hall_of_fame:sync_house`：House 索引同步 → 解析 pending PDF → 期權分析。每一步各寫一筆
+`hof_sync_runs`（kind = index／pdf_parse／options），某一步失敗只記錄、不中斷後續，並以結束碼 1 回報。
+手動觸發：`pm2 restart hall-of-fame-sync`。電腦在 08:30 須開機，排程才會執行。
+
+### 2026-10-17（六）— 新增：投資名人堂 P3b（期權解析＋口數反推）
+
+`bin/rails hall_of_fame:analyze_options` 解析 House 期權交易描述（`config/hall_of_fame_option_patterns.yml`），
+寫入 `hof_option_details`。有申報口數 → 反推每股權利金區間（stated_contracts）；沒有口數 → 以成交日參考價反推口數區間，
+參考價先取 Barchart 合約 price-history 頁 DOM 的當日收盤（barchart_dom，只讀 DOM、當天無成交不採用），
+頁面沒有該日才用 Black-Scholes 估算（bs_model，Yahoo 收盤＋前 30 交易日波動率）。CDP 離線時不估算、留待重試，
+並在 `hof_sync_runs`（新增 `kind` 欄位）記錄 CDP 未連線訊息。履約列只記期權資料，不反推。
+House PDF 重新解析時會先清除該份的期權明細，下次 `analyze_options` 重算。
+
+### 2026-10-17（六）— 新增：投資名人堂 P3（House PDF 解析）
+
+`bin/rails hall_of_fame:parse_house_pdfs` 下載 `parse_status=pending` 的 House PDF 到
+`storage/hall_of_fame/house/{year}/`（記 sha256），交給 Python sidecar `lib/hall_of_fame/house_parser.py`
+（pdfplumber，專用 venv，見 `lib/hall_of_fame/requirements.txt`）解析，PTR 寫入 `hof_transactions`、年報
+Schedule A 寫入 `hof_holdings`。列數對不上標記數、掃描檔、未知金額標籤 → needs_review；程式／環境錯誤 → failed，
+修好後執行 `bin/rails hall_of_fame:retry_failed_house_pdfs`。金額對照表 `config/hall_of_fame_ranges.yml`。
+首跑 87 份：parsed 44、needs_review 43（42 份為掃描檔，Khanna／McCaul 全為紙本申報）、failed 0。
+
+### 2026-10-17（六）— 新增：投資名人堂 P2（House 索引同步）
+
+`HallOfFame::HouseIndexSync` 下載眾議院當年＋前一年的 `{year}FD.zip`，依名單（Last 完全相同＋First 前綴）
+寫入 `hof_filings`（PTR／年報／修正，附 PDF 網址）。下載前以 `If-None-Match`＋`If-Modified-Since` 條件式請求，
+304 即跳過；已存在的 doc_id 不重寫。執行：`bin/rails hall_of_fame:sync_house_index`，紀錄在 `hof_sync_runs`。
+首跑 6 位議員共 87 筆。尚無排程與頁面。
+
+### 2026-10-17（六）— 新增：投資名人堂 P0–P1（盤點與資料表）
+
+依 `hall-of-fame-spec.md` 建立投資名人堂的資料層：六張 `hof_` 表（`hof_officials`、`hof_filings`、
+`hof_holdings`、`hof_transactions`、`hof_option_details`、`hof_sync_runs`），model 放 `app/models/hall_of_fame/`
+（交易 model 為 `HallOfFame::Trade`，避免蓋掉 ActiveRecord#transaction）。名單只來自
+`config/hall_of_fame.yml`，`bin/rails hall_of_fame:seed_officials` 冪等同步（11 位）。尚無頁面與排程。
 
 ### 2026-10-12（一）— 版本 v20261012，更新版本說明
 
@@ -2169,6 +2411,35 @@ bin/dev
 ```bash
 bundle exec rails tailwindcss:build
 ```
+
+## 重新 clone 後要補的 git hook
+
+`.git/hooks/` 不進版控，重新 clone 之後架構圖不會再隨 commit 產生，要手動補回：
+
+1. 安裝 code-review-graph 的 pre-commit：`code-review-graph install`。這一步會建立 `.git/hooks/pre-commit`，但**不會建立圖譜**。
+2. 建立圖譜：`code-review-graph build`（需數分鐘）。
+3. 在 `.git/hooks/pre-commit` 最後加入這一行（架構圖產生邏輯在有版控的 `bin/arch-diagram-precommit`）：
+
+   ```sh
+   bin/arch-diagram-precommit || exit 1
+   ```
+
+4. 確認可執行：`chmod +x .git/hooks/pre-commit bin/arch-diagram-precommit`。
+
+沒做第 2 步就 commit 的話，會發生什麼？2026-11-11 用暫存 clone 實測：
+- `code-review-graph update` 在沒有 graph.db 時不會失敗，而是建出 0 節點的空 graph.db。
+- 產生器會因此畫出只剩 1 層的圖。
+- 腳本現在會先擋下：找不到 graph.db、或 graph.db 是空的（`code-review-graph status` 的 Nodes 為 0），就印出「請先執行 code-review-graph build」並中止 commit。
+
+之後每次 commit 會先 `code-review-graph update --skip-flows`、重新產生 `docs/` 三個架構圖檔，有變動就併入同一個 commit。
+- 產生失敗或腳本不存在時，commit 會中止。
+- 產生器讀的是工作區與 graph.db，所以工作區裡還沒 commit 的程式改動，也會反映在這次 commit 的圖裡。
+- 已知限制：
+  - 請先 `git add` 再 `git commit`，或用 `git commit -a`。
+  - 如果用 `git commit <檔案>`，這次 commit 的圖仍然是新的，但 git 會用暫時的暫存區，所以 commit 完 `git status` 會暫時顯示 `docs/` 三檔為 `MM`。下一次正常 commit 時，hook 會重新加入新圖，自動恢復。
+- 請勿用 `--no-verify` 跳過 hook，否則可能把舊圖 commit 回去。
+- 測試：`HOOKSET=new script/arch_diagram_precommit_test.sh`。
+- 規格：`arch-diagram-autocommit.md`。
 
 ## 工具路由
 

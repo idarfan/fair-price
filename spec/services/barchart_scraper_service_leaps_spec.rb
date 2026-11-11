@@ -10,6 +10,9 @@ RSpec.describe BarchartScraperService, "#fetch_leaps" do
     # 讓 refresh_options_flow_if_stale 視為「今天已抓過」直接跳過，
     # 避免污染下方對 run_scraper("leaps", ...) 的嚴格 .with 期待。
     allow(OptionsFlow).to receive_message_chain(:where, :exists?).and_return(true)
+    # 美股盤中會多帶 --skip-iv-surface（leaps-iv-environment P2.7）；固定成非盤中，
+    # 下方對 extra_args 的嚴格比對才不會隨跑測試的時間改變。
+    allow(LeapsIvCapture).to receive(:regular_session?).and_return(false)
   end
 
   # ── Helper: stub the 5-minute cache check ───────────────────────────────────

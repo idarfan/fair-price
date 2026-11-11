@@ -121,10 +121,12 @@ RSpec.describe LeapsRecommendationService do
       expect(reason).to include("Vega")
     end
 
+    # leaps-thin-trading-flag S2：注意事項改為「成交相對清淡」的說法，不再暗示沒有成交。
     it "warns when the picked candidate has a low vol/OI ratio" do
       warned_pick = candidate(dte: 400, no_recent_volume_warning: true)
       reason = described_class.new([ warned_pick ]).call[:near_term][:reason]
-      expect(reason).to include("Volume/OI 比率偏低")
+      expect(reason).to include("⚠️ 注意：成交量相對未平倉量偏低，掛單可能較少；進出場前先確認報價與價差。")
+      expect(reason).not_to include("掛單簿可能已久未更新")
     end
 
     it "ends with the standard disclaimer" do

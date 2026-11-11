@@ -10,9 +10,27 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_06_120200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "barchart_iv_histories", force: :cascade do |t|
+    t.datetime "captured_at", null: false
+    t.datetime "created_at", null: false
+    t.decimal "imp_vol", precision: 8, scale: 5
+    t.decimal "iv_pctl", precision: 6, scale: 2
+    t.decimal "iv_rank", precision: 6, scale: 2
+    t.decimal "last_price", precision: 12, scale: 4
+    t.bigint "options_volume"
+    t.decimal "pc_oi_ratio", precision: 8, scale: 4
+    t.decimal "pc_vol_ratio", precision: 8, scale: 4
+    t.string "source_url", null: false
+    t.string "symbol", null: false
+    t.bigint "total_oi"
+    t.date "trade_date", null: false
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "trade_date"], name: "idx_barchart_iv_histories_unique", unique: true
+  end
 
   create_table "bcvs_chain_snapshots", force: :cascade do |t|
     t.datetime "created_at", null: false
@@ -123,6 +141,107 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
     t.index ["symbol", "snapshot_date"], name: "index_fundamentals_on_symbol_and_snapshot_date", unique: true
   end
 
+  create_table "hof_filings", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "doc_id", null: false
+    t.date "filing_date"
+    t.string "filing_type", null: false
+    t.bigint "official_id", null: false
+    t.text "parse_error"
+    t.string "parse_status", default: "pending", null: false
+    t.datetime "parsed_at"
+    t.string "pdf_path"
+    t.string "pdf_url"
+    t.string "sha256"
+    t.string "source", null: false
+    t.datetime "updated_at", null: false
+    t.integer "year"
+    t.index ["official_id"], name: "index_hof_filings_on_official_id"
+    t.index ["parse_status"], name: "index_hof_filings_on_parse_status"
+    t.index ["source", "doc_id"], name: "index_hof_filings_on_source_and_doc_id", unique: true
+  end
+
+  create_table "hof_holdings", force: :cascade do |t|
+    t.text "asset_name", null: false
+    t.string "asset_type"
+    t.datetime "created_at", null: false
+    t.bigint "filing_id", null: false
+    t.string "owner", null: false
+    t.string "ticker"
+    t.datetime "updated_at", null: false
+    t.string "value_label"
+    t.bigint "value_max"
+    t.bigint "value_min"
+    t.index ["filing_id"], name: "index_hof_holdings_on_filing_id"
+  end
+
+  create_table "hof_officials", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.string "category", null: false
+    t.datetime "created_at", null: false
+    t.string "display_name", null: false
+    t.string "district"
+    t.string "first_name", null: false
+    t.string "last_name", null: false
+    t.string "slug", null: false
+    t.string "source", null: false
+    t.string "title"
+    t.datetime "updated_at", null: false
+    t.index ["slug"], name: "index_hof_officials_on_slug", unique: true
+  end
+
+  create_table "hof_option_details", force: :cascade do |t|
+    t.text "calc_note"
+    t.integer "contracts_est_max"
+    t.integer "contracts_est_min"
+    t.integer "contracts_stated"
+    t.datetime "created_at", null: false
+    t.date "expiration"
+    t.string "option_right"
+    t.decimal "premium_implied_max", precision: 12, scale: 4
+    t.decimal "premium_implied_min", precision: 12, scale: 4
+    t.decimal "premium_ref", precision: 12, scale: 4
+    t.string "premium_source"
+    t.decimal "strike", precision: 12, scale: 4
+    t.bigint "transaction_id", null: false
+    t.decimal "underlying_close", precision: 12, scale: 4
+    t.datetime "updated_at", null: false
+    t.index ["transaction_id"], name: "index_hof_option_details_on_transaction_id", unique: true
+  end
+
+  create_table "hof_sync_runs", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "error_count", default: 0, null: false
+    t.text "error_log"
+    t.datetime "finished_at"
+    t.jsonb "http_validators", default: {}, null: false
+    t.string "kind", default: "index", null: false
+    t.integer "new_filings_count", default: 0, null: false
+    t.string "source", null: false
+    t.datetime "started_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["source", "kind", "started_at"], name: "index_hof_sync_runs_on_source_and_kind_and_started_at"
+  end
+
+  create_table "hof_transactions", force: :cascade do |t|
+    t.string "amount_label"
+    t.bigint "amount_max"
+    t.bigint "amount_min"
+    t.text "asset_name", null: false
+    t.string "asset_type_code"
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.bigint "filing_id", null: false
+    t.date "notified_date"
+    t.string "owner", null: false
+    t.string "ticker"
+    t.date "tx_date"
+    t.string "tx_type"
+    t.datetime "updated_at", null: false
+    t.index ["filing_id"], name: "index_hof_transactions_on_filing_id"
+    t.index ["ticker"], name: "index_hof_transactions_on_ticker"
+  end
+
   create_table "iv_daily_snapshots", force: :cascade do |t|
     t.decimal "atm_iv", precision: 8, scale: 4
     t.decimal "atm_strike", precision: 10, scale: 2
@@ -164,6 +283,36 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
     t.bigint "user_id", null: false
     t.index ["group_tag"], name: "index_iv_watchlists_on_group_tag"
     t.index ["user_id", "symbol"], name: "index_iv_watchlists_on_user_id_and_symbol", unique: true
+  end
+
+  create_table "leaps_iv_snapshots", force: :cascade do |t|
+    t.date "as_of_date", null: false
+    t.decimal "bc_hv", precision: 8, scale: 5
+    t.string "bc_hv_label"
+    t.datetime "captured_at", null: false
+    t.decimal "cm540_atm_iv", precision: 8, scale: 5
+    t.datetime "created_at", null: false
+    t.string "source", null: false
+    t.string "source_url", null: false
+    t.decimal "spot", precision: 12, scale: 4
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "as_of_date"], name: "idx_leaps_iv_snapshots_unique", unique: true
+  end
+
+  create_table "leaps_iv_surface_points", force: :cascade do |t|
+    t.date "as_of_date", null: false
+    t.decimal "call_iv", precision: 8, scale: 5
+    t.datetime "captured_at", null: false
+    t.datetime "created_at", null: false
+    t.decimal "delta", precision: 6, scale: 4
+    t.integer "dte"
+    t.date "expiration", null: false
+    t.decimal "moneyness", precision: 6, scale: 4
+    t.decimal "strike", precision: 12, scale: 4, null: false
+    t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "as_of_date", "expiration", "strike"], name: "idx_leaps_iv_surface_points_unique", unique: true
   end
 
   create_table "leaps_option_chain_snapshots", force: :cascade do |t|
@@ -747,6 +896,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
   end
 
   add_foreign_key "column_orders", "users", column: "updated_by_id"
+  add_foreign_key "hof_filings", "hof_officials", column: "official_id"
+  add_foreign_key "hof_holdings", "hof_filings", column: "filing_id"
+  add_foreign_key "hof_option_details", "hof_transactions", column: "transaction_id"
+  add_foreign_key "hof_transactions", "hof_filings", column: "filing_id"
   add_foreign_key "iv_watchlists", "users"
   add_foreign_key "margin_positions", "users"
   add_foreign_key "option_snapshots", "tracked_tickers"

@@ -6,8 +6,14 @@ RSpec.describe LeapsRankingService do
   # All rows in one example share the same scraped_at so maximum() returns them all.
   around { |ex| freeze_time { ex.run } }
 
+  # 沒指定 strike 時從 13.0 起每筆 +0.5（現價 13.08、Mid 3.2 → 外在價值皆為正；
+  # 每例重新起算，同例內不重複，符合 idx_leaps_chain_unique）。factory 的全域 strike
+  # 序列在 suite 前段很低（8.5 起），會算出負外在價值被排除；隨機順序下哪個案例先跑
+  # 就輪到誰失敗（seed 17594 sort order、seed 9176 bid_ask_spread_pct）。
+  let(:strike_seq) { 13.0.step(by: 0.5) }
+
   def make(attrs)
-    create(:leaps_option_chain_snapshot, attrs)
+    create(:leaps_option_chain_snapshot, { strike: strike_seq.next }.merge(attrs))
   end
 
   # ── Delta filter ─────────────────────────────────────────────────────────────
@@ -73,24 +79,30 @@ RSpec.describe LeapsRankingService do
     end
   end
 
-  # ── vol_oi_ratio warning ──────────────────────────────────────────────────────
+  # ── 成交相對清淡（leaps-thin-trading-flag S1）────────────────────────────────
+  #
+  # 判定改用同一列 volume ÷ OI 自算（不四捨五入），不再讀 Barchart V&G 頁的
+  # vol_oi_ratio（只到小數第 2 位、與 Options 頁不同時間抓、深價內履約價常缺）。
+  # 界線公式不變：非 nil 值升冪排序，cutoff = max(floor(n/3), 1)，取 ratios[cutoff-1]。
+  # 下列既有案例的輸入從 vol_oi_ratio 改成 volume／OI，故意把 vol_oi_ratio 設成
+  # 與自算值相反的排序，證明判定不讀它。
 
   describe "no_recent_volume_warning" do
     context "with enough candidates (n >= 4)" do
       before do
-        make(delta: 0.80, open_interest: 90_000, vol_oi_ratio: 0.040)
-        make(delta: 0.80, open_interest: 70_000, vol_oi_ratio: 0.030)
-        make(delta: 0.80, open_interest: 50_000, vol_oi_ratio: 0.020)
-        make(delta: 0.80, open_interest: 10_000, vol_oi_ratio: 0.002)
+        make(delta: 0.80, open_interest: 90_000, volume: 3_600, vol_oi_ratio: 0.0)   # 0.04
+        make(delta: 0.80, open_interest: 70_000, volume: 2_100, vol_oi_ratio: 0.0)   # 0.03
+        make(delta: 0.80, open_interest: 50_000, volume: 1_000, vol_oi_ratio: 0.0)   # 0.02
+        make(delta: 0.80, open_interest: 10_000, volume: 20,    vol_oi_ratio: 0.99)  # 0.002
       end
 
-      it "flags candidates at or below the 33rd-percentile vol_oi_ratio boundary" do
+      it "flags candidates at or below the bottom-third computed Vol/OI boundary" do
         results = described_class.new("NOK").call
         flagged = results.select { |e| e[:no_recent_volume_warning] }
         expect(flagged.map { |e| e[:open_interest] }).to contain_exactly(10_000)
       end
 
-      it "does not flag higher vol_oi_ratio candidates" do
+      it "does not flag higher computed Vol/OI candidates" do
         results   = described_class.new("NOK").call
         unflagged = results.reject { |e| e[:no_recent_volume_warning] }
         expect(unflagged.size).to eq(3)
@@ -99,9 +111,9 @@ RSpec.describe LeapsRankingService do
 
     context "with too few candidates (n < 4) — relative threshold meaningless" do
       before do
-        make(delta: 0.80, open_interest: 90_000, vol_oi_ratio: 0.001)  # tiny ratio
-        make(delta: 0.80, open_interest: 50_000, vol_oi_ratio: 0.002)
-        make(delta: 0.80, open_interest: 10_000, vol_oi_ratio: 0.003)
+        make(delta: 0.80, open_interest: 90_000, volume: 90)   # tiny ratio
+        make(delta: 0.80, open_interest: 50_000, volume: 100)
+        make(delta: 0.80, open_interest: 10_000, volume: 30)
       end
 
       it "does not flag any candidate (threshold returns nil)" do
@@ -110,39 +122,172 @@ RSpec.describe LeapsRankingService do
       end
     end
 
-    context "when vol_oi_ratio is nil and threshold exists" do
+    context "when OI is 0 (computed Vol/OI is nil) and threshold exists" do
       before do
-        make(delta: 0.80, open_interest: 90_000, vol_oi_ratio: 0.040)
-        make(delta: 0.80, open_interest: 70_000, vol_oi_ratio: 0.030)
-        make(delta: 0.80, open_interest: 50_000, vol_oi_ratio: 0.020)
-        make(delta: 0.80, open_interest: 5_000,  vol_oi_ratio: nil)
+        make(delta: 0.80, open_interest: 90_000, volume: 3_600)
+        make(delta: 0.80, open_interest: 70_000, volume: 2_100)
+        make(delta: 0.80, open_interest: 50_000, volume: 1_000)
+        make(delta: 0.80, open_interest: 0, volume: 50, vol_oi_ratio: nil)
       end
 
-      it "flags nil vol_oi_ratio when a valid threshold exists" do
-        result = described_class.new("NOK").call.find { |e| e[:open_interest] == 5_000 }
-        expect(result[:no_recent_volume_warning]).to be true
+      it "does not flag the row — insufficient data is not judged" do
+        result = described_class.new("NOK").call.find { |e| e[:open_interest].to_i.zero? }
+        expect(result[:no_recent_volume_warning]).to be false
+        expect(result[:computed_vol_oi]).to be_nil
       end
     end
 
-    context "when vol_oi_ratio is nil and threshold is nil (n < 4)" do
+    context "when OI is nil and threshold is nil (n < 4)" do
       before do
-        make(delta: 0.80, open_interest: 90_000, vol_oi_ratio: nil)
+        make(delta: 0.80, open_interest: nil, vol_oi_ratio: nil)
       end
 
-      it "does not flag nil vol_oi_ratio when threshold is also nil" do
+      it "does not flag the row" do
         result = described_class.new("NOK").call.first
         expect(result[:no_recent_volume_warning]).to be false
       end
     end
   end
 
+  describe ".computed_vol_oi" do
+    it "returns volume / OI without rounding" do
+      expect(described_class.computed_vol_oi(9, 8045)).to be_within(1e-12).of(9.0 / 8045)
+    end
+
+    it "returns 0.0 when volume is 0 and OI > 0" do
+      expect(described_class.computed_vol_oi(0, 500)).to eq(0.0)
+    end
+
+    it "returns nil when OI is 0 or nil, or volume is nil" do
+      expect(described_class.computed_vol_oi(50, 0)).to be_nil
+      expect(described_class.computed_vol_oi(50, nil)).to be_nil
+      expect(described_class.computed_vol_oi(nil, 500)).to be_nil
+    end
+  end
+
+  # 驗收資料：2026-11-09 23:07 台北（10:07 EST）NVDA 那批的實例。
+  describe "acceptance data (7 candidates from the 2026-11-09 NVDA batch)" do
+    # 代號 => [volume, OI, DB vol_oi_ratio, 自算值]
+    let(:acceptance) do
+      {
+        "A" => [ 9,    8_045,  0.0,  0.001119 ],
+        "B" => [ 96,   226,    0.19, 0.424779 ],
+        "C" => [ 5,    10,     0.0,  0.5 ],
+        "D" => [ 3583, 15_725, nil,  0.227854 ],
+        "E" => [ 0,    500,    nil,  0.0 ],
+        "F" => [ 50,   0,      nil,  nil ],
+        "G" => [ 724,  14_764, 0.05, 0.049038 ]
+      }
+    end
+    let(:service) { described_class.new("NOK") }
+    let(:results) { service.call }
+    let(:rows)    { by_code(results, acceptance) }
+
+    def by_code(results, acceptance)
+      acceptance.to_h do |code, (vol, oi, _db, _calc)|
+        [ code, results.find { |e| e[:volume] == vol && e[:open_interest] == oi } ]
+      end
+    end
+
+
+    before do
+      acceptance.each_value do |vol, oi, db_ratio, _calc|
+        make(delta: 0.80, volume: vol, open_interest: oi, vol_oi_ratio: db_ratio, extrinsic_value: 0.5)
+      end
+    end
+
+    it "computes Vol/OI to 6 decimal places; F is nil" do
+      acceptance.each do |code, (_vol, _oi, _db, calc)|
+        actual = rows.fetch(code)[:computed_vol_oi]
+        if calc.nil?
+          expect(actual).to be_nil, "#{code} should be nil"
+        else
+          expect(actual.round(6)).to eq(calc), "#{code}: #{actual}"
+        end
+      end
+    end
+
+    it "keeps the stored vol_oi_ratio untouched" do
+      expect(rows.fetch("B")[:vol_oi_ratio].to_f).to eq(0.19)
+      expect(rows.fetch("D")[:vol_oi_ratio]).to be_nil
+    end
+
+    # 界線手算：非 nil 自算值 {E 0.0, A 0.001119, G 0.049038, D 0.227854, B 0.424779, C 0.5}
+    # n = 6，cutoff = max(floor(6/3), 1) = 2，界線 = ratios[2 - 1] = 0.001119（A）。
+    # 被標記 = 自算值 ≤ 0.001119 → E、A。
+    it "flags exactly E and A (computed Vol/OI <= 0.001119)" do
+      flagged = rows.select { |_code, e| e[:no_recent_volume_warning] }.keys
+      expect(flagged).to contain_exactly("E", "A")
+    end
+
+    it "does not flag F (nil), D (old logic flagged NULL) or C (old logic flagged stored 0)" do
+      %w[F D C].each do |code|
+        expect(rows.fetch(code)[:no_recent_volume_warning]).to be(false), code
+      end
+    end
+
+    it "all_zero_volume? is false" do
+      results
+      expect(service.all_zero_volume?).to be false
+    end
+
+    it "call still returns an Array" do
+      expect(results).to be_an(Array)
+    end
+  end
+
+  describe "all OI are 0" do
+    let(:service) { described_class.new("NOK") }
+
+    before { 5.times { make(delta: 0.80, volume: 10, open_interest: 0) } }
+
+    it "has no threshold, so nothing is flagged" do
+      expect(service.call.none? { |e| e[:no_recent_volume_warning] }).to be true
+      expect(service.all_zero_volume?).to be false
+    end
+  end
+
+  describe "all computed Vol/OI are 0 (e.g. before the market opens)" do
+    let(:service) { described_class.new("NOK") }
+
+    before do
+      [ 8_045, 226, 10, 15_725, 500, 300, 14_764 ].each do |oi|
+        make(delta: 0.80, volume: 0, open_interest: oi, extrinsic_value: 0.5)
+      end
+    end
+
+    it "flags no row and reports all_zero_volume? true" do
+      results = service.call
+      expect(results.size).to eq(7)
+      expect(results.none? { |e| e[:no_recent_volume_warning] }).to be true
+      expect(service.all_zero_volume?).to be true
+    end
+  end
+
+  describe "#all_zero_volume? before #call" do
+    it "is false" do
+      expect(described_class.new("NOK").all_zero_volume?).to be false
+    end
+  end
+
+  describe "#all_zero_volume? when there are no candidates" do
+    it "is false" do
+      service = described_class.new("NOK")
+      expect(service.call).to eq([])
+      expect(service.all_zero_volume?).to be false
+    end
+  end
+
   # ── Sorting ───────────────────────────────────────────────────────────────────
 
   describe "sort order" do
+    # extrinsic_value 明確指定：factory 的 strike 序列在 suite 前段很低（8.5 起），
+    # 內在價值大於 Mid 會算出負外在價值而被排除。隨機順序下此案例排在前面就會失敗
+    # （seed 17594 重現，BASE 上單跑亦同），與 delta filter 區塊同樣處理。
     before do
-      make(delta: 0.80, open_interest: 30_000, dte: 730)
-      make(delta: 0.80, open_interest: 80_000, dte: 400)  # was 180 (< 364, now excluded)
-      make(delta: 0.80, open_interest: 80_000, dte: 540)
+      make(delta: 0.80, open_interest: 30_000, dte: 730, extrinsic_value: 0.5)
+      make(delta: 0.80, open_interest: 80_000, dte: 400, extrinsic_value: 0.5)  # was 180 (< 364, now excluded)
+      make(delta: 0.80, open_interest: 80_000, dte: 540, extrinsic_value: 0.5)
     end
 
     it "sorts by OI descending, then DTE descending on tie" do
