@@ -34,7 +34,7 @@ S1 在暫存 git repo（含假遠端 bare repo）跑情境；S2 實際 push 一�
 
 | 階段 | 內容 | 狀態 | 驗證證據 | 審查 |
 |---|---|---|---|---|
-| S0 | 定位 pre-push hook、實測產生時間 | 完成 | pre-push：`/home/idarfan/fairprice/.git/hooks/pre-push`（未版控；無 `core.hooksPath`、無 lefthook／overcommit／husky／pre-commit-config），第 38–39 行 `python3 ~/.claude/scripts/gen_arch_spec.py <repo>`、`python3 ~/.claude/scripts/gen_architecture.py <repo>`，graph.db 不在就跳過，永遠 exit 0。產生檔案：`docs/architecture_spec.yml`、`docs/fairprice-architecture.svg`、`docs/fairprice-architecture.html`（`.excalidraw` 不在產出內）。乾淨工作區連跑 3 次：0.19／0.17／0.34 秒，最大 0.34 秒（只記錄）。決定性：3 次 sha256 皆與 HEAD 相同（spec 53f555d7…、svg 3d7a4eae…、html c7a01760…），跑完工作區仍乾淨。輸入來源：`gen_arch_spec.py` 讀 `.code-review-graph/graph.db`（sqlite；「自動化腳本」層的 scraper 名稱來自 `get_python_items` :167-188 查 `nodes WHERE language='python'`）、工作區設定檔，以及 :203-209 glob `<repo>/scripts/*.py`、`<repo>/backend/scripts/*.py`（只用來偵測外部依賴；S0 r1 審查更正，原誤寫為 `lib/barchart_scrapers/*.py`）；`gen_architecture.py` glob 工作區 app/ 檔案並讀 spec → **讀工作區與 graph.db，不讀暫存區**。graph.db 由 Claude PostToolUse（Edit\|Write\|Bash）`code-review-graph update --skip-flows` 更新，終端機直接改檔不會更新（實測 update 約 2.2–2.4 秒）。既有 pre-commit：git `.git/hooks/pre-commit`（code-review-graph 安裝，`detect-changes --brief \|\| true`）；`pre-commit-rubocop.sh` 是 `~/.claude/settings.json` 的 Claude PreToolUse（Bash，指令含 `git commit` 才跑），終端機 commit 不經過。 | 異端審查官表示: VERDICT: PASS（verdict-arch-diagram-autocommit-S0-r1.md） |
+| S0 | 定位 pre-push hook、實測產生時間 | 完成 | pre-push：`/home/idarfan/fairprice/.git/hooks/pre-push`（未版控；無 `core.hooksPath`、無 lefthook／overcommit／husky／pre-commit-config），第 38–39 行 `python3 ~/.claude/scripts/gen_arch_spec.py <repo>`、`python3 ~/.claude/scripts/gen_architecture.py <repo>`，graph.db 不在就跳過，永遠 exit 0。產生檔案：`docs/architecture_spec.yml`、`docs/fairprice-architecture.svg`、`docs/fairprice-architecture.html`（`.excalidraw` 不在產出內）。乾淨工作區連跑 3 次：0.19／0.17／0.34 秒，最大 0.34 秒（只記錄）。決定性：3 次 sha256 皆與 HEAD 相同（spec 53f555d7…、svg 3d7a4eae…、html c7a01760…），跑完工作區仍乾淨。輸入來源：`gen_arch_spec.py` 讀 `.code-review-graph/graph.db`（sqlite；「自動化腳本」層的 scraper 名稱來自 `get_python_items` :167-188 查 `nodes WHERE language='python'`）、工作區設定檔，以及 :203-209 glob `<repo>/scripts/*.py`、`<repo>/backend/scripts/*.py`（只用來偵測外部依賴；S0 r1 審查更正，原誤寫為 `lib/barchart_scrapers/*.py`）；`gen_architecture.py` glob 工作區 app/ 檔案並讀 spec → **讀工作區與 graph.db，不讀暫存區**。graph.db 由 Claude PostToolUse（Edit\|Write\|Bash）`code-review-graph update --skip-flows` 更新，終端機直接改檔不會更新（實測 update 約 2.2–2.4 秒；patch2 追加：2026-11-11 連跑 3 次 `code-review-graph update --skip-flows` 為 1.90／1.87／1.83 秒，最大 1.90 秒）。既有 pre-commit：git `.git/hooks/pre-commit`（code-review-graph 安裝，`detect-changes --brief \|\| true`）；`pre-commit-rubocop.sh` 是 `~/.claude/settings.json` 的 Claude PreToolUse（Bash，指令含 `git commit` 才跑），終端機 commit 不經過。 | 異端審查官表示: VERDICT: PASS（verdict-arch-diagram-autocommit-S0-r1.md） |
 | S1 | 實作方案 A＋測試 | 未開始 | | |
 | S2 | 實際 push 驗收 | 未開始 | | |
 
@@ -62,7 +62,9 @@ S1 在暫存 git repo（含假遠端 bare repo）跑情境；S2 實際 push 一�
 ## S1 實作
 
 ### 方案 A（pre-commit）
-- 擴充既有 pre-commit hook（如 `pre-commit-rubocop.sh` 所在的鏈），既有檢查順序在前，產生架構圖在後：執行產生指令 → 若 S0 清單內檔案有變動 → `git add <清單內檔案>`。
+- 掛在 git 的 `/home/idarfan/fairprice/.git/hooks/pre-commit`，排在既有 `code-review-graph detect-changes` 之後（任何地方 commit 都會觸發；Claude Code commit 時其 rubocop hook 仍先跑完）。不修改 `~/.claude/hooks/pre-commit-rubocop.sh`。
+- 流程：`code-review-graph update --skip-flows`（先更新 graph.db，使終端機／IDE 直接改的程式也反映在圖上）→ 執行產生指令 → 若 S0 清單內檔案有變動 → `git add <清單內檔案>`。
+- `update` 或產生任一步失敗 → commit 中止並印出錯誤。
 - 從 pre-push 移除產生步驟。
 - 產生指令必須以**暫存區內容**為準不可行時（產生器讀工作區），在證據欄註明：工作區有未暫存的程式改動時，圖可能反映未 commit 的程式。
 
@@ -75,6 +77,7 @@ S1 在暫存 git repo（含假遠端 bare repo）跑情境；S2 實際 push 一�
 | T2 圖無需更新 | commit 不含圖檔；push 一次成功 |
 | T3 產生指令失敗 | commit 中止，印出錯誤 |
 | T4 工作區另有無關未 commit 檔 | 自動 commit 不含該檔 |
+| T5 不經 Claude Code、直接修改程式檔後 commit | graph.db 被更新，commit 內的圖反映該修改 |
 
 驗證：4 案全過；T1 必須在**舊 hook** 下失敗（遠端圖為舊版），送審附新舊兩次輸出。
 
