@@ -13,6 +13,8 @@
 
 選擇邏輯（`LeapsBestValueService`、`LeapsRecommendationService`）沒有修改。新增回歸基準 `f_with_best_value`（左右兩卡同時出現）。規格：`leaps-best-value-card-style.md`。
 
+S2 正式站驗收（TSM）：640／1104／1280px 的欄數與每格的空間都和測試環境一致，1104px 是切回 5 欄的臨界點。375px 頁首可以橫向捲動，這是全站導覽列的既有問題，不在本規格處理。
+
 ### 2026-11-11（三）— 架構圖改在 commit 時產生並併入同一個 commit
 
 以前 `docs/` 的架構圖是在 pre-push 時才產生，而且產生後不會 commit。結果是推上 GitHub 的永遠是舊圖，push 完工作區還會多出 3 個沒 commit 的修改。
