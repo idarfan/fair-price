@@ -64,6 +64,8 @@ S1 在暫存 git repo（含假遠端 bare repo）跑情境；S2 實際 push 一�
 ### 方案 A（pre-commit）
 - 掛在 git 的 `/home/idarfan/fairprice/.git/hooks/pre-commit`，排在既有 `code-review-graph detect-changes` 之後（任何地方 commit 都會觸發；Claude Code commit 時其 rubocop hook 仍先跑完）。不修改 `~/.claude/hooks/pre-commit-rubocop.sh`。
 - 流程：`code-review-graph update --skip-flows`（先更新 graph.db，使終端機／IDE 直接改的程式也反映在圖上）→ 執行產生指令 → 若 S0 清單內檔案有變動 → `git add <清單內檔案>`。
+- 上述流程寫在 `/home/idarfan/fairprice/bin/arch-diagram-precommit`（納入版控、可執行）；`.git/hooks/pre-commit` 只加一行呼叫它並傳回其結束碼。
+- README 補一段「重新 clone 後，在 `.git/hooks/pre-commit` 加入：`bin/arch-diagram-precommit || exit 1`」。
 - `update` 或產生任一步失敗 → commit 中止並印出錯誤。
 - 從 pre-push 移除產生步驟。
 - 產生指令必須以**暫存區內容**為準不可行時（產生器讀工作區），在證據欄註明：工作區有未暫存的程式改動時，圖可能反映未 commit 的程式。
@@ -78,6 +80,7 @@ S1 在暫存 git repo（含假遠端 bare repo）跑情境；S2 實際 push 一�
 | T3 產生指令失敗 | commit 中止，印出錯誤 |
 | T4 工作區另有無關未 commit 檔 | 自動 commit 不含該檔 |
 | T5 不經 Claude Code、直接修改程式檔後 commit | graph.db 被更新，commit 內的圖反映該修改 |
+| T6 `bin/arch-diagram-precommit` 不存在或不可執行 | commit 中止並印出錯誤，不靜默放行 |
 
 驗證：4 案全過；T1 必須在**舊 hook** 下失敗（遠端圖為舊版），送審附新舊兩次輸出。
 
