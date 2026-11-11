@@ -104,6 +104,6 @@ fi
 3. `git checkout -- <該檔>` 還原。
 4. 新建 `app/assets/javascripts/prettier_scope_probe.js`（未納版控、不在 `.gitignore`、新檔），先以 `prettier --file-info` 確認 `"ignored": false`，寫入未排版內容 → 確認被排版 → 立即刪除。
 
-驗證：步驟 2 的 `--stat` 輸出、步驟 4 的 `--file-info` 輸出與排版前後內容附證據；`git status` 回到乾淨狀態（既有 docs/ 3 個未追蹤檔除外，逐一列名）。
+驗證：步驟 2 的 `--stat` 輸出、步驟 4 的 `--file-info` 輸出與排版前後內容附證據；`git status` 回到乾淨狀態（既有 docs/ 3 個「已追蹤、有未 commit 修改」的檔除外，逐一列名）。
 
 不需重啟 server（未改 app 程式）。
