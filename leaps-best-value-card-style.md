@@ -33,7 +33,7 @@ request spec 比對兩卡的 DOM 結構與 class；Playwright 截桌面／手機
 
 | 階段 | 內容 | 狀態 | 驗證證據 | 審查 |
 |---|---|---|---|---|
-| S0 | 定位兩卡的繪製程式 | 未開始 | | |
+| S0 | 定位兩卡的繪製程式 | 完成 | 外框：`concept_cards.rb:241-252` `render_recommendation_group`（左 `render_best_value_card`、右 `div[data-leaps-oi-card]`）。**右卡** `render_oi_recommendation` 256-275：膠囊 `render_pick_badge` 278-288（呼叫於 264；class 依 `pick[:liquidity_tier]` 取 `LIQUIDITY_STYLE` 顏色，非固定綠色）、次選灰字 268-270、說明文字 272（`group[:reason]`，來自 `LeapsRecommendationService`）、明細 273 → `best_value_cards.rb:36-39` `render_oi_metric_blocks`。**左卡** `best_value_cards.rb:17-33` `render_best_value_card`：標題＋「與流動性最佳相同」、`render_contract_block` 42-55（「主推／次選」小字＋`$K / 到期日`＋⚠）；無膠囊、無說明文字。**明細格兩卡已共用** `render_metric_list` 59-71＋`metric_items` 73-84，欄位同為：履約價／到期日、Delta、Ask、OI、成交量、Spread %、年化時間成本、損益兩平（兩卡都沒有 Mid；右卡 Mid 只出現在說明文字）。左卡的列來自 `LeapsBestValueService#graded_candidates` 61-62 的 `slice`，不含 `:mid`、`:liquidity_tier`（但含 bid、ask）。**PDF**：`pdf_export.rb:113-126` `pdf_reco_group` 只輸出右卡的膠囊與說明文字（說明文字 135 行已含「Mid $x」），沒有明細格，最划算卡完全不進 PDF。規格「找到的問題 2」（兩邊各寫一份明細）前提不成立：兩卡已共用明細格，都缺 Mid（S0 r1 質詢 4）。右卡 Mid 來源 `LeapsOptionChainSnapshot#mid_price`（model 47-52）：bid、ask 皆有時為 `(bid + ask) / 2.0`，缺一邊時取另一邊。 | 異端審查官表示: VERDICT: PASS（verdict-leaps-best-value-card-style-S0-r1.md） |
 | S1 | 共用元件＋補 Mid＋左卡說明文字 | 未開始 | | |
 | S2 | 實頁截圖驗收 | 未開始 | | |
 
