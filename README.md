@@ -1,5 +1,22 @@
 # FairPrice
 
+### 2026-11-11（三）— 架構圖改在 commit 時產生並併入同一個 commit
+
+以前 `docs/` 的架構圖是在 pre-push 時才產生，而且產生後不會 commit。結果是推上 GitHub 的永遠是舊圖，push 完工作區還會多出 3 個沒 commit 的修改。
+
+現在改到 git pre-commit：
+- `.git/hooks/pre-commit` 會呼叫 `bin/arch-diagram-precommit`。
+- 這支腳本先更新 graph.db，再產生架構圖，圖有變動就併入這次 commit。
+- pre-push 不再產生架構圖。
+- 每次 commit 大約多等 2 秒。
+
+以下情況會中止 commit，不會靜默放行：
+- 產生失敗。
+- 腳本不存在或不能執行。
+- 還沒建好圖譜。
+
+重新 clone 後要補的步驟，見下方「重新 clone 後要補的 git hook」。測試：`script/arch_diagram_precommit_test.sh`。規格：`arch-diagram-autocommit.md`。
+
 ### 2026-11-11（三）— 編輯後的 prettier hook 不再整檔重排舊檔
 
 以前 `~/.claude/hooks/post-edit-ts.sh` 每次都對整個檔案跑 prettier。舊檔只改一行，整份也會被重新排版，`vector_pdf.js` 就因此一次多出 427 行差異。
@@ -2367,6 +2384,35 @@ bin/dev
 ```bash
 bundle exec rails tailwindcss:build
 ```
+
+## 重新 clone 後要補的 git hook
+
+`.git/hooks/` 不進版控，重新 clone 之後架構圖不會再隨 commit 產生，要手動補回：
+
+1. 安裝 code-review-graph 的 pre-commit：`code-review-graph install`。這一步會建立 `.git/hooks/pre-commit`，但**不會建立圖譜**。
+2. 建立圖譜：`code-review-graph build`（需數分鐘）。
+3. 在 `.git/hooks/pre-commit` 最後加入這一行（架構圖產生邏輯在有版控的 `bin/arch-diagram-precommit`）：
+
+   ```sh
+   bin/arch-diagram-precommit || exit 1
+   ```
+
+4. 確認可執行：`chmod +x .git/hooks/pre-commit bin/arch-diagram-precommit`。
+
+沒做第 2 步就 commit 的話，會發生什麼？2026-11-11 用暫存 clone 實測：
+- `code-review-graph update` 在沒有 graph.db 時不會失敗，而是建出 0 節點的空 graph.db。
+- 產生器會因此畫出只剩 1 層的圖。
+- 腳本現在會先擋下：找不到 graph.db、或 graph.db 是空的（`code-review-graph status` 的 Nodes 為 0），就印出「請先執行 code-review-graph build」並中止 commit。
+
+之後每次 commit 會先 `code-review-graph update --skip-flows`、重新產生 `docs/` 三個架構圖檔，有變動就併入同一個 commit。
+- 產生失敗或腳本不存在時，commit 會中止。
+- 產生器讀的是工作區與 graph.db，所以工作區裡還沒 commit 的程式改動，也會反映在這次 commit 的圖裡。
+- 已知限制：
+  - 請先 `git add` 再 `git commit`，或用 `git commit -a`。
+  - 如果用 `git commit <檔案>`，這次 commit 的圖仍然是新的，但 git 會用暫時的暫存區，所以 commit 完 `git status` 會暫時顯示 `docs/` 三檔為 `MM`。下一次正常 commit 時，hook 會重新加入新圖，自動恢復。
+- 請勿用 `--no-verify` 跳過 hook，否則可能把舊圖 commit 回去。
+- 測試：`HOOKSET=new script/arch_diagram_precommit_test.sh`。
+- 規格：`arch-diagram-autocommit.md`。
 
 ## 工具路由
 

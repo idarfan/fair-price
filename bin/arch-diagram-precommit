@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# 架構圖隨 commit 產生（arch-diagram-autocommit.md，2026-11-11）。
+#
+# 由 .git/hooks/pre-commit 在 code-review-graph detect-changes 之後呼叫：
+#   bin/arch-diagram-precommit || exit 1
+# .git/hooks 不進版控，重新 clone 之後要把上面那一行加回 pre-commit（見 README）。
+#
+# 流程：
+#   1. code-review-graph update --skip-flows
+#      先更新 graph.db。graph.db 平常只在 Claude Code 的工具呼叫後更新，終端機／IDE
+#      直接改的程式不會反映；不先更新，圖會是舊的。
+#   2. 產生架構圖（~/.claude/scripts/gen_arch_spec.py、gen_architecture.py，產生邏輯不改）
+#   3. docs/ 三個圖檔有變動 → git add 進這次 commit（只 add 這三檔，不碰其他檔案）
+# 任一步失敗 → 印出錯誤並以非 0 結束，pre-commit 會中止 commit，不靜默放行。
+#
+# 注意：產生器讀的是工作區與 graph.db，不是暫存區。工作區有未暫存的程式改動時，
+# 這次 commit 的圖也會反映那些還沒 commit 的程式。
+#
+# ARCH_DIAGRAM_GENERATE_CMD：只給測試用（script/arch_diagram_precommit_test.sh 換成替身產生器）。
+set -u
+
+fail() {
+  echo "⛔ arch-diagram-precommit：$1" >&2
+  echo "   commit 已中止。修正後重新 commit；請勿用 --no-verify 跳過，否則可能把舊圖 commit 回去。" >&2
+  exit 1
+}
+
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || fail "不在 git repo 內"
+cd "$REPO_ROOT" || fail "無法進入 $REPO_ROOT"
+
+DIAGRAM_FILES=(
+  docs/architecture_spec.yml
+  docs/fairprice-architecture.svg
+  docs/fairprice-architecture.html
+)
+
+command -v code-review-graph >/dev/null 2>&1 || fail "找不到 code-review-graph 指令"
+
+# 剛 clone 的 repo 沒有圖譜。update 在這種情況不會失敗，而是建出 0 節點的空 graph.db
+# 並 exit 0，產生器接著畫出只剩 1 層的圖、被當成「已更新」併進 commit（2026-11-11 實測）。
+# 所以 update 之前先確認圖譜存在且有節點。install 只裝 hook，不建圖譜，要靠 build。
+NEED_BUILD="請先執行 code-review-graph build 建立圖譜（數分鐘；剛 clone 的 repo 還要先 code-review-graph install 裝 hook），再重新 commit"
+[ -f .code-review-graph/graph.db ] || fail "找不到 .code-review-graph/graph.db。$NEED_BUILD"
+NODES=$(code-review-graph status 2>/dev/null | sed -n 's/^Nodes: *//p' | head -1)
+[ "${NODES:-0}" -gt 0 ] 2>/dev/null || fail "graph.db 是空的（Nodes: ${NODES:-?}）。$NEED_BUILD"
+
+echo "📐 arch-diagram-precommit：更新 graph.db…" >&2
+code-review-graph update --skip-flows >&2 || fail "graph.db 更新失敗（code-review-graph update --skip-flows）"
+
+echo "📐 arch-diagram-precommit：產生架構圖…" >&2
+if [ -n "${ARCH_DIAGRAM_GENERATE_CMD:-}" ]; then
+  bash -c "$ARCH_DIAGRAM_GENERATE_CMD" >&2 || fail "架構圖產生失敗（$ARCH_DIAGRAM_GENERATE_CMD）"
+else
+  python3 "$HOME/.claude/scripts/gen_arch_spec.py" "$REPO_ROOT" >&2 ||
+    fail "架構圖產生失敗（gen_arch_spec.py）"
+  python3 "$HOME/.claude/scripts/gen_architecture.py" "$REPO_ROOT" >&2 ||
+    fail "架構圖產生失敗（gen_architecture.py）"
+fi
+
+for f in "${DIAGRAM_FILES[@]}"; do
+  [ -f "$f" ] || fail "產生後找不到 $f"
+done
+
+if git diff --quiet -- "${DIAGRAM_FILES[@]}"; then
+  echo "📐 arch-diagram-precommit：架構圖沒有變動" >&2
+else
+  git add -- "${DIAGRAM_FILES[@]}" || fail "git add 架構圖失敗"
+  echo "📐 arch-diagram-precommit：架構圖已更新，併入這次 commit" >&2
+fi
+exit 0
