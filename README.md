@@ -1,5 +1,15 @@
 # FairPrice
 
+### 2026-11-11（三）— 編輯後的 prettier hook 不再整檔重排舊檔
+
+以前 `~/.claude/hooks/post-edit-ts.sh` 每次都對整個檔案跑 prettier。舊檔只改一行，整份也會被重新排版，`vector_pdf.js` 就因此一次多出 427 行差異。
+
+現在 hook 會先看這個檔案在 HEAD 的狀態：
+- 新檔、或 HEAD 版本已經符合 prettier：照常排版。
+- HEAD 版本從來沒排版過：跳過 prettier，只跑 eslint。
+
+實測在 `vector_pdf.js` 檔尾加一行，diff 只顯示 1 行新增；新建的檔案仍會照常排版。測試腳本是 `~/.claude/hooks/test/prettier_scope_test.sh`。規格見 `prettier-hook-scope.md`。
+
 ### 2026-11-11（三）— 修正 PDF 字型子集腳本的掃描範圍
 
 修正 LEAPS PDF 字型子集腳本。
