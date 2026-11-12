@@ -45,6 +45,9 @@ namespace :hall_of_fame do
 
   desc "每日排程（P4）：House 索引同步 → 解析 pending PDF → 期權分析；任一步失敗不中斷後續，結束碼 1"
   task sync_house: :environment do
+    # P4.1-2：pm2 cron 提早觸發時整輪略過（cron_restart 是 pm2 傳進來的排程字串；手動執行沒有）。
+    next if HallOfFame::SyncCronGate.new.early_fire?(ENV.fetch("cron_restart", nil))
+
     result = HallOfFame::HouseDailySync.new.call
     result.runs.each do |kind, run|
       puts "hall_of_fame:sync_house #{kind} run##{run.id} 錯誤 #{run.error_count}"
