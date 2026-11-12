@@ -14,6 +14,10 @@
 | P3 | House PDF 解析 | 完成 | r2 PASS | `hall_of_fame:parse_house_pdfs` 全量 87 份：parsed 44（ptr 42、annual 2）、needs_review 43、failed 0、pending 0；hof_transactions 1246、hof_holdings 779。needs_review：42 份掃描檔（文字層 0 字，Khanna PTR 21＋年報、McCaul PTR 19＋年報，皆 8/9 開頭紙本申報）、10075701 第 59 列 `Undetermined`。自洽檢查：有文字層 45 份列數＝標記數 45/45（FS 標記與年報 Schedule A `[XX]` 皆獨立計數，Schedule A→B 相鄰檢查全過）。夾具：20035553（Pelosi 最新 PTR）snapshot、20004433 舊格式回歸、8221120 掃描檔、10075701 年報。人工比對：20035553 唯一 1 列＋20035143 前 5 列與 PDF 一致。pytest 25 passed；rspec 1454 examples 0 failures。差異：Ruby 寫 DB、Python 只解析（使用者裁示 psql＝PostgreSQL）；§3 擴充 None／$1 - $1,000／精確金額；不寫 hof_sync_runs（避免覆蓋 P2 validators）；`.gitignore` 加 `/lib/hall_of_fame/venv/`；CI 無 venv，真 sidecar example skip、pytest 未接 CI。 | 2026-10-17 |
 | P3b | 期權解析＋口數反推 | 完成 | r2 PASS | `hall_of_fame:analyze_options` 正式庫 50 筆期權列：barchart_dom 4（MSFT 2026-08-14 四個合約，335C Dec 165.02／量 50 經使用者手動核對一致）、bs_model 22、stated_contracts 14、空值 10（履約列 8 只記期權資料不反推、Crenshaw META「10 puts at $X」2 筆 needs_review）；filings needs_review 44、parsed 43。夾具 20034836：INTC 200 口 50.00～250.00、UBER 25.00～50.00。CDP 離線 2 秒內回報、error_log 以 CDP_OFFLINE_MESSAGE 開頭、不走 bs_model。rspec 1482 examples 0 failures。差異：`hof_sync_runs.kind`（index／pdf_parse／options，保護 P2 validators）；Barchart 無成交日（lastPrice=0 或 volume 0／null）不採用；`[期權] ` 原因前綴；bs_model 參數在 `config/hall_of_fame_option_patterns.yml`；重新解析時先刪 option_details（r1 問題 1）；UI「模型估算」驗收延到 P5。 | 2026-10-17 |
 | P4 | 每日排程（pm2） | 完成 | r1 PASS（質詢 1：cron 證據補齊前不得標完成）；r2 PASS（verdict-hall-of-fame-P4-r2.md，cron 證據補齊；質詢 1：同日提早觸發 1～4 輪是否加防護，待使用者裁示） | pm2 app `hall-of-fame-sync`（cron `30 0 * * *` UTC = 台北 08:30，autorestart false），ecosystem diff 只含此 app；`pm2 start` 首跑 run#6–8、`pm2 restart` 觸發 run#9–11（finished_at 皆非 NULL）；模擬新 filing：刪 20026770（先備份）＋清 run#6 validators 後重新出現、parsed、交易列與備份一致；`pm2 save` 後 dump 含此 app。rspec 1488 examples 0 failures。差異（使用者裁示）：sync_house 加跑 analyze_options、P3 解析寫 kind=pdf_parse 紀錄、各步隔離錯誤＋結束碼 1。**待補**：一組 started_at 落在台北 08:30 前後、由 cron 觸發的 index／pdf_parse／options run（附 id、started_at、finished_at、當時 `uptime -s`）；2026-10-18 08:30 電腦關機未觸發。**補驗（2026-11-11）**：run #51 index 08:30:03→08:30:05、#52 pdf_parse 08:30:05→08:30:08、#53 options 08:30:08→08:30:08（2026-11-10 台北）；pm2.log `2026-11-10T00:30:00` Deregistering／Registering／starting 序列，當天只啟動一次；開機 2026-11-08 20:37:50（journal boot -1，觸發時已開機約 36 小時，非 resurrect）。附帶：11/07 #33–35、11/08 #45–47 亦於 08:30 觸發，但兩天各另有 3 次提早觸發（#24–32、#36–44），11/09 延後至 08:45:20（#48–50）。備份檔 `p4_deleted_filing_backup.json` 隨舊 session scratchpad 清除，無法取得（r1 質詢 2）。 | 2026-10-18；補驗 2026-11-11 |
+| P4.1-0 | 多跑 6 輪的寫入盤點與重複判定（唯讀） | 未開始 | | | |
+| P4.1-1 | 重複資料清理（僅 P4.1-0 查出重複時才做） | 未開始 | | | |
+| P4.1-2 | 提早觸發防護＋測試 | 未開始 | | | |
+| P4.1-3 | 上線後 cron 實證＋house.gov 請求次數對照 | 未開始 | | | |
 | P5 | 第一期 UI（國會分頁） | 完成 | r2 PASS | 頁面 `/hall_of_fame`（Phlex 掛載點＋React `HallOfFameApp`），API `api/v1/hall_of_fame/officials`（index／show）；sidebar 最末位入口。正式站（Playwright 9224）從 sidebar 點入：6 張人物卡；Pelosi 持股 68 列（Undetermined 1 列照原字串顯示、不列入佔比；None 7 列顯示 None）、圓餅 11 片、交易 29 列（BE 期權「申報 100 口｜$50.00～$100.00｜申報」）；Gottheimer 模型估算列「約 29～57 口｜$87.54｜模型估算」，hover 顯示 calc_note。佔比 service spec 手算一致（含 max=NULL），估算佔比加總 100 ± 0.1。rspec 1503 examples 0 failures；vitest 7 passed；tsc／eslint／rubocop 無錯。差異（使用者裁示）：只排除問題列；§1-0 例外更新 price_in_spec 一行與 leaps_page_html 一個 strip；持股 PDF 連結放表頭。截圖 `tmp/hall_of_fame/p5/`。 | 2026-10-18 |
 | P6 | 第一期 E2E 驗收 | 完成 | r1 PASS | 正式站 Playwright 9224（2026-10-18 22:47）：首頁 → app switcher 最末列點入，URL `http://localhost:3003/hall_of_fame`（無參數，referrer 首頁）；點 Pelosi 持股 68 列、交易 29 列；交易表第 1 列 `2026-09-08｜REOF XXX, LLC [AB]｜—｜配偶｜買｜$500,001 - $1,000,000｜2026-09-08` 與 P3 快照 20035553 及 PDF 原文逐欄一致；「原始 PDF」新分頁 200、application/pdf（Filing ID #20035553）。截圖 `tmp/hall_of_fame/p6/01_sidebar_entry.png`、`02_page_from_sidebar.png`、`03_pelosi_first_trade.png`、`04_original_pdf.png`。注意：P4 cron 證據補齊前，第一期不宣告完成（P6 質詢 1）。 | 2026-10-18 |
 | Q1 | OGE 索引探勘＋同步 | 完成 | r2 PASS | `hall_of_fame:sync_oge_index`（`HallOfFame::OgeIndexSync`）：Index view 條件式請求當關卡（帶 validators 回 304），有變動才用 OGE REST API `Presiden.nsf/API.xsp/v3/rest` 依姓查詢。正式庫 run#12 新增 39（trump 278e 3／278t 20、vance 2／0、bessent 2／2、lutnick 1／2、burgum 1／6），警示 1（Lutnick Annual 2026 需書面申請）；run#13 新增 0（304）。3 個樣本 UNID 皆在；5 位皆 ≥1 筆 oge_278e（裁示 2：Nominee 278 計入）；隨機 3 筆 PDF HEAD 200 application/pdf。有人查詢失敗時保留舊 validators，下次必重查（r1 問題 1）。spec 8 examples；完整 rspec 1511／1 failure（technical_dashboards_spec:24 台北日界既有時段性失敗，TZ=UTC 9 passed）。差異：filing_type 依 API 類型欄判定（非檔名）；尚未接入每日排程（Q4）。 | 2026-10-19 |
@@ -230,6 +234,7 @@ Rake：`hall_of_fame:seed_officials` 由 yml 同步 `hof_officials`（冪等）�
 做：
 1. pm2 `ecosystem.config.cjs` 新增 app `hall-of-fame-sync`（`autorestart: false`），每日 **08:30 Asia/Taipei（= 00:30 UTC）** 執行 `hall_of_fame:sync_house`（= P2 索引同步 → P3 解析 pending）。**pm2 daemon 跑在 UTC**（P0-4b），故 `cron_restart: "30 0 * * *"`，並在 ecosystem 該列與 wrapper 開頭註解寫明「UTC，= 台北 08:30」（照 `bin/iv-daily-snapshot.sh` 的註解寫法）。失敗寫 `hof_sync_runs.error_log`，不得中斷其他排程。
    - 開機時若被 `pm2 resurrect` 立即執行一次：本 app 為冪等（條件式請求回 304 即結束），允許，不加防護。
+     **（2026-11-11 由 P4.1 取代：改為沿用 `LeapsIvCronGuard`，提早觸發一律略過，含開機 resurrect；見 P4.1。）**
 2. wrapper script `bin/hall-of-fame-sync.sh`：照 `bin/iv-daily-snapshot.sh` 的寫法，以 `set -a; source .env; set +a` 讀 `.env`，不得依賴 pm2 環境快照（避免舊環境變數覆蓋 `.env`）。
 3. `pm2 save`。
 4. 不得變動 ecosystem 內其他 app（§1-0）。
@@ -244,6 +249,93 @@ Rake：`hall_of_fame:seed_officials` 由 yml 同步 `hof_officials`（冪等）�
 - [ ] 隔日檢查：`hof_sync_runs` 有一筆 started_at 落在台北 08:30 前後數分鐘內（由 cron 觸發，非手動）。
 - [ ] `pm2 restart hall-of-fame-sync` 手動觸發一次（不是直接跑 rake），`hof_sync_runs` 新增一筆、finished_at 非 NULL；`pm2 save` 後 `pm2 resurrect` 清單中仍有此 app。
 - [ ] 模擬新 filing：刪除一筆 `hof_filings`（記下 doc_id）後觸發，該 doc_id 重新出現且 parse_status=parsed。
+
+## P4.1 排程提早觸發防護（2026-11-11 使用者裁示，PR #20 合併後開工）
+
+背景（P4 r2 審查質詢 1）：pm2 6.0.14 內建 croner 會在排定時間前提早觸發（根因同 leaps-iv-environment P7：setTimeout 到期就執行、不檢查牆上時鐘，WSL2 牆上時鐘比 monotonic 慢）。`hall-of-fame-sync` 沒有防護，11/07、11/08 各多跑 3 輪（run #24–32、#36–44），每輪都會請求 house.gov；11/09 則延後到 08:45:20 才觸發（#48–50）。
+
+使用者裁示：
+- 選擇「加防護」，不只是「確認重跑是冪等的」。理由：就算重跑冪等，每天仍會多打 house.gov 好幾次；抓政府網站要節制，被擋 IP 的話整個名人堂同步會停擺。
+- 防護**直接沿用** leaps-iv-environment P7.1 的 `LeapsIvCronGuard`，不重新設計（11/11 已用實際 cron 紀錄證明有效）。
+- **先查清楚重複資料，再改程式。**
+
+順序：P4.1-0 → （有重複才做）P4.1-1 → P4.1-2 → P4.1-3。各步驟單獨送審。
+
+### P4.1-0 多跑 6 輪的寫入盤點與重複判定（唯讀，不改資料、不改程式）
+
+對象：11/07、11/08 多跑的 6 輪，每輪各有 index／pdf_parse／options 三筆 run（#24–26、#27–29、#30–32、#36–38、#39–41、#42–44）。對照組：當天正點那輪（#33–35、#45–47）。
+
+1. **逐輪寫入筆數**：以每筆 run 的 `[started_at, finished_at]`（finished_at 為 NULL 時取下一筆 run 的 started_at）為時間窗，計算該窗內：
+   - `hof_filings` 新增筆數（created_at 落在窗內）與 run 的 `new_filings_count` 對照；
+   - `hof_filings` 被解析的筆數（parsed_at 落在窗內）與 pdf_parse run `error_log` 第一行「本次處理：…」對照；
+   - `hof_transactions`、`hof_holdings` 新增筆數（created_at 落在窗內）；
+   - `hof_option_details` 新增／更新筆數（created_at／updated_at 落在窗內）。
+   結果做成一張表：run id × 各表筆數。
+2. **重複判定欄位**：
+   - `hof_filings`：`(source, doc_id)` 有唯一索引，不可能重複；仍以 `GROUP BY source, doc_id HAVING count(*) > 1` 查一次，附結果（預期 0 列）。
+   - `hof_option_details`：`transaction_id` 有唯一索引，同上，附 `GROUP BY transaction_id HAVING count(*) > 1` 結果。
+   - `hof_transactions`：沒有唯一索引。以 `filing_id` 加 P3 寫入欄位（`owner, asset_name, ticker, asset_type_code, tx_type, tx_date, notified_date, amount_label, amount_min, amount_max, description`）分組，`count(*) > 1` 的群組列出來。**判定為重複**：同一群組內有不同的 `created_at`（代表不是同一次寫入）。同一次 `insert_all` 寫入的完全相同列（同一份 PDF 本來就有兩列一樣的交易），created_at 相同，不算重複。
+   - `hof_holdings`：同上，分組欄位為 `filing_id, owner, asset_name, ticker, asset_type, value_label, value_min, value_max`。
+   - `hof_sync_runs`：多出來的 run 紀錄本身不是資料重複，是實際執行過的歷史，P4 r2 的證據也引用它們，**不刪**。
+3. 證據：每一條 SQL 原文＋查詢結果原文，附在 request 與狀態表證據欄。SELECT 附 `EXPLAIN ANALYZE`（撰寫端審查協定）。
+4. 結論只有兩種：「無重複 → 跳過 P4.1-1，直接 P4.1-2」或「有重複 → 列出筆數，進 P4.1-1」。
+5. **正點那輪是否也會重寫**：用同樣的時間窗方法，查對照組（#33–35、#45–47）與 11/09 #48–50 寫入的 `hof_transactions`／`hof_holdings`，其 `filing_id` 是否屬於「在該 run 之前就已 parsed」的 filing。
+   - 若有：代表正常每日執行也會重新寫入已解析文件，這是比提早觸發更大的問題。**本單位不修**，在 request 單獨列一節「另案回報」：受影響 filing 數、列數、寫入路徑（是先刪再寫，還是直接追加），由使用者另開規格。
+   - 若重新解析採「先刪再寫」（不會產生重複、只會改 created_at），照實寫明；第 2 點的重複判定仍以「同一 filing、不同 created_at 同時存在」為準，不受影響。
+
+### P4.1-1 重複資料清理（只在 P4.1-0 查出重複時才做）
+
+1. 先把要刪除的列表交給使用者：每個表的筆數、id 清單、所屬 filing。**取得使用者確認後**才進行下一步。
+2. 刪除前備份：被刪的列匯出成 JSON，放 `~/fairprice-review/evidence/hall-of-fame-P4.1/`（不得放 scratchpad，P4 r1 質詢 2 的教訓）。
+3. 刪除在單一 transaction 內執行；`hof_transactions` 被刪的列，若有對應 `hof_option_details` 一併處理，不得留下孤兒。
+4. 刪除後重跑 P4.1-0 第 2 點的重複判定 SQL，結果必須為 0 列；各表總筆數＝刪除前總數－刪除筆數。
+5. 附 DELETE 的 `EXPLAIN`（不加 ANALYZE）。
+
+### P4.1-2 提早觸發防護＋測試
+
+行為清單（與 `LeapsIvCronGuard`／`LeapsIvSnapshotRunner#early_fire?` 相同；`LeapsIvCronGuard` 本身不修改、不改名）：
+
+1. **判斷來源**：只看 pm2 傳給子程序的環境變數 `cron_restart`（本 app 為 `30 0 * * *`，UTC）。
+2. **沒有 `cron_restart`**（手動執行 `bin/hall-of-fame-sync.sh` 或直接跑 rake）：一律照常執行。
+3. **判定提早觸發**：`LeapsIvCronGuard.new(cron).early?(now)`，即「現在離下一次排定時間，比離上一次排定時間還近」。不設固定門檻。
+   - 例：11/07 的 00:27:40、00:29:53 UTC（下一次 00:30 只差幾分鐘，上一次是前一天 00:30）→ 提早，略過。
+   - 正點 00:30:00 那一秒算「上一次」→ 不是提早，執行。
+4. **延後觸發照常執行**：只要沒有晚過兩次排定時間的中點（本 app 為台北 20:30），一律執行。例：11/09 的 00:45:20 UTC → 執行。
+5. **開機 resurrect**：同一套規則。台北 20:30～08:30 之間開機（離下一次 08:30 較近）→ 略過，等 08:30 正點；08:30～20:30 之間開機 → 執行一次（當天 08:30 若關機錯過，等於補跑）。
+   已知取捨（使用者接受）：當天 08:30 關機錯過、又在 20:30 之後才開機，當天不補跑，等隔天 08:30。README 一併寫明。
+6. **略過時**：
+   - 不呼叫 `HallOfFame::HouseDailySync`，不寫 `hof_sync_runs`，不發出任何 house.gov 請求。
+   - 印一行到 stdout（pm2 out log）並寫 `Rails.logger.info`，格式與 P7.1 相同、前綴換成本 task：
+     `[hall_of_fame:sync_house] pm2 cron 提早觸發，略過：現在 <ISO8601 UTC>，下一次排定 <ISO8601 UTC>（cron 30 0 * * *，UTC）`
+   - 結束碼 0（不是失敗）。
+7. **`cron_restart` 格式無法判斷**（`LeapsIvCronGuard::Unsupported`）：`Rails.logger.warn` 一行原因後**照常執行**，寧可多跑也不讓排程整個停掉。
+8. **注意**：和 P7.1 一樣，在台北 20:30～08:30 之間手動 `pm2 restart hall-of-fame-sync` 也會被略過；要強制跑一輪，直接執行 `bin/hall-of-fame-sync.sh`。這點寫進 README。
+9. 放置位置：`lib/tasks/hall_of_fame.rake` 的 `sync_house` task 開頭（與 `leaps_iv:snapshot` 相同的位置）；判斷邏輯放在可單獨測試的方法裡，不寫在 rake block 內。
+
+測試（三種情況都要有，另加兩個邊界）：
+- [ ] **提早觸發被略過**：`cron_restart="30 0 * * *"`、`now=2026-11-07 00:27:40 UTC` → `HouseDailySync` 沒被呼叫、`hof_sync_runs` 筆數不變、stdout 含上面那行略過訊息。**這一案要先在舊程式下執行，確認失敗（紅燈），輸出附 request。**
+- [ ] **正點執行**：`now=2026-11-08 00:30:00 UTC` → `HouseDailySync` 被呼叫一次。
+- [ ] **延後執行**：`now=2026-11-09 00:45:20 UTC` → `HouseDailySync` 被呼叫一次。
+- [ ] 邊界：沒有 `cron_restart` → 執行；`cron_restart` 為不支援的寫法（例如 `*/5 * * * *`）→ 記 warn、執行。
+- [ ] 完整 `bundle exec rspec` 通過；`bin/rubocop` 無違規。
+
+上線：本 app 每次都由 pm2 以新的程序啟動 rake，程式改完不需要重啟 `fairprice-rails`，也**不得**為了上線而 `pm2 restart hall-of-fame-sync`（會立刻觸發一輪）。
+
+### P4.1-3 上線後 cron 實證＋house.gov 請求次數對照
+
+條件與 leaps-iv-environment P7.1 相同，用實際 cron 紀錄證明：
+- [ ] **pm2.log 觸發序列**：至少一天的完整序列。cron 觸發是 `Deregistering`＋`Registering a cron job on: 20` 成對，開機 resurrect 只有 `Registering`。
+- [ ] **略過的那一行**：pm2 out log 或 Rails log 中的 `[hall_of_fame:sync_house] pm2 cron 提早觸發，略過：…`，時間與 pm2.log 的那次啟動對得上。
+- [ ] **只有正點那一輪寫入資料**：同一天 `hof_sync_runs` 只有一組 index／pdf_parse／options，started_at 在台北 08:30 前後；被略過的那次時間窗內，`hof_sync_runs`、`hof_filings` 等都沒有新寫入。
+- [ ] 若觀察期間剛好沒有任何提早觸發（例如 11/10 那種正點才觸發的日子），照實回報，由使用者裁示是否延長觀察；不得用手動 `pm2 restart` 製造提早觸發來充數，除非使用者同意。
+- [ ] **house.gov 每日請求次數，修改前後對照**（使用者要求）：
+  - 修改前：11/07～11/10 每天一列；修改後：上線後觀察期間每天一列。
+  - 算法：
+    - 索引請求＝當天 index run 筆數 × 2（每輪請求當年與前一年各一次，條件式請求，304 也算一次請求）。這部分是確切數字。
+    - PDF 下載＝當天各 pdf_parse run「本次處理」筆數加總。這是**上限**，不是確切數字：PDF 已存在本機就不會重新下載，而目前沒有逐次請求紀錄可以區分。
+  - 表格欄位：日期、index run 數、索引請求數、PDF 下載上限、合計、當天提早／延後觸發次數。
+  - **使用者裁示（2026-11-12）：不加逐次請求紀錄。** 防護成效以「每日 index run 數」（確切值）證明；PDF 下載維持上限算法，修改前後口徑一致。若日後需要確切值，另開單位。
+- [ ] 觀察期間同時記錄每天實際觸發時間，延後超過 5 分鐘的，併入 2026-11-11 工作日誌的待辦（「觀察 3–5 天 pm2 cron 觸發時間」）一起處理。
 
 ## P5 第一期 UI（國會分頁）
 
