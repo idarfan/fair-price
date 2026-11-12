@@ -114,13 +114,13 @@ module.exports = {
       watch: false,
     },
 
-    // ── 投資名人堂每日同步（cron 30 0 * * * 為 UTC，= 台北 08:30）
+    // ── 投資名人堂每日同步（cron 30 5 * * * 為 UTC，= 台北 13:30；P4.1 由 08:30 改，使用者開機時段約 12:00～23:00）
     {
       name: 'hall-of-fame-sync',
       script: './bin/hall-of-fame-sync.sh',
       cwd: '/home/idarfan/fairprice',
       interpreter: '/bin/bash',
-      cron_restart: '30 0 * * *',
+      cron_restart: '30 5 * * *',
       autorestart: false,
       watch: false,
     },

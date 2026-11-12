@@ -1,6 +1,6 @@
 #!/bin/bash
 # 投資名人堂每日同步（House 索引 → 解析 pending PDF → 期權分析）
-# pm2 cron: 30 0 * * *（UTC，= 台北 08:30；pm2 daemon 必須以 TZ=UTC 啟動）
+# pm2 cron: 30 5 * * *（UTC，= 台北 13:30；pm2 daemon 必須以 TZ=UTC 啟動）
 
 set -e
 

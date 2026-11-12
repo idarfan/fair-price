@@ -27,9 +27,10 @@ RSpec.describe "hall_of_fame:sync_house", type: :task do
   end
 
   # hall-of-fame-spec.md P4.1-2：沿用 LeapsIvCronGuard 的提早觸發防護。
-  # 時間皆取自實際發生過的 pm2 觸發（P4 r2／P4.1-0）：11/07 00:27:40 提早、11/08 00:30:00 正點、11/09 00:45:20 延後。
+  # 排程為台北 13:30（cron 30 5 * * *，UTC；patch2）。時刻取自實際發生過的 pm2 觸發分秒，平移到新排程：
+  # 11/07 提早 2 分 20 秒 → 05:27:40、11/08 正點 → 05:30:00、11/09 延後 15 分 20 秒 → 05:45:20。
   describe "pm2 cron 提早觸發防護（P4.1-2）" do
-    let(:cron) { "30 0 * * *" }
+    let(:cron) { "30 5 * * *" }
     let(:ok)   { HallOfFame::HouseDailySync::Result.new(runs: {}, failures: []) }
 
     around do |example|
@@ -42,34 +43,46 @@ RSpec.describe "hall_of_fame:sync_house", type: :task do
 
     before { allow(service).to receive(:call).and_return(ok) }
 
-    it "提早觸發（11/07 00:27:40 UTC）：略過，不呼叫 HouseDailySync、不寫 hof_sync_runs，印略過訊息" do
+    it "提早觸發（05:27:40 UTC）：略過，不呼叫 HouseDailySync、不寫 hof_sync_runs，印略過訊息" do
       runs_before = HallOfFame::SyncRun.count
-      travel_to(Time.utc(2026, 11, 7, 0, 27, 40)) do
+      travel_to(Time.utc(2026, 11, 7, 5, 27, 40)) do
         expect { task.invoke }
-          .to output(include("[hall_of_fame:sync_house] pm2 cron 提早觸發，略過：現在 2026-11-07T00:27:40Z，" \
-                             "下一次排定 2026-11-07T00:30:00Z（cron 30 0 * * *，UTC）")).to_stdout
+          .to output(include("[hall_of_fame:sync_house] pm2 cron 提早觸發，略過：現在 2026-11-07T05:27:40Z，" \
+                             "下一次排定 2026-11-07T05:30:00Z（cron 30 5 * * *，UTC）")).to_stdout
       end
       expect(HallOfFame::HouseDailySync).not_to have_received(:new)
       expect(HallOfFame::SyncRun.count).to eq(runs_before)
     end
 
-    it "正點（11/08 00:30:00 UTC）：執行一次" do
-      travel_to(Time.utc(2026, 11, 8, 0, 30, 0)) { task.invoke }
+    it "正點（05:30:00 UTC）：執行一次" do
+      travel_to(Time.utc(2026, 11, 8, 5, 30, 0)) { task.invoke }
 
       expect(service).to have_received(:call).once
     end
 
-    it "延後（11/09 00:45:20 UTC）：照常執行一次" do
-      travel_to(Time.utc(2026, 11, 9, 0, 45, 20)) { task.invoke }
+    it "延後（05:45:20 UTC）：照常執行一次" do
+      travel_to(Time.utc(2026, 11, 9, 5, 45, 20)) { task.invoke }
 
       expect(service).to have_received(:call).once
+    end
+
+    context "舊排程字串 30 0 * * *（回歸：guard 依 cron 字串判斷，沒有把時間寫死）" do
+      let(:cron) { "30 0 * * *" }
+
+      it "11/07 00:27:40 UTC 仍判定為提早觸發並略過" do
+        travel_to(Time.utc(2026, 11, 7, 0, 27, 40)) do
+          expect { task.invoke }
+            .to output(include("下一次排定 2026-11-07T00:30:00Z（cron 30 0 * * *，UTC）")).to_stdout
+        end
+        expect(HallOfFame::HouseDailySync).not_to have_received(:new)
+      end
     end
 
     context "沒有 cron_restart（手動執行 bin/hall-of-fame-sync.sh）" do
       let(:cron) { nil }
 
       it "一律執行，即使時間落在提早區間" do
-        travel_to(Time.utc(2026, 11, 7, 0, 27, 40)) { task.invoke }
+        travel_to(Time.utc(2026, 11, 7, 5, 27, 40)) { task.invoke }
 
         expect(service).to have_received(:call).once
       end
@@ -80,11 +93,19 @@ RSpec.describe "hall_of_fame:sync_house", type: :task do
 
       it "記 warn 後照常執行" do
         allow(Rails.logger).to receive(:warn)
-        travel_to(Time.utc(2026, 11, 7, 0, 27, 40)) { task.invoke }
+        travel_to(Time.utc(2026, 11, 7, 5, 27, 40)) { task.invoke }
 
         expect(Rails.logger).to have_received(:warn).with(/無法判斷提早觸發，照常執行/)
         expect(service).to have_received(:call).once
       end
+    end
+
+    it "ecosystem.config.cjs 的 hall-of-fame-sync 排程為 30 5 * * *（UTC＝台北 13:30）" do
+      ecosystem = Rails.root.join("ecosystem.config.cjs").read
+      block = ecosystem[/name:\s*'hall-of-fame-sync'.*?\}/m]
+
+      expect(block).to be_present
+      expect(block[/cron_restart:\s*'([^']+)'/, 1]).to eq("30 5 * * *")
     end
   end
 end
